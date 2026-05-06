@@ -1,12 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error("ANTHROPIC_API_KEY is not set in environment variables.");
-}
+// Lazily instantiated so the app boots without crashing when key isn't set.
+// The key is validated on first actual call.
+let _client: Anthropic | null = null;
 
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+function getClient(): Anthropic {
+  if (!_client) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error(
+        "ANTHROPIC_API_KEY is not set. Add it to .env.local and restart the server."
+      );
+    }
+    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _client;
+}
 
 export const MODELS = {
   // Default for generation tasks
@@ -20,7 +28,6 @@ export type CallAIParams = {
   user: string;
   model?: (typeof MODELS)[keyof typeof MODELS];
   maxTokens?: number;
-  stream?: boolean;
 };
 
 export type CallAIResult = {
@@ -39,8 +46,8 @@ export async function callAI({
   user,
   model = MODELS.sonnet,
   maxTokens = 4096,
-}: Omit<CallAIParams, "stream">): Promise<CallAIResult> {
-  const response = await anthropic.messages.create({
+}: CallAIParams): Promise<CallAIResult> {
+  const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
     system,
@@ -71,8 +78,8 @@ export async function* callAIStream({
   user,
   model = MODELS.sonnet,
   maxTokens = 8192,
-}: Omit<CallAIParams, "stream">): AsyncGenerator<string> {
-  const stream = anthropic.messages.stream({
+}: CallAIParams): AsyncGenerator<string> {
+  const stream = getClient().messages.stream({
     model,
     max_tokens: maxTokens,
     system,
