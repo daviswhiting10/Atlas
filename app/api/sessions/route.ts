@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
 
 const CreateSchema = z.object({
@@ -10,21 +11,38 @@ const CreateSchema = z.object({
   date: z.string(),
 });
 
-export async function POST(req: Request) {
+export const POST = withWorkspace(async (req, { workspaceId }) => {
   const body = await req.json();
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+
   const { clientId, rawInput, structuredNote, rpeAvg, date } = parsed.data;
-  const note = await prisma.sessionNote.create({
-    data: {
-      clientId,
-      rawInput,
-      structuredNote: JSON.stringify(structuredNote),
-      rpeAvg: rpeAvg ?? null,
-      date: new Date(date),
-    },
+
+  // Verify clientId belongs to this workspace
+  const client = await prisma.clientProfile.findFirst({
+    where: { id: clientId, workspaceId, deletedAt: null },
+    select: { id: true },
   });
+  if (!client) {
+    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  const [note] = await Promise.all([
+    prisma.sessionNote.create({
+      data: {
+        clientId,
+        rawInput,
+        structuredNote,
+        rpeAvg: rpeAvg ?? null,
+        date: new Date(date),
+      },
+    }),
+    prisma.clientProfile.updateMany({
+      where: { id: clientId, workspaceId },
+      data: { lastContactAt: new Date() },
+    }),
+  ]);
   return NextResponse.json(note, { status: 201 });
-}
+});

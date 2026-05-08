@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronRight, ChevronLeft, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, CheckCircle, AlertTriangle, Loader2, Upload } from "lucide-react";
 
 type Client = { id: string; fullName: string };
 
@@ -105,6 +105,8 @@ export default function IntakePage() {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState(preselectedClientId);
+  const [mode, setMode] = useState<"form" | "pdf">("form");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -123,11 +125,20 @@ export default function IntakePage() {
     if (!clientId) { toast.error("Select a client"); return; }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/ai/intake-extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, formData: form }),
-      });
+      let res: Response;
+      if (mode === "pdf") {
+        if (!pdfFile) { toast.error("Select a PDF file"); setSubmitting(false); return; }
+        const fd = new FormData();
+        fd.append("clientId", clientId);
+        fd.append("file", pdfFile);
+        res = await fetch("/api/ai/intake-pdf", { method: "POST", body: fd });
+      } else {
+        res = await fetch("/api/ai/intake-extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId, formData: form }),
+        });
+      }
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setResult({ aiSummary: data.aiSummary, redFlags: data.redFlags ?? [] });
@@ -198,11 +209,28 @@ export default function IntakePage() {
 
   return (
     <div className="p-8 max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">New Intake</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Client fills this out on your laptop/iPad. AI processes it on submission.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">New Intake</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {mode === "form" ? "Client fills this out on your laptop/iPad." : "Upload an existing intake PDF to extract."}
+          </p>
+        </div>
+        <div className="flex gap-1 bg-muted rounded-lg p-1">
+          <button
+            onClick={() => setMode("form")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "form" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Form
+          </button>
+          <button
+            onClick={() => setMode("pdf")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${mode === "pdf" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Upload className="w-3.5 h-3.5" />
+            PDF
+          </button>
+        </div>
       </div>
 
       {/* Client selector */}
@@ -220,8 +248,26 @@ export default function IntakePage() {
         </Select>
       </div>
 
-      {/* Progress */}
-      <div className="flex gap-1 mb-6">
+      {/* PDF upload mode */}
+      {mode === "pdf" && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <Label className="mb-2 block">Upload Intake PDF</Label>
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+            />
+            {pdfFile && (
+              <p className="text-xs text-muted-foreground mt-2">{pdfFile.name} ({(pdfFile.size / 1024).toFixed(0)} KB)</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Progress (form mode only) */}
+      {mode === "form" && <div className="flex gap-1 mb-6">
         {STEPS.map((s, i) => (
           <div key={s} className="flex-1">
             <div className={`h-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`} />
@@ -230,10 +276,10 @@ export default function IntakePage() {
             </p>
           </div>
         ))}
-      </div>
+      </div>}
 
-      {/* Step content */}
-      <Card className="mb-6">
+      {/* Step content (form mode only) */}
+      {mode === "form" && <Card className="mb-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">Step {step + 1}: {STEPS[step]}</CardTitle>
         </CardHeader>
@@ -414,25 +460,27 @@ export default function IntakePage() {
             </>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Nav buttons */}
       <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={() => setStep((s) => s - 1)}
-          disabled={step === 0}
-        >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Back
-        </Button>
-        {step < STEPS.length - 1 ? (
+        {mode === "form" ? (
+          <Button
+            variant="outline"
+            onClick={() => setStep((s) => s - 1)}
+            disabled={step === 0}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back
+          </Button>
+        ) : <div />}
+        {mode === "form" && step < STEPS.length - 1 ? (
           <Button onClick={() => setStep((s) => s + 1)}>
             Next
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         ) : (
-          <Button onClick={submit} disabled={submitting || !clientId}>
+          <Button onClick={submit} disabled={submitting || !clientId || (mode === "pdf" && !pdfFile)}>
             {submitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />

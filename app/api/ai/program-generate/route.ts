@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withWorkspace } from "@/lib/api/middleware";
 import { callAI, MODELS } from "@/lib/ai/client";
 import { buildProgramPrompt } from "@/lib/ai/prompts/program";
 import { getClient } from "@/lib/db/clients";
 import { getTrainer } from "@/lib/db/trainer";
-import { prisma } from "@/lib/db/client";
+import { loadMethodology } from "@/lib/ai/methodology-loader";
 
 const Schema = z.object({
   clientId: z.string(),
@@ -16,24 +17,32 @@ const Schema = z.object({
   notes: z.string().optional(),
 });
 
-export async function POST(req: Request) {
+export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
   const body = await req.json();
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const [client, trainer] = await Promise.all([
-    getClient(parsed.data.clientId),
-    getTrainer(),
+  const [client, trainer, methodology] = await Promise.all([
+    getClient(parsed.data.clientId, workspaceId),
+    getTrainer(workspaceId),
+    loadMethodology(workspaceId, "program"),
   ]);
 
   if (!client) {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
 
-  // Get AI summary from most recent intake if available
   const intakeSummary = client.intakeForms?.[0]?.aiSummary ?? null;
+
+  const voiceProfile = trainer?.voiceProfile;
+  const trainerVoice =
+    typeof voiceProfile === "string"
+      ? voiceProfile
+      : voiceProfile
+        ? JSON.stringify(voiceProfile)
+        : null;
 
   const { system, user } = buildProgramPrompt({
     clientName: client.fullName,
@@ -44,19 +53,22 @@ export async function POST(req: Request) {
     sessionLength: parsed.data.sessionLength,
     equipment: parsed.data.equipment,
     notes: parsed.data.notes,
-    trainerVoice: trainer?.voiceProfile ?? null,
+    trainerVoice,
+    methodology,
   });
 
-  // Programs are long — use Sonnet with higher token limit
   const result = await callAI({
     system,
     user,
     model: MODELS.sonnet,
     maxTokens: 4096,
+    feature: "program-generate",
+    workspaceId,
+    userId,
   });
 
   return NextResponse.json({
     program: result.content,
     tokens: { in: result.inputTokens, out: result.outputTokens },
   });
-}
+});

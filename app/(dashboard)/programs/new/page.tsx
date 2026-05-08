@@ -83,7 +83,7 @@ export default function NewProgramPage() {
         name: `${client?.fullName ?? "Client"} — ${goal.replace("_", " ")} program`,
         goal,
         durationWeeks: parseInt(durationWeeks),
-        structure: generatedProgram,
+        markdownBlob: generatedProgram,
         notes,
       }),
     });

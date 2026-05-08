@@ -42,7 +42,7 @@ type Client = {
   createdAt: string;
   programs: Array<{ id: string; name: string; goal: string; status: string; createdAt: string }>;
   sessionNotes: Array<{ id: string; date: string; rawInput: string; rpeAvg: number | null }>;
-  intakeForms: Array<{ id: string; aiSummary: string | null; createdAt: string; redFlags: string | null }>;
+  intakeForms: Array<{ id: string; aiSummary: string | null; createdAt: string; redFlags: unknown }>;
   outreachLog: Array<{ id: string; purpose: string; channel: string; createdAt: string; sentAt: string | null }>;
 };
 
@@ -108,9 +108,7 @@ export default function ClientDetailPage() {
     );
   }
 
-  const redFlags = client.intakeForms[0]?.redFlags
-    ? JSON.parse(client.intakeForms[0].redFlags)
-    : null;
+  const redFlags = client.intakeForms[0]?.redFlags ?? null;
 
   return (
     <div className="p-8 max-w-4xl">

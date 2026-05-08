@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withWorkspace } from "@/lib/api/middleware";
 import { callAI, MODELS } from "@/lib/ai/client";
 import { buildIntakePrompt } from "@/lib/ai/prompts/intake";
 import { getClient } from "@/lib/db/clients";
+import { loadMethodology } from "@/lib/ai/methodology-loader";
 import { prisma } from "@/lib/db/client";
 
 const Schema = z.object({
@@ -10,14 +12,17 @@ const Schema = z.object({
   formData: z.record(z.string(), z.string()),
 });
 
-export async function POST(req: Request) {
+export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
   const body = await req.json();
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const client = await getClient(parsed.data.clientId);
+  const [client, methodology] = await Promise.all([
+    getClient(parsed.data.clientId, workspaceId),
+    loadMethodology(workspaceId, "intake"),
+  ]);
   if (!client) {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
@@ -25,9 +30,18 @@ export async function POST(req: Request) {
   const { system, user } = buildIntakePrompt({
     formData: parsed.data.formData,
     clientName: client.fullName,
+    methodology,
   });
 
-  const result = await callAI({ system, user, model: MODELS.sonnet, maxTokens: 1024 });
+  const result = await callAI({
+    system,
+    user,
+    model: MODELS.sonnet,
+    maxTokens: 1024,
+    feature: "intake-extract",
+    workspaceId,
+    userId,
+  });
 
   let extracted: {
     aiSummary: string;
@@ -45,21 +59,20 @@ export async function POST(req: Request) {
     );
   }
 
-  // Persist to IntakeForm
   const intakeForm = await prisma.intakeForm.create({
     data: {
       clientId: parsed.data.clientId,
-      rawFilePath: "web-form",
-      parsedData: JSON.stringify(extracted.parsedData),
+      sourceType: "web-form",
+      parsedData: extracted.parsedData,
       aiSummary: extracted.aiSummary,
-      redFlags: JSON.stringify(extracted.redFlags),
+      redFlags: extracted.redFlags,
     },
   });
 
   // Update client primaryGoal if extracted
   if (extracted.parsedData?.primaryGoal) {
-    await prisma.client.update({
-      where: { id: parsed.data.clientId },
+    await prisma.clientProfile.updateMany({
+      where: { id: parsed.data.clientId, workspaceId },
       data: { primaryGoal: extracted.parsedData.primaryGoal as string },
     });
   }
@@ -70,4 +83,4 @@ export async function POST(req: Request) {
     redFlags: extracted.redFlags,
     tokens: { in: result.inputTokens, out: result.outputTokens },
   });
-}
+});

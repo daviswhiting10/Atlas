@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { prisma } from "@/lib/db/client";
 
-// Lazily instantiated so the app boots without crashing when key isn't set.
-// The key is validated on first actual call.
 let _client: Anthropic | null = null;
 
 function getClient(): Anthropic {
@@ -17,9 +16,7 @@ function getClient(): Anthropic {
 }
 
 export const MODELS = {
-  // Default for generation tasks
   sonnet: "claude-sonnet-4-6",
-  // Cheap classification / scoring calls
   haiku: "claude-haiku-4-5-20251001",
 } as const;
 
@@ -28,6 +25,10 @@ export type CallAIParams = {
   user: string;
   model?: (typeof MODELS)[keyof typeof MODELS];
   maxTokens?: number;
+  // Usage tracking — provide both or neither
+  feature?: string;
+  workspaceId?: string;
+  userId?: string;
 };
 
 export type CallAIResult = {
@@ -35,18 +36,36 @@ export type CallAIResult = {
   inputTokens: number;
   outputTokens: number;
   model: string;
+  latencyMs: number;
 };
 
-/**
- * Core AI call wrapper — handles errors, logs token usage, no streaming.
- * For streaming use callAIStream instead.
- */
+function estimateCostCents(
+  model: string,
+  inputTokens: number,
+  outputTokens: number
+): number {
+  const pricing: Record<string, { in: number; out: number }> = {
+    "claude-haiku-4-5-20251001": { in: 0.8, out: 4.0 },
+    "claude-sonnet-4-6": { in: 3.0, out: 15.0 },
+    "claude-opus-4-6": { in: 15.0, out: 75.0 },
+  };
+  const p = pricing[model] ?? { in: 3.0, out: 15.0 };
+  return Math.round(
+    ((inputTokens * p.in + outputTokens * p.out) / 1_000_000) * 100
+  );
+}
+
 export async function callAI({
   system,
   user,
   model = MODELS.sonnet,
   maxTokens = 4096,
+  feature,
+  workspaceId,
+  userId,
 }: CallAIParams): Promise<CallAIResult> {
+  const start = Date.now();
+
   const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
@@ -56,23 +75,43 @@ export async function callAI({
 
   const content =
     response.content[0].type === "text" ? response.content[0].text : "";
+  const latencyMs = Date.now() - start;
 
-  // Cost visibility — log per call so we can see what features cost
   console.log(
-    `[AI] model=${model} in=${response.usage.input_tokens} out=${response.usage.output_tokens}`
+    `[AI] model=${model} in=${response.usage.input_tokens} out=${response.usage.output_tokens} latency=${latencyMs}ms`
   );
+
+  // Fire-and-forget — a DB hiccup must never fail an AI generation
+  if (workspaceId) {
+    prisma.usageLog
+      .create({
+        data: {
+          workspaceId,
+          feature: feature ?? "unknown",
+          model,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+          costCents: estimateCostCents(
+            model,
+            response.usage.input_tokens,
+            response.usage.output_tokens
+          ),
+          latencyMs,
+          userId: userId ?? null,
+        },
+      })
+      .catch((err: unknown) => console.error("[UsageLog] Write failed:", err));
+  }
 
   return {
     content,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
     model,
+    latencyMs,
   };
 }
 
-/**
- * Streaming variant — yields text chunks. Use for long generation (programs).
- */
 export async function* callAIStream({
   system,
   user,

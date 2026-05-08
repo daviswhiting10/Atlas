@@ -36,12 +36,12 @@ type Lead = {
 };
 
 const COLUMNS = [
-  { key: "new", label: "New" },
-  { key: "contacted", label: "Contacted" },
-  { key: "replied", label: "Replied" },
-  { key: "booked", label: "Booked" },
-  { key: "converted", label: "Converted" },
-  { key: "dead", label: "Dead" },
+  { key: "NEW", label: "New" },
+  { key: "CONTACTED", label: "Contacted" },
+  { key: "REPLIED", label: "Replied" },
+  { key: "BOOKED", label: "Booked" },
+  { key: "CONVERTED", label: "Converted" },
+  { key: "DEAD", label: "Dead" },
 ];
 
 const SOURCE_LABELS: Record<string, string> = {

@@ -1,20 +1,18 @@
 import { prisma } from "./client";
-import { ClientStatus } from "@/app/generated/prisma/client";
 
-export async function getClients() {
-  return prisma.client.findMany({
+export async function getClients(workspaceId: string) {
+  return prisma.clientProfile.findMany({
+    where: { workspaceId, deletedAt: null },
     orderBy: { updatedAt: "desc" },
     include: {
-      _count: {
-        select: { sessionNotes: true, programs: true },
-      },
+      _count: { select: { sessionNotes: true, programs: true } },
     },
   });
 }
 
-export async function getClient(id: string) {
-  return prisma.client.findUnique({
-    where: { id },
+export async function getClient(id: string, workspaceId: string) {
+  return prisma.clientProfile.findFirst({
+    where: { id, workspaceId, deletedAt: null },
     include: {
       intakeForms: { orderBy: { createdAt: "desc" } },
       assessments: { orderBy: { createdAt: "desc" } },
@@ -25,32 +23,69 @@ export async function getClient(id: string) {
   });
 }
 
-export async function createClient(data: {
-  fullName: string;
-  email?: string;
-  phone?: string;
-  primaryGoal?: string;
-  status?: ClientStatus;
-}) {
-  return prisma.client.create({ data });
+export async function createClient(
+  workspaceId: string,
+  data: {
+    fullName: string;
+    email?: string;
+    phone?: string;
+    primaryGoal?: string;
+    status?: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
+  }
+) {
+  return prisma.clientProfile.create({ data: { workspaceId, ...data } });
 }
 
 export async function updateClient(
   id: string,
+  workspaceId: string,
   data: Partial<{
     fullName: string;
     email: string;
     phone: string;
     primaryGoal: string;
-    status: ClientStatus;
+    status: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
     retentionScore: number;
     retentionFlag: string;
     lastContactAt: Date;
   }>
 ) {
-  return prisma.client.update({ where: { id }, data });
+  // updateMany to enforce workspaceId scoping on the write path too
+  return prisma.clientProfile.updateMany({
+    where: { id, workspaceId, deletedAt: null },
+    data,
+  });
 }
 
-export async function deleteClient(id: string) {
-  return prisma.client.delete({ where: { id } });
+export async function deleteClient(id: string, workspaceId: string) {
+  return prisma.clientProfile.updateMany({
+    where: { id, workspaceId },
+    data: { deletedAt: new Date() },
+  });
+}
+
+const AT_RISK_DAYS = 21;
+
+/**
+ * Heuristic run on inbox load: any ACTIVE client with no contact in AT_RISK_DAYS
+ * gets flipped to AT_RISK. Fire-and-forget safe to call on every page load.
+ */
+export async function runRetentionHeuristic(workspaceId: string): Promise<void> {
+  const cutoff = new Date(Date.now() - AT_RISK_DAYS * 24 * 60 * 60 * 1000);
+
+  await prisma.clientProfile.updateMany({
+    where: {
+      workspaceId,
+      deletedAt: null,
+      status: "ACTIVE",
+      OR: [
+        { lastContactAt: { lt: cutoff } },
+        { lastContactAt: null, createdAt: { lt: cutoff } },
+      ],
+    },
+    data: {
+      status: "AT_RISK",
+      retentionFlag: `No contact in ${AT_RISK_DAYS}+ days`,
+    },
+  });
 }

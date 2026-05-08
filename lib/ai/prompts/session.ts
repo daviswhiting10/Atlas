@@ -1,7 +1,5 @@
-import { loadMethodology } from "../methodology-loader";
-
-export function buildSessionPrompt(input: { rawInput: string; clientName: string }) {
-  const methodology = loadMethodology("session");
+export function buildSessionPrompt(input: { rawInput: string; clientName: string; methodology?: string }) {
+  const methodology = input.methodology ?? "";
 
   return {
     system: `You are Atlas, an AI assistant for a personal trainer named Davis Whiting.

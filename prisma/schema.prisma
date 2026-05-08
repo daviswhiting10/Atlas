@@ -4,35 +4,138 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Trainer {
-  id              String   @id @default(cuid())
-  name            String
-  email           String
-  voiceProfile    String?
-  methodologyHash String?
-  createdAt       DateTime @default(now())
+// ─────────────────────────────────────────────
+// WORKSPACE (tenant root)
+// ─────────────────────────────────────────────
+
+model Workspace {
+  id               String                @id @default(cuid())
+  name             String
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  users            User[]
+  clientProfiles   ClientProfile[]
+  leads            Lead[]
+  outreachMessages OutreachMessage[]
+  methodology      MethodologyDocument[]
+  observations     TrainerObservation[]
+  exercises        Exercise[]
+  conversations    Conversation[]
+  usageLogs        UsageLog[]
 }
 
-model Client {
-  id             String            @id @default(cuid())
-  fullName       String
-  email          String?
-  phone          String?
-  status         ClientStatus      @default(PROSPECT)
-  primaryGoal    String?
-  intakeForms    IntakeForm[]
-  assessments    Assessment[]
-  programs       Program[]
-  sessionNotes   SessionNote[]
-  outreachLog    OutreachMessage[]
-  retentionScore Int?
-  retentionFlag  String?
-  lastContactAt  DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+// ─────────────────────────────────────────────
+// AUTH (Auth.js v5 required models)
+// ─────────────────────────────────────────────
+
+model User {
+  id             String          @id @default(cuid())
+  name           String?
+  email          String          @unique
+  emailVerified  DateTime?
+  image          String?
+  role           Role            @default(TRAINER)
+  workspaceId    String?
+  workspace      Workspace?      @relation(fields: [workspaceId], references: [id])
+  accounts       Account[]
+  sessions       Session[]
+  trainerProfile TrainerProfile?
+  clientProfile  ClientProfile?  @relation("ClientUser")
+  sentMessages   Message[]
+  usageLogs      UsageLog[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+enum Role {
+  TRAINER
+  CLIENT
+  ADMIN
+}
+
+// ─────────────────────────────────────────────
+// PROFILES
+// ─────────────────────────────────────────────
+
+model TrainerProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  bio            String?  @db.Text
+  certifications Json?
+  voiceProfile   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ClientProfile {
+  id               String            @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id])
+  userId           String?           @unique // null until client onboards to the app
+  user             User?             @relation("ClientUser", fields: [userId], references: [id])
+  fullName         String
+  email            String?
+  phone            String?
+  dob              DateTime?
+  primaryGoal      String?
+  status           ClientStatus      @default(PROSPECT)
+  retentionScore   Int?
+  retentionFlag    String?
+  lastContactAt    DateTime?
+  deletedAt        DateTime?
+  intakeForms      IntakeForm[]
+  assessments      Assessment[]
+  programs         Program[]
+  sessionNotes     SessionNote[]
+  outreachLog      OutreachMessage[]
+  workoutLogs      WorkoutLog[]
+  nutritionEntries NutritionEntry[]
+  progressPhotos   ProgressPhoto[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 enum ClientStatus {
@@ -42,87 +145,329 @@ enum ClientStatus {
   CHURNED
 }
 
+// ─────────────────────────────────────────────
+// INTAKE & ASSESSMENT
+// ─────────────────────────────────────────────
+
 model IntakeForm {
-  id           String   @id @default(cuid())
-  clientId     String
-  client       Client   @relation(fields: [clientId], references: [id])
-  rawFilePath  String
-  parsedData   String   // JSON stored as text in SQLite
-  aiSummary    String?
-  redFlags     String?  // JSON array stored as text
-  createdAt    DateTime @default(now())
+  id         String        @id @default(cuid())
+  clientId   String
+  client     ClientProfile @relation(fields: [clientId], references: [id])
+  sourceType String        @default("web-form")
+  rawFileUrl String?
+  parsedData Json
+  aiSummary  String?       @db.Text
+  redFlags   Json?
+  createdAt  DateTime      @default(now())
 }
 
 model Assessment {
-  id                  String   @id @default(cuid())
-  clientId            String
-  client              Client   @relation(fields: [clientId], references: [id])
-  type                String
-  findings            String   // JSON stored as text
-  correctiveProtocol  String?  // JSON stored as text
-  referralFlag        Boolean  @default(false)
-  referralReason      String?
-  createdAt           DateTime @default(now())
+  id                 String        @id @default(cuid())
+  clientId           String
+  client             ClientProfile @relation(fields: [clientId], references: [id])
+  type               String
+  findings           Json
+  correctiveProtocol Json?
+  referralFlag       Boolean       @default(false)
+  referralReason     String?
+  createdAt          DateTime      @default(now())
 }
+
+// ─────────────────────────────────────────────
+// EXERCISE LIBRARY
+// ─────────────────────────────────────────────
+
+model Exercise {
+  id            String                 @id @default(cuid())
+  workspaceId   String? // null = global library
+  workspace     Workspace?             @relation(fields: [workspaceId], references: [id])
+  name          String
+  slug          String                 @unique
+  pattern       String
+  muscleGroups  Json
+  equipment     Json
+  videoUrl      String?
+  cues          String?                @db.Text
+  regression    String? // slug of regression exercise
+  progression   String? // slug of progression exercise
+  prescriptions ExercisePrescription[]
+  createdAt     DateTime               @default(now())
+}
+
+// ─────────────────────────────────────────────
+// PROGRAMS
+// ─────────────────────────────────────────────
 
 model Program {
-  id           String   @id @default(cuid())
-  clientId     String
-  client       Client   @relation(fields: [clientId], references: [id])
-  name         String
-  goal         String
+  id            String        @id @default(cuid())
+  clientId      String
+  client        ClientProfile @relation(fields: [clientId], references: [id])
+  name          String
+  goal          String
   durationWeeks Int
-  structure    String   // JSON stored as text
-  notes        String?
-  trainerEdits String?  // JSON stored as text
-  status       String   @default("draft")
-  createdAt    DateTime @default(now())
+  status        ProgramStatus @default(DRAFT)
+  markdownBlob  String?       @db.Text
+  structure     Json?
+  blocks        ProgramBlock[]
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+model ProgramBlock {
+  id        String            @id @default(cuid())
+  programId String
+  program   Program           @relation(fields: [programId], references: [id])
+  weekStart Int
+  weekEnd   Int
+  focus     String?
+  notes     String?           @db.Text
+  workouts  WorkoutTemplate[]
+  createdAt DateTime          @default(now())
+}
+
+model WorkoutTemplate {
+  id          String                 @id @default(cuid())
+  blockId     String
+  block       ProgramBlock           @relation(fields: [blockId], references: [id])
+  dayOfWeek   Int
+  name        String
+  notes       String?                @db.Text
+  exercises   ExercisePrescription[]
+  workoutLogs WorkoutLog[]
+  createdAt   DateTime               @default(now())
+}
+
+model ExercisePrescription {
+  id                String          @id @default(cuid())
+  workoutTemplateId String
+  workoutTemplate   WorkoutTemplate @relation(fields: [workoutTemplateId], references: [id])
+  exerciseId        String
+  exercise          Exercise        @relation(fields: [exerciseId], references: [id])
+  order             Int
+  sets              Int
+  reps              String
+  loadGuidance      String?
+  restSeconds       Int?
+  tempo             String?
+  rpe               Int?
+  notes             String?
+  setLogs           SetLog[]
+  createdAt         DateTime        @default(now())
+}
+
+// ─────────────────────────────────────────────
+// WORKOUT LOGGING
+// ─────────────────────────────────────────────
+
+model WorkoutLog {
+  id                String           @id @default(cuid())
+  clientId          String
+  client            ClientProfile    @relation(fields: [clientId], references: [id])
+  workoutTemplateId String?
+  workoutTemplate   WorkoutTemplate? @relation(fields: [workoutTemplateId], references: [id])
+  date              DateTime
+  durationMin       Int?
+  rpeAvg            Float?
+  clientNotes       String?          @db.Text
+  trainerSeen       Boolean          @default(false)
+  sets              SetLog[]
+  createdAt         DateTime         @default(now())
+}
+
+model SetLog {
+  id                     String                @id @default(cuid())
+  workoutLogId           String
+  workoutLog             WorkoutLog            @relation(fields: [workoutLogId], references: [id])
+  exercisePrescriptionId String?
+  exercisePrescription   ExercisePrescription? @relation(fields: [exercisePrescriptionId], references: [id])
+  setNumber              Int
+  weight                 Float?
+  reps                   Int?
+  completed              Boolean               @default(true)
+  createdAt              DateTime              @default(now())
+}
+
+// ─────────────────────────────────────────────
+// SESSION NOTES
+// ─────────────────────────────────────────────
+
 model SessionNote {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   clientId       String
-  client         Client   @relation(fields: [clientId], references: [id])
+  client         ClientProfile @relation(fields: [clientId], references: [id])
   date           DateTime
-  rawInput       String
-  structuredNote String   // JSON stored as text
+  rawInput       String        @db.Text
+  structuredNote Json
   rpeAvg         Float?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime      @default(now())
+}
+
+// ─────────────────────────────────────────────
+// NUTRITION & PROGRESS PHOTOS
+// ─────────────────────────────────────────────
+
+model NutritionEntry {
+  id           String        @id @default(cuid())
+  clientId     String
+  client        ClientProfile @relation(fields: [clientId], references: [id])
+  date         DateTime
+  mealType     String
+  photoUrl     String?
+  aiAnalysis   Json?
+  manualMacros Json?
+  notes        String?
+  createdAt    DateTime      @default(now())
+}
+
+model ProgressPhoto {
+  id        String        @id @default(cuid())
+  clientId  String
+  client    ClientProfile @relation(fields: [clientId], references: [id])
+  date      DateTime
+  url       String
+  angle     PhotoAngle
+  stripped  Boolean       @default(false)
+  createdAt DateTime      @default(now())
+}
+
+enum PhotoAngle {
+  FRONT
+  SIDE
+  BACK
+}
+
+// ─────────────────────────────────────────────
+// MESSAGING
+// ─────────────────────────────────────────────
+
+model Conversation {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  participants Json
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String       @db.Text
+  attachments    Json?
+  readBy         Json?
+  createdAt      DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+// LEADS & OUTREACH
+// ─────────────────────────────────────────────
+
+model Lead {
+  id                  String            @id @default(cuid())
+  workspaceId         String
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id])
+  fullName            String
+  email               String?
+  phone               String?
+  source              String
+  context             String?           @db.Text
+  status              LeadStatus        @default(NEW)
+  convertedToClientId String?
+  outreachLog         OutreachMessage[]
+  deletedAt           DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  BOOKED
+  CONVERTED
+  DEAD
 }
 
 model OutreachMessage {
-  id             String    @id @default(cuid())
+  id             String         @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id])
   clientId       String?
-  client         Client?   @relation(fields: [clientId], references: [id])
+  client         ClientProfile? @relation(fields: [clientId], references: [id])
   leadId         String?
-  lead           Lead?     @relation(fields: [leadId], references: [id])
+  lead           Lead?          @relation(fields: [leadId], references: [id])
   channel        String
   purpose        String
-  generatedDraft String
-  sentVersion    String?
+  generatedDraft String         @db.Text
+  sentVersion    String?        @db.Text
   sentAt         DateTime?
-  reply          String?
+  reply          String?        @db.Text
+  createdAt      DateTime       @default(now())
+}
+
+// ─────────────────────────────────────────────
+// METHODOLOGY
+// ─────────────────────────────────────────────
+
+model MethodologyDocument {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  slug        String
+  title       String
+  appliesTo   Json
+  content     String    @db.Text
+  version     Int       @default(1)
+  hash        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, slug])
+}
+
+// ─────────────────────────────────────────────
+// SECOND BRAIN
+// ─────────────────────────────────────────────
+
+model TrainerObservation {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  context        String    @db.Text
+  aiVersion      String    @db.Text
+  trainerVersion String    @db.Text
+  embedding      Bytes? // Phase 4: migrate to pgvector(1536)
+  tags           Json
   createdAt      DateTime  @default(now())
 }
 
-model Lead {
-  id          String            @id @default(cuid())
-  fullName    String
-  email       String?
-  phone       String?
-  source      String
-  context     String?
-  status      String            @default("new")
-  outreachLog OutreachMessage[]
-  createdAt   DateTime          @default(now())
-}
+// ─────────────────────────────────────────────
+// USAGE LOGGING
+// ─────────────────────────────────────────────
 
-model TrainerObservation {
-  id             String   @id @default(cuid())
-  context        String
-  aiVersion      String
-  trainerVersion String
-  embedding      Bytes?
-  tags           String   // JSON array stored as text
-  createdAt      DateTime @default(now())
+model UsageLog {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  feature      String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costCents    Int
+  latencyMs    Int?
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
+  createdAt    DateTime  @default(now())
 }

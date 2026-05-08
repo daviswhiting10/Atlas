@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withWorkspace } from "@/lib/api/middleware";
 import { getClient, updateClient, deleteClient } from "@/lib/db/clients";
 
 const UpdateSchema = z.object({
@@ -10,26 +11,33 @@ const UpdateSchema = z.object({
   status: z.enum(["PROSPECT", "ACTIVE", "AT_RISK", "CHURNED"]).optional(),
 });
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const client = await getClient(id);
-  if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(client);
-}
-
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const body = await req.json();
-  const parsed = UpdateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+export const GET = withWorkspace<{ id: string }>(
+  async (_req, { workspaceId }, { params }) => {
+    const { id } = await params;
+    const client = await getClient(id, workspaceId);
+    if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(client);
   }
-  const client = await updateClient(id, parsed.data);
-  return NextResponse.json(client);
-}
+);
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  await deleteClient(id);
-  return NextResponse.json({ ok: true });
-}
+export const PATCH = withWorkspace<{ id: string }>(
+  async (req, { workspaceId }, { params }) => {
+    const { id } = await params;
+    const body = await req.json();
+    const parsed = UpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    await updateClient(id, workspaceId, parsed.data);
+    const updated = await getClient(id, workspaceId);
+    return NextResponse.json(updated);
+  }
+);
+
+export const DELETE = withWorkspace<{ id: string }>(
+  async (_req, { workspaceId }, { params }) => {
+    const { id } = await params;
+    await deleteClient(id, workspaceId);
+    return NextResponse.json({ ok: true });
+  }
+);

@@ -1,7 +1,5 @@
-import { loadMethodology } from "../methodology-loader";
-
-export function buildIntakePrompt(input: { formData: Record<string, string>; clientName: string }) {
-  const methodology = loadMethodology("intake");
+export function buildIntakePrompt(input: { formData: Record<string, string>; clientName: string; methodology?: string }) {
+  const methodology = input.methodology ?? "";
 
   return {
     system: `You are Atlas, an AI assistant for a personal trainer named Davis Whiting (NASM CPT, NASM CNC).

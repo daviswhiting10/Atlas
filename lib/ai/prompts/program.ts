@@ -1,5 +1,3 @@
-import { loadMethodology } from "../methodology-loader";
-
 export type ProgramInput = {
   clientName: string;
   clientSummary?: string | null;
@@ -10,10 +8,11 @@ export type ProgramInput = {
   equipment: string;
   notes?: string;
   trainerVoice?: string | null;
+  methodology?: string;
 };
 
 export function buildProgramPrompt(input: ProgramInput) {
-  const methodology = loadMethodology("program");
+  const methodology = input.methodology ?? "";
 
   const voiceSection = input.trainerVoice
     ? `## Trainer Voice & Philosophy\n${input.trainerVoice}`

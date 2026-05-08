@@ -65,9 +65,9 @@ export default function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     const res = await fetch("/api/trainer", {
-      method: "POST",
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ voiceProfile: form.voiceProfile }),
     });
     setSaving(false);
     if (res.ok) toast.success("Settings saved");

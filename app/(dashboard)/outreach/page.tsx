@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Copy, CheckCheck, Wand2 } from "lucide-react";
+import { Loader2, Copy, CheckCheck, Wand2, Save } from "lucide-react";
 
 type Client = { id: string; fullName: string; status: string };
 
@@ -47,6 +47,7 @@ export default function OutreachPage() {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/clients")
@@ -58,6 +59,7 @@ export default function OutreachPage() {
     if (!clientId) { toast.error("Select a client"); return; }
     setLoading(true);
     setDraft("");
+    setSavedId(null);
     try {
       const res = await fetch("/api/ai/outreach-generate", {
         method: "POST",
@@ -67,6 +69,16 @@ export default function OutreachPage() {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setDraft(data.draft);
+      // Auto-save draft to OutreachMessage log
+      const saveRes = await fetch("/api/outreach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, purpose, channel, generatedDraft: data.draft }),
+      });
+      if (saveRes.ok) {
+        const saved = await saveRes.json();
+        setSavedId(saved.id);
+      }
     } catch {
       toast.error("Failed to generate. Check your API key.");
     } finally {
@@ -168,7 +180,12 @@ export default function OutreachPage() {
             <CardTitle className="text-sm font-semibold">
               Draft — {PURPOSES.find((p) => p.value === purpose)?.label}
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {savedId && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Save className="w-3 h-3" /> Saved
+                </span>
+              )}
               {selectedClient && (
                 <Badge variant="outline" className="text-xs">
                   {selectedClient.fullName}

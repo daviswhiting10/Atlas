@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withWorkspace } from "@/lib/api/middleware";
 import { getLead, updateLead } from "@/lib/db/leads";
 
 const UpdateSchema = z.object({
@@ -8,23 +9,30 @@ const UpdateSchema = z.object({
   phone: z.string().optional(),
   source: z.string().optional(),
   context: z.string().optional(),
-  status: z.enum(["new", "contacted", "replied", "booked", "converted", "dead"]).optional(),
+  status: z
+    .enum(["NEW", "CONTACTED", "REPLIED", "BOOKED", "CONVERTED", "DEAD"])
+    .optional(),
 });
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const lead = await getLead(id);
-  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(lead);
-}
-
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const body = await req.json();
-  const parsed = UpdateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+export const GET = withWorkspace<{ id: string }>(
+  async (_req, { workspaceId }, { params }) => {
+    const { id } = await params;
+    const lead = await getLead(id, workspaceId);
+    if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(lead);
   }
-  const lead = await updateLead(id, parsed.data);
-  return NextResponse.json(lead);
-}
+);
+
+export const PATCH = withWorkspace<{ id: string }>(
+  async (req, { workspaceId }, { params }) => {
+    const { id } = await params;
+    const body = await req.json();
+    const parsed = UpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    await updateLead(id, workspaceId, parsed.data);
+    const updated = await getLead(id, workspaceId);
+    return NextResponse.json(updated);
+  }
+);
