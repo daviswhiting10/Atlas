@@ -63,9 +63,9 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     data: {
       clientId: parsed.data.clientId,
       sourceType: "web-form",
-      parsedData: extracted.parsedData,
+      parsedData: extracted.parsedData as object,
       aiSummary: extracted.aiSummary,
-      redFlags: extracted.redFlags,
+      redFlags: extracted.redFlags as object,
     },
   });
 

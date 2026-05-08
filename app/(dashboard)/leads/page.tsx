@@ -177,7 +177,7 @@ export default function LeadsPage() {
                     {lead.email && <p className="text-xs text-muted-foreground mt-0.5 truncate">{lead.email}</p>}
                     <p className="text-xs text-muted-foreground mt-1">{SOURCE_LABELS[lead.source] ?? lead.source}</p>
                     {lead.context && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{lead.context}"</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">&quot;{lead.context}&quot;</p>
                     )}
                     <div className="flex gap-1 mt-2 flex-wrap">
                       {COLUMNS.filter((c) => c.key !== col.key).slice(0, 3).map((target) => (

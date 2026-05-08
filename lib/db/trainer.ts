@@ -12,13 +12,15 @@ export async function updateTrainer(
   data: {
     bio?: string;
     certifications?: string[];
-    voiceProfile?: Record<string, unknown> | string;
+    voiceProfile?: unknown;
   }
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload = data as any;
   return prisma.trainerProfile.upsert({
     where: { userId },
-    update: data,
-    create: { userId, ...data },
+    update: payload,
+    create: { userId, ...payload },
     include: { user: { select: { name: true, email: true } } },
   });
 }

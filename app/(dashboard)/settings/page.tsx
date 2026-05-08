@@ -52,11 +52,11 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((trainer) => {
         if (trainer) {
-          setForm({
-            name: trainer.name ?? form.name,
-            email: trainer.email ?? form.email,
+          setForm((prev) => ({
+            name: trainer.name ?? prev.name,
+            email: trainer.email ?? prev.email,
             voiceProfile: trainer.voiceProfile ?? DEFAULT_VOICE,
-          });
+          }));
         }
       });
   }, []);
@@ -134,7 +134,7 @@ export default function SettingsPage() {
               </Badge>
             </CardTitle>
             <CardDescription className="text-xs">
-              Describe your training style, what you say and don't say, and how you relate to clients.
+              Describe your training style, what you say and don&apos;t say, and how you relate to clients.
               The more specific, the better the AI output.
             </CardDescription>
           </CardHeader>

@@ -42,7 +42,7 @@ type Client = {
   createdAt: string;
   programs: Array<{ id: string; name: string; goal: string; status: string; createdAt: string }>;
   sessionNotes: Array<{ id: string; date: string; rawInput: string; rpeAvg: number | null }>;
-  intakeForms: Array<{ id: string; aiSummary: string | null; createdAt: string; redFlags: unknown }>;
+  intakeForms: Array<{ id: string; aiSummary: string | null; createdAt: string; redFlags: Array<{ issue: string; severity: string; recommendedAction: string }> | null }>;
   outreachLog: Array<{ id: string; purpose: string; channel: string; createdAt: string; sentAt: string | null }>;
 };
 

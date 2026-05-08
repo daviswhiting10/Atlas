@@ -4,6 +4,7 @@ import Email from "next-auth/providers/email"
 export default {
   providers: [
     Email({
+      server: process.env.EMAIL_SERVER ?? "smtp://localhost:25",
       from: "Atlas <noreply@atlasapp.co>",
       async sendVerificationRequest({ identifier, url }) {
         if (!process.env.RESEND_API_KEY) {

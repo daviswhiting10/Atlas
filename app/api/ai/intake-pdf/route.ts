@@ -3,7 +3,8 @@ import { withWorkspace } from "@/lib/api/middleware";
 import { callAI, MODELS } from "@/lib/ai/client";
 import { getClient } from "@/lib/db/clients";
 import { prisma } from "@/lib/db/client";
-import pdfParse from "pdf-parse";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
 
 const SYSTEM = `You are Atlas, an AI assistant for a personal trainer named Davis Whiting (NASM CPT, NASM CNC).
 
@@ -100,9 +101,9 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     data: {
       clientId,
       sourceType: "pdf",
-      parsedData: extracted.parsedData,
+      parsedData: extracted.parsedData as object,
       aiSummary: extracted.aiSummary,
-      redFlags: extracted.redFlags,
+      redFlags: extracted.redFlags as object,
     },
   });
 

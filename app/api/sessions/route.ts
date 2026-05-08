@@ -34,7 +34,7 @@ export const POST = withWorkspace(async (req, { workspaceId }) => {
       data: {
         clientId,
         rawInput,
-        structuredNote,
+        structuredNote: structuredNote as object,
         rpeAvg: rpeAvg ?? null,
         date: new Date(date),
       },
