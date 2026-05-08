@@ -1,9 +1,11 @@
 # Atlas — Project State
 
-## Current phase: Phase 1 — Foundation (IN PROGRESS)
+## Current phase: Phase 3 — Operations (starting)
 
 ## What's live
-- Nothing in prod yet. Phase 1 build in progress.
+- **Prod**: https://atlas-red-eight.vercel.app
+- **DB**: Neon PostgreSQL (ep-nameless-field-apekq1z7, us-east-1)
+- Deployed: 2026-05-08
 
 ## What's been built (this session)
 - Full Prisma schema: Postgres, multi-tenant, all Phase 1–4 models
@@ -25,15 +27,27 @@ npm run build   # must pass zero TS errors
 ```
 
 ## Phase 1 acceptance criteria
-- [ ] Magic link → login → / works for seeded trainer
-- [ ] Every client/lead/intake/program API route returns only rows for authed workspace
-- [ ] Every callAI invocation produces a UsageLog row (feature, model, tokens, latencyMs, workspaceId)
-- [ ] `npm run seed:methodology` parses /methodology/*.md into MethodologyDocument rows
-- [ ] `next build` passes with zero TS errors
-- [ ] Deployed to Vercel + Neon, prod URL captured below
+- [x] Magic link → login → / works for seeded trainer
+- [x] Every client/lead/intake/program API route returns only rows for authed workspace (withWorkspace HOF)
+- [x] Every callAI invocation produces a UsageLog row (feature, model, tokens, latencyMs, workspaceId)
+- [x] `npm run seed:methodology` parses /methodology/*.md into MethodologyDocument rows
+- [x] `next build` passes with zero TS errors
+- [x] Deployed to Vercel + Neon — https://atlas-red-eight.vercel.app
 
-## Prod URL
-_Not yet deployed._
+## Phase 2 shipped
+- Leads kanban (uppercase enum fix)
+- Outreach persistence (OutreachMessage + lastContactAt)
+- Session save updates lastContactAt
+- Retention heuristic: ACTIVE → AT_RISK after 21 days no contact
+- PDF intake route + form/PDF toggle
+- Programs save as markdownBlob
+- All build errors resolved
+
+## Phase 3 — Operations (next)
+Remaining work:
+- [ ] Outreach history view (/outreach/history)
+- [ ] Session list per client (currently write-only)
+- [ ] Fill in /methodology/*.md files (run seed:methodology after)
 
 ## Required env vars
 ```
