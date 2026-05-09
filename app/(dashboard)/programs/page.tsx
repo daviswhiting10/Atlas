@@ -39,7 +39,7 @@ export default function ProgramsPage() {
   useEffect(() => {
     fetch("/api/programs")
       .then((r) => r.json())
-      .then(setPrograms)
+      .then((data) => setPrograms(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }, []);
 
