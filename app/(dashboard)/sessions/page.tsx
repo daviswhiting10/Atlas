@@ -45,7 +45,7 @@ export default function SessionsPage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    fetch("/api/clients").then((r) => r.json()).then(setClients);
+    fetch("/api/clients").then((r) => r.json()).then((data) => setClients(Array.isArray(data) ? data : []));
   }, []);
 
   function toggleRecording() {

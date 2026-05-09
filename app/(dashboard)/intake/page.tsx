@@ -113,7 +113,7 @@ export default function IntakePage() {
   const [result, setResult] = useState<{ aiSummary: string; redFlags: Array<{ issue: string; severity: string; recommendedAction: string }> } | null>(null);
 
   useEffect(() => {
-    fetch("/api/clients").then((r) => r.json()).then(setClients);
+    fetch("/api/clients").then((r) => r.json()).then((data) => setClients(Array.isArray(data) ? data : []));
   }, []);
 
   function set(field: keyof FormData) {

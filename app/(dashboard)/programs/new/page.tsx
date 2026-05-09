@@ -38,7 +38,7 @@ export default function NewProgramPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/clients").then((r) => r.json()).then(setClients);
+    fetch("/api/clients").then((r) => r.json()).then((data) => setClients(Array.isArray(data) ? data : []));
   }, []);
 
   const sel = (setter: (v: string) => void) => (v: string | null) => { if (v) setter(v); };

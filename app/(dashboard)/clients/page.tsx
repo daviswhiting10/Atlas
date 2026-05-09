@@ -64,7 +64,7 @@ export default function ClientsPage() {
   useEffect(() => {
     fetch("/api/clients")
       .then((r) => r.json())
-      .then(setClients)
+      .then((data) => setClients(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }, []);
 

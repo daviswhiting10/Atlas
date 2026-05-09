@@ -66,7 +66,7 @@ export default function LeadsPage() {
   });
 
   useEffect(() => {
-    fetch("/api/leads").then((r) => r.json()).then(setLeads);
+    fetch("/api/leads").then((r) => r.json()).then((data) => setLeads(Array.isArray(data) ? data : []));
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
