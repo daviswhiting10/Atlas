@@ -49,10 +49,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user }) {
-      // On sign-in, user is populated — fetch workspaceId and role from DB
-      if (user?.id) {
+      // On sign-in user is populated; on subsequent requests only token exists.
+      // In both cases, if workspaceId is missing, fetch it from the DB.
+      const userId = user?.id ?? (token.id as string | undefined)
+      if (userId && !token.workspaceId) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: userId },
           select: { id: true, role: true, workspaceId: true },
         })
         if (dbUser) {
