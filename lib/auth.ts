@@ -46,4 +46,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt({ token, user }) {
+      // On sign-in, user is populated — fetch workspaceId and role from DB
+      if (user?.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { id: true, role: true, workspaceId: true },
+        })
+        if (dbUser) {
+          token.id = dbUser.id
+          token.role = dbUser.role
+          token.workspaceId = dbUser.workspaceId ?? undefined
+        }
+      }
+      return token
+    },
+  },
 })
