@@ -11,7 +11,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Email({
       server: process.env.EMAIL_SERVER ?? "smtp://localhost:25",
-      from: "Atlas <noreply@atlasapp.co>",
+      from: "Atlas <onboarding@resend.dev>",
       async sendVerificationRequest({ identifier, url }) {
         if (!process.env.RESEND_API_KEY) {
           console.log("\n" + "─".repeat(64))
@@ -28,7 +28,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Atlas <noreply@atlasapp.co>",
+            from: "Atlas <onboarding@resend.dev>",
             to: [identifier],
             subject: "Sign in to Atlas",
             html: `<p style="font-family:sans-serif;max-width:480px;margin:40px auto">
@@ -51,7 +51,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       // On sign-in user is populated; on subsequent requests only token exists.
       // In both cases, if workspaceId is missing, fetch it from the DB.
-      const userId = user?.id ?? (token.id as string | undefined)
+      // token.sub is Auth.js default user ID field; token.id is our custom field
+      const userId = user?.id ?? (token.id as string | undefined) ?? token.sub
       if (userId && !token.workspaceId) {
         const dbUser = await prisma.user.findUnique({
           where: { id: userId },

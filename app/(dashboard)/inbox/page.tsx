@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 export default async function InboxPage() {
   const session = await auth();
-  if (!session?.user?.workspaceId) redirect("/login");
+  if (!session?.user?.workspaceId) redirect("/");
   await runRetentionHeuristic(session.user.workspaceId);
   const clients = await getClients(session.user.workspaceId);
 

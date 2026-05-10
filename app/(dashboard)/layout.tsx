@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  console.log("[layout] session:", JSON.stringify({ id: session?.user?.id, workspaceId: session?.user?.workspaceId }));
   if (!session?.user) redirect("/login");
 
   return (
