@@ -1,6 +1,5 @@
 import { getClients, runRetentionHeuristic } from "@/lib/db/clients";
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
@@ -10,9 +9,10 @@ import { cn } from "@/lib/utils";
 
 export default async function InboxPage() {
   const session = await auth();
-  if (!session?.user?.workspaceId) redirect("/");
-  await runRetentionHeuristic(session.user.workspaceId);
-  const clients = await getClients(session.user.workspaceId);
+  const workspaceId = session?.user?.workspaceId;
+  const clients = workspaceId
+    ? (await runRetentionHeuristic(workspaceId), await getClients(workspaceId))
+    : [];
 
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
   const atRiskClients = clients.filter((c) => c.status === "AT_RISK");
