@@ -5,51 +5,42 @@
 ## What's live
 - **Prod**: https://atlas-red-eight.vercel.app
 - **DB**: Neon PostgreSQL (ep-nameless-field-apekq1z7, us-east-1)
-- Deployed: 2026-05-08
+- Deployed: 2026-05-09
 
 ## What's been built
 - Full Prisma schema: Postgres, multi-tenant, all Phase 1–4 models
-- Auth.js v5 with email magic links + Resend
+- Auth.js v5 with email magic links + Resend (`onboarding@resend.dev`)
 - `withWorkspace` HOF — all API routes structurally scoped
 - UsageLog wired on every `callAI` call (fire-and-forget)
 - Methodology loader reads from DB (`MethodologyDocument` table)
 - Exercise library: 80 hand-curated exercises
 - Seed: Workspace + User (davis@atlasapp.co) + TrainerProfile + exercises
-- `npm run seed:methodology` — parses /methodology/*.md → MethodologyDocument rows
 - Edge-safe middleware: `lib/auth.config.ts` has zero Node.js imports
-- JWT callback explicitly fetches `workspaceId` + `role` from DB on sign-in
+- JWT callback fetches `workspaceId`/`role` from DB; uses `token.sub` fallback
 - All client-side fetches guarded against non-array API responses
+- Dropdowns: replaced Base UI Select with Radix UI Select (standard shadcn)
 
-## Known bugs (fix next session — see docs/prompts/session-start.md)
-1. `/inbox` redirects to login (server component auth pattern differs)
-2. Page crashes: `e.filter is not a function` — programs page and possibly others
-3. Dropdowns non-functional throughout app
-4. Resend magic links going out but not delivering to Gmail (from domain issue)
-5. Voice input in session notes not working (low priority)
-
-## Debug logging to remove after bugs are fixed
-- `console.log("[layout] session: ...")` in `app/(dashboard)/layout.tsx`
-- `authorized()` returns `true` (no protection) in `lib/auth.config.ts`
-
-## Phase 2 shipped
-- Leads kanban
-- Outreach persistence (OutreachMessage + lastContactAt)
-- Retention heuristic: ACTIVE → AT_RISK after 21 days no contact
-- PDF intake route
-- Programs save as markdownBlob
-- Session notes with SOAP structure
+## Bugs fixed this session
+- ✅ Inbox redirect to login — `token.sub` fallback + inbox redirects to `/` not `/login`
+- ✅ `e.filter is not a function` — all 6 pages guarded with `Array.isArray` check
+- ✅ Dropdowns non-functional — replaced Base UI with Radix UI Select
+- ✅ Resend not delivering — `from` changed to `onboarding@resend.dev`
+- ✅ Debug console.log removed from layout
+- ✅ `authorized()` restored to `!!auth`
 
 ## Phase 3 — Operations (remaining)
+- [ ] Smoke test: every nav item loads, no console errors, API calls return correct shapes
+- [ ] Voice input in session notes (browser SpeechRecognition — test in Chrome)
 - [ ] Outreach history view (/outreach/history)
 - [ ] Session list per client (currently write-only)
-- [ ] Fill in /methodology/*.md files (run seed:methodology after)
+- [ ] Fill in /methodology/*.md files (run `npm run seed:methodology` after)
 
 ## Required env vars (Vercel)
 ```
-DATABASE_URL=postgresql://...        # Neon connection string
-AUTH_SECRET=...                      # same value as NEXTAUTH_SECRET
+DATABASE_URL=postgresql://...
+AUTH_SECRET=xMg95OE+MjCAK6vTdTaV6vIp/Q1/Di4QctcWg78d99Q=
 AUTH_URL=https://atlas-red-eight.vercel.app
-NEXTAUTH_SECRET=...                  # Auth.js v5 fallback
+NEXTAUTH_SECRET=xMg95OE+MjCAK6vTdTaV6vIp/Q1/Di4QctcWg78d99Q=
 NEXTAUTH_URL=https://atlas-red-eight.vercel.app
 RESEND_API_KEY=...
 ANTHROPIC_API_KEY=...
