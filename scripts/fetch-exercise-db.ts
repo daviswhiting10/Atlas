@@ -1,7 +1,12 @@
 /**
- * Fetches yuhonas/free-exercise-db (CC0) and writes to data/exercise-db-raw.json.
- * Run once: npx tsx scripts/fetch-exercise-db.ts
- * Commit the output so seeds are reproducible offline.
+ * Source:  https://github.com/yuhonas/free-exercise-db
+ * License: CC0 1.0 Universal (public domain) — no attribution required
+ * Pulled:  2026-05-13
+ *
+ * Fetches the full exercise list and writes to data/exercise-db-raw.json.
+ * Run only when you want to refresh from upstream:
+ *   npx tsx scripts/fetch-exercise-db.ts
+ * The output is committed to the repo so seeds are reproducible offline.
  */
 import { writeFileSync } from "fs";
 import { join } from "path";
