@@ -31,6 +31,7 @@ export const SEED_EXERCISES: SeedEntry[] = [
   { name: "Front Barbell Squat", movementPattern: "SQUAT" },
   { name: "Box Squat", movementPattern: "SQUAT" },
   { name: "Barbell Hack Squat", movementPattern: "SQUAT" },
+  { name: "Hack Squat", movementPattern: "SQUAT" },
   { name: "Overhead Squat", movementPattern: "SQUAT" },
   { name: "Wide Stance Barbell Squat", movementPattern: "SQUAT" },
   { name: "Zercher Squats", movementPattern: "SQUAT" },
@@ -50,6 +51,7 @@ export const SEED_EXERCISES: SeedEntry[] = [
   { name: "Barbell Glute Bridge", movementPattern: "HINGE" },
   { name: "Single Leg Glute Bridge", movementPattern: "HINGE" },
   { name: "One-Arm Kettlebell Swings", movementPattern: "HINGE" },
+  { name: "Good Morning", movementPattern: "HINGE" },
   { name: "Pull Through", movementPattern: "HINGE" },
 
   // ─── HORIZONTAL PUSH ─────────────────────────────────────────────────────

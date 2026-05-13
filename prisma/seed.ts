@@ -136,6 +136,30 @@ async function main() {
 
   console.log(`Exercises: ${seeded} seeded, ${skipped} skipped (not in raw DB)`);
 
+  // Delete orphaned exercises — rows whose slug is no longer in the seed list.
+  // Safety guard: only run if we successfully upserted at least (N - 5) rows,
+  // where N = seed file length. A malformed/truncated seed list must not nuke the catalog.
+  const expectedMin = SEED_EXERCISES.length - 5;
+  if (seeded >= expectedMin) {
+    const seedSlugs = SEED_EXERCISES.map((e) => slugify(e.name));
+    const deleted = await prisma.exercise.deleteMany({
+      where: { slug: { notIn: seedSlugs } },
+    });
+    if (deleted.count > 0) {
+      console.log(`Exercises: ${deleted.count} orphan(s) deleted (not in seed list)`);
+    } else {
+      console.log("Exercises: no orphans to delete");
+    }
+  } else {
+    console.warn(
+      `⚠  Orphan-delete skipped — only ${seeded}/${SEED_EXERCISES.length} exercises upserted (threshold: ${expectedMin})`
+    );
+  }
+
+  // Confirm final count matches seed list
+  const finalCount = await prisma.exercise.count();
+  console.log(`Exercises: ${finalCount} total in DB (seed list: ${SEED_EXERCISES.length})`);
+
   console.log("\nSeed complete.");
   console.log("Next: npm run seed:methodology");
 }
