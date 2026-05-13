@@ -23,6 +23,7 @@ model Workspace {
   methodology      MethodologyDocument[]
   observations     TrainerObservation[]
   exercises        Exercise[]
+  workouts         Workout[]
   conversations    Conversation[]
   usageLogs        UsageLog[]
 }
@@ -131,6 +132,7 @@ model ClientProfile {
   sessionNotes     SessionNote[]
   outreachLog      OutreachMessage[]
   workoutLogs      WorkoutLog[]
+  workouts         Workout[]
   nutritionEntries NutritionEntry[]
   progressPhotos   ProgressPhoto[]
   createdAt        DateTime          @default(now())
@@ -176,21 +178,53 @@ model Assessment {
 // EXERCISE LIBRARY
 // ─────────────────────────────────────────────
 
+enum MovementPattern {
+  SQUAT
+  HINGE
+  HORIZONTAL_PUSH
+  VERTICAL_PUSH
+  HORIZONTAL_PULL
+  VERTICAL_PULL
+  LUNGE
+  CARRY
+  ROTATION
+  ANTI_ROTATION
+  LOCOMOTION
+}
+
 model Exercise {
-  id            String                 @id @default(cuid())
-  workspaceId   String? // null = global library
-  workspace     Workspace?             @relation(fields: [workspaceId], references: [id])
-  name          String
-  slug          String                 @unique
-  pattern       String
-  muscleGroups  Json
-  equipment     Json
-  videoUrl      String?
-  cues          String?                @db.Text
-  regression    String? // slug of regression exercise
-  progression   String? // slug of progression exercise
-  prescriptions ExercisePrescription[]
-  createdAt     DateTime               @default(now())
+  id               String                 @id @default(cuid())
+  workspaceId      String? // null = global library
+  workspace        Workspace?             @relation(fields: [workspaceId], references: [id])
+  name             String
+  slug             String                 @unique
+  movementPattern  MovementPattern
+  primaryMuscles   Json // String[]
+  secondaryMuscles Json // String[]
+  equipment        String
+  instructions     Json // String[]
+  gifUrl           String?
+  videoUrl         String?
+  coachingCues     String[]               @default([])
+  regression       String?
+  progression      String?
+  prescriptions    ExercisePrescription[]
+  createdAt        DateTime               @default(now())
+}
+
+// Standalone workout — isTemplate=true + clientId=null = reusable template
+model Workout {
+  id           String         @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id])
+  clientId     String?
+  client       ClientProfile? @relation(fields: [clientId], references: [id])
+  name         String
+  isTemplate   Boolean        @default(false)
+  templateName String?
+  templateTags Json? // { goal, split, level, equipment }
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
 
 // ─────────────────────────────────────────────

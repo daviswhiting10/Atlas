@@ -1,14 +1,45 @@
 import "dotenv/config";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 import { prisma } from "../lib/db/client";
-import exercises from "../data/exercises.json";
+import { SEED_EXERCISES } from "../data/exercise-seed";
 
 const WORKSPACE_ID = "ws_atlas_primary";
 
+// Free-exercise-db raw shape
+type RawExercise = {
+  id: string;
+  name: string;
+  equipment: string;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  instructions: string[];
+  images: string[];
+  category: string;
+  force?: string;
+  level?: string;
+  mechanic?: string;
+};
+
+const GIF_BASE =
+  "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises";
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function buildGifUrl(raw: RawExercise): string | null {
+  if (!raw.images?.length) return null;
+  // images[0] is like "ExerciseName/0.jpg"
+  return `${GIF_BASE}/${raw.images[0]}`;
+}
+
 async function main() {
   const email = process.env.SEED_TRAINER_EMAIL;
-  if (!email) {
-    throw new Error("SEED_TRAINER_EMAIL is required in .env.local");
-  }
+  if (!email) throw new Error("SEED_TRAINER_EMAIL is required in .env");
 
   // 1. Workspace
   const workspace = await prisma.workspace.upsert({
@@ -41,29 +72,69 @@ async function main() {
       certifications: ["NASM CPT", "NASM CNC"],
     },
   });
-  console.log("TrainerProfile: created");
+  console.log("TrainerProfile: ok");
 
-  // 4. Exercise library (global — workspaceId null)
-  let count = 0;
-  for (const ex of exercises) {
+  // 4. Exercise library
+  const rawPath = join(process.cwd(), "data", "exercise-db-raw.json");
+  if (!existsSync(rawPath)) {
+    console.warn(
+      "⚠  data/exercise-db-raw.json not found. Run: npx tsx scripts/fetch-exercise-db.ts"
+    );
+    console.log("\nSeed complete (no exercises seeded).");
+    return;
+  }
+
+  const rawExercises: RawExercise[] = JSON.parse(
+    readFileSync(rawPath, "utf-8")
+  );
+
+  // Build lookup: slug → raw exercise
+  const rawBySlug = new Map<string, RawExercise>();
+  for (const raw of rawExercises) {
+    rawBySlug.set(slugify(raw.name), raw);
+  }
+
+  let seeded = 0;
+  let skipped = 0;
+
+  for (const entry of SEED_EXERCISES) {
+    const slug = slugify(entry.name);
+    const raw = rawBySlug.get(slug);
+
+    if (!raw) {
+      console.warn(`  skip (not in raw DB): "${entry.name}" [${slug}]`);
+      skipped++;
+      continue;
+    }
+
     await prisma.exercise.upsert({
-      where: { slug: ex.slug },
-      update: {},
+      where: { slug },
+      update: {
+        movementPattern: entry.movementPattern,
+        coachingCues: entry.coachingCues ?? [],
+        gifUrl: buildGifUrl(raw),
+        primaryMuscles: raw.primaryMuscles,
+        secondaryMuscles: raw.secondaryMuscles,
+        equipment: raw.equipment ?? "body only",
+        instructions: raw.instructions,
+      },
       create: {
-        name: ex.name,
-        slug: ex.slug,
-        pattern: ex.pattern,
-        muscleGroups: ex.muscleGroups,
-        equipment: ex.equipment,
-        cues: ex.cues ?? null,
-        regression: ex.regression ?? null,
-        progression: ex.progression ?? null,
+        name: raw.name,
+        slug,
+        movementPattern: entry.movementPattern,
+        primaryMuscles: raw.primaryMuscles,
+        secondaryMuscles: raw.secondaryMuscles,
+        equipment: raw.equipment ?? "body only",
+        instructions: raw.instructions,
+        gifUrl: buildGifUrl(raw),
+        coachingCues: entry.coachingCues ?? [],
         workspaceId: null,
       },
     });
-    count++;
+    seeded++;
   }
-  console.log(`Exercises: ${count} seeded`);
+
+  console.log(`Exercises: ${seeded} seeded, ${skipped} skipped (not in raw DB)`);
 
   console.log("\nSeed complete.");
   console.log("Next: npm run seed:methodology");
