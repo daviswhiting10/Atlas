@@ -111,7 +111,7 @@ async function main() {
       where: { slug },
       update: {
         movementPattern: entry.movementPattern,
-        coachingCues: entry.coachingCues ?? [],
+        coachingCues: [],
         gifUrl: buildGifUrl(raw),
         primaryMuscles: raw.primaryMuscles,
         secondaryMuscles: raw.secondaryMuscles,
@@ -127,7 +127,7 @@ async function main() {
         equipment: raw.equipment ?? "body only",
         instructions: raw.instructions,
         gifUrl: buildGifUrl(raw),
-        coachingCues: entry.coachingCues ?? [],
+        coachingCues: [],
         workspaceId: null,
       },
     });
@@ -159,6 +159,21 @@ async function main() {
   // Confirm final count matches seed list
   const finalCount = await prisma.exercise.count();
   console.log(`Exercises: ${finalCount} total in DB (seed list: ${SEED_EXERCISES.length})`);
+
+  // 5. Jack Simon — first real client
+  await prisma.clientProfile.upsert({
+    where: { id: "cp_jack_simon" },
+    update: {},
+    create: {
+      id: "cp_jack_simon",
+      workspaceId: workspace.id,
+      fullName: "Jack Simon",
+      email: "jack@example.com",
+      status: "ACTIVE",
+      primaryGoal: "hypertrophy",
+    },
+  });
+  console.log("ClientProfile: Jack Simon seeded");
 
   console.log("\nSeed complete.");
   console.log("Next: npm run seed:methodology");

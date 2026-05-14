@@ -5,7 +5,7 @@ export async function getClients(workspaceId: string) {
     where: { workspaceId, deletedAt: null },
     orderBy: { updatedAt: "desc" },
     include: {
-      _count: { select: { sessionNotes: true, programs: true } },
+      _count: { select: { sessionNotes: true, programAssignments: true } },
     },
   });
 }
@@ -16,7 +16,13 @@ export async function getClient(id: string, workspaceId: string) {
     include: {
       intakeForms: { orderBy: { createdAt: "desc" } },
       assessments: { orderBy: { createdAt: "desc" } },
-      programs: { orderBy: { createdAt: "desc" } },
+      programAssignments: {
+        orderBy: { startDate: "desc" },
+        include: {
+          sourceProgram: { select: { id: true, name: true } },
+          _count: { select: { assignedWorkouts: true } },
+        },
+      },
       sessionNotes: { orderBy: { date: "desc" }, take: 20 },
       outreachLog: { orderBy: { createdAt: "desc" }, take: 20 },
     },

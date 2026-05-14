@@ -10,26 +10,12 @@ import { Plus, Dumbbell } from "lucide-react";
 type Program = {
   id: string;
   name: string;
-  goal: string;
+  description: string | null;
   durationWeeks: number;
-  status: string;
-  createdAt: string;
-  client: { id: string; fullName: string };
-};
-
-const GOAL_LABELS: Record<string, string> = {
-  weight_loss: "Weight Loss",
-  hypertrophy: "Hypertrophy",
-  pain_mgmt: "Pain Management",
-  performance: "Performance",
-  general: "General Fitness",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-zinc-100 text-zinc-600 border-zinc-200",
-  approved: "bg-blue-50 text-blue-700 border-blue-200",
-  active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  archived: "bg-zinc-50 text-zinc-400 border-zinc-100",
+  goalTags: { goals: string[]; conditions: string[] } | null;
+  updatedAt: string;
+  _count: { assignments: number };
+  blocks: { _count: { workouts: number } }[];
 };
 
 export default function ProgramsPage() {
@@ -48,7 +34,7 @@ export default function ProgramsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Programs</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{programs.length} total</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{programs.length} template{programs.length !== 1 ? "s" : ""}</p>
         </div>
         <Link href="/programs/new" className={buttonVariants()}>
           <Plus className="w-4 h-4 mr-1.5" />
@@ -68,36 +54,43 @@ export default function ProgramsPage() {
             <Dumbbell className="w-10 h-10 text-muted-foreground mb-3" />
             <p className="font-medium">No programs yet</p>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
-              Generate an AI-powered periodized program for any client
+              Build a periodized program template, then assign it to clients.
             </p>
             <Link href="/programs/new" className={buttonVariants()}>
               <Plus className="w-4 h-4 mr-1.5" />
-              Generate First Program
+              Build First Program
             </Link>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {programs.map((p) => (
-            <Card key={p.id} className="hover:border-primary/40 transition-colors">
-              <CardContent className="py-4 px-5 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{p.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {p.client.fullName} · {GOAL_LABELS[p.goal] ?? p.goal} · {p.durationWeeks}wk
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={`text-xs capitalize ${STATUS_COLORS[p.status] ?? ""}`}>
-                    {p.status}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(p.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {programs.map((p) => {
+            const totalWorkouts = p.blocks.reduce((s, b) => s + b._count.workouts, 0);
+            const goals = p.goalTags?.goals ?? [];
+            return (
+              <Link key={p.id} href={`/programs/${p.id}`}>
+                <Card className="hover:border-primary/40 transition-colors cursor-pointer">
+                  <CardContent className="py-4 px-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{p.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {p.durationWeeks}wk · {p.blocks.length} block{p.blocks.length !== 1 ? "s" : ""} · {totalWorkouts} workouts
+                        {goals.length > 0 && ` · ${goals.join(", ")}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {p._count.assignments} assigned
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(p.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

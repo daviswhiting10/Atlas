@@ -29,6 +29,16 @@ import {
   Trash2,
 } from "lucide-react";
 
+type ProgramAssignment = {
+  id: string;
+  name: string;
+  status: string;
+  startDate: string;
+  createdAt: string;
+  sourceProgram: { id: string; name: string };
+  _count: { assignedWorkouts: number };
+};
+
 type Client = {
   id: string;
   fullName: string;
@@ -40,7 +50,7 @@ type Client = {
   retentionFlag: string | null;
   lastContactAt: string | null;
   createdAt: string;
-  programs: Array<{ id: string; name: string; goal: string; status: string; createdAt: string }>;
+  programAssignments: ProgramAssignment[];
   sessionNotes: Array<{ id: string; date: string; rawInput: string; rpeAvg: number | null }>;
   intakeForms: Array<{ id: string; aiSummary: string | null; createdAt: string; redFlags: Array<{ issue: string; severity: string; recommendedAction: string }> | null }>;
   outreachLog: Array<{ id: string; purpose: string; channel: string; createdAt: string; sentAt: string | null }>;
@@ -201,9 +211,9 @@ export default function ClientDetailPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="programs">
             Programs
-            {client.programs.length > 0 && (
+            {client.programAssignments.length > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1">
-                {client.programs.length}
+                {client.programAssignments.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -276,31 +286,51 @@ export default function ClientDetailPage() {
 
         <TabsContent value="programs">
           <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">{client.programs.length} programs</p>
-            <Link href={`/programs/new?clientId=${client.id}`} className={cn(buttonVariants({ size: "sm" }))}>
+            <p className="text-sm text-muted-foreground">
+              {client.programAssignments.length} assignment{client.programAssignments.length !== 1 ? "s" : ""}
+            </p>
+            <Link href="/programs" className={cn(buttonVariants({ size: "sm" }))}>
               <Dumbbell className="w-3 h-3 mr-1.5" />
-              New Program
+              Assign Program
             </Link>
           </div>
-          {client.programs.length === 0 ? (
+          {client.programAssignments.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center">
                 <Dumbbell className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium">No programs yet</p>
+                <p className="text-sm font-medium">No programs assigned</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">
+                  Build a program in the library, then assign it here.
+                </p>
+                <Link href="/programs" className={cn(buttonVariants({ size: "sm" }))}>
+                  Go to Program Library
+                </Link>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-2">
-              {client.programs.map((p) => (
-                <Card key={p.id}>
-                  <CardContent className="py-3 px-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.goal.replace("_", " ")}</p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">{p.status}</Badge>
-                  </CardContent>
-                </Card>
+              {client.programAssignments.map((a) => (
+                <Link key={a.id} href={`/clients/${client.id}/programs/${a.id}`}>
+                  <Card className="hover:border-primary/40 transition-colors cursor-pointer">
+                    <CardContent className="py-3 px-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">{a.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Started {new Date(a.startDate).toLocaleDateString()} · {a._count.assignedWorkouts} sessions
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs capitalize",
+                          a.status === "ACTIVE" && "border-emerald-200 text-emerald-700"
+                        )}
+                      >
+                        {a.status.toLowerCase()}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}

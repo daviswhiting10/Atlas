@@ -12,20 +12,22 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model Workspace {
-  id               String                @id @default(cuid())
-  name             String
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  users            User[]
-  clientProfiles   ClientProfile[]
-  leads            Lead[]
-  outreachMessages OutreachMessage[]
-  methodology      MethodologyDocument[]
-  observations     TrainerObservation[]
-  exercises        Exercise[]
-  workouts         Workout[]
-  conversations    Conversation[]
-  usageLogs        UsageLog[]
+  id                 String                @id @default(cuid())
+  name               String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  users              User[]
+  clientProfiles     ClientProfile[]
+  leads              Lead[]
+  outreachMessages   OutreachMessage[]
+  methodology        MethodologyDocument[]
+  observations       TrainerObservation[]
+  exercises          Exercise[]
+  workouts           Workout[]
+  conversations      Conversation[]
+  usageLogs          UsageLog[]
+  programs           Program[]
+  programAssignments ProgramAssignment[]
 }
 
 // ─────────────────────────────────────────────
@@ -111,32 +113,32 @@ model TrainerProfile {
 }
 
 model ClientProfile {
-  id               String            @id @default(cuid())
-  workspaceId      String
-  workspace        Workspace         @relation(fields: [workspaceId], references: [id])
-  userId           String?           @unique // null until client onboards to the app
-  user             User?             @relation("ClientUser", fields: [userId], references: [id])
-  fullName         String
-  email            String?
-  phone            String?
-  dob              DateTime?
-  primaryGoal      String?
-  status           ClientStatus      @default(PROSPECT)
-  retentionScore   Int?
-  retentionFlag    String?
-  lastContactAt    DateTime?
-  deletedAt        DateTime?
-  intakeForms      IntakeForm[]
-  assessments      Assessment[]
-  programs         Program[]
-  sessionNotes     SessionNote[]
-  outreachLog      OutreachMessage[]
-  workoutLogs      WorkoutLog[]
-  workouts         Workout[]
-  nutritionEntries NutritionEntry[]
-  progressPhotos   ProgressPhoto[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                 String              @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id])
+  userId             String?             @unique // null until client onboards to the app
+  user               User?               @relation("ClientUser", fields: [userId], references: [id])
+  fullName           String
+  email              String?
+  phone              String?
+  dob                DateTime?
+  primaryGoal        String?
+  status             ClientStatus        @default(PROSPECT)
+  retentionScore     Int?
+  retentionFlag      String?
+  lastContactAt      DateTime?
+  deletedAt          DateTime?
+  intakeForms        IntakeForm[]
+  assessments        Assessment[]
+  programAssignments ProgramAssignment[]
+  sessionNotes       SessionNote[]
+  outreachLog        OutreachMessage[]
+  workoutLogs        WorkoutLog[]
+  workouts           Workout[]
+  nutritionEntries   NutritionEntry[]
+  progressPhotos     ProgressPhoto[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 enum ClientStatus {
@@ -193,139 +195,199 @@ enum MovementPattern {
 }
 
 model Exercise {
-  id               String                 @id @default(cuid())
-  workspaceId      String? // null = global library
-  workspace        Workspace?             @relation(fields: [workspaceId], references: [id])
-  name             String
-  slug             String                 @unique
-  movementPattern  MovementPattern
-  primaryMuscles   Json // String[]
-  secondaryMuscles Json // String[]
-  equipment        String
-  instructions     Json // String[]
-  gifUrl           String?
-  videoUrl         String?
-  coachingCues     String[]               @default([])
-  regression       String?
-  progression      String?
-  prescriptions    ExercisePrescription[]
-  createdAt        DateTime               @default(now())
+  id                String                    @id @default(cuid())
+  workspaceId       String? // null = global library
+  workspace         Workspace?                @relation(fields: [workspaceId], references: [id])
+  name              String
+  slug              String                    @unique
+  movementPattern   MovementPattern
+  primaryMuscles    Json // String[]
+  secondaryMuscles  Json // String[]
+  equipment         String
+  instructions      Json // String[]
+  gifUrl            String?
+  videoUrl          String?
+  coachingCues      String[]                  @default([])
+  regression        String?
+  progression       String?
+  workoutExercises  WorkoutExercise[]
+  assignedExercises AssignedWorkoutExercise[]
+  createdAt         DateTime                  @default(now())
 }
 
-// Standalone workout — isTemplate=true + clientId=null = reusable template
+// Workout: used both as a standalone template (blockId=null) and as part of a Block (blockId set)
 model Workout {
-  id           String         @id @default(cuid())
+  id           String          @id @default(cuid())
   workspaceId  String
-  workspace    Workspace      @relation(fields: [workspaceId], references: [id])
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id])
+  blockId      String?
+  block        Block?          @relation(fields: [blockId], references: [id], onDelete: Cascade)
   clientId     String?
-  client       ClientProfile? @relation(fields: [clientId], references: [id])
+  client       ClientProfile?  @relation(fields: [clientId], references: [id])
   name         String
-  isTemplate   Boolean        @default(false)
+  dayOfWeek    Int? // 1–7; null for standalone templates
+  order        Int? // position within block
+  isTemplate   Boolean         @default(false)
   templateName String?
   templateTags Json? // { goal, split, level, equipment }
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  exercises    WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  workoutId      String
+  exerciseId     String
+  order          Int
+  prescribedSets Json // SetShape[]
+  notes          String?  @db.Text
+
+  workout        Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise       Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@index([workoutId, order])
 }
 
 // ─────────────────────────────────────────────
-// PROGRAMS
+// PROGRAMS (workspace-level templates)
 // ─────────────────────────────────────────────
 
 model Program {
-  id            String        @id @default(cuid())
-  clientId      String
-  client        ClientProfile @relation(fields: [clientId], references: [id])
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
   name          String
-  goal          String
-  durationWeeks Int
-  status        ProgramStatus @default(DRAFT)
-  markdownBlob  String?       @db.Text
-  structure     Json?
-  blocks        ProgramBlock[]
+  description   String?   @db.Text
+  goalTags      Json? // { goals: string[], conditions: string[] }
+  durationWeeks Int // stored for query convenience; should equal sum of block.weeks
+  isTemplate    Boolean   @default(true)
   deletedAt     DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  blocks      Block[]
+  assignments ProgramAssignment[]
+
+  @@index([workspaceId, deletedAt])
 }
 
-enum ProgramStatus {
-  DRAFT
-  ACTIVE
-  COMPLETED
-  ARCHIVED
-}
-
-model ProgramBlock {
-  id        String            @id @default(cuid())
-  programId String
-  program   Program           @relation(fields: [programId], references: [id])
-  weekStart Int
-  weekEnd   Int
-  focus     String?
-  notes     String?           @db.Text
-  workouts  WorkoutTemplate[]
-  createdAt DateTime          @default(now())
-}
-
-model WorkoutTemplate {
-  id          String                 @id @default(cuid())
-  blockId     String
-  block       ProgramBlock           @relation(fields: [blockId], references: [id])
-  dayOfWeek   Int
+model Block {
+  id          String    @id @default(cuid())
+  workspaceId String
+  programId   String
   name        String
-  notes       String?                @db.Text
-  exercises   ExercisePrescription[]
-  workoutLogs WorkoutLog[]
-  createdAt   DateTime               @default(now())
-}
+  order       Int // position within program (1-indexed)
+  weeks       Int // duration in weeks
 
-model ExercisePrescription {
-  id                String          @id @default(cuid())
-  workoutTemplateId String
-  workoutTemplate   WorkoutTemplate @relation(fields: [workoutTemplateId], references: [id])
-  exerciseId        String
-  exercise          Exercise        @relation(fields: [exerciseId], references: [id])
-  order             Int
-  sets              Int
-  reps              String
-  loadGuidance      String?
-  restSeconds       Int?
-  tempo             String?
-  rpe               Int?
-  notes             String?
-  setLogs           SetLog[]
-  createdAt         DateTime        @default(now())
+  program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  workouts    Workout[]
+
+  @@index([programId, order])
 }
 
 // ─────────────────────────────────────────────
-// WORKOUT LOGGING
+// PROGRAM ASSIGNMENTS (client snapshots)
+// ─────────────────────────────────────────────
+
+model ProgramAssignment {
+  id              String           @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  clientId        String
+  client          ClientProfile    @relation(fields: [clientId], references: [id])
+  sourceProgramId String
+  sourceProgram   Program          @relation(fields: [sourceProgramId], references: [id])
+  name            String // copied from Program.name at assignment time; editable
+  startDate       DateTime
+  status          AssignmentStatus @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  assignedWorkouts AssignedWorkout[]
+
+  @@index([workspaceId, clientId, status])
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELED
+}
+
+model AssignedWorkout {
+  id                  String        @id @default(cuid())
+  workspaceId         String
+  programAssignmentId String
+  sourceWorkoutId     String? // FK to template Workout for traceability; null for ad-hoc
+  name                String
+  scheduledDate       DateTime
+  loggedBy            LoggedBy      @default(TRAINER)
+  status              WorkoutStatus @default(PLANNED)
+  order               Int
+  notes               String?       @db.Text
+
+  programAssignment ProgramAssignment         @relation(fields: [programAssignmentId], references: [id], onDelete: Cascade)
+  exercises         AssignedWorkoutExercise[]
+
+  @@index([programAssignmentId, scheduledDate])
+}
+
+enum LoggedBy {
+  TRAINER
+  CLIENT
+}
+
+enum WorkoutStatus {
+  PLANNED
+  LOGGED
+  SKIPPED
+  RESCHEDULED
+}
+
+model AssignedWorkoutExercise {
+  id                String  @id @default(cuid())
+  workspaceId       String
+  assignedWorkoutId String
+  exerciseId        String
+  order             Int
+  prescribedSets    Json // SetShape[]
+  notes             String? @db.Text
+
+  assignedWorkout AssignedWorkout @relation(fields: [assignedWorkoutId], references: [id], onDelete: Cascade)
+  exercise        Exercise        @relation(fields: [exerciseId], references: [id])
+
+  @@index([assignedWorkoutId, order])
+}
+
+// ─────────────────────────────────────────────
+// WORKOUT LOGGING (Week 2 — stubs kept for FK hygiene)
 // ─────────────────────────────────────────────
 
 model WorkoutLog {
-  id                String           @id @default(cuid())
-  clientId          String
-  client            ClientProfile    @relation(fields: [clientId], references: [id])
-  workoutTemplateId String?
-  workoutTemplate   WorkoutTemplate? @relation(fields: [workoutTemplateId], references: [id])
-  date              DateTime
-  durationMin       Int?
-  rpeAvg            Float?
-  clientNotes       String?          @db.Text
-  trainerSeen       Boolean          @default(false)
-  sets              SetLog[]
-  createdAt         DateTime         @default(now())
+  id          String        @id @default(cuid())
+  clientId    String
+  client      ClientProfile @relation(fields: [clientId], references: [id])
+  date        DateTime
+  durationMin Int?
+  rpeAvg      Float?
+  clientNotes String?       @db.Text
+  trainerSeen Boolean       @default(false)
+  sets        SetLog[]
+  createdAt   DateTime      @default(now())
 }
 
 model SetLog {
-  id                     String                @id @default(cuid())
-  workoutLogId           String
-  workoutLog             WorkoutLog            @relation(fields: [workoutLogId], references: [id])
-  exercisePrescriptionId String?
-  exercisePrescription   ExercisePrescription? @relation(fields: [exercisePrescriptionId], references: [id])
-  setNumber              Int
-  weight                 Float?
-  reps                   Int?
-  completed              Boolean               @default(true)
-  createdAt              DateTime              @default(now())
+  id           String     @id @default(cuid())
+  workoutLogId String
+  workoutLog   WorkoutLog @relation(fields: [workoutLogId], references: [id])
+  setNumber    Int
+  weight       Float?
+  reps         Int?
+  completed    Boolean    @default(true)
+  createdAt    DateTime   @default(now())
 }
 
 // ─────────────────────────────────────────────
@@ -350,7 +412,7 @@ model SessionNote {
 model NutritionEntry {
   id           String        @id @default(cuid())
   clientId     String
-  client        ClientProfile @relation(fields: [clientId], references: [id])
+  client       ClientProfile @relation(fields: [clientId], references: [id])
   date         DateTime
   mealType     String
   photoUrl     String?
@@ -382,13 +444,13 @@ enum PhotoAngle {
 // ─────────────────────────────────────────────
 
 model Conversation {
-  id           String    @id @default(cuid())
-  workspaceId  String
-  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
   participants Json
-  messages     Message[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Message {
