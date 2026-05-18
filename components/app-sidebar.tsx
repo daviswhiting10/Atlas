@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Inbox,
   Users,
@@ -12,6 +13,7 @@ import {
   ClipboardList,
   Settings,
   Zap,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +43,12 @@ const navItems = [
     label: "Outreach",
     items: [
       { href: "/outreach", icon: MessageSquare, label: "Outreach" },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { href: "/pricing", icon: DollarSign, label: "Pricing" },
     ],
   },
 ];
@@ -106,6 +114,12 @@ export function AppSidebar() {
         <div className="mt-2 px-2 py-2">
           <p className="text-xs font-medium text-zinc-400">Davis Whiting</p>
           <p className="text-xs text-zinc-600">NASM CPT · CNC</p>
+          <button
+            onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
+            className="mt-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </aside>

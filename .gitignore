@@ -46,3 +46,5 @@ trainer-os.db-wal
 
 # local client files
 /data/clients/
+.env.local.save
+NOTES.md

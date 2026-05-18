@@ -16,43 +16,63 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronRight, ChevronLeft, CheckCircle, AlertTriangle, Loader2, Upload } from "lucide-react";
+import { ChevronRight, ChevronLeft, CheckCircle, AlertTriangle, Loader2, Upload, Plus } from "lucide-react";
 
 type Client = { id: string; fullName: string };
 
 type FormData = {
-  // Step 1: Demographics & History
+  // Step 0: Demographics
   age: string;
   sex: string;
+  weight: string;
+  height: string;
   occupation: string;
   trainingHistory: string;
   yearsTraining: string;
-  // Step 2: Goals
+  fatMass: string;
+  leanMass: string;
+  bfp: string;
+  vf: string;
+  // Step 1: Goals
   primaryGoal: string;
   secondaryGoals: string;
   targetTimeline: string;
-  // Step 3: Injury & Medical
+  whyImportant: string;
+  // Step 2: Injury & Medical
   currentInjuries: string;
   pastInjuries: string;
   medications: string;
   medicalConditions: string;
-  // Step 4: PAR-Q+
+  priorCoaching: string;
+  // Step 3: PAR-Q+
   heartCondition: string;
   chestPain: string;
   dizziness: string;
   boneJointProblem: string;
   bloodPressureMeds: string;
   otherReason: string;
-  // Step 5: Lifestyle
+  // Step 4: Lifestyle & Nutrition
   sleepHours: string;
   stressLevel: string;
-  nutritionBaseline: string;
+  nutritionBreakfast: string;
+  nutritionLunch: string;
+  nutritionDinner: string;
+  nutritionSnacks: string;
+  nutritionDrinks: string;
+  nutritionSupplements: string;
   waterIntake: string;
-  // Step 6: Preferences
+  supportSystem: string;
+  biggestMotivation: string;
+  biggestChallenge: string;
+  // Step 5: Preferences & Wrap-Up
   sessionLength: string;
   sessionsPerWeek: string;
+  preferredDays: string;
+  preferredTime: string;
   equipment: string;
   dislikes: string;
+  confidenceScore: string;
+  limitingFactor: string;
 };
 
 const STEPS = [
@@ -60,18 +80,23 @@ const STEPS = [
   "Goals",
   "Injury History",
   "PAR-Q+",
-  "Lifestyle",
+  "Lifestyle & Nutrition",
   "Preferences",
 ];
 
 const EMPTY_FORM: FormData = {
-  age: "", sex: "", occupation: "", trainingHistory: "", yearsTraining: "",
-  primaryGoal: "", secondaryGoals: "", targetTimeline: "",
-  currentInjuries: "", pastInjuries: "", medications: "", medicalConditions: "",
+  age: "", sex: "", weight: "", height: "", occupation: "", trainingHistory: "", yearsTraining: "",
+  fatMass: "", leanMass: "", bfp: "", vf: "",
+  primaryGoal: "", secondaryGoals: "", targetTimeline: "", whyImportant: "",
+  currentInjuries: "", pastInjuries: "", medications: "", medicalConditions: "", priorCoaching: "",
   heartCondition: "no", chestPain: "no", dizziness: "no", boneJointProblem: "no",
   bloodPressureMeds: "no", otherReason: "no",
-  sleepHours: "", stressLevel: "", nutritionBaseline: "", waterIntake: "",
-  sessionLength: "", sessionsPerWeek: "", equipment: "", dislikes: "",
+  sleepHours: "", stressLevel: "",
+  nutritionBreakfast: "", nutritionLunch: "", nutritionDinner: "", nutritionSnacks: "",
+  nutritionDrinks: "", nutritionSupplements: "",
+  waterIntake: "", supportSystem: "", biggestMotivation: "", biggestChallenge: "",
+  sessionLength: "", sessionsPerWeek: "", preferredDays: "", preferredTime: "",
+  equipment: "", dislikes: "", confidenceScore: "", limitingFactor: "",
 };
 
 function YesNoField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -119,6 +144,14 @@ export default function IntakePage() {
   function set(field: keyof FormData) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  }
+
+  function handleClientSelect(v: string) {
+    if (v === "__new__") {
+      router.push("/clients");
+      return;
+    }
+    setClientId(v);
   }
 
   async function submit() {
@@ -236,7 +269,7 @@ export default function IntakePage() {
       {/* Client selector */}
       <div className="mb-6">
         <Label className="mb-1.5 block">Client</Label>
-        <Select value={clientId} onValueChange={(v) => { if (v) setClientId(v); }}>
+        <Select value={clientId} onValueChange={handleClientSelect}>
           <SelectTrigger className="w-64">
             <SelectValue placeholder="Select client..." />
           </SelectTrigger>
@@ -244,6 +277,12 @@ export default function IntakePage() {
             {clients.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.fullName}</SelectItem>
             ))}
+            <SelectItem value="__new__">
+              <span className="flex items-center gap-1.5 text-primary">
+                <Plus className="w-3.5 h-3.5" />
+                Add new client
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -303,6 +342,16 @@ export default function IntakePage() {
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Weight</Label>
+                  <Input value={form.weight} onChange={set("weight")} placeholder="e.g. 185 lbs" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Height</Label>
+                  <Input value={form.height} onChange={set("height")} placeholder={`e.g. 5'10"`} />
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>Occupation</Label>
                 <Input value={form.occupation} onChange={set("occupation")} placeholder="e.g. Software engineer, nurse, teacher..." />
@@ -314,6 +363,27 @@ export default function IntakePage() {
               <div className="space-y-1.5">
                 <Label>Years of consistent training</Label>
                 <Input value={form.yearsTraining} onChange={set("yearsTraining")} placeholder="e.g. 2 years, 6 months, just starting" />
+              </div>
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground mb-3">InBody Scan Results <span className="font-normal">(optional — fill after scan)</span></p>
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Fat Mass</Label>
+                    <Input value={form.fatMass} onChange={set("fatMass")} placeholder="lbs" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Lean Mass</Label>
+                    <Input value={form.leanMass} onChange={set("leanMass")} placeholder="lbs" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>BFP %</Label>
+                    <Input value={form.bfp} onChange={set("bfp")} placeholder="%" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>VF Score</Label>
+                    <Input value={form.vf} onChange={set("vf")} placeholder="1–20" />
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -334,7 +404,11 @@ export default function IntakePage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Secondary goals or specifics</Label>
-                <Textarea value={form.secondaryGoals} onChange={set("secondaryGoals")} rows={2} placeholder="e.g. Run a 5K, fit in my suit again, reduce lower back pain..." />
+                <Textarea value={form.secondaryGoals} onChange={set("secondaryGoals")} rows={3} placeholder="List up to 3 additional goals — e.g. run a 5K, fit in my suit, reduce lower back pain..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Why is it important to achieve these goals? How will your life change?</Label>
+                <Textarea value={form.whyImportant} onChange={set("whyImportant")} rows={3} placeholder="What's the deeper motivation? How will things be different when you get there?" />
               </div>
               <div className="space-y-1.5">
                 <Label>Timeline</Label>
@@ -359,6 +433,10 @@ export default function IntakePage() {
               <div className="space-y-1.5">
                 <Label>Diagnosed medical conditions</Label>
                 <Input value={form.medicalConditions} onChange={set("medicalConditions")} placeholder="e.g. Type 2 diabetes, hypertension, none..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Have you worked with a nutrition or fitness coach before?</Label>
+                <Textarea value={form.priorCoaching} onChange={set("priorCoaching")} rows={2} placeholder="If yes, what worked? What didn't?" />
               </div>
             </>
           )}
@@ -401,21 +479,58 @@ export default function IntakePage() {
           )}
           {step === 4 && (
             <>
-              <div className="space-y-1.5">
-                <Label>Sleep (hours per night average)</Label>
-                <Input value={form.sleepHours} onChange={set("sleepHours")} placeholder="e.g. 7" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Sleep (hours/night)</Label>
+                  <Input value={form.sleepHours} onChange={set("sleepHours")} placeholder="e.g. 7" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Stress level (1–10)</Label>
+                  <Input value={form.stressLevel} onChange={set("stressLevel")} placeholder="1 = zen, 10 = on fire" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Stress level (1–10)</Label>
-                <Input value={form.stressLevel} onChange={set("stressLevel")} placeholder="1 = zen, 10 = on fire" />
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground mb-3">Typical day of nutrition</p>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Breakfast</Label>
+                    <Input value={form.nutritionBreakfast} onChange={set("nutritionBreakfast")} placeholder="What do you typically eat for breakfast?" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Lunch</Label>
+                    <Input value={form.nutritionLunch} onChange={set("nutritionLunch")} placeholder="Typical lunch?" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Dinner</Label>
+                    <Input value={form.nutritionDinner} onChange={set("nutritionDinner")} placeholder="Typical dinner?" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Snacks</Label>
+                    <Input value={form.nutritionSnacks} onChange={set("nutritionSnacks")} placeholder="Any snacks throughout the day?" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Drinks (caffeine / alcohol / water)</Label>
+                    <Input value={form.nutritionDrinks} onChange={set("nutritionDrinks")} placeholder="Coffee, energy drinks, alcohol frequency, water oz..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Current supplements</Label>
+                    <Input value={form.nutritionSupplements} onChange={set("nutritionSupplements")} placeholder="Protein powder, creatine, vitamins, none..." />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Current nutrition habits</Label>
-                <Textarea value={form.nutritionBaseline} onChange={set("nutritionBaseline")} rows={3} placeholder="How do you eat day-to-day? Any dietary restrictions? Do you track anything?" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Daily water intake</Label>
-                <Input value={form.waterIntake} onChange={set("waterIntake")} placeholder="e.g. 64oz, 1 liter, not enough..." />
+              <div className="pt-2 border-t border-border space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Do you have a support system? What do they think about your goals?</Label>
+                  <Textarea value={form.supportSystem} onChange={set("supportSystem")} rows={2} placeholder="Spouse, friends, family — are they on board?" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>What is your biggest motivation?</Label>
+                  <Input value={form.biggestMotivation} onChange={set("biggestMotivation")} placeholder="What gets you out of bed?" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>What is your biggest challenge?</Label>
+                  <Input value={form.biggestChallenge} onChange={set("biggestChallenge")} placeholder="What has gotten in the way before?" />
+                </div>
               </div>
             </>
           )}
@@ -450,12 +565,52 @@ export default function IntakePage() {
                 </div>
               </div>
               <div className="space-y-1.5">
+                <Label>Preferred training days</Label>
+                <Input value={form.preferredDays} onChange={set("preferredDays")} placeholder="e.g. Mon/Wed/Fri, weekdays only, weekends work best..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Preferred time of day</Label>
+                <Select value={form.preferredTime} onValueChange={(v) => { if (v) setForm({ ...form, preferredTime: v }); }}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="early_morning">Early morning (5–7 AM)</SelectItem>
+                    <SelectItem value="morning">Morning (7–10 AM)</SelectItem>
+                    <SelectItem value="midday">Midday (10 AM–1 PM)</SelectItem>
+                    <SelectItem value="afternoon">Afternoon (1–5 PM)</SelectItem>
+                    <SelectItem value="evening">Evening (5–8 PM)</SelectItem>
+                    <SelectItem value="flexible">Flexible</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Equipment available</Label>
                 <Textarea value={form.equipment} onChange={set("equipment")} rows={2} placeholder="Full gym, home gym (describe), bands only, etc." />
               </div>
               <div className="space-y-1.5">
                 <Label>Exercise dislikes or hard limits</Label>
                 <Textarea value={form.dislikes} onChange={set("dislikes")} rows={2} placeholder="e.g. hate running, bad knees so no high-impact, don't want to do Olympic lifts..." />
+              </div>
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground mb-3">Confidence Check</p>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>On a scale of 1–10, how confident are you in achieving the goals we discussed?</Label>
+                    <Select value={form.confidenceScore} onValueChange={(v) => { if (v) setForm({ ...form, confidenceScore: v }); }}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {["1","2","3","4","5","6","7","8","9","10"].map((n) => (
+                          <SelectItem key={n} value={n}>{n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {form.confidenceScore && parseInt(form.confidenceScore) < 10 && (
+                    <div className="space-y-1.5">
+                      <Label>What is the limiting factor?</Label>
+                      <Textarea value={form.limitingFactor} onChange={set("limitingFactor")} rows={2} placeholder="What would need to change to make it a 10?" />
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}

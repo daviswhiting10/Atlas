@@ -59,9 +59,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           select: { id: true, role: true, workspaceId: true },
         })
         if (dbUser) {
+          // If user has no workspace, auto-assign the primary workspace
+          let workspaceId = dbUser.workspaceId
+          if (!workspaceId) {
+            const primary = await prisma.workspace.findFirst({
+              select: { id: true },
+              orderBy: { createdAt: "asc" },
+            })
+            if (primary) {
+              await prisma.user.update({
+                where: { id: dbUser.id },
+                data: { workspaceId: primary.id },
+              })
+              workspaceId = primary.id
+            }
+          }
           token.id = dbUser.id
           token.role = dbUser.role
-          token.workspaceId = dbUser.workspaceId ?? undefined
+          token.workspaceId = workspaceId ?? undefined
         }
       }
       return token

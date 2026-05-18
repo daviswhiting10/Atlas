@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/client";
 import { NextResponse } from "next/server";
 
 export type AuthContext = {
@@ -45,7 +46,15 @@ export function withWorkspace<P extends Record<string, string> = Record<string, 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const workspaceId = session.user.workspaceId;
+    let workspaceId = session.user.workspaceId;
+    if (!workspaceId) {
+      // Fallback: look up directly from DB in case JWT is stale
+      const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { workspaceId: true },
+      });
+      workspaceId = dbUser?.workspaceId ?? undefined;
+    }
     if (!workspaceId) {
       return NextResponse.json(
         { error: "No workspace associated with this account. Contact support." },
