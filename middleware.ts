@@ -19,6 +19,12 @@ export async function middleware(req: NextRequest) {
     const role = session?.user?.role ?? "TRAINER";
     const path = req.nextUrl.pathname;
 
+    // Authenticated user landing on /login → redirect to their home
+    if (session?.user && path === "/login") {
+      const dest = role === "CLIENT" ? "/today" : "/inbox";
+      return NextResponse.redirect(new URL(dest, req.url));
+    }
+
     // CLIENT accessing a trainer route → redirect to /today
     if (role === "CLIENT" && !isClientPath(path) && !isApiClientPath(path)) {
       return NextResponse.redirect(new URL("/today", req.url));
