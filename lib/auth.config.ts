@@ -7,6 +7,7 @@ export default {
   pages: {
     signIn: "/login",
     verifyRequest: "/login?verify=1",
+    error: "/error",
   },
   callbacks: {
     jwt({ token, user }) {

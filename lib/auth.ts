@@ -4,8 +4,23 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
 
+const baseAdapter = PrismaAdapter(prisma)
+
+// Override createVerificationToken to clear stale tokens for the same email
+// before inserting a new one. This ensures only the latest magic link is valid,
+// preventing "link already used" errors from old emails in the inbox.
+const adapter = {
+  ...baseAdapter,
+  async createVerificationToken(verificationToken: { identifier: string; token: string; expires: Date }) {
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: verificationToken.identifier },
+    })
+    return baseAdapter.createVerificationToken!(verificationToken)
+  },
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter,
   session: { strategy: "jwt" },
   ...authConfig,
   providers: [
