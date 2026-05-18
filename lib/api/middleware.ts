@@ -48,12 +48,29 @@ export function withWorkspace<P extends Record<string, string> = Record<string, 
 
     let workspaceId = session.user.workspaceId;
     if (!workspaceId) {
-      // Fallback: look up directly from DB in case JWT is stale
+      // JWT is stale — look up or bootstrap workspace from DB
       const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { workspaceId: true },
+        select: { id: true, name: true, email: true, workspaceId: true },
       });
       workspaceId = dbUser?.workspaceId ?? undefined;
+
+      if (!workspaceId && dbUser) {
+        let primary = await prisma.workspace.findFirst({
+          select: { id: true },
+          orderBy: { createdAt: "asc" },
+        });
+        if (!primary) {
+          primary = await prisma.workspace.create({
+            data: { name: dbUser.name ?? dbUser.email ?? "My Workspace" },
+          });
+        }
+        await prisma.user.update({
+          where: { id: dbUser.id },
+          data: { workspaceId: primary.id },
+        });
+        workspaceId = primary.id;
+      }
     }
     if (!workspaceId) {
       return NextResponse.json(
