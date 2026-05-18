@@ -46,8 +46,10 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
   const [newPattern, setNewPattern] = useState("");
   const [newEquipment, setNewEquipment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -61,6 +63,22 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
       setLoading(false);
     }, 250);
   }, [query]);
+
+  // Recalculate dropdown position whenever it opens
+  useEffect(() => {
+    if (open && inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+        backgroundColor: "var(--popover)",
+        color: "var(--popover-foreground)",
+      });
+    }
+  }, [open, results]);
 
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -116,6 +134,7 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <Input
+          ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
@@ -125,8 +144,8 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
       </div>
       {open && (
         <div
-          className="absolute z-50 mt-1 w-full border rounded-md shadow-md max-h-80 overflow-y-auto"
-          style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)" }}
+          className="border rounded-md shadow-lg max-h-64 overflow-y-auto"
+          style={dropdownStyle}
         >
           {loading && <p className="px-3 py-2 text-xs text-muted-foreground">Searching...</p>}
           {!loading && results.map((ex) => (
@@ -143,7 +162,6 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
             </button>
           ))}
 
-          {/* Add new exercise — shown when no results or as footer */}
           {!loading && !adding && (
             <button
               type="button"
@@ -155,7 +173,6 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
             </button>
           )}
 
-          {/* Inline mini-form */}
           {adding && (
             <div
               className="px-3 py-3 border-t border-border space-y-2"

@@ -83,7 +83,7 @@ export default function ClientsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    if (!res.ok) { toast.error("Failed to create client"); return; }
+    if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(`Failed to create client (${res.status}): ${err?.error ?? "unknown"}`); return; }
     const newClient = await res.json();
     setClients((prev) => [newClient, ...prev]);
     setDialogOpen(false);

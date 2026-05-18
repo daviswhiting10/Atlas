@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -116,10 +116,29 @@ function makeInitial(): ProgramState {
   return { name: "", description: "", goals: [], conditions: [], blocks: [] };
 }
 
+const DRAFT_KEY = "atlas-program-draft";
+
 export function ProgramBuilder({ programId, initial }: Props) {
   const router = useRouter();
-  const [prog, setProg] = useState<ProgramState>(initial ?? makeInitial());
+  const [prog, setProg] = useState<ProgramState>(() => {
+    // For new programs only: restore draft from localStorage
+    if (!programId && !initial && typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (saved) return JSON.parse(saved) as ProgramState;
+      } catch {}
+    }
+    return initial ?? makeInitial();
+  });
   const [saving, setSaving] = useState(false);
+
+  // Auto-save draft to localStorage for new programs
+  useEffect(() => {
+    if (programId) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(prog));
+    } catch {}
+  }, [prog, programId]);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -298,6 +317,7 @@ export function ProgramBuilder({ programId, initial }: Props) {
       }
       const saved = await res.json();
       toast.success("Program saved");
+      try { localStorage.removeItem(DRAFT_KEY); } catch {}
       if (andAssign) {
         router.push(`/programs/${saved.id}/assign`);
       } else if (!programId) {
@@ -608,7 +628,7 @@ export function ProgramBuilder({ programId, initial }: Props) {
             <Save className="w-4 h-4 mr-1.5" />
             Save
           </Button>
-          <Button disabled={saving || !programId} onClick={() => save(true)}>
+          <Button disabled={saving} onClick={() => save(true)}>
             <UserPlus className="w-4 h-4 mr-1.5" />
             Save &amp; Assign
           </Button>

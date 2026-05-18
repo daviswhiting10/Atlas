@@ -76,7 +76,7 @@ export default function LeadsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    if (!res.ok) { toast.error("Failed to add lead"); return; }
+    if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(`Failed to add lead (${res.status}): ${err?.error ?? "unknown"}`); return; }
     const lead = await res.json();
     setLeads((prev) => [lead, ...prev]);
     setDialogOpen(false);
