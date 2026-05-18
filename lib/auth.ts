@@ -45,7 +45,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           body: JSON.stringify({
             from: "Atlas <onboarding@resend.dev>",
             to: [identifier],
-            subject: "Sign in to Atlas",
+            subject: `Sign in to Atlas — ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
             html: `<p style="font-family:sans-serif;max-width:480px;margin:40px auto">
               <strong style="font-size:18px">Sign in to Atlas</strong><br/><br/>
               <a href="${url}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:15px">Sign in &rarr;</a>
