@@ -3,6 +3,16 @@ import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
 
+export const GET = withWorkspace(async (_req, { workspaceId }) => {
+  const notes = await prisma.sessionNote.findMany({
+    where: { client: { workspaceId, deletedAt: null } },
+    orderBy: { date: "desc" },
+    take: 20,
+    include: { client: { select: { id: true, fullName: true } } },
+  });
+  return NextResponse.json(notes);
+});
+
 const CreateSchema = z.object({
   clientId: z.string(),
   rawInput: z.string(),

@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +21,13 @@ import { toast } from "sonner";
 import { Mic, MicOff, Loader2, CheckCircle } from "lucide-react";
 
 type Client = { id: string; fullName: string };
+type SessionRecord = {
+  id: string;
+  date: string;
+  rawInput: string;
+  rpeAvg: number | null;
+  client: { id: string; fullName: string };
+};
 type StructuredNote = {
   subjective: string;
   objective: string;
@@ -37,6 +45,7 @@ export default function SessionsPage() {
   const preselectedClientId = searchParams.get("clientId") ?? "";
 
   const [clients, setClients] = useState<Client[]>([]);
+  const [recentSessions, setRecentSessions] = useState<SessionRecord[]>([]);
   const [clientId, setClientId] = useState(preselectedClientId);
   const [rawInput, setRawInput] = useState("");
   const [structuredNote, setStructuredNote] = useState<StructuredNote | null>(null);
@@ -46,6 +55,7 @@ export default function SessionsPage() {
 
   useEffect(() => {
     fetch("/api/clients").then((r) => r.json()).then((data) => setClients(Array.isArray(data) ? data : []));
+    fetch("/api/sessions").then((r) => r.json()).then((data) => setRecentSessions(Array.isArray(data) ? data : []));
   }, []);
 
   function toggleRecording() {
@@ -112,6 +122,11 @@ export default function SessionsPage() {
     });
     if (!res.ok) { toast.error("Failed to save"); return; }
     toast.success("Session saved");
+    const saved = await res.json();
+    const client = clients.find((c) => c.id === clientId);
+    if (client) {
+      setRecentSessions((prev) => [{ ...saved, client: { id: client.id, fullName: client.fullName } }, ...prev]);
+    }
     setRawInput("");
     setStructuredNote(null);
   }
@@ -232,6 +247,34 @@ export default function SessionsPage() {
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+
+      {recentSessions.length > 0 && (
+        <div className="mt-10">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent Sessions</p>
+          <div className="space-y-2">
+            {recentSessions.map((s) => (
+              <Card key={s.id}>
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/clients/${s.client.id}`} className="text-sm font-medium hover:text-primary">
+                        {s.client.fullName}
+                      </Link>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                    {s.rpeAvg != null && (
+                      <span className="text-xs font-mono text-muted-foreground">RPE {s.rpeAvg.toFixed(1)}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{s.rawInput}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
