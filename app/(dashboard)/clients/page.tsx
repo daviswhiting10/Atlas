@@ -33,7 +33,7 @@ type Client = {
   primaryGoal: string | null;
   retentionScore: number | null;
   updatedAt: string;
-  _count: { sessionNotes: number; programs: number };
+  _count: { sessionNotes: number; programAssignments: number };
 };
 
 const GOAL_LABELS: Record<string, string> = {
@@ -239,7 +239,7 @@ export default function ClientsPage() {
                 <div className="flex items-center gap-4">
                   <div className="text-right hidden sm:block">
                     <p className="text-xs text-muted-foreground">
-                      {client._count.sessionNotes} sessions · {client._count.programs} programs
+                      {client._count.sessionNotes} sessions · {client._count.programAssignments} programs
                     </p>
                     {client.retentionScore != null && (
                       <p className="text-xs font-mono text-muted-foreground">

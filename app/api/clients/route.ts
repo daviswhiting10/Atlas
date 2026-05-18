@@ -26,5 +26,8 @@ export const POST = withWorkspace(async (req, { workspaceId }) => {
     ...parsed.data,
     email: parsed.data.email || undefined,
   });
-  return NextResponse.json(client, { status: 201 });
+  return NextResponse.json(
+    { ...client, _count: { sessionNotes: 0, programAssignments: 0 } },
+    { status: 201 }
+  );
 });
