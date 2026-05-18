@@ -26,6 +26,7 @@ export default {
           | "CLIENT"
           | "ADMIN"
         session.user.workspaceId = token.workspaceId as string | undefined
+        session.user.clientProfileId = token.clientProfileId as string | undefined
       }
       return session
     },

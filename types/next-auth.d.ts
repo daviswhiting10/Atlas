@@ -6,6 +6,7 @@ declare module "next-auth" {
       id: string
       role: "TRAINER" | "CLIENT" | "ADMIN"
       workspaceId?: string
+      clientProfileId?: string
     } & DefaultSession["user"]
   }
 }
@@ -15,5 +16,6 @@ declare module "next-auth/jwt" {
     id?: string
     role?: string
     workspaceId?: string
+    clientProfileId?: string
   }
 }

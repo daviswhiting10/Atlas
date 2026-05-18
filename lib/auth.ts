@@ -77,6 +77,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.id = dbUser.id
           token.role = dbUser.role
           token.workspaceId = workspaceId ?? undefined
+
+          // For CLIENT role: attach clientProfileId
+          if (dbUser.role === "CLIENT") {
+            const cp = await prisma.clientProfile.findFirst({
+              where: { userId: dbUser.id },
+              select: { id: true },
+            })
+            token.clientProfileId = cp?.id ?? undefined
+          }
         }
       }
       return token

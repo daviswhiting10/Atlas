@@ -27,6 +27,7 @@ import {
   MessageSquare,
   AlertTriangle,
   Trash2,
+  UserCheck,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -89,6 +90,18 @@ export default function ClientDetailPage() {
       setClient((prev) => prev ? { ...prev, status: updated.status } : null);
       toast.success("Status updated");
     }
+  }
+
+  async function inviteClient() {
+    if (!client?.email) { toast.error("Add an email to this client first"); return; }
+    const res = await fetch(`/api/clients/${id}/invite`, { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err?.error ?? "Invite failed");
+      return;
+    }
+    const data = await res.json();
+    toast.success(`Invite sent to ${data.email}`);
   }
 
   async function deleteClient() {
@@ -170,6 +183,10 @@ export default function ClientDetailPage() {
             <MessageSquare className="w-3 h-3 mr-1" />
             Message
           </Link>
+          <Button variant="outline" size="sm" onClick={inviteClient}>
+            <UserCheck className="w-3 h-3 mr-1" />
+            Invite to Atlas
+          </Button>
           <Button variant="ghost" size="sm" onClick={deleteClient} className="text-destructive hover:text-destructive">
             <Trash2 className="w-4 h-4" />
           </Button>
