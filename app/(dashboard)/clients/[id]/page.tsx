@@ -280,7 +280,7 @@ export default function ClientDetailPage() {
             Message
           </Link>
           <Link
-            href={`/sessions?clientId=${client.id}`}
+            href={`/clients/${client.id}/log`}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
@@ -435,7 +435,7 @@ export default function ClientDetailPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-semibold">Recent Sessions</CardTitle>
                     <Link
-                      href={`/sessions?clientId=${client.id}`}
+                      href={`/clients/${client.id}/log`}
                       className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "h-7 text-xs")}
                     >
                       <ClipboardList className="w-3 h-3 mr-1" />
@@ -642,7 +642,7 @@ export default function ClientDetailPage() {
         <TabsContent value="sessions">
           <div className="flex justify-between items-center mb-3">
             <p className="text-sm text-muted-foreground">{client.sessionNotes.length} sessions</p>
-            <Link href={`/sessions?clientId=${client.id}`} className={cn(buttonVariants({ size: "sm" }))}>
+            <Link href={`/clients/${client.id}/log`} className={cn(buttonVariants({ size: "sm" }))}>
               <ClipboardList className="w-3 h-3 mr-1.5" />
               Log Session
             </Link>
