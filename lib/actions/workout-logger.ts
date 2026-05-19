@@ -267,3 +267,19 @@ export async function getLastPerformance(
     .filter((s) => s.workoutLog.date.toISOString().slice(0, 10) === mostRecentDate)
     .map(({ weight, reps, rpe, completed }) => ({ weight, reps, rpe, completed }));
 }
+
+// ── getLastExerciseNote ────────────────────────────────────────────────────────
+//
+// Returns the most recent coach note for a client + exercise, or null.
+
+export async function getLastExerciseNote(
+  clientId: string,
+  exerciseId: string
+): Promise<string | null> {
+  const note = await prisma.exerciseCoachNote.findFirst({
+    where: { clientId, exerciseId },
+    orderBy: { createdAt: "desc" },
+    select: { note: true },
+  });
+  return note?.note ?? null;
+}
