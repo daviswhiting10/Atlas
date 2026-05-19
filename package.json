@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
@@ -12,7 +12,8 @@
     "seed:programs": "tsx scripts/seed-programs.ts",
     "fetch:exercises": "tsx scripts/fetch-exercise-db.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -44,11 +44,6 @@ const INCREMENTS: Record<string, { upper: number; lower: number }> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function avgRpe(sets: SetRecord[]): number | null {
-  const values = sets.map((s) => s.rpe).filter((r): r is number => r != null);
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
 
 function maxRpe(sets: SetRecord[]): number | null {
   const values = sets.map((s) => s.rpe).filter((r): r is number => r != null);

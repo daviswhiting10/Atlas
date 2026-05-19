@@ -2,7 +2,7 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -53,8 +53,7 @@ type ExerciseState = {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatLastSets(
-  lastSets: LoggerExercise["lastSets"],
-  goalLabel: string
+  lastSets: LoggerExercise["lastSets"]
 ): string {
   if (lastSets.length === 0) return "";
   const parts = lastSets.map((s) => {
@@ -396,7 +395,7 @@ export default function WorkoutLogger({
       <div className="space-y-4">
         {exercises.map((ex) => {
           const state = exState[ex.aweId];
-          const lastStr = formatLastSets(ex.lastSets, "");
+          const lastStr = formatLastSets(ex.lastSets);
           const s = ex.suggestion;
           const hasLastData = ex.lastSets.length > 0;
 
