@@ -138,6 +138,7 @@ export async function upsertProgram(
                 order: ex.order,
                 prescribedSets: ex.prescribedSets,
                 notes: ex.notes ?? null,
+                section: ex.section ?? null,
               },
             });
           } else {
@@ -149,6 +150,7 @@ export async function upsertProgram(
                 order: ex.order,
                 prescribedSets: ex.prescribedSets,
                 notes: ex.notes ?? null,
+                section: ex.section ?? null,
               },
             });
           }

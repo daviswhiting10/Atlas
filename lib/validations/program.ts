@@ -21,6 +21,7 @@ export const WorkoutExerciseSchema = z.object({
   order: z.number().int().min(1),
   prescribedSets: z.array(SetSchema).min(1, "Add at least one set"),
   notes: z.string().nullable().optional(),
+  section: z.string().nullable().optional(), // "Warmup" | "Main A" | "Main B" | "Burner" | custom
 });
 
 export const WorkoutSchema = z.object({

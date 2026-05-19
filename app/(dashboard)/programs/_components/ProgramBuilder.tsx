@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -45,32 +44,35 @@ type ExerciseInput = {
   notes: string;
 };
 
-type WorkoutInput = {
+// A section is a named group within a day (e.g. "Warmup", "Main A", "Burner")
+type SectionInput = {
   _key: string;
-  id?: string;
   name: string;
-  dayOfWeek: number;
-  order: number;
   exercises: ExerciseInput[];
   open: boolean;
 };
 
-type BlockInput = {
+// A day is a single training session (maps to DB Workout)
+type DayInput = {
   _key: string;
-  id?: string;
+  id?: string;       // DB Workout.id — present when editing
+  blockId?: string;  // DB Block.id — needed for edit reconciliation
   name: string;
+  dayOfWeek: number;
   order: number;
-  weeks: number;
-  workouts: WorkoutInput[];
+  sections: SectionInput[];
   open: boolean;
 };
 
 type ProgramState = {
   name: string;
   description: string;
+  durationWeeks: number;
   goals: string[];
   conditions: string[];
-  blocks: BlockInput[];
+  days: DayInput[];
+  // Store the single DB Block id when editing so we can pass it back for reconciliation
+  blockId?: string;
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -98,6 +100,8 @@ const DAY_LABELS: Record<number, string> = {
   1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun",
 };
 
+const DEFAULT_SECTIONS = ["Warmup", "Main A", "Main B", "Burner"];
+
 let _keyCounter = 0;
 function key() { return `k${++_keyCounter}`; }
 
@@ -105,23 +109,31 @@ function defaultSet(num: number): SetInput {
   return { setNumber: num, weight: null, repMin: 8, repMax: 12, rpe: null, restSeconds: 90, notes: "" };
 }
 
+function makeDefaultSections(): SectionInput[] {
+  return DEFAULT_SECTIONS.map((name) => ({
+    _key: key(),
+    name,
+    exercises: [],
+    open: true,
+  }));
+}
+
 // ─── Builder component ────────────────────────────────────────────────────────
 
 type Props = {
-  programId?: string; // undefined = creating new
+  programId?: string;
   initial?: ProgramState;
 };
 
 function makeInitial(): ProgramState {
-  return { name: "", description: "", goals: [], conditions: [], blocks: [] };
+  return { name: "", description: "", durationWeeks: 4, goals: [], conditions: [], days: [] };
 }
 
-const DRAFT_KEY = "atlas-program-draft";
+const DRAFT_KEY = "atlas-program-draft-v2"; // v2 = new section-based structure
 
 export function ProgramBuilder({ programId, initial }: Props) {
   const router = useRouter();
   const [prog, setProg] = useState<ProgramState>(() => {
-    // For new programs only: restore draft from localStorage
     if (!programId && !initial && typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(DRAFT_KEY);
@@ -132,80 +144,55 @@ export function ProgramBuilder({ programId, initial }: Props) {
   });
   const [saving, setSaving] = useState(false);
 
-  // Auto-save draft to localStorage for new programs
   useEffect(() => {
     if (programId) return;
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(prog));
-    } catch {}
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(prog)); } catch {}
   }, [prog, programId]);
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  // ─── Day actions ──────────────────────────────────────────────────────────
 
-  const updateBlock = useCallback(
-    (bKey: string, fn: (b: BlockInput) => BlockInput) =>
-      setProg((p) => ({ ...p, blocks: p.blocks.map((b) => (b._key === bKey ? fn(b) : b)) })),
-    []
-  );
-
-  const updateWorkout = useCallback(
-    (bKey: string, wKey: string, fn: (w: WorkoutInput) => WorkoutInput) =>
-      updateBlock(bKey, (b) => ({
-        ...b,
-        workouts: b.workouts.map((w) => (w._key === wKey ? fn(w) : w)),
-      })),
-    [updateBlock]
-  );
-
-  const updateExercise = useCallback(
-    (bKey: string, wKey: string, eKey: string, fn: (e: ExerciseInput) => ExerciseInput) =>
-      updateWorkout(bKey, wKey, (w) => ({
-        ...w,
-        exercises: w.exercises.map((e) => (e._key === eKey ? fn(e) : e)),
-      })),
-    [updateWorkout]
-  );
-
-  // ─── Block actions ────────────────────────────────────────────────────────
-
-  function addBlock() {
+  function addDay() {
     setProg((p) => ({
       ...p,
-      blocks: [
-        ...p.blocks,
+      days: [
+        ...p.days,
         {
           _key: key(),
-          name: `Block ${p.blocks.length + 1}`,
-          order: p.blocks.length + 1,
-          weeks: 4,
-          workouts: [],
+          name: `Day ${p.days.length + 1}`,
+          dayOfWeek: Math.min(p.days.length + 1, 7),
+          order: p.days.length + 1,
+          sections: makeDefaultSections(),
           open: true,
         },
       ],
     }));
   }
 
-  function removeBlock(bKey: string) {
+  function removeDay(dKey: string) {
     setProg((p) => ({
       ...p,
-      blocks: p.blocks
-        .filter((b) => b._key !== bKey)
-        .map((b, i) => ({ ...b, order: i + 1 })),
+      days: p.days
+        .filter((d) => d._key !== dKey)
+        .map((d, i) => ({ ...d, order: i + 1 })),
     }));
   }
 
-  // ─── Workout actions ──────────────────────────────────────────────────────
+  const updateDay = useCallback(
+    (dKey: string, fn: (d: DayInput) => DayInput) =>
+      setProg((p) => ({ ...p, days: p.days.map((d) => (d._key === dKey ? fn(d) : d)) })),
+    []
+  );
 
-  function addWorkout(bKey: string) {
-    updateBlock(bKey, (b) => ({
-      ...b,
-      workouts: [
-        ...b.workouts,
+  // ─── Section actions ──────────────────────────────────────────────────────
+
+  function addSection(dKey: string) {
+    updateDay(dKey, (d) => ({
+      ...d,
+      sections: [
+        ...d.sections,
         {
           _key: key(),
-          name: `Day ${b.workouts.length + 1}`,
-          dayOfWeek: Math.min(b.workouts.length + 1, 7),
-          order: b.workouts.length + 1,
+          name: `Block ${d.sections.length + 1}`,
           exercises: [],
           open: true,
         },
@@ -213,27 +200,34 @@ export function ProgramBuilder({ programId, initial }: Props) {
     }));
   }
 
-  function removeWorkout(bKey: string, wKey: string) {
-    updateBlock(bKey, (b) => ({
-      ...b,
-      workouts: b.workouts
-        .filter((w) => w._key !== wKey)
-        .map((w, i) => ({ ...w, order: i + 1 })),
+  function removeSection(dKey: string, sKey: string) {
+    updateDay(dKey, (d) => ({
+      ...d,
+      sections: d.sections.filter((s) => s._key !== sKey),
     }));
   }
 
+  const updateSection = useCallback(
+    (dKey: string, sKey: string, fn: (s: SectionInput) => SectionInput) =>
+      updateDay(dKey, (d) => ({
+        ...d,
+        sections: d.sections.map((s) => (s._key === sKey ? fn(s) : s)),
+      })),
+    [updateDay]
+  );
+
   // ─── Exercise actions ─────────────────────────────────────────────────────
 
-  function addExercise(bKey: string, wKey: string, ex: ExerciseOption) {
-    updateWorkout(bKey, wKey, (w) => ({
-      ...w,
+  function addExercise(dKey: string, sKey: string, ex: ExerciseOption) {
+    updateSection(dKey, sKey, (s) => ({
+      ...s,
       exercises: [
-        ...w.exercises,
+        ...s.exercises,
         {
           _key: key(),
           exerciseId: ex.id,
           exerciseName: ex.name,
-          order: w.exercises.length + 1,
+          order: s.exercises.length + 1,
           prescribedSets: [defaultSet(1), defaultSet(2), defaultSet(3)],
           notes: "",
         },
@@ -241,12 +235,24 @@ export function ProgramBuilder({ programId, initial }: Props) {
     }));
   }
 
-  function removeExercise(bKey: string, wKey: string, eKey: string) {
-    updateWorkout(bKey, wKey, (w) => ({
-      ...w,
-      exercises: w.exercises
+  function removeExercise(dKey: string, sKey: string, eKey: string) {
+    updateSection(dKey, sKey, (s) => ({
+      ...s,
+      exercises: s.exercises
         .filter((e) => e._key !== eKey)
         .map((e, i) => ({ ...e, order: i + 1 })),
+    }));
+  }
+
+  function updateExercise(
+    dKey: string,
+    sKey: string,
+    eKey: string,
+    fn: (e: ExerciseInput) => ExerciseInput
+  ) {
+    updateSection(dKey, sKey, (s) => ({
+      ...s,
+      exercises: s.exercises.map((e) => (e._key === eKey ? fn(e) : e)),
     }));
   }
 
@@ -273,6 +279,9 @@ export function ProgramBuilder({ programId, initial }: Props) {
   async function save(andAssign = false) {
     if (!prog.name.trim()) { toast.error("Program needs a name"); return; }
 
+    // Flatten the Day → Section → Exercise tree into the API shape:
+    // One Block (the entire program) with workouts (days), exercises tagged with section name
+    const globalOrder = { val: 0 };
     const body = {
       name: prog.name.trim(),
       description: prog.description.trim() || null,
@@ -280,25 +289,37 @@ export function ProgramBuilder({ programId, initial }: Props) {
         prog.goals.length || prog.conditions.length
           ? { goals: prog.goals, conditions: prog.conditions }
           : null,
-      blocks: prog.blocks.map((b) => ({
-        id: b.id,
-        name: b.name,
-        order: b.order,
-        weeks: b.weeks,
-        workouts: b.workouts.map((w) => ({
-          id: w.id,
-          name: w.name,
-          dayOfWeek: w.dayOfWeek,
-          order: w.order,
-          exercises: w.exercises.map((e) => ({
-            id: e.id,
-            exerciseId: e.exerciseId,
-            order: e.order,
-            prescribedSets: e.prescribedSets,
-            notes: e.notes || null,
-          })),
-        })),
-      })),
+      blocks: [
+        {
+          id: prog.blockId,
+          name: "Program",
+          order: 1,
+          weeks: prog.durationWeeks,
+          workouts: prog.days.map((day) => {
+            globalOrder.val = 0;
+            const exercises = day.sections.flatMap((section) =>
+              section.exercises.map((ex) => {
+                globalOrder.val += 1;
+                return {
+                  id: ex.id,
+                  exerciseId: ex.exerciseId,
+                  order: globalOrder.val,
+                  prescribedSets: ex.prescribedSets,
+                  notes: ex.notes || null,
+                  section: section.name,
+                };
+              })
+            );
+            return {
+              id: day.id,
+              name: day.name,
+              dayOfWeek: day.dayOfWeek,
+              order: day.order,
+              exercises,
+            };
+          }),
+        },
+      ],
     };
 
     setSaving(true);
@@ -328,15 +349,12 @@ export function ProgramBuilder({ programId, initial }: Props) {
     }
   }
 
-  // ─── Computed ─────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
 
-  const totalWeeks = prog.blocks.reduce((s, b) => s + b.weeks, 0);
-  const totalWorkouts = prog.blocks.reduce(
-    (s, b) => s + b.workouts.length * b.weeks,
+  const totalExercises = prog.days.reduce(
+    (s, d) => s + d.sections.reduce((ss, sec) => ss + sec.exercises.length, 0),
     0
   );
-
-  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="p-8 max-w-4xl pb-24">
@@ -373,6 +391,23 @@ export function ProgramBuilder({ programId, initial }: Props) {
               rows={2}
               placeholder="Brief notes on goals, client profile, methodology..."
             />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Label>Duration</Label>
+            <Input
+              type="number"
+              min={1}
+              value={prog.durationWeeks}
+              onChange={(e) =>
+                setProg((p) => ({
+                  ...p,
+                  durationWeeks: Math.max(1, parseInt(e.target.value) || 1),
+                }))
+              }
+              className="h-8 w-20 text-sm text-center"
+            />
+            <span className="text-sm text-muted-foreground">weeks</span>
           </div>
 
           <div className="space-y-2">
@@ -416,62 +451,59 @@ export function ProgramBuilder({ programId, initial }: Props) {
               ))}
             </div>
           </div>
-
-          {totalWeeks > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {totalWeeks} weeks · ~{totalWorkouts} total sessions
-            </p>
-          )}
         </div>
       </div>
 
-      {/* Blocks */}
+      {/* Days */}
       <div className="space-y-4">
-        {prog.blocks.map((block) => (
-          <Card key={block._key} className="border-2">
+        {prog.days.map((day) => (
+          <Card key={day._key} className="border-2">
+            {/* Day header */}
             <CardHeader className="py-3 px-4">
               <div className="flex items-center gap-3">
                 <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
                 <button
                   type="button"
-                  onClick={() => updateBlock(block._key, (b) => ({ ...b, open: !b.open }))}
-                  className="flex-1 flex items-center gap-2 text-left"
+                  onClick={() => updateDay(day._key, (d) => ({ ...d, open: !d.open }))}
+                  className="flex-1 flex items-center gap-2 text-left min-w-0"
                 >
-                  {block.open ? (
+                  {day.open ? (
                     <ChevronDown className="w-4 h-4 shrink-0" />
                   ) : (
                     <ChevronRight className="w-4 h-4 shrink-0" />
                   )}
                   <Input
-                    value={block.name}
+                    value={day.name}
                     onChange={(e) =>
-                      updateBlock(block._key, (b) => ({ ...b, name: e.target.value }))
+                      updateDay(day._key, (d) => ({ ...d, name: e.target.value }))
                     }
                     onClick={(e) => e.stopPropagation()}
                     className="h-7 font-semibold text-sm border-0 shadow-none p-0 focus-visible:ring-0"
-                    placeholder="Block name..."
+                    placeholder="Day name..."
                   />
                 </button>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-muted-foreground">Weeks:</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={block.weeks}
-                    onChange={(e) =>
-                      updateBlock(block._key, (b) => ({
-                        ...b,
-                        weeks: Math.max(1, parseInt(e.target.value) || 1),
-                      }))
+                  <Select
+                    value={String(day.dayOfWeek)}
+                    onValueChange={(v) =>
+                      updateDay(day._key, (d) => ({ ...d, dayOfWeek: parseInt(v) }))
                     }
-                    className="h-7 w-14 text-xs text-center"
-                  />
-                  <Badge variant="outline" className="text-xs">
-                    {block.workouts.length} workout{block.workouts.length !== 1 ? "s" : ""}
-                  </Badge>
+                  >
+                    <SelectTrigger className="h-7 w-20 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DAY_LABELS).map(([v, label]) => (
+                        <SelectItem key={v} value={v}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">
+                    {day.sections.reduce((s, sec) => s + sec.exercises.length, 0)} ex
+                  </span>
                   <button
                     type="button"
-                    onClick={() => removeBlock(block._key)}
+                    onClick={() => removeDay(day._key)}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -480,64 +512,47 @@ export function ProgramBuilder({ programId, initial }: Props) {
               </div>
             </CardHeader>
 
-            {block.open && (
+            {/* Day body — sections */}
+            {day.open && (
               <CardContent className="px-4 pb-4 space-y-3">
-                {block.workouts.map((workout) => (
-                  <div key={workout._key} className="border rounded-md bg-muted/20">
-                    {/* Workout header */}
+                {day.sections.map((section) => (
+                  <div key={section._key} className="border rounded-md bg-muted/20">
+                    {/* Section header */}
                     <div className="flex items-center gap-2 px-3 py-2">
                       <button
                         type="button"
                         onClick={() =>
-                          updateWorkout(block._key, workout._key, (w) => ({ ...w, open: !w.open }))
+                          updateSection(day._key, section._key, (s) => ({
+                            ...s,
+                            open: !s.open,
+                          }))
                         }
-                        className="flex items-center gap-1.5 flex-1 min-w-0"
+                        className="flex items-center gap-1.5 min-w-0"
                       >
-                        {workout.open ? (
+                        {section.open ? (
                           <ChevronDown className="w-3.5 h-3.5 shrink-0" />
                         ) : (
                           <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                         )}
-                        <Input
-                          value={workout.name}
-                          onChange={(e) =>
-                            updateWorkout(block._key, workout._key, (w) => ({
-                              ...w,
-                              name: e.target.value,
-                            }))
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-6 text-sm border-0 shadow-none p-0 focus-visible:ring-0 bg-transparent"
-                          placeholder="Workout name..."
-                        />
                       </button>
+                      <Input
+                        value={section.name}
+                        onChange={(e) =>
+                          updateSection(day._key, section._key, (s) => ({
+                            ...s,
+                            name: e.target.value,
+                          }))
+                        }
+                        className="h-6 flex-1 text-sm font-medium border-0 shadow-none p-0 focus-visible:ring-0 bg-transparent"
+                        placeholder="Block name..."
+                      />
                       <div className="flex items-center gap-2 shrink-0">
-                        <Select
-                          value={String(workout.dayOfWeek)}
-                          onValueChange={(v) =>
-                            updateWorkout(block._key, workout._key, (w) => ({
-                              ...w,
-                              dayOfWeek: parseInt(v),
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-6 w-20 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(DAY_LABELS).map(([v, label]) => (
-                              <SelectItem key={v} value={v}>
-                                {label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                         <span className="text-xs text-muted-foreground">
-                          {workout.exercises.length} ex
+                          {section.exercises.length} ex
                         </span>
                         <button
                           type="button"
-                          onClick={() => removeWorkout(block._key, workout._key)}
+                          onClick={() => removeSection(day._key, section._key)}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -545,21 +560,25 @@ export function ProgramBuilder({ programId, initial }: Props) {
                       </div>
                     </div>
 
-                    {/* Exercises */}
-                    {workout.open && (
+                    {/* Section exercises */}
+                    {section.open && (
                       <div className="px-3 pb-3 space-y-3">
-                        {workout.exercises.map((ex) => (
+                        {section.exercises.map((ex) => (
                           <div key={ex._key} className="bg-background border rounded p-3">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-xs font-medium text-muted-foreground w-4">
                                   {ex.order}.
                                 </span>
-                                <span className="text-sm font-medium truncate">{ex.exerciseName}</span>
+                                <span className="text-sm font-medium truncate">
+                                  {ex.exerciseName}
+                                </span>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => removeExercise(block._key, workout._key, ex._key)}
+                                onClick={() =>
+                                  removeExercise(day._key, section._key, ex._key)
+                                }
                                 className="text-muted-foreground hover:text-destructive shrink-0"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -568,19 +587,23 @@ export function ProgramBuilder({ programId, initial }: Props) {
                             <SetsTable
                               sets={ex.prescribedSets}
                               onChange={(sets) =>
-                                updateExercise(block._key, workout._key, ex._key, (e) => ({
-                                  ...e,
-                                  prescribedSets: sets,
-                                }))
+                                updateExercise(
+                                  day._key,
+                                  section._key,
+                                  ex._key,
+                                  (e) => ({ ...e, prescribedSets: sets })
+                                )
                               }
                             />
                             <Input
                               value={ex.notes}
                               onChange={(e) =>
-                                updateExercise(block._key, workout._key, ex._key, (ex2) => ({
-                                  ...ex2,
-                                  notes: e.target.value,
-                                }))
+                                updateExercise(
+                                  day._key,
+                                  section._key,
+                                  ex._key,
+                                  (ex2) => ({ ...ex2, notes: e.target.value })
+                                )
                               }
                               placeholder="Exercise notes (optional)..."
                               className="mt-2 h-7 text-xs"
@@ -589,39 +612,43 @@ export function ProgramBuilder({ programId, initial }: Props) {
                         ))}
 
                         <ExercisePicker
-                          onSelect={(ex) => addExercise(block._key, workout._key, ex)}
-                          placeholder="+ Add exercise..."
+                          onSelect={(ex) => addExercise(day._key, section._key, ex)}
+                          placeholder={`+ Add exercise to ${section.name}...`}
                         />
                       </div>
                     )}
                   </div>
                 ))}
 
+                {/* Add block within day */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="text-xs text-muted-foreground w-full border border-dashed"
-                  onClick={() => addWorkout(block._key)}
+                  onClick={() => addSection(day._key)}
                 >
                   <Plus className="w-3 h-3 mr-1" />
-                  Add workout to {block.name}
+                  Add block to {day.name}
                 </Button>
               </CardContent>
             )}
           </Card>
         ))}
 
-        <Button type="button" variant="outline" onClick={addBlock} className="w-full">
+        {/* Add Day */}
+        <Button type="button" variant="outline" onClick={addDay} className="w-full">
           <Plus className="w-4 h-4 mr-1.5" />
-          Add Block
+          Add Day
         </Button>
       </div>
 
       {/* Save bar */}
       <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur p-4 flex items-center justify-between z-40">
         <div className="text-xs text-muted-foreground">
-          {totalWeeks > 0 ? `${totalWeeks} weeks · ${prog.blocks.length} blocks` : "No blocks yet"}
+          {prog.days.length > 0
+            ? `${prog.durationWeeks} weeks · ${prog.days.length} day${prog.days.length !== 1 ? "s" : ""} · ${totalExercises} exercises`
+            : "No days yet"}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" disabled={saving} onClick={() => save(false)}>
@@ -639,6 +666,9 @@ export function ProgramBuilder({ programId, initial }: Props) {
 }
 
 // ─── Data loader helper (used by edit page) ─────────────────────────────────
+
+// Standard section order for display grouping
+const SECTION_ORDER = ["Warmup", "Main A", "Main B", "Burner"];
 
 export function programApiToState(api: {
   name: string;
@@ -660,40 +690,73 @@ export function programApiToState(api: {
         order: number;
         prescribedSets: unknown;
         notes: string | null;
+        section: string | null;
         exercise: { id: string; name: string };
       }[];
     }[];
   }[];
 }): ProgramState {
+  // Use the first block as the canonical block (new programs have exactly one)
+  const firstBlock = api.blocks[0];
+  const durationWeeks = firstBlock?.weeks ?? 4;
+  const blockId = firstBlock?.id;
+
+  // Flatten all workouts from all blocks into days
+  const allWorkouts = api.blocks.flatMap((b) => b.workouts);
+
+  const days: DayInput[] = allWorkouts.map((w) => {
+    // Group exercises by section name
+    const sectionMap = new Map<string, typeof w.exercises>();
+    for (const ex of w.exercises) {
+      const sName = ex.section ?? "Main A";
+      if (!sectionMap.has(sName)) sectionMap.set(sName, []);
+      sectionMap.get(sName)!.push(ex);
+    }
+
+    // Build sections: standard order first, then any extras
+    const sectionNames = [
+      ...SECTION_ORDER.filter((s) => sectionMap.has(s)),
+      ...Array.from(sectionMap.keys()).filter((s) => !SECTION_ORDER.includes(s)),
+    ];
+
+    // If no exercises at all, show default empty sections
+    const sections: SectionInput[] =
+      sectionNames.length > 0
+        ? sectionNames.map((name) => ({
+            _key: key(),
+            name,
+            open: false,
+            exercises: (sectionMap.get(name) ?? []).map((e) => ({
+              _key: key(),
+              id: e.id,
+              exerciseId: e.exerciseId,
+              exerciseName: e.exercise.name,
+              order: e.order,
+              prescribedSets: (e.prescribedSets as SetDraft[]) ?? [],
+              notes: e.notes ?? "",
+            })),
+          }))
+        : makeDefaultSections().map((s) => ({ ...s, open: false }));
+
+    return {
+      _key: key(),
+      id: w.id,
+      blockId,
+      name: w.name,
+      dayOfWeek: w.dayOfWeek ?? 1,
+      order: w.order ?? 1,
+      sections,
+      open: false,
+    };
+  });
+
   return {
     name: api.name,
     description: api.description ?? "",
+    durationWeeks,
     goals: api.goalTags?.goals ?? [],
     conditions: api.goalTags?.conditions ?? [],
-    blocks: api.blocks.map((b) => ({
-      _key: key(),
-      id: b.id,
-      name: b.name,
-      order: b.order,
-      weeks: b.weeks,
-      open: false,
-      workouts: b.workouts.map((w) => ({
-        _key: key(),
-        id: w.id,
-        name: w.name,
-        dayOfWeek: w.dayOfWeek ?? 1,
-        order: w.order ?? 1,
-        open: false,
-        exercises: w.exercises.map((e) => ({
-          _key: key(),
-          id: e.id,
-          exerciseId: e.exerciseId,
-          exerciseName: e.exercise.name,
-          order: e.order,
-          prescribedSets: (e.prescribedSets as SetDraft[]) ?? [],
-          notes: e.notes ?? "",
-        })),
-      })),
-    })),
+    days,
+    blockId,
   };
 }
