@@ -244,6 +244,8 @@ model WorkoutExercise {
   prescribedSets Json // SetShape[]
   notes          String?  @db.Text
 
+  section        String?  // "warmup" | "block_a" | "block_b" | "finisher"
+
   workout        Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise       Exercise @relation(fields: [exerciseId], references: [id])
 
@@ -263,6 +265,7 @@ model Program {
   goalTags      Json? // { goals: string[], conditions: string[] }
   durationWeeks Int // stored for query convenience; should equal sum of block.weeks
   isTemplate    Boolean   @default(true)
+  isDraft       Boolean   @default(false)
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -273,6 +276,14 @@ model Program {
   @@index([workspaceId, deletedAt])
 }
 
+enum OptPhase {
+  STABILIZATION_ENDURANCE
+  STRENGTH_ENDURANCE
+  HYPERTROPHY
+  MAX_STRENGTH
+  POWER
+}
+
 model Block {
   id          String    @id @default(cuid())
   workspaceId String
@@ -280,6 +291,7 @@ model Block {
   name        String
   order       Int // position within program (1-indexed)
   weeks       Int // duration in weeks
+  phase       OptPhase?
 
   program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   workouts    Workout[]

@@ -160,6 +160,80 @@ export async function upsertProgram(
   });
 }
 
+export async function duplicateProgram(id: string, workspaceId: string) {
+  const source = await prisma.program.findFirst({
+    where: { id, workspaceId, deletedAt: null },
+    include: {
+      blocks: {
+        orderBy: { order: "asc" },
+        include: {
+          workouts: {
+            orderBy: { order: "asc" },
+            include: { exercises: { orderBy: { order: "asc" } } },
+          },
+        },
+      },
+    },
+  });
+  if (!source) return null;
+
+  return prisma.$transaction(async (tx) => {
+    const copy = await tx.program.create({
+      data: {
+        workspaceId,
+        name: `${source.name} (Copy)`,
+        description: source.description,
+        goalTags: source.goalTags ?? undefined,
+        durationWeeks: source.durationWeeks,
+        isTemplate: true,
+        isDraft: source.isDraft,
+      },
+    });
+
+    for (const block of source.blocks) {
+      const newBlock = await tx.block.create({
+        data: {
+          workspaceId,
+          programId: copy.id,
+          name: block.name,
+          order: block.order,
+          weeks: block.weeks,
+          phase: block.phase ?? undefined,
+        },
+      });
+
+      for (const workout of block.workouts) {
+        const newWorkout = await tx.workout.create({
+          data: {
+            workspaceId,
+            blockId: newBlock.id,
+            name: workout.name,
+            dayOfWeek: workout.dayOfWeek,
+            order: workout.order,
+            isTemplate: true,
+          },
+        });
+
+        for (const ex of workout.exercises) {
+          await tx.workoutExercise.create({
+            data: {
+              workspaceId,
+              workoutId: newWorkout.id,
+              exerciseId: ex.exerciseId,
+              order: ex.order,
+              prescribedSets: ex.prescribedSets as never,
+              notes: ex.notes,
+              section: ex.section,
+            },
+          });
+        }
+      }
+    }
+
+    return copy;
+  });
+}
+
 export async function softDeleteProgram(id: string, workspaceId: string) {
   return prisma.program.updateMany({
     where: { id, workspaceId },

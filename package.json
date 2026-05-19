@@ -9,6 +9,7 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "seed:methodology": "tsx scripts/seed-methodology.ts",
+    "seed:programs": "tsx scripts/seed-programs.ts",
     "fetch:exercises": "tsx scripts/fetch-exercise-db.ts"
   },
   "prisma": {
