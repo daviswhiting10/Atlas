@@ -137,6 +137,7 @@ model ClientProfile {
   workouts           Workout[]
   nutritionEntries   NutritionEntry[]
   progressPhotos     ProgressPhoto[]
+  exerciseCoachNotes ExerciseCoachNote[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -212,6 +213,8 @@ model Exercise {
   progression       String?
   workoutExercises  WorkoutExercise[]
   assignedExercises AssignedWorkoutExercise[]
+  setLogs           SetLog[]
+  coachNotes        ExerciseCoachNote[]
   createdAt         DateTime                  @default(now())
 }
 
@@ -343,6 +346,7 @@ model AssignedWorkout {
 
   programAssignment ProgramAssignment         @relation(fields: [programAssignmentId], references: [id], onDelete: Cascade)
   exercises         AssignedWorkoutExercise[]
+  workoutLog        WorkoutLog?
 
   @@index([programAssignmentId, scheduledDate])
 }
@@ -370,6 +374,7 @@ model AssignedWorkoutExercise {
 
   assignedWorkout AssignedWorkout @relation(fields: [assignedWorkoutId], references: [id], onDelete: Cascade)
   exercise        Exercise        @relation(fields: [exerciseId], references: [id])
+  setLogs         SetLog[]
 
   @@index([assignedWorkoutId, order])
 }
@@ -379,27 +384,36 @@ model AssignedWorkoutExercise {
 // ─────────────────────────────────────────────
 
 model WorkoutLog {
-  id          String        @id @default(cuid())
-  clientId    String
-  client      ClientProfile @relation(fields: [clientId], references: [id])
-  date        DateTime
-  durationMin Int?
-  rpeAvg      Float?
-  clientNotes String?       @db.Text
-  trainerSeen Boolean       @default(false)
-  sets        SetLog[]
-  createdAt   DateTime      @default(now())
+  id                String           @id @default(cuid())
+  clientId          String
+  client            ClientProfile    @relation(fields: [clientId], references: [id])
+  assignedWorkoutId String?          @unique // null for ad-hoc sessions
+  assignedWorkout   AssignedWorkout? @relation(fields: [assignedWorkoutId], references: [id])
+  date              DateTime
+  durationMin       Int?
+  rpeAvg            Float?
+  clientNotes       String?          @db.Text
+  trainerSeen       Boolean          @default(false)
+  sets              SetLog[]
+  createdAt         DateTime         @default(now())
 }
 
 model SetLog {
-  id           String     @id @default(cuid())
-  workoutLogId String
-  workoutLog   WorkoutLog @relation(fields: [workoutLogId], references: [id])
-  setNumber    Int
-  weight       Float?
-  reps         Int?
-  completed    Boolean    @default(true)
-  createdAt    DateTime   @default(now())
+  id                        String                   @id @default(cuid())
+  workoutLogId              String
+  workoutLog                WorkoutLog               @relation(fields: [workoutLogId], references: [id])
+  exerciseId                String?                  // which exercise this set was for
+  exercise                  Exercise?                @relation(fields: [exerciseId], references: [id])
+  assignedWorkoutExerciseId String?                  // link back to the prescription
+  assignedWorkoutExercise   AssignedWorkoutExercise? @relation(fields: [assignedWorkoutExerciseId], references: [id])
+  setNumber                 Int
+  weight                    Float?
+  reps                      Int?
+  rpe                       Float?                   // per-set RPE (1–10)
+  completed                 Boolean                  @default(true)
+  createdAt                 DateTime                 @default(now())
+
+  @@index([exerciseId, workoutLogId])
 }
 
 // ─────────────────────────────────────────────
@@ -415,6 +429,24 @@ model SessionNote {
   structuredNote Json
   rpeAvg         Float?
   createdAt      DateTime      @default(now())
+}
+
+// ─────────────────────────────────────────────
+// EXERCISE COACH NOTES
+// ─────────────────────────────────────────────
+
+model ExerciseCoachNote {
+  id          String        @id @default(cuid())
+  workspaceId String
+  clientId    String
+  exerciseId  String
+  note        String        @db.Text
+  createdAt   DateTime      @default(now())
+
+  client      ClientProfile @relation(fields: [clientId], references: [id])
+  exercise    Exercise      @relation(fields: [exerciseId], references: [id])
+
+  @@index([clientId, exerciseId])
 }
 
 // ─────────────────────────────────────────────
