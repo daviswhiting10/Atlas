@@ -126,40 +126,7 @@ function buildInitialState(
   return state;
 }
 
-// ── RPE Picker (mobile) ────────────────────────────────────────────────────────
 
-const RPE_OPTIONS = ["6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10"];
-
-function RpePicker({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4">
-      {RPE_OPTIONS.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(value === opt ? "" : opt)}
-          className={cn(
-            "flex-none w-12 h-11 rounded-xl border text-sm font-medium transition-colors touch-manipulation shrink-0",
-            value === opt
-              ? "bg-primary text-primary-foreground border-primary"
-              : "border-border text-muted-foreground"
-          )}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
@@ -599,10 +566,6 @@ export default function WorkoutLogger({
           </div>
         ) : (
           <>
-            <p className="text-sm font-semibold text-muted-foreground mb-3 text-center">
-              Set {activeIdx + 1} of {state.sets.length}
-            </p>
-
             {/* Weight */}
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Weight</p>
@@ -684,16 +647,6 @@ export default function WorkoutLogger({
                   +
                 </button>
               </div>
-            </div>
-
-            {/* RPE */}
-            <div className="mb-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">RPE</p>
-              <RpePicker
-                value={activeSet.rpe}
-                onChange={(rpe) => updateSet(ex.aweId, activeIdx, { rpe })}
-                disabled={activeSet.saving}
-              />
             </div>
 
             {/* Complete set button */}

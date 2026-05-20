@@ -54,10 +54,8 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
       <table className="w-full text-xs border rounded overflow-hidden">
         <thead>
           <tr className="bg-muted text-muted-foreground">
-            <th className="px-1.5 py-1 text-center font-medium w-8">#</th>
-            <th className="px-1.5 py-1 text-center font-medium w-32">Weight</th>
-            <th className="px-1.5 py-1 text-center font-medium w-20">Reps</th>
-            <th className="px-1.5 py-1 text-center font-medium w-12">RPE</th>
+            <th className="px-1.5 py-1 text-center font-medium w-36">Weight</th>
+            <th className="px-1.5 py-1 text-center font-medium w-28">Reps</th>
             <th className="px-1.5 py-1 text-left font-medium">Notes</th>
             {!readOnly && <th className="w-6" />}
           </tr>
@@ -65,7 +63,6 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
         <tbody>
           {sets.map((s, idx) => (
             <tr key={idx} className="hover:bg-muted/30">
-              <td className={`${cellCls} text-center text-muted-foreground`}>{s.setNumber}</td>
               <td className={cellCls}>
                 <div className="flex items-center gap-1 min-w-0">
                   {s.isBodyweight ? (
@@ -117,18 +114,6 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                     onChange={(e) => update(idx, "repMax", Math.max(s.repMin, parseInt(e.target.value) || s.repMin))}
                   />
                 </div>
-              </td>
-              <td className={cellCls}>
-                <input
-                  type="number"
-                  className={inputCls}
-                  value={s.rpe ?? ""}
-                  placeholder="—"
-                  min={1}
-                  max={10}
-                  disabled={readOnly}
-                  onChange={(e) => update(idx, "rpe", num(e.target.value))}
-                />
               </td>
               <td className={cellCls}>
                 <input

@@ -644,7 +644,7 @@ export function ProgramBuilder({ programId, initial }: Props) {
       </div>
 
       {/* Save bar */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur p-4 flex items-center justify-between z-40">
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur p-4 flex items-center justify-between z-40">
         <div className="text-xs text-muted-foreground">
           {prog.days.length > 0
             ? `${prog.durationWeeks} weeks · ${prog.days.length} day${prog.days.length !== 1 ? "s" : ""} · ${totalExercises} exercises`
