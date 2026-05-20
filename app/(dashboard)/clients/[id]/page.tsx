@@ -30,6 +30,7 @@ import {
   Activity,
   Clock,
   MoreHorizontal,
+  BarChart2,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -374,6 +375,13 @@ export default function ClientDetailPage() {
           <TabsTrigger value="notes" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
             Notes
           </TabsTrigger>
+          <Link
+            href={`/clients/${client.id}/progress`}
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 border-b-2 border-transparent whitespace-nowrap"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Progress
+          </Link>
         </TabsList>
 
         {/* ── Overview tab ──────────────────────────────────────────────── */}

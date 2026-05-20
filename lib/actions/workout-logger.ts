@@ -2,6 +2,10 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import {
+  checkStrengthMilestones,
+  checkSessionMilestones,
+} from "@/lib/progress/milestones";
 
 // ── Auth helper ────────────────────────────────────────────────────────────────
 
@@ -106,6 +110,24 @@ export async function logSet(input: {
       select: { id: true },
     });
     setLogId = created.id;
+
+    // Fire-and-forget: check strength milestones on completed sets
+    if (input.completed && input.exerciseId) {
+      const exercise = await prisma.exercise.findUnique({
+        where: { id: input.exerciseId },
+        select: { name: true },
+      });
+      if (exercise) {
+        checkStrengthMilestones(
+          workspaceId,
+          input.clientId,
+          input.exerciseId,
+          exercise.name,
+          { weight: input.weight, reps: input.reps, completed: input.completed },
+          setLogId
+        ).catch((err: unknown) => console.error("[milestones] strength check:", err));
+      }
+    }
   }
 
   return { workoutLogId, setLogId };
@@ -178,6 +200,11 @@ export async function completeSession(input: {
       data: { lastContactAt: new Date() },
     }),
   ]);
+
+  // Fire-and-forget: session milestones
+  checkSessionMilestones(workspaceId, input.clientId).catch(
+    (err: unknown) => console.error("[milestones] session check:", err)
+  );
 
   // Create SessionNote if trainer provided narrative notes
   if (input.rawInput && input.structuredNote) {

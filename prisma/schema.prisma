@@ -28,6 +28,8 @@ model Workspace {
   usageLogs          UsageLog[]
   programs           Program[]
   programAssignments ProgramAssignment[]
+  measurements       Measurement[]
+  milestones         Milestone[]
 }
 
 // ─────────────────────────────────────────────
@@ -128,6 +130,8 @@ model ClientProfile {
   retentionFlag      String?
   lastContactAt      DateTime?
   deletedAt          DateTime?
+  keyLiftIds         String[]            @default([])
+  goalTargets        Json?
   intakeForms        IntakeForm[]
   assessments        Assessment[]
   programAssignments ProgramAssignment[]
@@ -138,6 +142,8 @@ model ClientProfile {
   nutritionEntries   NutritionEntry[]
   progressPhotos     ProgressPhoto[]
   exerciseCoachNotes ExerciseCoachNote[]
+  measurements       Measurement[]
+  milestones         Milestone[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -215,6 +221,7 @@ model Exercise {
   assignedExercises AssignedWorkoutExercise[]
   setLogs           SetLog[]
   coachNotes        ExerciseCoachNote[]
+  milestones        Milestone[]
   createdAt         DateTime                  @default(now())
 }
 
@@ -590,6 +597,61 @@ model TrainerObservation {
   embedding      Bytes? // Phase 4: migrate to pgvector(1536)
   tags           Json
   createdAt      DateTime  @default(now())
+}
+
+// ─────────────────────────────────────────────
+// PROGRESS: MEASUREMENTS
+// ─────────────────────────────────────────────
+
+model Measurement {
+  id              String        @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id])
+  clientId        String
+  client          ClientProfile @relation(fields: [clientId], references: [id])
+  measuredAt      DateTime
+  bodyWeightKg    Float?
+  bodyFatPct      Float?
+  leanMassKg      Float?
+  visceralFat     Float?
+  waistCm         Float?
+  hipsCm          Float?
+  chestCm         Float?
+  armCm           Float?
+  thighCm         Float?
+  painRating      Int?
+  source          String        // "manual" | "inbody" | "other"
+  notes           String?       @db.Text
+  enteredByUserId String
+  createdAt       DateTime      @default(now())
+
+  @@index([clientId, measuredAt])
+}
+
+// ─────────────────────────────────────────────
+// PROGRESS: MILESTONES
+// ─────────────────────────────────────────────
+
+model Milestone {
+  id             String        @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id])
+  clientId       String
+  client         ClientProfile @relation(fields: [clientId], references: [id])
+  type           String        // "first_session" | "session_25" | "first_pr" | etc.
+  title          String
+  description    String        @db.Text
+  metricValue    Float?
+  metricUnit     String?
+  exerciseId     String?
+  exercise       Exercise?     @relation(fields: [exerciseId], references: [id])
+  achievedAt     DateTime
+  sourceSetLogId String?
+  seenByClient   Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  @@index([clientId, achievedAt])
+  @@index([clientId, type, exerciseId])
 }
 
 // ─────────────────────────────────────────────
