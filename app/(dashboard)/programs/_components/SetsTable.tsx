@@ -99,18 +99,18 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                     type="number"
                     className={inputCls}
                     value={s.repMin}
-                    min={1}
+                    min={0}
                     disabled={readOnly}
-                    onChange={(e) => update(idx, "repMin", parseInt(e.target.value) || 1)}
+                    onChange={(e) => update(idx, "repMin", parseInt(e.target.value) || 0)}
                   />
                   <span className="text-muted-foreground">–</span>
                   <input
                     type="number"
                     className={inputCls}
                     value={s.repMax}
-                    min={s.repMin}
+                    min={0}
                     disabled={readOnly}
-                    onChange={(e) => update(idx, "repMax", Math.max(s.repMin, parseInt(e.target.value) || s.repMin))}
+                    onChange={(e) => update(idx, "repMax", Math.max(s.repMin, parseInt(e.target.value) || 0))}
                   />
                 </div>
               </td>

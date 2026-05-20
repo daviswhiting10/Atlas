@@ -6,7 +6,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Dumbbell, Copy, UserPlus } from "lucide-react";
+import { Plus, Dumbbell, Copy, UserPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +65,16 @@ export default function ProgramsPage() {
       .then((data) => setPrograms(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }, []);
+
+  async function deleteProgram(e: React.MouseEvent, id: string, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    const res = await fetch(`/api/programs/${id}`, { method: "DELETE" });
+    if (!res.ok) { toast.error("Delete failed"); return; }
+    setPrograms((prev) => prev.filter((p) => p.id !== id));
+    toast.success(`"${name}" deleted`);
+  }
 
   async function duplicate(e: React.MouseEvent, id: string, name: string) {
     e.preventDefault();
@@ -233,6 +243,14 @@ export default function ProgramsPage() {
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                         >
                           <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => deleteProgram(e, p.id, p.name)}
+                          title="Delete program"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                         <Link
                           href={`/programs/${p.id}/assign`}

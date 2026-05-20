@@ -118,6 +118,9 @@ function WorkoutEditor({
     workout.exercises.map(toDraft)
   );
   const [loggedBy, setLoggedBy] = useState<"TRAINER" | "CLIENT">(workout.loggedBy);
+  const [scheduledDate, setScheduledDate] = useState(
+    workout.scheduledDate.split("T")[0]
+  );
   const [saving, setSaving] = useState(false);
 
   const updateEx = useCallback(
@@ -160,6 +163,7 @@ function WorkoutEditor({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             loggedBy,
+            scheduledDate,
             exercises: exercises.map((e) => ({
               id: e.id,
               exerciseId: e.exerciseId,
@@ -191,8 +195,18 @@ function WorkoutEditor({
 
   return (
     <div className="mt-3 space-y-3">
+      {/* Date + logged-by row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Date:</span>
+          <input
+            type="date"
+            value={scheduledDate}
+            onChange={(e) => setScheduledDate(e.target.value)}
+            className="text-xs h-7 rounded-md border border-input px-2 bg-background"
+          />
+        </div>
       {/* In-person / At-home toggle */}
-      <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">Logged by:</span>
         <button
           type="button"

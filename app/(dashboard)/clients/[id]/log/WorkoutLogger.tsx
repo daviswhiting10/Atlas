@@ -1028,6 +1028,7 @@ function DesktopSetRow({
         <Input
           value={entry.reps}
           onChange={(e) => onChange({ reps: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onComplete(); } }}
           placeholder="reps"
           className="h-7 w-14 text-xs text-center px-1"
           type="number"
