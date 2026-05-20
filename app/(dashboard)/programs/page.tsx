@@ -6,7 +6,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Dumbbell, Copy, UserPlus, Trash2 } from "lucide-react";
+import { Plus, Dumbbell, Copy, UserPlus, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -106,10 +106,16 @@ export default function ProgramsPage() {
             {filtered.length !== programs.length && ` · ${filtered.length} shown`}
           </p>
         </div>
-        <Link href="/programs/new" className={buttonVariants()}>
-          <Plus className="w-4 h-4 mr-1.5" />
-          New Program
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/programs/idea" className={buttonVariants({ variant: "outline" })}>
+            <Sparkles className="w-4 h-4 mr-1.5 text-violet-500" />
+            AI Idea
+          </Link>
+          <Link href="/programs/new" className={buttonVariants()}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            New Program
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
