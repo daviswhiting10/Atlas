@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,8 +17,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
-  Mail,
-  Phone,
   Dumbbell,
   ClipboardList,
   FileText,
@@ -207,25 +205,24 @@ export default function ClientDetailPage() {
     : null;
 
   return (
-    <div className="p-8 max-w-5xl pb-12">
+    <div className="p-4 md:p-8 max-w-5xl pb-12">
       {/* Back */}
-      <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}>
+      <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-3 -ml-2")}>
         <ArrowLeft className="w-4 h-4 mr-1" />
         Clients
       </Link>
 
       {/* ── Header strip ──────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-5 gap-4">
-        <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-start justify-between mb-4 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Avatar */}
-          <div className={cn("w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0", avatarBg)}>
+          <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-base md:text-lg font-bold shrink-0", avatarBg)}>
             {getInitials(client.fullName)}
           </div>
           {/* Name + meta */}
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight leading-tight">{client.fullName}</h1>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {/* Clickable status pill — single source of truth */}
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight truncate">{client.fullName}</h1>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   className={cn(
@@ -245,57 +242,40 @@ export default function ClientDetailPage() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-
               {goalLabel && (
-                <span className="text-sm text-muted-foreground">{goalLabel}</span>
-              )}
-              {activeProgram && (
-                <span className="text-xs text-muted-foreground truncate">
-                  {activeProgram.name}
-                </span>
-              )}
-            </div>
-            <div className="flex gap-3 mt-1.5">
-              {client.email && (
-                <a href={`mailto:${client.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                  <Mail className="w-3 h-3" />{client.email}
-                </a>
-              )}
-              {client.phone && (
-                <a href={`tel:${client.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                  <Phone className="w-3 h-3" />{client.phone}
-                </a>
+                <span className="text-xs text-muted-foreground hidden sm:inline">{goalLabel}</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Actions — icon-only on mobile, labeled on desktop */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <Link
             href={`/outreach?clientId=${client.id}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 w-9 p-0 md:w-auto md:px-3")}
+            title="Message"
           >
-            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-            Message
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            <span className="hidden md:inline ml-1.5">Message</span>
           </Link>
           <Link
             href={`/clients/${client.id}/log`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            className={cn(buttonVariants({ size: "sm" }), "h-9 w-9 p-0 md:w-auto md:px-3")}
+            title="Log Session"
           >
-            <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
-            Log Session
+            <ClipboardList className="w-4 h-4 shrink-0" />
+            <span className="hidden md:inline ml-1.5">Log</span>
           </Link>
-          <Button variant="outline" size="sm" onClick={inviteClient}>
-            <UserCheck className="w-3.5 h-3.5 mr-1.5" />
-            Invite
-          </Button>
-          {/* Overflow */}
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm transition-colors">
+            <DropdownMenuTrigger className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
               <MoreHorizontal className="w-4 h-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={inviteClient}>
+                <UserCheck className="w-3.5 h-3.5 mr-2" />
+                Invite client
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={deleteClient}
                 className="text-destructive focus:text-destructive"
@@ -316,8 +296,8 @@ export default function ClientDetailPage() {
         </div>
       )}
 
-      {/* ── KPI strip ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      {/* ── KPI strip — scrollable on mobile, grid on desktop ────────────── */}
+      <div className="flex gap-3 overflow-x-auto pb-1 mb-5 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible md:pb-0 lg:grid-cols-5">
         <KpiTile
           icon={<TrendingDown className="w-4 h-4" />}
           label="Current weight"
@@ -352,7 +332,7 @@ export default function ClientDetailPage() {
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
       <Tabs defaultValue="overview">
-        <TabsList className="w-full justify-start mb-5 h-auto p-0 bg-transparent border-b rounded-none gap-0">
+        <TabsList className="w-full justify-start mb-5 h-auto p-0 bg-transparent border-b rounded-none gap-0 overflow-x-auto flex-nowrap">
           <TabsTrigger value="overview" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
             Overview
           </TabsTrigger>
@@ -738,7 +718,7 @@ function KpiTile({
   sub: string;
 }) {
   return (
-    <div className="rounded-lg border bg-card px-4 py-3 space-y-1">
+    <div className="rounded-lg border bg-card px-4 py-3 space-y-1 snap-start shrink-0 min-w-[140px] md:min-w-0">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <span className="w-4 h-4">{icon}</span>
         <span className="text-xs">{label}</span>
