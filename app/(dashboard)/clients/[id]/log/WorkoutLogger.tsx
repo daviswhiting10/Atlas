@@ -9,7 +9,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +36,7 @@ import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 type SetEntry = {
   setLogId: string | null;
   weight: string;
+  isBodyweight: boolean;
   reps: string;
   rpe: string;
   completed: boolean;
@@ -78,6 +78,7 @@ function initSetEntry(
     return {
       setLogId: existing.id,
       weight: existing.weight != null ? String(existing.weight) : "",
+      isBodyweight: existing.weight === null,
       reps: existing.reps != null ? String(existing.reps) : "",
       rpe: existing.rpe != null ? String(existing.rpe) : "",
       completed: existing.completed,
@@ -93,6 +94,7 @@ function initSetEntry(
   return {
     setLogId: null,
     weight: suggestedWeight != null ? String(suggestedWeight) : "",
+    isBodyweight: false,
     reps: suggestedReps != null ? String(suggestedReps) : "",
     rpe: "",
     completed: false,
@@ -190,7 +192,8 @@ export default function WorkoutLogger({
       const last = sets[sets.length - 1];
       const newSet: SetEntry = {
         setLogId: null,
-        weight: last?.weight ?? "",
+        weight: last?.isBodyweight ? "" : (last?.weight ?? ""),
+        isBodyweight: last?.isBodyweight ?? false,
         reps: last?.reps ?? "",
         rpe: "",
         completed: false,
@@ -223,7 +226,7 @@ export default function WorkoutLogger({
         assignedWorkoutExerciseId: aweId,
         setLogId: entry.setLogId ?? undefined,
         setNumber: idx + 1,
-        weight: entry.weight ? parseFloat(entry.weight) : null,
+        weight: entry.isBodyweight ? null : (entry.weight ? parseFloat(entry.weight) : null),
         reps: entry.reps ? parseInt(entry.reps, 10) : null,
         rpe: entry.rpe ? parseFloat(entry.rpe) : null,
         completed: !entry.completed,
@@ -402,25 +405,18 @@ export default function WorkoutLogger({
           return (
             <Card key={ex.aweId}>
               <CardHeader className="pb-2 pt-4 px-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <CardTitle className="text-sm font-semibold leading-tight">
-                      {ex.name}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {ex.prescribedSets.length} ×{" "}
-                      {ex.prescribedSets[0]
-                        ? ex.prescribedSets[0].repMin === ex.prescribedSets[0].repMax
-                          ? ex.prescribedSets[0].repMax
-                          : `${ex.prescribedSets[0].repMin}–${ex.prescribedSets[0].repMax}`
-                        : "?"}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {ex.prescribedSets[0]?.restSeconds != null
-                      ? `${ex.prescribedSets[0].restSeconds}s rest`
-                      : "—"}
-                  </Badge>
+                <div className="min-w-0">
+                  <CardTitle className="text-sm font-semibold leading-tight">
+                    {ex.name}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {ex.prescribedSets.length} ×{" "}
+                    {ex.prescribedSets[0]
+                      ? ex.prescribedSets[0].repMin === ex.prescribedSets[0].repMax
+                        ? ex.prescribedSets[0].repMax
+                        : `${ex.prescribedSets[0].repMin}–${ex.prescribedSets[0].repMax}`
+                      : "?"}
+                  </p>
                 </div>
 
                 {/* Last performance */}
@@ -469,6 +465,7 @@ export default function WorkoutLogger({
                     key={idx}
                     idx={idx}
                     entry={entry}
+                    repMax={ex.prescribedSets[idx]?.repMax ?? ex.prescribedSets[0]?.repMax ?? null}
                     onChange={(patch) => updateSet(ex.aweId, idx, patch)}
                     onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                   />
@@ -501,7 +498,7 @@ export default function WorkoutLogger({
                             },
                           }))
                         }
-                        placeholder="Coach note for this exercise…"
+                        placeholder="Pain, adaptation, form cue…"
                         className="h-7 text-xs"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") saveNote(ex.aweId, ex.exerciseId);
@@ -646,78 +643,119 @@ export default function WorkoutLogger({
 function SetRow({
   idx,
   entry,
+  repMax,
   onChange,
   onComplete,
 }: {
   idx: number;
   entry: SetEntry;
+  repMax: number | null;
   onChange: (patch: Partial<SetEntry>) => void;
   onComplete: () => void;
 }) {
+  const hitsTopOfRange =
+    entry.completed &&
+    repMax != null &&
+    entry.reps !== "" &&
+    parseInt(entry.reps, 10) >= repMax;
+
   return (
-    <div
-      className={cn(
-        "flex items-center gap-1.5 transition-opacity",
-        entry.completed && "opacity-60"
-      )}
-    >
-      <span className="text-xs text-muted-foreground w-5 shrink-0 text-right">
-        {idx + 1}
-      </span>
-
-      {/* Weight */}
-      <Input
-        value={entry.weight}
-        onChange={(e) => onChange({ weight: e.target.value })}
-        placeholder="lb"
-        className="h-7 w-16 text-xs text-center px-1"
-        type="number"
-        step="2.5"
-      />
-      <span className="text-xs text-muted-foreground shrink-0">lb</span>
-
-      {/* Reps */}
-      <span className="text-xs text-muted-foreground shrink-0">×</span>
-      <Input
-        value={entry.reps}
-        onChange={(e) => onChange({ reps: e.target.value })}
-        placeholder="reps"
-        className="h-7 w-14 text-xs text-center px-1"
-        type="number"
-      />
-      <span className="text-xs text-muted-foreground shrink-0">reps</span>
-
-      {/* RPE */}
-      <span className="text-xs text-muted-foreground shrink-0">RPE</span>
-      <Input
-        value={entry.rpe}
-        onChange={(e) => onChange({ rpe: e.target.value })}
-        placeholder="—"
-        className="h-7 w-12 text-xs text-center px-1"
-        type="number"
-        step="0.5"
-        min="1"
-        max="10"
-      />
-
-      {/* ✓ button */}
-      <button
-        type="button"
-        onClick={onComplete}
-        disabled={entry.saving}
+    <div className="space-y-0.5">
+      <div
         className={cn(
-          "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
-          entry.completed
-            ? "bg-emerald-500 border-emerald-500 text-white"
-            : "border-border text-muted-foreground hover:border-emerald-400 hover:text-emerald-600"
+          "flex items-center gap-1.5 transition-opacity",
+          entry.completed && "opacity-60"
         )}
       >
-        {entry.saving ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
+        <span className="text-xs text-muted-foreground w-5 shrink-0 text-right">
+          {idx + 1}
+        </span>
+
+        {/* Weight / BW toggle */}
+        {entry.isBodyweight ? (
+          <button
+            type="button"
+            onClick={() => onChange({ isBodyweight: false, weight: "" })}
+            className="h-7 w-16 text-xs text-center rounded-md border border-border bg-muted font-medium hover:bg-muted/70 shrink-0"
+          >
+            BW
+          </button>
         ) : (
-          <Check className="w-3 h-3" />
+          <Input
+            value={entry.weight}
+            onChange={(e) => onChange({ weight: e.target.value })}
+            placeholder="lb"
+            className="h-7 w-16 text-xs text-center px-1"
+            type="number"
+            step="2.5"
+          />
         )}
-      </button>
+
+        {/* BW toggle button */}
+        <button
+          type="button"
+          onClick={() => onChange({ isBodyweight: !entry.isBodyweight, weight: "" })}
+          className={cn(
+            "text-xs px-1 h-7 rounded border shrink-0 transition-colors",
+            entry.isBodyweight
+              ? "border-emerald-400 text-emerald-700 bg-emerald-50"
+              : "border-border text-muted-foreground hover:border-muted-foreground"
+          )}
+          title="Toggle bodyweight"
+        >
+          N/A
+        </button>
+
+        {/* Reps */}
+        <span className="text-xs text-muted-foreground shrink-0">×</span>
+        <Input
+          value={entry.reps}
+          onChange={(e) => onChange({ reps: e.target.value })}
+          placeholder="reps"
+          className="h-7 w-14 text-xs text-center px-1"
+          type="number"
+        />
+
+        {/* RPE */}
+        <span className="text-xs text-muted-foreground shrink-0">RPE</span>
+        <Input
+          value={entry.rpe}
+          onChange={(e) => onChange({ rpe: e.target.value })}
+          placeholder="—"
+          className="h-7 w-12 text-xs text-center px-1"
+          type="number"
+          step="0.5"
+          min="1"
+          max="10"
+        />
+
+        {/* ✓ button */}
+        <button
+          type="button"
+          onClick={onComplete}
+          disabled={entry.saving}
+          className={cn(
+            "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
+            entry.completed
+              ? "bg-emerald-500 border-emerald-500 text-white"
+              : "border-border text-muted-foreground hover:border-emerald-400 hover:text-emerald-600"
+          )}
+        >
+          {entry.saving ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Check className="w-3 h-3" />
+          )}
+        </button>
+      </div>
+
+      {/* Progression hint */}
+      {hitsTopOfRange && (
+        <p className="text-xs text-emerald-700 pl-7 flex items-center gap-1">
+          <TrendingUp className="w-3 h-3 shrink-0" />
+          Increase weight next session
+        </p>
+      )}
     </div>
   );
 }
