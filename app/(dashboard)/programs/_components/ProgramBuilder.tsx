@@ -106,7 +106,7 @@ let _keyCounter = 0;
 function key() { return `k${++_keyCounter}`; }
 
 function defaultSet(num: number): SetInput {
-  return { setNumber: num, weight: null, repMin: 8, repMax: 12, rpe: null, restSeconds: 90, notes: "" };
+  return { setNumber: num, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" };
 }
 
 function makeDefaultSections(): SectionInput[] {

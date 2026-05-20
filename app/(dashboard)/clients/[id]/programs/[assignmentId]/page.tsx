@@ -76,7 +76,7 @@ function toDraft(ex: AssignedExercise): ExerciseDraft {
     exerciseId: ex.exerciseId,
     exerciseName: ex.exercise.name,
     order: ex.order,
-    prescribedSets: ex.prescribedSets,
+    prescribedSets: ex.prescribedSets.map((s) => ({ isBodyweight: false, ...s })),
     notes: ex.notes ?? "",
   };
 }
@@ -135,9 +135,9 @@ function WorkoutEditor({
         exerciseName: ex.name,
         order: prev.length + 1,
         prescribedSets: [
-          { setNumber: 1, weight: null, repMin: 8, repMax: 12, rpe: null, restSeconds: 90, notes: "" },
-          { setNumber: 2, weight: null, repMin: 8, repMax: 12, rpe: null, restSeconds: 90, notes: "" },
-          { setNumber: 3, weight: null, repMin: 8, repMax: 12, rpe: null, restSeconds: 90, notes: "" },
+          { setNumber: 1, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
+          { setNumber: 2, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
+          { setNumber: 3, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
         ],
         notes: "",
       },

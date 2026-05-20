@@ -6,6 +6,7 @@ import { Trash2, Plus } from "lucide-react";
 export type SetDraft = {
   setNumber: number;
   weight: number | null;
+  isBodyweight: boolean;
   repMin: number;
   repMax: number;
   rpe: number | null;
@@ -20,7 +21,7 @@ type Props = {
 };
 
 function newSet(setNumber: number): SetDraft {
-  return { setNumber, weight: null, repMin: 8, repMax: 12, rpe: null, restSeconds: 90, notes: "" };
+  return { setNumber, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" };
 }
 
 function num(v: string): number | null {
@@ -54,10 +55,10 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
         <thead>
           <tr className="bg-muted text-muted-foreground">
             <th className="px-1.5 py-1 text-center font-medium w-8">#</th>
-            <th className="px-1.5 py-1 text-center font-medium w-16">Weight</th>
+            <th className="px-1.5 py-1 text-center font-medium w-20">Weight</th>
             <th className="px-1.5 py-1 text-center font-medium w-20">Reps</th>
             <th className="px-1.5 py-1 text-center font-medium w-12">RPE</th>
-            <th className="px-1.5 py-1 text-center font-medium w-16">Rest(s)</th>
+            <th className="px-1.5 py-1 text-left font-medium">Notes</th>
             {!readOnly && <th className="w-6" />}
           </tr>
         </thead>
@@ -66,14 +67,47 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
             <tr key={idx} className="hover:bg-muted/30">
               <td className={`${cellCls} text-center text-muted-foreground`}>{s.setNumber}</td>
               <td className={cellCls}>
-                <input
-                  type="number"
-                  className={inputCls}
-                  value={s.weight ?? ""}
-                  placeholder="—"
-                  disabled={readOnly}
-                  onChange={(e) => update(idx, "weight", num(e.target.value))}
-                />
+                {s.isBodyweight ? (
+                  <div className="flex items-center gap-1 justify-center">
+                    <span className="text-xs font-medium text-muted-foreground">N/A</span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground text-xs underline leading-none"
+                        onClick={() => {
+                          const next = sets.map((row, i) => i === idx ? { ...row, isBodyweight: false, weight: null } : row);
+                          onChange(next);
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={s.weight ?? ""}
+                      placeholder="—"
+                      disabled={readOnly}
+                      onChange={(e) => update(idx, "weight", num(e.target.value))}
+                    />
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        title="Bodyweight / N/A"
+                        className="text-muted-foreground hover:text-foreground text-xs leading-none shrink-0"
+                        onClick={() => {
+                          const next = sets.map((row, i) => i === idx ? { ...row, isBodyweight: true, weight: null } : row);
+                          onChange(next);
+                        }}
+                      >
+                        N/A
+                      </button>
+                    )}
+                  </div>
+                )}
               </td>
               <td className={cellCls}>
                 <div className="flex items-center gap-0.5">
@@ -110,12 +144,12 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
               </td>
               <td className={cellCls}>
                 <input
-                  type="number"
-                  className={inputCls}
-                  value={s.restSeconds ?? ""}
-                  placeholder="—"
+                  type="text"
+                  className={`${inputCls} text-left`}
+                  value={s.notes}
+                  placeholder="Pain, adaptation, cue…"
                   disabled={readOnly}
-                  onChange={(e) => update(idx, "restSeconds", num(e.target.value))}
+                  onChange={(e) => update(idx, "notes", e.target.value)}
                 />
               </td>
               {!readOnly && (
