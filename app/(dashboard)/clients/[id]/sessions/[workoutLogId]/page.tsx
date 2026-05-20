@@ -72,6 +72,7 @@ export default function SessionDetailPage() {
       .then((r) => r.json())
       .then((data: SessionDetail) => {
         setSession(data);
+        // Use the raw date string (YYYY-MM-DD) for the input value — no timezone conversion needed
         setDateValue(data.date.slice(0, 10));
         setLoading(false);
       })

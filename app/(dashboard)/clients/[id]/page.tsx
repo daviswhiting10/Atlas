@@ -108,6 +108,13 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+// Parse a date string (YYYY-MM-DD or ISO) as local time to avoid UTC-offset day shift
+function localDate(dateStr: string): Date {
+  // Append T12:00:00 so bare date strings don't shift to the previous day in western timezones
+  const s = dateStr.slice(0, 10);
+  return new Date(`${s}T12:00:00`);
+}
+
 function getWeekBounds() {
   const now = new Date();
   const day = now.getDay(); // 0=Sun
@@ -121,7 +128,7 @@ function getWeekBounds() {
 }
 
 function relativeTime(date: string) {
-  const diff = Date.now() - new Date(date).getTime();
+  const diff = Date.now() - localDate(date).getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
@@ -206,14 +213,14 @@ export default function ClientDetailPage() {
   const redFlags = client.intakeForms[0]?.redFlags ?? null;
   const { monday, sunday } = getWeekBounds();
   const sessionsThisWeek = client.workoutLogs.filter((s) => {
-    const d = new Date(s.date);
+    const d = localDate(s.date);
     return d >= monday && d <= sunday;
   }).length;
   const lastSession = client.workoutLogs[0] ?? null;
   const lastContact = client.lastContactAt
     ? new Date(client.lastContactAt)
     : lastSession
-    ? new Date(lastSession.date)
+    ? localDate(lastSession.date)
     : null;
 
   return (
@@ -332,7 +339,7 @@ export default function ClientDetailPage() {
           icon={<CalendarDays className="w-4 h-4" />}
           label="Last session"
           value={lastSession ? relativeTime(lastSession.date) : "—"}
-          sub={lastSession ? new Date(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None yet"}
+          sub={lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None yet"}
         />
         <KpiTile
           icon={<Clock className="w-4 h-4" />}
@@ -457,7 +464,7 @@ export default function ClientDetailPage() {
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-medium">
-                              {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                              {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
@@ -664,7 +671,7 @@ export default function ClientDetailPage() {
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-semibold">
-                        {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                        {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                       </p>
                       {s.durationMin != null && (
                         <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
