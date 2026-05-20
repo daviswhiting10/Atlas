@@ -65,7 +65,7 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
               <td className={cellCls}>
                 <div className="flex items-center gap-1 min-w-0">
                   {s.isBodyweight ? (
-                    <span className="text-xs font-medium text-muted-foreground flex-1 text-center">BW</span>
+                    <span className="text-xs font-medium text-muted-foreground flex-1 text-center">N/A</span>
                   ) : (
                     <input
                       type="number"
@@ -88,7 +88,7 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                         onChange(next);
                       }}
                     >
-                      {s.isBodyweight ? "lb" : "BW"}
+                      {s.isBodyweight ? "lb" : "N/A"}
                     </button>
                   )}
                 </div>

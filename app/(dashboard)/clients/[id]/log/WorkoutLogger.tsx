@@ -571,7 +571,7 @@ export default function WorkoutLogger({
               {activeSet.isBodyweight ? (
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-16 rounded-xl border-2 bg-muted flex items-center justify-center text-lg font-semibold">
-                    BW
+                    N/A
                   </div>
                   <button
                     type="button"
@@ -612,7 +612,7 @@ export default function WorkoutLogger({
                     onClick={() => updateSet(ex.aweId, activeIdx, { isBodyweight: true, weight: "" })}
                     className="text-xs font-medium text-muted-foreground border rounded-lg px-2 h-9 touch-manipulation"
                   >
-                    BW
+                    N/A
                   </button>
                 </div>
               )}
