@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export type ExerciseOption = {
   id: string;
@@ -53,7 +54,7 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.length < 2) { setResults([]); setOpen(false); return; }
+    if (query.length < 2) { setResults([]); if (!adding) setOpen(false); return; }
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
       const res = await fetch(`/api/exercises?q=${encodeURIComponent(query)}`);
@@ -62,7 +63,7 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
       setOpen(true);
       setLoading(false);
     }, 250);
-  }, [query]);
+  }, [query, adding]);
 
   // Recalculate dropdown position whenever it opens
   useEffect(() => {
@@ -119,11 +120,15 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
           equipment: newEquipment.trim(),
         }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Failed to save");
+      }
       const ex: ExerciseOption = await res.json();
+      toast.success(`"${ex.name}" added to library`);
       select(ex);
-    } catch {
-      // silently fail — user stays in form
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save exercise");
     } finally {
       setSaving(false);
     }
@@ -176,7 +181,7 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
           {adding && (
             <div
               className="px-3 py-3 border-t border-border space-y-2"
-              onMouseDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
             >
               <p className="text-xs font-medium">New exercise</p>
               <Input

@@ -571,14 +571,14 @@ export default function WorkoutLogger({
               {activeSet.isBodyweight ? (
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-16 rounded-xl border-2 bg-muted flex items-center justify-center text-lg font-semibold">
-                    Bodyweight
+                    BW
                   </div>
                   <button
                     type="button"
                     onClick={() => updateSet(ex.aweId, activeIdx, { isBodyweight: false, weight: "" })}
                     className="text-sm text-muted-foreground underline touch-manipulation"
                   >
-                    Add weight
+                    Add lb
                   </button>
                 </div>
               ) : (
@@ -586,7 +586,7 @@ export default function WorkoutLogger({
                   <button
                     type="button"
                     onClick={() => adjustWeight(ex.aweId, activeIdx, -2.5)}
-                    className="w-14 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
+                    className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     −
                   </button>
@@ -603,16 +603,16 @@ export default function WorkoutLogger({
                   <button
                     type="button"
                     onClick={() => adjustWeight(ex.aweId, activeIdx, 2.5)}
-                    className="w-14 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
+                    className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     +
                   </button>
                   <button
                     type="button"
                     onClick={() => updateSet(ex.aweId, activeIdx, { isBodyweight: true, weight: "" })}
-                    className="text-xs text-muted-foreground border rounded-lg px-2 h-9 touch-manipulation"
+                    className="text-xs font-medium text-muted-foreground border rounded-lg px-2 h-9 touch-manipulation"
                   >
-                    N/A
+                    BW
                   </button>
                 </div>
               )}
