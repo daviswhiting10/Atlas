@@ -24,6 +24,19 @@ export async function getClient(id: string, workspaceId: string) {
         },
       },
       sessionNotes: { orderBy: { date: "desc" }, take: 20 },
+      workoutLogs: {
+        orderBy: { date: "desc" },
+        take: 50,
+        include: {
+          assignedWorkout: {
+            select: {
+              scheduledDate: true,
+              programAssignment: { select: { name: true } },
+            },
+          },
+          _count: { select: { sets: true } },
+        },
+      },
       outreachLog: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });

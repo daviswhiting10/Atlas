@@ -55,6 +55,17 @@ type Client = {
   createdAt: string;
   programAssignments: ProgramAssignment[];
   sessionNotes: Array<{ id: string; date: string; rawInput: string; rpeAvg: number | null }>;
+  workoutLogs: Array<{
+    id: string;
+    date: string;
+    durationMin: number | null;
+    clientNotes: string | null;
+    _count: { sets: number };
+    assignedWorkout: {
+      scheduledDate: string;
+      programAssignment: { name: string };
+    } | null;
+  }>;
   intakeForms: Array<{
     id: string;
     aiSummary: string | null;
@@ -193,11 +204,11 @@ export default function ClientDetailPage() {
   const activeProgram = client.programAssignments.find((a) => a.status === "ACTIVE");
   const redFlags = client.intakeForms[0]?.redFlags ?? null;
   const { monday, sunday } = getWeekBounds();
-  const sessionsThisWeek = client.sessionNotes.filter((s) => {
+  const sessionsThisWeek = client.workoutLogs.filter((s) => {
     const d = new Date(s.date);
     return d >= monday && d <= sunday;
   }).length;
-  const lastSession = client.sessionNotes[0] ?? null;
+  const lastSession = client.workoutLogs[0] ?? null;
   const lastContact = client.lastContactAt
     ? new Date(client.lastContactAt)
     : lastSession
@@ -320,7 +331,7 @@ export default function ClientDetailPage() {
           icon={<CalendarDays className="w-4 h-4" />}
           label="Last session"
           value={lastSession ? relativeTime(lastSession.date) : "—"}
-          sub={lastSession ? new Date(lastSession.date).toLocaleDateString() : "None yet"}
+          sub={lastSession ? new Date(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None yet"}
         />
         <KpiTile
           icon={<Clock className="w-4 h-4" />}
@@ -346,9 +357,9 @@ export default function ClientDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="sessions" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
             Sessions
-            {client.sessionNotes.length > 0 && (
+            {client.workoutLogs.length > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1 py-0">
-                {client.sessionNotes.length}
+                {client.workoutLogs.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -424,25 +435,25 @@ export default function ClientDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {client.sessionNotes.length === 0 ? (
+                  {client.workoutLogs.length === 0 ? (
                     <div className="py-3 text-center">
                       <p className="text-sm text-muted-foreground">No sessions yet.</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {client.sessionNotes.slice(0, 5).map((s) => (
+                      {client.workoutLogs.slice(0, 5).map((s) => (
                         <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
                           <div className="min-w-0">
                             <p className="text-xs font-medium">
                               {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                             </p>
-                            <p className="text-xs text-muted-foreground truncate max-w-xs">
-                              {s.rawInput.slice(0, 80)}{s.rawInput.length > 80 ? "…" : ""}
+                            <p className="text-xs text-muted-foreground">
+                              {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
                             </p>
                           </div>
-                          {s.rpeAvg != null && (
+                          {s.durationMin != null && (
                             <span className="text-xs font-mono text-muted-foreground ml-3 shrink-0">
-                              RPE {s.rpeAvg.toFixed(1)}
+                              {s.durationMin}m
                             </span>
                           )}
                         </div>
@@ -621,13 +632,13 @@ export default function ClientDetailPage() {
         {/* ── Sessions tab ──────────────────────────────────────────────── */}
         <TabsContent value="sessions">
           <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">{client.sessionNotes.length} sessions</p>
+            <p className="text-sm text-muted-foreground">{client.workoutLogs.length} sessions logged</p>
             <Link href={`/clients/${client.id}/log`} className={cn(buttonVariants({ size: "sm" }))}>
               <ClipboardList className="w-3 h-3 mr-1.5" />
               Log Session
             </Link>
           </div>
-          {client.sessionNotes.length === 0 ? (
+          {client.workoutLogs.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center">
                 <ClipboardList className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
@@ -636,18 +647,23 @@ export default function ClientDetailPage() {
             </Card>
           ) : (
             <div className="space-y-2">
-              {client.sessionNotes.map((s) => (
+              {client.workoutLogs.map((s) => (
                 <Card key={s.id}>
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-semibold">
-                        {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                       </p>
-                      {s.rpeAvg != null && (
-                        <span className="text-xs font-mono text-muted-foreground">RPE {s.rpeAvg.toFixed(1)}</span>
+                      {s.durationMin != null && (
+                        <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{s.rawInput}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
+                    </p>
+                    {s.clientNotes && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
+                    )}
                   </CardContent>
                 </Card>
               ))}
