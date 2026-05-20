@@ -365,7 +365,7 @@ export async function updateAssignedWorkout(
     // Verify ownership
     const existing = await tx.assignedWorkout.findFirst({
       where: { id, workspaceId },
-      include: { exercises: true },
+      include: { exercises: true, workoutLog: { select: { id: true } } },
     });
     if (!existing) throw new Error("Not found");
 
@@ -383,6 +383,7 @@ export async function updateAssignedWorkout(
     }
 
     // Update workout header
+    const newScheduledDate = data.scheduledDate != null ? new Date(data.scheduledDate) : null;
     await tx.assignedWorkout.update({
       where: { id },
       data: {
@@ -390,9 +391,17 @@ export async function updateAssignedWorkout(
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.loggedBy != null && { loggedBy: data.loggedBy }),
         ...(data.status != null && { status: data.status }),
-        ...(data.scheduledDate != null && { scheduledDate: new Date(data.scheduledDate) }),
+        ...(newScheduledDate != null && { scheduledDate: newScheduledDate }),
       },
     });
+
+    // Sync WorkoutLog.date so "Last session" reflects the corrected date
+    if (newScheduledDate != null && existing.workoutLog) {
+      await tx.workoutLog.update({
+        where: { id: existing.workoutLog.id },
+        data: { date: newScheduledDate },
+      });
+    }
 
     // Reconcile exercises if provided
     if (data.exercises != null) {

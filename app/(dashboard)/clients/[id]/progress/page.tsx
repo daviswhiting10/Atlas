@@ -9,6 +9,7 @@ import { ProgressShell, useProgressData, type ProgressData } from "./_components
 import { StatTile } from "./_components/StatTile";
 import { MilestoneCard } from "./_components/MilestoneCard";
 import { HeroProgressChart, type HeroDataPoint } from "@/components/charts/HeroProgressChart";
+import { E1RMLineChart, type E1RMPoint } from "@/components/charts/E1RMLineChart";
 import { VolumeBarChart } from "@/components/charts/VolumeBarChart";
 import { WeightTrendChart } from "@/components/charts/WeightTrendChart";
 
@@ -96,6 +97,20 @@ function buildSessionsHero(data: ProgressData): HeroDataPoint[] {
   return data.volumeSeries.map((v) => ({ date: v.weekStart, value: v.sessionCount }));
 }
 
+function buildLiftSeries(data: ProgressData, exerciseId: string): E1RMPoint[] {
+  const pts = data.strengthSeries
+    .filter((s) => s.exerciseId === exerciseId)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  let best = 0;
+  return pts.map((p) => {
+    const isPR = p.e1RM > best;
+    if (isPR) best = p.e1RM;
+    return { date: p.date, e1RM: p.e1RM, isPR };
+  });
+}
+
+const LIFT_COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"];
+
 // ── Stats builders ────────────────────────────────────────────────────────────
 
 function computeStats(data: ProgressData, goal: string) {
@@ -139,17 +154,39 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
   const goal = data.client.primaryGoal ?? "general";
   const cfg = GOAL_CONFIG[goal] ?? DEFAULT_GOAL_CONFIG;
 
-  const heroData =
-    cfg.heroMetric === "weight"
-      ? buildWeightHero(data)
-      : cfg.heroMetric === "strength"
-      ? buildStrengthHero(data)
-      : buildSessionsHero(data);
+  // Fall back to strength hero if goal is weight-based but no measurements yet
+  const weightHero = buildWeightHero(data);
+  const strengthHero = buildStrengthHero(data);
+  let heroData: HeroDataPoint[];
+  let heroLabel = cfg.label;
+  let heroUnit = cfg.heroMetric === "weight" ? "kg" : cfg.heroMetric === "strength" ? "%" : "sessions";
+  let heroColor = cfg.color;
+
+  if (cfg.heroMetric === "weight") {
+    if (weightHero.length > 0) {
+      heroData = weightHero;
+    } else if (strengthHero.length > 0) {
+      heroData = strengthHero;
+      heroLabel = "Strength composite";
+      heroUnit = "%";
+      heroColor = "#3b82f6";
+    } else {
+      heroData = [];
+    }
+  } else if (cfg.heroMetric === "strength") {
+    heroData = strengthHero;
+  } else {
+    heroData = buildSessionsHero(data);
+  }
 
   const stats = computeStats(data, goal);
   const recentMilestones = data.milestones.slice(0, 5);
-
   const hasData = heroData.length > 0;
+
+  // Key lifts that have actual data
+  const keyLiftsWithData = data.keyLifts.filter((kl) =>
+    data.strengthSeries.some((s) => s.exerciseId === kl.exerciseId)
+  );
 
   return (
     <div className="space-y-6">
@@ -158,13 +195,13 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
         <div className="flex items-start justify-between px-5 pt-5 pb-2">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              {cfg.label}
+              {heroLabel}
             </p>
             {heroData.length > 0 && (
               <p className={cn("text-4xl font-bold tracking-tight mt-1", cfg.accentClass)}>
-                {cfg.heroMetric === "weight"
+                {heroUnit === "kg"
                   ? `${heroData[heroData.length - 1].value.toFixed(1)} kg`
-                  : cfg.heroMetric === "strength"
+                  : heroUnit === "%"
                   ? `${heroData[heroData.length - 1].value > 0 ? "+" : ""}${heroData[heroData.length - 1].value.toFixed(1)}%`
                   : `${heroData[heroData.length - 1].value} sessions/wk`}
               </p>
@@ -183,32 +220,24 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
           <div style={{ height: 280 }}>
             <HeroProgressChart
               data={heroData}
-              label={cfg.label}
-              unit={cfg.heroMetric === "weight" ? "kg" : cfg.heroMetric === "strength" ? "%" : "sessions"}
-              color={cfg.color}
-              formatY={
-                cfg.heroMetric === "strength"
-                  ? (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`
-                  : undefined
-              }
+              label={heroLabel}
+              unit={heroUnit}
+              color={heroColor}
+              formatY={heroUnit === "%" ? (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : undefined}
             />
           </div>
         ) : (
-          <div className="h-48 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <p className="text-sm">
-              {cfg.heroMetric === "weight"
-                ? "Log a body weight measurement to start the chart"
-                : "Complete a session to start the chart"}
+          <div className="h-48 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+            <p className="text-sm text-center px-4">
+              Log a session to see strength charts, or log a body measurement to see weight trend.
             </p>
-            {cfg.heroMetric === "weight" && (
-              <Link
-                href={`/clients/${clientId}/measurements/new`}
-                className={buttonVariants({ size: "sm" })}
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Log first measurement
-              </Link>
-            )}
+            <Link
+              href={`/clients/${clientId}/measurements/new`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Log first measurement
+            </Link>
           </div>
         )}
       </div>
@@ -227,6 +256,43 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
         ))}
       </div>
 
+      {/* Key lifts — shown for all goals when session data exists */}
+      {keyLiftsWithData.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold">Key lifts</p>
+            <Link
+              href={`/clients/${clientId}/progress/strength`}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Full strength view →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {keyLiftsWithData.slice(0, 4).map((kl, i) => {
+              const color = LIFT_COLORS[i % LIFT_COLORS.length];
+              const series = buildLiftSeries(data, kl.exerciseId);
+              return (
+                <div key={kl.exerciseId} className="rounded-xl border bg-card p-3">
+                  <div className="flex items-baseline justify-between mb-1">
+                    <p className="text-xs font-semibold">{kl.exerciseName}</p>
+                    <span className="text-xs font-bold" style={{ color }}>
+                      {kl.currentE1RM?.toFixed(0) ?? "—"} lb e1RM
+                    </span>
+                  </div>
+                  <E1RMLineChart data={series} color={color} height={90} />
+                  {kl.pctChange != null && (
+                    <p className={cn("text-xs font-medium mt-1", kl.pctChange >= 0 ? "text-emerald-600" : "text-red-500")}>
+                      {kl.pctChange > 0 ? "+" : ""}{kl.pctChange.toFixed(1)}% from baseline
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Secondary charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Volume bar chart */}
@@ -239,13 +305,27 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
           </div>
         )}
 
-        {/* Weight trend (always show if data, even for non-weight-loss goals) */}
+        {/* Body weight trend — shown for all goals when data exists */}
         {data.weightSeries.length > 0 && (
           <div className="rounded-xl border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Body Weight Trend
             </p>
-            <WeightTrendChart data={data.weightSeries} color={cfg.color} height={160} />
+            <WeightTrendChart data={data.weightSeries} color="#10b981" height={160} />
+          </div>
+        )}
+
+        {/* Nudge to log body weight if none yet */}
+        {data.weightSeries.length === 0 && data.totalSessions > 0 && (
+          <div className="rounded-xl border border-dashed bg-card p-4 flex flex-col items-center justify-center gap-2 text-center">
+            <p className="text-xs text-muted-foreground">No body measurements yet</p>
+            <Link
+              href={`/clients/${clientId}/measurements/new`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-7 text-xs")}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Log weight
+            </Link>
           </div>
         )}
       </div>

@@ -52,7 +52,7 @@ export async function logSet(input: {
       id: input.assignedWorkoutId,
       programAssignment: { workspaceId },
     },
-    select: { id: true },
+    select: { id: true, scheduledDate: true },
   });
   if (!assignedWorkout) throw new Error("Workout not found");
 
@@ -67,11 +67,12 @@ export async function logSet(input: {
     if (existing) {
       workoutLogId = existing.id;
     } else {
+      // Use the scheduled date so "Last session" reflects when it happened
       const created = await prisma.workoutLog.create({
         data: {
           clientId: input.clientId,
           assignedWorkoutId: input.assignedWorkoutId,
-          date: new Date(),
+          date: assignedWorkout.scheduledDate,
         },
         select: { id: true },
       });
