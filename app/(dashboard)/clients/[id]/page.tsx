@@ -450,7 +450,11 @@ export default function ClientDetailPage() {
                   ) : (
                     <div className="space-y-2">
                       {client.workoutLogs.slice(0, 5).map((s) => (
-                        <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                        <Link
+                          key={s.id}
+                          href={`/clients/${client.id}/sessions/${s.id}`}
+                          className="flex items-center justify-between py-1.5 border-b last:border-0 hover:bg-muted/40 -mx-1 px-1 rounded transition-colors"
+                        >
                           <div className="min-w-0">
                             <p className="text-xs font-medium">
                               {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
@@ -464,7 +468,7 @@ export default function ClientDetailPage() {
                               {s.durationMin}m
                             </span>
                           )}
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
