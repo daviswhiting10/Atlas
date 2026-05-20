@@ -88,7 +88,7 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                         onChange(next);
                       }}
                     >
-                      {s.isBodyweight ? "lb" : "N/A"}
+                      {s.isBodyweight ? "lb" : "BW"}
                     </button>
                   )}
                 </div>
