@@ -6,7 +6,6 @@ import { signOut } from "next-auth/react";
 import {
   Inbox,
   Users,
-  UserPlus,
   FileText,
   Dumbbell,
   MessageSquare,
@@ -28,7 +27,6 @@ const navItems = [
     label: "Clients",
     items: [
       { href: "/clients", icon: Users, label: "Roster" },
-      { href: "/leads", icon: UserPlus, label: "Pipeline" },
       { href: "/intake", icon: FileText, label: "Intake" },
     ],
   },

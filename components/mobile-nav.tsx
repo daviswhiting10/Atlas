@@ -15,7 +15,6 @@ import {
   DollarSign,
   Settings,
   ClipboardList,
-  UserPlus,
   LogOut,
   Zap,
 } from "lucide-react";
@@ -59,7 +58,6 @@ const TABS = [
 const MORE_LINKS = [
   { href: "/outreach", icon: MessageSquare, label: "Outreach" },
   { href: "/intake", icon: FileText, label: "Intake" },
-  { href: "/leads", icon: UserPlus, label: "Pipeline" },
   { href: "/pricing", icon: DollarSign, label: "Pricing" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
