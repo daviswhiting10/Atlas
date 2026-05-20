@@ -8,7 +8,6 @@ import {
   Tooltip,
   ReferenceLine,
   ResponsiveContainer,
-  Dot,
 } from "recharts";
 import { useState } from "react";
 import { format } from "date-fns";

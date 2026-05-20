@@ -9,7 +9,6 @@ import {
   ProgressShell,
   useProgressData,
   type ProgressData,
-  type MeasurementRecord,
 } from "../_components/ProgressShell";
 import { WeightTrendChart } from "@/components/charts/WeightTrendChart";
 import { format } from "date-fns";
