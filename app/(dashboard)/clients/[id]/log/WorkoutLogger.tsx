@@ -171,7 +171,6 @@ export default function WorkoutLogger({
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
   const [restSecs, setRestSecs] = useState(0);
   const [undoEntry, setUndoEntry] = useState<{ aweId: string; idx: number } | null>(null);
-  const [notesOpen, setNotesOpen] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartX = useRef(0);
 
@@ -208,12 +207,6 @@ export default function WorkoutLogger({
     const current = parseFloat(entry.weight) || 0;
     const next = Math.max(0, current + delta);
     updateSet(aweId, idx, { weight: next % 1 === 0 ? String(next) : next.toFixed(1) });
-  }
-
-  function adjustReps(aweId: string, idx: number, delta: number) {
-    const entry = exState[aweId].sets[idx];
-    const current = parseInt(entry.reps) || 0;
-    updateSet(aweId, idx, { reps: String(Math.max(1, current + delta)) });
   }
 
   function addSet(aweId: string) {
@@ -456,7 +449,8 @@ export default function WorkoutLogger({
     const activeSet = state.sets[activeIdx];
     const s = ex.suggestion;
     const lastStr = formatLastSets(ex.lastSets);
-    const repMax = ex.prescribedSets[activeIdx]?.repMax ?? ex.prescribedSets[0]?.repMax ?? null;
+    const prescribed = ex.prescribedSets[activeIdx] ?? ex.prescribedSets[0] ?? null;
+    const repMax = prescribed?.repMax ?? null;
 
     return (
       <div
@@ -567,11 +561,16 @@ export default function WorkoutLogger({
         ) : (
           <>
             {/* Weight */}
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Weight</p>
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Weight</p>
+                {prescribed?.weight != null && !activeSet.isBodyweight && (
+                  <p className="text-xs font-semibold text-emerald-600">Prescribed: {prescribed.weight} lb</p>
+                )}
+              </div>
               {activeSet.isBodyweight ? (
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-14 rounded-xl border-2 bg-muted flex items-center justify-center text-base font-semibold">
+                  <div className="flex-1 h-16 rounded-xl border-2 bg-muted flex items-center justify-center text-lg font-semibold">
                     Bodyweight
                   </div>
                   <button
@@ -587,24 +586,24 @@ export default function WorkoutLogger({
                   <button
                     type="button"
                     onClick={() => adjustWeight(ex.aweId, activeIdx, -2.5)}
-                    className="w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
+                    className="w-14 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     −
                   </button>
                   <Input
                     value={activeSet.weight}
                     onChange={(e) => updateSet(ex.aweId, activeIdx, { weight: e.target.value })}
-                    className="flex-1 h-14 text-center text-xl font-semibold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    className="flex-1 h-16 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                     type="number"
                     inputMode="decimal"
                     step="2.5"
-                    style={{ fontSize: "1.25rem" }}
+                    style={{ fontSize: "1.75rem" }}
                     placeholder="lb"
                   />
                   <button
                     type="button"
                     onClick={() => adjustWeight(ex.aweId, activeIdx, 2.5)}
-                    className="w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
+                    className="w-14 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     +
                   </button>
@@ -620,33 +619,26 @@ export default function WorkoutLogger({
             </div>
 
             {/* Reps */}
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Reps</p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => adjustReps(ex.aweId, activeIdx, -1)}
-                  className="w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
-                >
-                  −
-                </button>
-                <Input
-                  value={activeSet.reps}
-                  onChange={(e) => updateSet(ex.aweId, activeIdx, { reps: e.target.value })}
-                  className="flex-1 h-14 text-center text-xl font-semibold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                  type="number"
-                  inputMode="numeric"
-                  style={{ fontSize: "1.25rem" }}
-                  placeholder="reps"
-                />
-                <button
-                  type="button"
-                  onClick={() => adjustReps(ex.aweId, activeIdx, 1)}
-                  className="w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
-                >
-                  +
-                </button>
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reps</p>
+                {prescribed && (
+                  <p className="text-xs font-semibold text-emerald-600">
+                    {prescribed.repMin === prescribed.repMax
+                      ? `${prescribed.repMax} reps`
+                      : `${prescribed.repMin}–${prescribed.repMax} reps`}
+                  </p>
+                )}
               </div>
+              <Input
+                value={activeSet.reps}
+                onChange={(e) => updateSet(ex.aweId, activeIdx, { reps: e.target.value })}
+                className="w-full h-20 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                type="number"
+                inputMode="numeric"
+                style={{ fontSize: "2.5rem" }}
+                placeholder="—"
+              />
             </div>
 
             {/* Complete set button */}
@@ -730,45 +722,37 @@ export default function WorkoutLogger({
           </div>
         )}
 
-        {/* ── Coach note (collapsible) ───────────────────────────────── */}
-        <div className="mt-3 border rounded-xl overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setNotesOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-muted-foreground"
-          >
-            <span>Notes</span>
-            {notesOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-          {notesOpen && (
-            <div className="px-4 pb-3 border-t pt-2">
-              {state.noteAdded ? (
-                <p className="text-xs text-emerald-600">Note saved ✓</p>
-              ) : (
-                <div className="flex gap-1.5">
-                  <Input
-                    value={state.noteInput}
-                    onChange={(e) =>
-                      setExState((prev) => ({
-                        ...prev,
-                        [ex.aweId]: { ...prev[ex.aweId], noteInput: e.target.value },
-                      }))
-                    }
-                    placeholder="Pain, adaptation, form cue…"
-                    className="h-9 text-base flex-1"
-                    style={{ fontSize: "16px" }}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveNote(ex.aweId, ex.exerciseId); }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-9 shrink-0"
-                    disabled={!state.noteInput.trim() || state.noteSaving}
-                    onClick={() => saveNote(ex.aweId, ex.exerciseId)}
-                  >
-                    {state.noteSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                  </Button>
-                </div>
+        {/* ── Coach note ────────────────────────────────────────────── */}
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Notes</p>
+          {state.noteAdded ? (
+            <p className="text-xs text-emerald-600 py-2">Note saved ✓</p>
+          ) : (
+            <div className="space-y-2">
+              <Textarea
+                value={state.noteInput}
+                onChange={(e) =>
+                  setExState((prev) => ({
+                    ...prev,
+                    [ex.aweId]: { ...prev[ex.aweId], noteInput: e.target.value },
+                  }))
+                }
+                placeholder="Pain, adaptation, form cue…"
+                rows={3}
+                className="resize-none"
+                style={{ fontSize: "16px" }}
+              />
+              {state.noteInput.trim() && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={state.noteSaving}
+                  onClick={() => saveNote(ex.aweId, ex.exerciseId)}
+                >
+                  {state.noteSaving ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : null}
+                  Save note
+                </Button>
               )}
             </div>
           )}

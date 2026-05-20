@@ -55,8 +55,7 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
         <thead>
           <tr className="bg-muted text-muted-foreground">
             <th className="px-1.5 py-1 text-center font-medium w-36">Weight</th>
-            <th className="px-1.5 py-1 text-center font-medium w-28">Reps</th>
-            <th className="px-1.5 py-1 text-left font-medium">Notes</th>
+            <th className="px-1.5 py-1 text-center font-medium">Reps</th>
             {!readOnly && <th className="w-6" />}
           </tr>
         </thead>
@@ -114,16 +113,6 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                     onChange={(e) => update(idx, "repMax", Math.max(s.repMin, parseInt(e.target.value) || s.repMin))}
                   />
                 </div>
-              </td>
-              <td className={cellCls}>
-                <input
-                  type="text"
-                  className={`${inputCls} text-left`}
-                  value={s.notes}
-                  placeholder="Pain, adaptation, cue…"
-                  disabled={readOnly}
-                  onChange={(e) => update(idx, "notes", e.target.value)}
-                />
               </td>
               {!readOnly && (
                 <td className={cellCls}>
