@@ -55,7 +55,7 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
         <thead>
           <tr className="bg-muted text-muted-foreground">
             <th className="px-1.5 py-1 text-center font-medium w-8">#</th>
-            <th className="px-1.5 py-1 text-center font-medium w-20">Weight</th>
+            <th className="px-1.5 py-1 text-center font-medium w-32">Weight</th>
             <th className="px-1.5 py-1 text-center font-medium w-20">Reps</th>
             <th className="px-1.5 py-1 text-center font-medium w-12">RPE</th>
             <th className="px-1.5 py-1 text-left font-medium">Notes</th>
@@ -67,24 +67,10 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
             <tr key={idx} className="hover:bg-muted/30">
               <td className={`${cellCls} text-center text-muted-foreground`}>{s.setNumber}</td>
               <td className={cellCls}>
-                {s.isBodyweight ? (
-                  <div className="flex items-center gap-1 justify-center">
-                    <span className="text-xs font-medium text-muted-foreground">N/A</span>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground text-xs underline leading-none"
-                        onClick={() => {
-                          const next = sets.map((row, i) => i === idx ? { ...row, isBodyweight: false, weight: null } : row);
-                          onChange(next);
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 min-w-0">
+                  {s.isBodyweight ? (
+                    <span className="text-xs font-medium text-muted-foreground flex-1 text-center">BW</span>
+                  ) : (
                     <input
                       type="number"
                       className={inputCls}
@@ -93,21 +79,23 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                       disabled={readOnly}
                       onChange={(e) => update(idx, "weight", num(e.target.value))}
                     />
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        title="Bodyweight / N/A"
-                        className="text-muted-foreground hover:text-foreground text-xs leading-none shrink-0"
-                        onClick={() => {
-                          const next = sets.map((row, i) => i === idx ? { ...row, isBodyweight: true, weight: null } : row);
-                          onChange(next);
-                        }}
-                      >
-                        N/A
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      title={s.isBodyweight ? "Enter weight" : "Bodyweight / N/A"}
+                      className="text-[10px] shrink-0 px-1 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground leading-none"
+                      onClick={() => {
+                        const next = sets.map((row, i) =>
+                          i === idx ? { ...row, isBodyweight: !row.isBodyweight, weight: null } : row
+                        );
+                        onChange(next);
+                      }}
+                    >
+                      {s.isBodyweight ? "lb" : "N/A"}
+                    </button>
+                  )}
+                </div>
               </td>
               <td className={cellCls}>
                 <div className="flex items-center gap-0.5">
