@@ -28,7 +28,6 @@ import {
   CalendarDays,
   TrendingDown,
   Activity,
-  Clock,
   MoreHorizontal,
   BarChart2,
 } from "lucide-react";
@@ -217,11 +216,6 @@ export default function ClientDetailPage() {
     return d >= monday && d <= sunday;
   }).length;
   const lastSession = client.workoutLogs[0] ?? null;
-  const lastContact = client.lastContactAt
-    ? new Date(client.lastContactAt)
-    : lastSession
-    ? localDate(lastSession.date)
-    : null;
 
   return (
     <div className="p-4 md:p-8 max-w-5xl pb-12">
@@ -340,12 +334,6 @@ export default function ClientDetailPage() {
           label="Last session"
           value={lastSession ? relativeTime(lastSession.date) : "—"}
           sub={lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None yet"}
-        />
-        <KpiTile
-          icon={<Clock className="w-4 h-4" />}
-          label="Last contact"
-          value={lastContact ? relativeTime(lastContact.toISOString()) : "—"}
-          sub={lastContact ? lastContact.toLocaleDateString() : "None recorded"}
         />
       </div>
 
