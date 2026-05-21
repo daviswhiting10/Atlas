@@ -454,27 +454,33 @@ export default function ClientDetailPage() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {client.workoutLogs.slice(0, 5).map((s) => (
-                        <Link
-                          key={s.id}
-                          href={`/clients/${client.id}/sessions/${s.id}`}
-                          className="flex items-center justify-between py-1.5 border-b last:border-0 hover:bg-muted/40 -mx-1 px-1 rounded transition-colors"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium">
-                              {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
-                            </p>
+                      {client.workoutLogs.slice(0, 5).map((s) => {
+                        const label = localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                        return (
+                          <div key={s.id} className="relative flex items-center justify-between py-2 border-b last:border-0 -mx-1 px-1 rounded group hover:bg-muted/40 transition-colors">
+                            <Link href={`/clients/${client.id}/sessions/${s.id}`} className="absolute inset-0 rounded" />
+                            <div className="min-w-0 pointer-events-none">
+                              <p className="text-xs font-medium">{label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
+                              </p>
+                            </div>
+                            <div className="relative z-10 flex items-center gap-2 shrink-0 ml-3">
+                              {s.durationMin != null && (
+                                <span className="text-xs font-mono text-muted-foreground">{s.durationMin}m</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => deleteSession(s.id, label)}
+                                title="Delete session"
+                                className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                          {s.durationMin != null && (
-                            <span className="text-xs font-mono text-muted-foreground ml-3 shrink-0">
-                              {s.durationMin}m
-                            </span>
-                          )}
-                        </Link>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -667,16 +673,12 @@ export default function ClientDetailPage() {
               {client.workoutLogs.map((s) => {
                 const label = localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
                 return (
-                  <Card key={s.id} className="group">
-                    <CardContent className="py-3 px-4">
+                  <div key={s.id} className="relative rounded-xl border bg-card group hover:border-primary/40 transition-colors">
+                    <Link href={`/clients/${client.id}/sessions/${s.id}`} className="absolute inset-0 rounded-xl" />
+                    <div className="py-3 px-4">
                       <div className="flex items-center justify-between mb-1">
-                        <Link
-                          href={`/clients/${client.id}/sessions/${s.id}`}
-                          className="text-sm font-semibold hover:underline"
-                        >
-                          {label}
-                        </Link>
-                        <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold pointer-events-none">{label}</p>
+                        <div className="relative z-10 flex items-center gap-2 shrink-0">
                           {s.durationMin != null && (
                             <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
                           )}
@@ -684,20 +686,20 @@ export default function ClientDetailPage() {
                             type="button"
                             onClick={() => deleteSession(s.id, label)}
                             title="Delete session"
-                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                            className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground pointer-events-none">
                         {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
                       </p>
                       {s.clientNotes && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic pointer-events-none">{s.clientNotes}</p>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 );
               })}
             </div>
