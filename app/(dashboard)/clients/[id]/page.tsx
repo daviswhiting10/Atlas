@@ -684,7 +684,7 @@ export default function ClientDetailPage() {
                             type="button"
                             onClick={() => deleteSession(s.id, label)}
                             title="Delete session"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
