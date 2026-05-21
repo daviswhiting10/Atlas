@@ -174,6 +174,16 @@ export default function ClientDetailPage() {
     toast.success(`Invite sent to ${data.email}`);
   }
 
+  async function deleteSession(sessionId: string, label: string) {
+    if (!confirm(`Delete session "${label}"? All logged sets will be removed.`)) return;
+    const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+    if (!res.ok) { toast.error("Delete failed"); return; }
+    setClient((prev) =>
+      prev ? { ...prev, workoutLogs: prev.workoutLogs.filter((s) => s.id !== sessionId) } : null
+    );
+    toast.success("Session deleted");
+  }
+
   async function deleteClient() {
     if (!confirm(`Delete ${client?.fullName}? This cannot be undone.`)) return;
     await fetch(`/api/clients/${id}`, { method: "DELETE" });
@@ -654,26 +664,42 @@ export default function ClientDetailPage() {
             </Card>
           ) : (
             <div className="space-y-2">
-              {client.workoutLogs.map((s) => (
-                <Card key={s.id}>
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold">
-                        {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+              {client.workoutLogs.map((s) => {
+                const label = localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+                return (
+                  <Card key={s.id} className="group">
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <Link
+                          href={`/clients/${client.id}/sessions/${s.id}`}
+                          className="text-sm font-semibold hover:underline"
+                        >
+                          {label}
+                        </Link>
+                        <div className="flex items-center gap-2">
+                          {s.durationMin != null && (
+                            <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => deleteSession(s.id, label)}
+                            title="Delete session"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
                       </p>
-                      {s.durationMin != null && (
-                        <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
+                      {s.clientNotes && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
                       )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
-                    </p>
-                    {s.clientNotes && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
