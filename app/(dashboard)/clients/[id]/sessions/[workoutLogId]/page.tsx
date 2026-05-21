@@ -182,7 +182,7 @@ export default function SessionDetailPage() {
           <div className="rounded-2xl border bg-card px-5 py-5 space-y-4">
             <div className="flex items-center gap-2">
               <RotateCcw className="w-4 h-4 text-muted-foreground" />
-              <p className="font-semibold text-sm">Restart "{restartInfo.assignedWorkoutName}"</p>
+              <p className="font-semibold text-sm">Restart &ldquo;{restartInfo.assignedWorkoutName}&rdquo;</p>
             </div>
             <p className="text-sm text-muted-foreground">Session deleted. Pick a date to re-log this workout.</p>
             <div className="flex items-center gap-3">
