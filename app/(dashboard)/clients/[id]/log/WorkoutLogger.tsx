@@ -175,7 +175,9 @@ export default function WorkoutLogger({
   const touchStartX = useRef(0);
 
   const isResuming = existingWorkoutLogId != null;
-  const dateLabel = new Date(scheduledDate).toLocaleDateString("en-US", {
+  // scheduledDate is YYYY-MM-DD — parse as local date to avoid UTC offset shifting the day
+  const [sdYear, sdMonth, sdDay] = scheduledDate.split("-").map(Number);
+  const dateLabel = new Date(sdYear, sdMonth - 1, sdDay).toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -560,6 +562,41 @@ export default function WorkoutLogger({
           </div>
         ) : (
           <>
+            {/* ── Completed sets — inline glanceable summary ─────────────── */}
+            {/* Capped at last 3 so it never pushes inputs below the fold.    */}
+            {state.sets.some((s) => s.completed) && (() => {
+              const doneWithIdx = state.sets
+                .map((s, i) => ({ ...s, originalIdx: i }))
+                .filter((s) => s.completed);
+              const show = doneWithIdx.length > 3 ? doneWithIdx.slice(-3) : doneWithIdx;
+              const hiddenCount = doneWithIdx.length - show.length;
+              return (
+                <div className="mb-4 pb-3 border-b">
+                  {hiddenCount > 0 && (
+                    <p className="text-[10px] text-muted-foreground mb-1">+{hiddenCount} earlier</p>
+                  )}
+                  <div className="space-y-0.5">
+                    {show.map((entry) => (
+                      <div key={entry.originalIdx} className="flex items-center gap-2">
+                        <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span className="text-xs font-mono text-muted-foreground">
+                          S{entry.originalIdx + 1}{"  "}
+                          {entry.isBodyweight ? "BW" : entry.weight ? `${entry.weight}lb` : "—"}
+                          {" × "}{entry.reps || "—"}
+                          {entry.rpe ? `  @${entry.rpe}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Set counter ────────────────────────────────────────────── */}
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+              Set {activeIdx + 1} of {state.sets.length}
+            </p>
+
             {/* Weight */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
@@ -632,16 +669,20 @@ export default function WorkoutLogger({
               </div>
               <Input
                 value={activeSet.reps}
-                onChange={(e) => updateSet(ex.aweId, activeIdx, { reps: e.target.value })}
-                className="w-full h-20 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                type="number"
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  updateSet(ex.aweId, activeIdx, { reps: val });
+                }}
+                onFocus={(e) => e.target.select()}
+                className="w-full h-20 text-center font-bold rounded-xl border-2"
+                type="text"
                 inputMode="numeric"
                 style={{ fontSize: "2.5rem" }}
                 placeholder="—"
               />
             </div>
 
-            {/* Complete set button */}
+            {/* Complete set button — label includes set number so progress is unambiguous */}
             <button
               type="button"
               onClick={() => handleComplete(ex.aweId, ex.exerciseId, activeIdx)}
@@ -653,11 +694,11 @@ export default function WorkoutLogger({
               ) : (
                 <Check className="w-5 h-5" />
               )}
-              Complete Set
+              Complete Set {activeIdx + 1}
             </button>
 
             {/* Progression hint at top of rep range */}
-            {activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && (
+            {activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && !prescribed?.lockWeight && (
               <p className="text-xs text-emerald-700 text-center flex items-center justify-center gap-1 mb-2">
                 <TrendingUp className="w-3 h-3" />
                 Increase weight next session
@@ -694,33 +735,7 @@ export default function WorkoutLogger({
           </button>
         )}
 
-        {/* ── Completed sets (collapsible) ───────────────────────────── */}
-        {state.sets.some((s) => s.completed) && (
-          <div className="mt-3 border rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => {}}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-muted-foreground"
-            >
-              <span>Completed sets ({state.sets.filter((s) => s.completed).length})</span>
-            </button>
-            <div className="px-4 pb-3 space-y-1">
-              {state.sets.map((entry, i) =>
-                entry.completed ? (
-                  <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-                    <span>
-                      Set {i + 1}:
-                      {entry.isBodyweight ? " BW" : entry.weight ? ` ${entry.weight} lb` : ""}
-                      {entry.reps ? ` × ${entry.reps}` : ""}
-                      {entry.rpe ? ` @ RPE ${entry.rpe}` : ""}
-                    </span>
-                  </div>
-                ) : null
-              )}
-            </div>
-          </div>
-        )}
+        {/* Completed sets are shown inline above the active set inputs — no separate list needed here */}
 
         {/* ── Coach note ────────────────────────────────────────────── */}
         <div className="mt-4">
@@ -893,6 +908,7 @@ export default function WorkoutLogger({
                       idx={idx}
                       entry={entry}
                       repMax={repMax}
+                      lockWeight={ex.prescribedSets[idx]?.lockWeight ?? ex.prescribedSets[0]?.lockWeight ?? false}
                       onChange={(patch) => updateSet(ex.aweId, idx, patch)}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                     />
@@ -912,8 +928,8 @@ export default function WorkoutLogger({
                   {state.noteAdded ? (
                     <p className="text-xs text-emerald-600">Note saved ✓</p>
                   ) : (
-                    <div className="flex gap-1.5">
-                      <Input
+                    <div className="flex flex-col gap-1.5">
+                      <Textarea
                         value={state.noteInput}
                         onChange={(e) =>
                           setExState((prev) => ({
@@ -922,13 +938,13 @@ export default function WorkoutLogger({
                           }))
                         }
                         placeholder="Pain, adaptation, form cue…"
-                        className="h-7 text-xs"
-                        onKeyDown={(e) => { if (e.key === "Enter") saveNote(ex.aweId, ex.exerciseId); }}
+                        rows={2}
+                        className="text-xs resize-none"
                       />
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-xs px-2 shrink-0"
+                        className="h-7 text-xs px-2 self-end"
                         disabled={!state.noteInput.trim() || state.noteSaving}
                         onClick={() => saveNote(ex.aweId, ex.exerciseId)}
                       >
@@ -972,16 +988,19 @@ function DesktopSetRow({
   idx,
   entry,
   repMax,
+  lockWeight,
   onChange,
   onComplete,
 }: {
   idx: number;
   entry: SetEntry;
   repMax: number | null;
+  lockWeight: boolean;
   onChange: (patch: Partial<SetEntry>) => void;
   onComplete: () => void;
 }) {
   const hitsTopOfRange =
+    !lockWeight &&
     entry.completed &&
     repMax != null &&
     entry.reps !== "" &&
@@ -1027,11 +1046,13 @@ function DesktopSetRow({
         <span className="text-xs text-muted-foreground shrink-0">×</span>
         <Input
           value={entry.reps}
-          onChange={(e) => onChange({ reps: e.target.value })}
+          onChange={(e) => onChange({ reps: e.target.value.replace(/\D/g, "") })}
+          onFocus={(e) => e.target.select()}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onComplete(); } }}
           placeholder="reps"
           className="h-7 w-14 text-xs text-center px-1"
-          type="number"
+          type="text"
+          inputMode="numeric"
         />
 
         <span className="text-xs text-muted-foreground shrink-0">RPE</span>

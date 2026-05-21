@@ -219,7 +219,7 @@ export default function ProgramsPage() {
                               <span
                                 key={g}
                                 className={cn(
-                                  "inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium",
+                                  "inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium whitespace-nowrap",
                                   GOAL_COLORS[g] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"
                                 )}
                               >
@@ -229,7 +229,7 @@ export default function ProgramsPage() {
                             {conditions.map((c) => (
                               <span
                                 key={c}
-                                className="inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium bg-amber-50 text-amber-700 border-amber-200"
+                                className="inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200"
                               >
                                 {c}
                               </span>
@@ -241,34 +241,39 @@ export default function ProgramsPage() {
                         <Badge variant="outline" className="text-xs">
                           {p._count.assignments} assigned
                         </Badge>
-                        <button
-                          type="button"
-                          onClick={(e) => duplicate(e, p.id, p.name)}
-                          disabled={duplicating}
-                          title="Duplicate program"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => deleteProgram(e, p.id, p.name)}
-                          title="Delete program"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <Link
-                          href={`/programs/${p.id}/assign`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                          title="Assign to client"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" />
-                        </Link>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(p.updatedAt).toLocaleDateString()}
-                        </span>
+                        {/* TODO: mobile program actions (duplicate/delete/assign) — these
+                            are desktop-hover-only and hidden on mobile to prevent layout
+                            overflow. Add a "..." long-press or sheet menu for mobile. */}
+                        <div className="hidden md:flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => duplicate(e, p.id, p.name)}
+                            disabled={duplicating}
+                            title="Duplicate program"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => deleteProgram(e, p.id, p.name)}
+                            title="Delete program"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <Link
+                            href={`/programs/${p.id}/assign`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                            title="Assign to client"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                          </Link>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(p.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
