@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Copy } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type SetDraft = {
   setNumber: number;
@@ -12,6 +13,7 @@ export type SetDraft = {
   rpe: number | null;
   restSeconds: number | null;
   notes: string;
+  lockWeight?: boolean;
 };
 
 type Props = {
@@ -20,7 +22,10 @@ type Props = {
   readOnly?: boolean;
 };
 
-function newSet(setNumber: number): SetDraft {
+function newSet(setNumber: number, template?: SetDraft): SetDraft {
+  if (template) {
+    return { ...template, setNumber, notes: "" };
+  }
   return { setNumber, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" };
 }
 
@@ -30,13 +35,22 @@ function num(v: string): number | null {
 }
 
 export function SetsTable({ sets, onChange, readOnly = false }: Props) {
+  const lockWeight = sets[0]?.lockWeight ?? false;
+
   function update(idx: number, field: keyof SetDraft, value: SetDraft[keyof SetDraft]) {
     const next = sets.map((s, i) => (i === idx ? { ...s, [field]: value } : s));
     onChange(next);
   }
 
   function addSet() {
-    onChange([...sets, newSet(sets.length + 1)]);
+    const last = sets[sets.length - 1];
+    onChange([...sets, newSet(sets.length + 1, last)]);
+  }
+
+  function duplicateSet(idx: number) {
+    const src = sets[idx];
+    const after = sets.slice(idx + 1).map((s) => ({ ...s, setNumber: s.setNumber + 1 }));
+    onChange([...sets.slice(0, idx + 1), newSet(idx + 2, src), ...after]);
   }
 
   function removeSet(idx: number) {
@@ -46,17 +60,37 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
     onChange(next);
   }
 
+  function toggleLockWeight() {
+    onChange(sets.map((s) => ({ ...s, lockWeight: !lockWeight })));
+  }
+
   const cellCls = "border-b px-1.5 py-1";
   const inputCls = "w-full bg-transparent text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary/40 rounded px-1 py-0.5 disabled:opacity-50";
 
   return (
     <div className="mt-2">
+      {!readOnly && (
+        <div className="flex items-center gap-2 mb-1.5">
+          <button
+            type="button"
+            onClick={toggleLockWeight}
+            className={cn(
+              "text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors",
+              !lockWeight
+                ? "border-emerald-400 text-emerald-700 bg-emerald-50"
+                : "border-border text-muted-foreground"
+            )}
+          >
+            {lockWeight ? "Fixed weight" : "Progressive overload ↑"}
+          </button>
+        </div>
+      )}
       <table className="w-full text-xs border rounded overflow-hidden">
         <thead>
           <tr className="bg-muted text-muted-foreground">
             <th className="px-1.5 py-1 text-center font-medium w-36">Weight</th>
             <th className="px-1.5 py-1 text-center font-medium">Reps</th>
-            {!readOnly && <th className="w-6" />}
+            {!readOnly && <th className="w-12" />}
           </tr>
         </thead>
         <tbody>
@@ -116,13 +150,24 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
               </td>
               {!readOnly && (
                 <td className={cellCls}>
-                  <button
-                    type="button"
-                    onClick={() => removeSet(idx)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => duplicateSet(idx)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Duplicate set"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeSet(idx)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="Remove set"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </td>
               )}
             </tr>

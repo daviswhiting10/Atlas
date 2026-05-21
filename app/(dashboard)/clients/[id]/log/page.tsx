@@ -18,6 +18,7 @@ export type PrescribedSet = {
   rpe: number | null;
   restSeconds: number | null;
   notes: string;
+  lockWeight?: boolean;
 };
 
 export type LoggerExercise = {
@@ -198,7 +199,7 @@ export default async function LogPage({
       clientName={client.fullName}
       assignedWorkoutId={assignedWorkout.id}
       workoutName={assignedWorkout.name}
-      scheduledDate={assignedWorkout.scheduledDate.toISOString()}
+      scheduledDate={assignedWorkout.scheduledDate.toISOString().split("T")[0]}
       assignmentName={assignedWorkout.programAssignment.name}
       exercises={exercises}
       existingWorkoutLogId={existingLog?.id ?? null}
