@@ -457,27 +457,24 @@ export default function ClientDetailPage() {
                       {client.workoutLogs.slice(0, 5).map((s) => {
                         const label = localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
                         return (
-                          <div key={s.id} className="relative flex items-center justify-between py-2 border-b last:border-0 -mx-1 px-1 rounded group hover:bg-muted/40 transition-colors">
-                            <Link href={`/clients/${client.id}/sessions/${s.id}`} className="absolute inset-0 rounded" />
-                            <div className="min-w-0 pointer-events-none">
+                          <div key={s.id} className="flex items-center border-b last:border-0">
+                            <Link
+                              href={`/clients/${client.id}/sessions/${s.id}`}
+                              className="flex-1 min-w-0 py-2 pr-2"
+                            >
                               <p className="text-xs font-medium">{label}</p>
                               <p className="text-xs text-muted-foreground">
                                 {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
                               </p>
-                            </div>
-                            <div className="relative z-10 flex items-center gap-2 shrink-0 ml-3">
-                              {s.durationMin != null && (
-                                <span className="text-xs font-mono text-muted-foreground">{s.durationMin}m</span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => deleteSession(s.id, label)}
-                                title="Delete session"
-                                className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => deleteSession(s.id, label)}
+                              title="Delete session"
+                              className="shrink-0 p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         );
                       })}
@@ -673,32 +670,28 @@ export default function ClientDetailPage() {
               {client.workoutLogs.map((s) => {
                 const label = localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
                 return (
-                  <div key={s.id} className="relative rounded-xl border bg-card group hover:border-primary/40 transition-colors">
-                    <Link href={`/clients/${client.id}/sessions/${s.id}`} className="absolute inset-0 rounded-xl" />
-                    <div className="py-3 px-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold pointer-events-none">{label}</p>
-                        <div className="relative z-10 flex items-center gap-2 shrink-0">
-                          {s.durationMin != null && (
-                            <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => deleteSession(s.id, label)}
-                            title="Delete session"
-                            className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground pointer-events-none">
+                  <div key={s.id} className="flex items-stretch rounded-xl border bg-card hover:border-primary/40 transition-colors">
+                    <Link
+                      href={`/clients/${client.id}/sessions/${s.id}`}
+                      className="flex-1 py-3 px-4 min-w-0"
+                    >
+                      <p className="text-sm font-semibold">{label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
+                        {s.durationMin != null && ` · ${s.durationMin}m`}
                       </p>
                       {s.clientNotes && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic pointer-events-none">{s.clientNotes}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
                       )}
-                    </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => deleteSession(s.id, label)}
+                      title="Delete session"
+                      className="px-4 flex items-center text-muted-foreground hover:text-destructive hover:bg-muted rounded-r-xl border-l transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 );
               })}
