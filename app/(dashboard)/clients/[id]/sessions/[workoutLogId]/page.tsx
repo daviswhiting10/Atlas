@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -60,12 +60,23 @@ function groupByExercise(sets: SetLog[]): ExerciseGroup[] {
   return order.map((k) => map.get(k)!);
 }
 
+type RestartInfo = {
+  assignedWorkoutId: string;
+  assignedWorkoutName: string;
+  assignmentId: string;
+};
+
 export default function SessionDetailPage() {
   const { id: clientId, workoutLogId } = useParams<{ id: string; workoutLogId: string }>();
+  const router = useRouter();
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateValue, setDateValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [restartInfo, setRestartInfo] = useState<RestartInfo | null>(null);
+  const [restartDate, setRestartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [restarting, setRestarting] = useState(false);
 
   useEffect(() => {
     fetch(`/api/sessions/${workoutLogId}`)
@@ -98,6 +109,52 @@ export default function SessionDetailPage() {
     }
   }
 
+  async function deleteSession() {
+    if (!confirm("Delete this session? All logged sets will be removed. The workout will be reset to PLANNED so you can re-log it.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/sessions/${workoutLogId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      const data = await res.json();
+      toast.success("Session deleted");
+      if (data.assignedWorkoutId && data.assignedWorkoutName && data.assignmentId) {
+        setRestartInfo({
+          assignedWorkoutId: data.assignedWorkoutId,
+          assignedWorkoutName: data.assignedWorkoutName,
+          assignmentId: data.assignmentId,
+        });
+        setSession(null);
+      } else {
+        router.push(`/clients/${clientId}`);
+      }
+    } catch {
+      toast.error("Could not delete session");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function restartSession() {
+    if (!restartInfo) return;
+    setRestarting(true);
+    try {
+      // Update the scheduled date on the assigned workout before navigating
+      const res = await fetch(
+        `/api/assignments/${restartInfo.assignmentId}/workouts/${restartInfo.assignedWorkoutId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scheduledDate: restartDate }),
+        }
+      );
+      if (!res.ok) throw new Error("Could not update date");
+      router.push(`/clients/${clientId}/log?workoutId=${restartInfo.assignedWorkoutId}`);
+    } catch {
+      toast.error("Could not set date — try again");
+      setRestarting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -112,6 +169,44 @@ export default function SessionDetailPage() {
   }
 
   if (!session) {
+    if (restartInfo) {
+      return (
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
+          <Link
+            href={`/clients/${clientId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to client
+          </Link>
+          <div className="rounded-2xl border bg-card px-5 py-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-muted-foreground" />
+              <p className="font-semibold text-sm">Restart "{restartInfo.assignedWorkoutName}"</p>
+            </div>
+            <p className="text-sm text-muted-foreground">Session deleted. Pick a date to re-log this workout.</p>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-muted-foreground w-20 shrink-0">Session date</label>
+              <input
+                type="date"
+                value={restartDate}
+                onChange={(e) => setRestartDate(e.target.value)}
+                className="flex-1 text-sm border rounded-lg px-3 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={restartSession} disabled={restarting || !restartDate} className="flex-1">
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                {restarting ? "Starting…" : "Start session"}
+              </Button>
+              <Link href={`/clients/${clientId}`} className={buttonVariants({ variant: "outline" })}>
+                Cancel
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center text-muted-foreground">
         <p>Session not found.</p>
@@ -158,6 +253,16 @@ export default function SessionDetailPage() {
                 {session.durationMin}m
               </span>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={deleteSession}
+              disabled={deleting}
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+              title="Delete session"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
           </div>
         </div>
 

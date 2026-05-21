@@ -85,3 +85,47 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
 
   return NextResponse.json({ ok: true });
 });
+
+// DELETE /api/sessions/[workoutLogId]
+// Deletes the WorkoutLog + all its SetLogs, then resets the linked AssignedWorkout
+// back to PLANNED so the workout can be re-logged on a new date.
+export const DELETE = withWorkspace<Ctx>(async (_req, { workspaceId }, { params }) => {
+  const { workoutLogId } = await params;
+
+  const existing = await prisma.workoutLog.findFirst({
+    where: { id: workoutLogId, client: { workspaceId } },
+    select: {
+      id: true,
+      assignedWorkoutId: true,
+      assignedWorkout: {
+        select: {
+          id: true,
+          name: true,
+          programAssignment: { select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.$transaction(async (tx) => {
+    // Delete all set logs first (no cascade on this FK)
+    await tx.setLog.deleteMany({ where: { workoutLogId } });
+    // Delete the workout log
+    await tx.workoutLog.delete({ where: { id: workoutLogId } });
+    // Reset the assigned workout so it can be logged again
+    if (existing.assignedWorkoutId) {
+      await tx.assignedWorkout.update({
+        where: { id: existing.assignedWorkoutId },
+        data: { status: "PLANNED" },
+      });
+    }
+  });
+
+  return NextResponse.json({
+    ok: true,
+    assignedWorkoutId: existing.assignedWorkout?.id ?? null,
+    assignedWorkoutName: existing.assignedWorkout?.name ?? null,
+    assignmentId: existing.assignedWorkout?.programAssignment.id ?? null,
+  });
+});
