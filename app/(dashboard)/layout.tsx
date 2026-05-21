@@ -11,7 +11,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen bg-background">
       <AppSidebar />
       {/* pb-24 on mobile reserves space above the bottom tab bar + safe area */}
-      <main className="md:ml-56 min-h-screen pb-24 md:pb-0">
+      {/* pt safe-area-inset-top prevents content sitting behind notch/Dynamic Island in PWA standalone mode */}
+      <main
+        className="md:ml-56 min-h-screen pb-24 md:pb-0"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         {children}
       </main>
       <MobileNav />
