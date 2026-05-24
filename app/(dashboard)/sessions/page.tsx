@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Mic, MicOff, Loader2, CheckCircle } from "lucide-react";
+import { Mic, MicOff, Loader2, CheckCircle, Trash2 } from "lucide-react";
 
 type Client = { id: string; fullName: string };
 type SessionRecord = {
@@ -105,6 +105,14 @@ export default function SessionsPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function deleteSessionNote(noteId: string) {
+    if (!confirm("Delete this session note? This cannot be undone.")) return;
+    const res = await fetch(`/api/sessions?id=${noteId}`, { method: "DELETE" });
+    if (!res.ok) { toast.error("Could not delete session"); return; }
+    setRecentSessions((prev) => prev.filter((s) => s.id !== noteId));
+    toast.success("Session deleted");
   }
 
   async function saveNote() {
@@ -258,17 +266,27 @@ export default function SessionsPage() {
               <Card key={s.id}>
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/clients/${s.client.id}`} className="text-sm font-medium hover:text-primary">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Link href={`/clients/${s.client.id}`} className="text-sm font-medium hover:text-primary truncate">
                         {s.client.fullName}
                       </Link>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground shrink-0">
                         {new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </span>
                     </div>
-                    {s.rpeAvg != null && (
-                      <span className="text-xs font-mono text-muted-foreground">RPE {s.rpeAvg.toFixed(1)}</span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {s.rpeAvg != null && (
+                        <span className="text-xs font-mono text-muted-foreground">RPE {s.rpeAvg.toFixed(1)}</span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => deleteSessionNote(s.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{s.rawInput}</p>
                 </CardContent>

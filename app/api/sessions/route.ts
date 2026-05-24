@@ -56,3 +56,19 @@ export const POST = withWorkspace(async (req, { workspaceId }) => {
   ]);
   return NextResponse.json(note, { status: 201 });
 });
+
+// DELETE /api/sessions?id=<sessionNoteId>
+export const DELETE = withWorkspace(async (req, { workspaceId }) => {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const note = await prisma.sessionNote.findFirst({
+    where: { id, client: { workspaceId, deletedAt: null } },
+    select: { id: true },
+  });
+  if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.sessionNote.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+});

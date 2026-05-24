@@ -85,3 +85,23 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
 
   return NextResponse.json({ ok: true });
 });
+
+// DELETE /api/sessions/[workoutLogId]
+// Deletes a WorkoutLog and all its associated sets
+export const DELETE = withWorkspace<Ctx>(async (_req, { workspaceId }, { params }) => {
+  const { workoutLogId } = await params;
+
+  const existing = await prisma.workoutLog.findFirst({
+    where: { id: workoutLogId, client: { workspaceId } },
+    select: { id: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Delete sets first (no cascade configured), then the log
+  await prisma.$transaction([
+    prisma.setLog.deleteMany({ where: { workoutLogId } }),
+    prisma.workoutLog.delete({ where: { id: workoutLogId } }),
+  ]);
+
+  return NextResponse.json({ ok: true });
+});

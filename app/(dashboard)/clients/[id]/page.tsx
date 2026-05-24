@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -179,6 +179,18 @@ export default function ClientDetailPage() {
     await fetch(`/api/clients/${id}`, { method: "DELETE" });
     toast.success("Client deleted");
     router.push("/clients");
+  }
+
+  async function deleteWorkoutLog(logId: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this session? This cannot be undone.")) return;
+    const res = await fetch(`/api/sessions/${logId}`, { method: "DELETE" });
+    if (!res.ok) { toast.error("Could not delete session"); return; }
+    setClient((prev) =>
+      prev ? { ...prev, workoutLogs: prev.workoutLogs.filter((s) => s.id !== logId) } : null
+    );
+    toast.success("Session deleted");
   }
 
   if (loading) {
@@ -655,24 +667,36 @@ export default function ClientDetailPage() {
           ) : (
             <div className="space-y-2">
               {client.workoutLogs.map((s) => (
-                <Card key={s.id}>
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold">
-                        {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                <Link key={s.id} href={`/clients/${client.id}/sessions/${s.id}`} className="block">
+                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold">
+                          {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {s.durationMin != null && (
+                            <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => deleteWorkoutLog(s.id, e)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
                       </p>
-                      {s.durationMin != null && (
-                        <span className="text-xs font-mono text-muted-foreground">{s.durationMin} min</span>
+                      {s.clientNotes && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
                       )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
-                    </p>
-                    {s.clientNotes && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
-                    )}
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
