@@ -34,7 +34,7 @@ import {
   completeSession,
   addExerciseNote,
 } from "@/lib/actions/workout-logger";
-import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
+import type { LoggerExercise, PrescribedSet, ExistingSetLog, PrevSet } from "./page";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -81,6 +81,22 @@ function formatLastSets(lastSets: LoggerExercise["lastSets"]): string {
   const rpeParts = lastSets.map((s) => s.rpe).filter((r): r is number => r != null);
   const rpeStr =
     rpeParts.length > 0 ? ` @ RPE ${Math.max(...rpeParts).toFixed(1)}` : "";
+  return `${parts.join(", ")}${rpeStr}`;
+}
+
+function formatPrevSets(sets: PrevSet[]): string {
+  if (sets.length === 0) return "";
+  const parts = sets.map((s) => {
+    const w = s.bandColor
+      ? `${s.bandColor.charAt(0).toUpperCase() + s.bandColor.slice(1)} band`
+      : s.weight != null
+      ? `${s.weight} lb`
+      : "BW";
+    const r = s.reps != null ? `× ${s.reps}` : "";
+    return `${w} ${r}`.trim();
+  });
+  const rpeParts = sets.map((s) => s.rpe).filter((r): r is number => r != null);
+  const rpeStr = rpeParts.length > 0 ? ` @ RPE ${Math.max(...rpeParts).toFixed(1)}` : "";
   return `${parts.join(", ")}${rpeStr}`;
 }
 
@@ -927,7 +943,14 @@ export default function WorkoutLogger({
           {lastStr && (
             <p className="text-xs text-muted-foreground mt-1.5">Last: {lastStr}</p>
           )}
-          {!ex.lastSets.length && (
+          {/* Previous week reference — same workout, one week prior */}
+          {ex.prevWorkoutSets.length > 0 && (
+            <p className="text-xs mt-1" style={{ color: "var(--blue)" }}>
+              <span className="font-semibold">Prev week:</span>{" "}
+              {formatPrevSets(ex.prevWorkoutSets)}
+            </p>
+          )}
+          {!ex.lastSets.length && !ex.prevWorkoutSets.length && (
             <p className="text-xs text-muted-foreground italic mt-1.5">First time — start conservative.</p>
           )}
 
@@ -1522,6 +1545,14 @@ export default function WorkoutLogger({
                   <p className="text-xs text-muted-foreground mt-1">{lastStr}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground mt-1 italic">First time — start conservative.</p>
+                )}
+
+                {/* Previous week reference */}
+                {ex.prevWorkoutSets.length > 0 && (
+                  <p className="text-xs mt-1" style={{ color: "var(--blue)" }}>
+                    <span className="font-semibold">Prev week:</span>{" "}
+                    {formatPrevSets(ex.prevWorkoutSets)}
+                  </p>
                 )}
 
                 {s.type === "progress" && (

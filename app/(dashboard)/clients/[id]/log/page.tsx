@@ -21,6 +21,13 @@ export type PrescribedSet = {
   notes: string;
 };
 
+export type PrevSet = {
+  weight: number | null;
+  bandColor: string | null;
+  reps: number | null;
+  rpe: number | null;
+};
+
 export type LoggerExercise = {
   aweId: string;
   exerciseId: string;
@@ -34,6 +41,8 @@ export type LoggerExercise = {
     rpe: number | null;
     completed: boolean;
   }>;
+  /** Sets logged in the previous occurrence of this same workout (e.g. Week 1 when currently in Week 2). */
+  prevWorkoutSets: PrevSet[];
   lastNote: string | null;
   suggestion: ProgressionSuggestion;
 };
@@ -154,6 +163,49 @@ export default async function LogPage({
     }
   }
 
+  // ── Previous occurrence of this same workout template (for "Prev week" reference) ─
+  // Find the most recent LOGGED assigned workout with the same sourceWorkoutId,
+  // scheduled before today's workout. Used to show "Performed X lb last time."
+  const prevWorkoutSetsByExercise: Record<string, PrevSet[]> = {};
+  if (assignedWorkout.sourceWorkoutId) {
+    const prevWorkout = await prisma.assignedWorkout.findFirst({
+      where: {
+        sourceWorkoutId: assignedWorkout.sourceWorkoutId,
+        programAssignment: { clientId, workspaceId },
+        status: "LOGGED",
+        scheduledDate: { lt: assignedWorkout.scheduledDate },
+      },
+      orderBy: { scheduledDate: "desc" },
+      select: {
+        workoutLog: {
+          select: {
+            sets: {
+              where: { completed: true },
+              orderBy: { setNumber: "asc" },
+              select: {
+                exerciseId: true,
+                weight: true,
+                bandColor: true,
+                reps: true,
+                rpe: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (const set of prevWorkout?.workoutLog?.sets ?? []) {
+      if (!set.exerciseId) continue;
+      (prevWorkoutSetsByExercise[set.exerciseId] ??= []).push({
+        weight: set.weight,
+        bandColor: set.bandColor,
+        reps: set.reps,
+        rpe: set.rpe,
+      });
+    }
+  }
+
   // ── Per-exercise: last performance + note + suggestion ──────────────────────
   const goal = client.primaryGoal ?? "general";
 
@@ -189,6 +241,7 @@ export default async function LogPage({
         section,
         prescribedSets,
         lastSets,
+        prevWorkoutSets: prevWorkoutSetsByExercise[awe.exerciseId] ?? [],
         lastNote,
         suggestion,
       };
