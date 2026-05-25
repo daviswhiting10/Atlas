@@ -321,13 +321,6 @@ export default function WorkoutLogger({
     });
   }
 
-  // ── Active set (mobile) ───────────────────────────────────────────────────
-  function getActiveSetIdx(aweId: string): number {
-    const sets = exState[aweId]?.sets ?? [];
-    const first = sets.findIndex((s) => !s.completed);
-    return first >= 0 ? first : sets.length;
-  }
-
   // ── Log set ───────────────────────────────────────────────────────────────
   async function handleComplete(aweId: string, exerciseId: string, idx: number) {
     const entry = exState[aweId].sets[idx];
