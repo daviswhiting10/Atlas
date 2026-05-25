@@ -97,12 +97,12 @@ export default function ProgramsPage() {
   });
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1
             className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
           >
             Programs
           </h1>

@@ -91,11 +91,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
       <div className="mb-6">
         <h1
           className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+          style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
         >
           Settings
         </h1>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
             <CardTitle className="text-sm font-semibold">Profile</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Name</Label>
                 <Input

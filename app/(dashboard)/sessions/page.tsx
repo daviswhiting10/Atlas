@@ -140,11 +140,11 @@ export default function SessionsPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-3xl">
       <div className="mb-6">
         <h1
           className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+          style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
         >
           Log Session
         </h1>
@@ -156,7 +156,7 @@ export default function SessionsPage() {
       <div className="mb-4">
         <Label className="mb-1.5 block">Client</Label>
         <Select value={clientId} onValueChange={(v) => { if (v) setClientId(v); }}>
-          <SelectTrigger className="w-64">
+          <SelectTrigger className="w-full sm:w-64 min-h-[44px]">
             <SelectValue placeholder="Select client..." />
           </SelectTrigger>
           <SelectContent>

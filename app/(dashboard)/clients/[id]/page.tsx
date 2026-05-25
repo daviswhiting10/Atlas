@@ -195,7 +195,7 @@ export default function ClientDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-5xl space-y-4">
+      <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl space-y-4">
         <div className="h-8 w-32 bg-muted rounded animate-pulse" />
         <div className="h-24 bg-muted rounded-xl animate-pulse" />
         <div className="h-16 bg-muted rounded-lg animate-pulse" />
@@ -207,7 +207,7 @@ export default function ClientDetailPage() {
 
   if (!client) {
     return (
-      <div className="p-8">
+      <div className="px-5 pt-7 md:px-8 md:pt-8">
         <p className="text-muted-foreground">Client not found.</p>
         <Link href="/clients" className={cn(buttonVariants({ variant: "link" }), "p-0 mt-2 block")}>
           Back to clients
@@ -230,7 +230,7 @@ export default function ClientDetailPage() {
   const lastSession = client.workoutLogs[0] ?? null;
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl pb-12">
+    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-5xl pb-12">
       {/* Back */}
       <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-3 -ml-2")}>
         <ArrowLeft className="w-4 h-4 mr-1" />

@@ -198,7 +198,7 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
               {heroLabel}
             </p>
             {heroData.length > 0 && (
-              <p className="font-display italic leading-none mt-1" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", color: cfg.color }}>
+              <p className="font-display italic leading-none mt-1" style={{ fontSize: "clamp(2rem, 5vw, 4rem)", color: cfg.color }}>
                 {heroUnit === "kg"
                   ? `${heroData[heroData.length - 1].value.toFixed(1)} kg`
                   : heroUnit === "%"

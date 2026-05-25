@@ -78,7 +78,7 @@ export default function ProgramIdeaPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+    <div className="max-w-3xl mx-auto px-5 pt-7 md:px-8 md:pt-8 space-y-5">
       {/* Back */}
       <Link
         href="/programs"

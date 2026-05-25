@@ -11,10 +11,10 @@
 }
 
 /* ── Mobile nav clearance ──────────────────────────────────────────────────
-   Only applied below md breakpoint. Outside @layer so it wins over Tailwind. */
+   96px clears the 64px tab bar + 32px breathing room (spec: 96px bottom). */
 @media (max-width: 767px) {
   .pb-nav-safe {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -62,6 +62,21 @@
 .card-lift:hover {
   transform: translateY(-2px);
   box-shadow: 0 30px 60px -30px rgba(43, 107, 255, 0.30);
+}
+
+/* ── Mobile: replace hover lifts with active press scale ───────────────── */
+@media (max-width: 760px) {
+  .card-lift {
+    transition: transform 150ms ease;
+  }
+  .card-lift:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .card-lift:active {
+    transform: scale(0.98);
+    box-shadow: none;
+  }
 }
 
 @layer base {

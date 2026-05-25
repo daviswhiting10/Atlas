@@ -461,7 +461,7 @@ export default function AssignedProgramPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-4xl">
+      <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-4xl">
         <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
         <div className="space-y-2">
           {[...Array(4)].map((_, i) => <div key={i} className="h-16 bg-muted rounded animate-pulse" />)}
@@ -472,7 +472,7 @@ export default function AssignedProgramPage() {
 
   if (!assignment) {
     return (
-      <div className="p-8">
+      <div className="px-5 pt-5 md:px-8 md:pt-8">
         <p className="text-muted-foreground">Assignment not found.</p>
         <Link href={`/clients/${clientId}`} className={cn(buttonVariants({ variant: "link" }), "p-0 mt-2 block")}>
           Back to client
@@ -485,7 +485,7 @@ export default function AssignedProgramPage() {
   const weeks = Object.keys(weekGroups).map(Number).sort((a, b) => a - b);
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-4xl">
       <Link
         href={`/clients/${clientId}`}
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}

@@ -133,7 +133,7 @@ export default function NewMeasurementPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-xl">
+    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-xl">
       <Link
         href={`/clients/${clientId}/progress/body`}
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}

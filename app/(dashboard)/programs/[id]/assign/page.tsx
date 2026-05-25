@@ -83,14 +83,14 @@ export default function AssignProgramPage() {
   }
 
   if (!program) {
-    return <div className="p-8"><div className="h-8 w-48 bg-muted rounded animate-pulse" /></div>;
+    return <div className="px-5 pt-5 md:px-8 md:pt-8"><div className="h-8 w-48 bg-muted rounded animate-pulse" /></div>;
   }
 
   const totalWorkoutsPerBlock = program.blocks.map((b) => b.workouts.length * b.weeks);
   const totalWorkouts = totalWorkoutsPerBlock.reduce((a, b) => a + b, 0);
 
   return (
-    <div className="p-8 max-w-xl">
+    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-xl">
       <Link
         href={`/programs/${programId}`}
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}
@@ -101,7 +101,7 @@ export default function AssignProgramPage() {
 
       <h1
         className="font-display leading-[1.04] tracking-[-0.01em] mb-1"
-        style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+        style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
       >
         Assign Program
       </h1>

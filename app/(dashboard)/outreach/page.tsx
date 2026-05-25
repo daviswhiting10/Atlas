@@ -204,9 +204,9 @@ export default function OutreachPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-3xl">
       <div className="mb-6">
-        <h1 className="font-display leading-[1.04] tracking-[-0.01em]" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}>Outreach</h1>
+        <h1 className="font-display leading-[1.04] tracking-[-0.01em]" style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}>Outreach</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
           Generate AI-personalized messages or use templates.
         </p>
@@ -221,11 +221,11 @@ export default function OutreachPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label className="mb-1.5 block text-xs">Client</Label>
               <Select value={clientId} onValueChange={(v) => { if (v) setClientId(v); }}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="min-h-[44px] text-sm sm:h-8 sm:text-xs">
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -238,7 +238,7 @@ export default function OutreachPage() {
             <div>
               <Label className="mb-1.5 block text-xs">Purpose</Label>
               <Select value={purpose} onValueChange={setPurpose}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="min-h-[44px] text-sm sm:h-8 sm:text-xs">
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -251,7 +251,7 @@ export default function OutreachPage() {
             <div>
               <Label className="mb-1.5 block text-xs">Channel</Label>
               <Select value={channel} onValueChange={(v) => setChannel(v as "email" | "sms" | "dm")}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="min-h-[44px] text-sm sm:h-8 sm:text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

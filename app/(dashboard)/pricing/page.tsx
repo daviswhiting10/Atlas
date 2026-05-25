@@ -8,11 +8,11 @@ const CREDENTIALS = [
 
 export default function PricingPage() {
   return (
-    <div className="p-8 max-w-4xl">
-      <div className="mb-8">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-4xl">
+      <div className="mb-6 md:mb-8">
         <h1
           className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+          style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
         >
           Pricing
         </h1>

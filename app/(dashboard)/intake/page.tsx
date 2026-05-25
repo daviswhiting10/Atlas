@@ -226,7 +226,7 @@ export default function IntakePage() {
   // ── Result screen ──────────────────────────────────────────────────────────
   if (result) {
     return (
-      <div className="p-4 sm:p-8 max-w-2xl">
+      <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
         <div className="flex items-center gap-2 mb-6">
           <CheckCircle className="w-5 h-5 text-green-700" />
           <h1
@@ -295,13 +295,13 @@ export default function IntakePage() {
 
   // ── Main form ──────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 sm:p-8 max-w-2xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1
             className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
           >
             Goal Setting Session
           </h1>
@@ -415,7 +415,7 @@ export default function IntakePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label>Fat Mass</Label>
               <Input value={form.fatMass} onChange={set("fatMass")} placeholder="lbs" />

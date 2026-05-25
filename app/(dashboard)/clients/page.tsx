@@ -92,12 +92,12 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1
             className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
           >
             Clients
           </h1>
@@ -126,7 +126,7 @@ export default function ClientsPage() {
                   placeholder="Jane Smith"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Email</Label>
                   <Input
@@ -145,7 +145,7 @@ export default function ClientsPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Primary Goal</Label>
                   <Select value={form.primaryGoal} onValueChange={sel((v) => setForm((f) => ({ ...f, primaryGoal: v })))}>
@@ -183,17 +183,17 @@ export default function ClientsPage() {
 
       {/* Filters */}
       <div className="flex gap-3 mb-6">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search clients..."
-            className="pl-8"
+            className="pl-8 min-h-[44px]"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <Select value={filterStatus} onValueChange={sel(setFilterStatus)}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-32 sm:w-36 min-h-[44px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="PROSPECT">Prospect</SelectItem>
@@ -227,7 +227,7 @@ export default function ClientsPage() {
               <Link
                 key={client.id}
                 href={`/clients/${client.id}`}
-                className="flex items-center justify-between px-5 py-4 hover:bg-muted/40 transition-colors"
+                className="flex items-center justify-between px-5 py-4 min-h-[60px] hover:bg-muted/40 active:bg-muted/60 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">

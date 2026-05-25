@@ -22,7 +22,7 @@ export default async function InboxPage() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="p-4 md:p-8 md:max-w-5xl">
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
       {/* ── Page heading — Instrument Serif, italic name ─────────────── */}
       <div className="mb-6 md:mb-10">
         <h1
@@ -52,7 +52,7 @@ export default async function InboxPage() {
             <CardContent className="pt-4 pb-3">
               <div
                 className="font-display italic leading-none"
-                style={{ fontSize: "clamp(3rem, 5vw, 4.5rem)", color }}
+                style={{ fontSize: "clamp(3.5rem, 6vw, 5rem)", color }}
               >
                 {value}
               </div>
@@ -126,21 +126,21 @@ export default async function InboxPage() {
         </div>
       )}
 
-      {/* ── Quick actions — desktop only ─────────────────────────────── */}
-      <div className="hidden md:grid grid-cols-3 gap-4 mb-8">
+      {/* ── Quick actions — grid on desktop, stacked on mobile ──────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
         {[
-          { href: "/clients",  icon: Users,      title: "Add Client",  desc: "New intake or import" },
-          { href: "/sessions", icon: TrendingUp,  title: "Log Session", desc: "Post-session notes" },
-          { href: "/outreach", icon: MessageSquare, title: "Outreach",  desc: "Generate messages" },
+          { href: "/clients",  icon: Users,         title: "Add Client",  desc: "New intake or import" },
+          { href: "/sessions", icon: TrendingUp,     title: "Log Session", desc: "Post-session notes" },
+          { href: "/outreach", icon: MessageSquare,  title: "Outreach",    desc: "Generate messages" },
         ].map(({ href, icon: Icon, title, desc }) => (
           <Link key={href} href={href}>
-            <Card lift className="h-full cursor-pointer">
-              <CardContent className="pt-5 flex flex-col gap-2">
+            <Card lift className="cursor-pointer">
+              <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
                 <div
-                  className="w-8 h-8 rounded-md flex items-center justify-center"
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
                   style={{ background: "rgba(43,107,255,0.08)" }}
                 >
-                  <Icon className="w-4 h-4" style={{ color: "var(--blue)" }} />
+                  <Icon className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
                 </div>
                 <div>
                   <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>

@@ -18,8 +18,8 @@ export default function EditProgramPage() {
       .then((data) => { if (data) setInitial(programApiToState(data)); });
   }, [id]);
 
-  if (notFound) return <div className="p-8 text-muted-foreground">Program not found.</div>;
-  if (!initial) return <div className="p-8"><div className="h-8 w-48 bg-muted rounded animate-pulse" /></div>;
+  if (notFound) return <div className="px-5 pt-5 md:px-8 md:pt-8 text-muted-foreground">Program not found.</div>;
+  if (!initial) return <div className="px-5 pt-5 md:px-8 md:pt-8"><div className="h-8 w-48 bg-muted rounded animate-pulse" /></div>;
 
   return <ProgramBuilder programId={id} initial={initial} />;
 }

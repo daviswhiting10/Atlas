@@ -357,7 +357,7 @@ export function ProgramBuilder({ programId, initial }: Props) {
   );
 
   return (
-    <div className="p-8 max-w-4xl pb-24">
+    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-4xl pb-24">
       <Link
         href="/programs"
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}

@@ -120,7 +120,7 @@ export function ProgressShell({
   const base = `/clients/${clientId}/progress`;
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl pb-20 md:pb-8">
+    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-5xl pb-20 md:pb-8">
       {/* Back */}
       <Link
         href={`/clients/${clientId}`}

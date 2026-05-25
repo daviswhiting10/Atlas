@@ -127,7 +127,7 @@ export default async function LogPage({
   // ── No workout to log ───────────────────────────────────────────────────────
   if (!assignedWorkout) {
     return (
-      <div className="p-8 max-w-2xl">
+      <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-2xl">
         <p className="text-muted-foreground text-sm mb-2">
           No planned workouts found for {client.fullName}.
         </p>
