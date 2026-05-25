@@ -13,6 +13,7 @@ import WorkoutLogger from "./WorkoutLogger";
 export type PrescribedSet = {
   setNumber: number;
   weight: number | null;
+  unit?: "reps" | "secs"; // "secs" for holds; undefined = reps (legacy)
   repMin: number;
   repMax: number;
   rpe: number | null;

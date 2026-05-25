@@ -44,8 +44,9 @@ type SetEntry = {
   isBodyweight: boolean;
   isBand: boolean;
   bandColor: string; // "yellow"|"red"|"green"|"blue"|"black"|"purple"
+  isSeconds: boolean; // true when this is a hold/time-based set
   note: string;
-  reps: string;
+  reps: string;       // stores seconds when isSeconds === true
   rpe: string;
   completed: boolean;
   saving: boolean;
@@ -94,6 +95,7 @@ function initSetEntry(
   suggestion: LoggerExercise["suggestion"],
   existing?: ExistingSetLog
 ): SetEntry {
+  const isSeconds = ps.unit === "secs";
   if (existing) {
     return {
       setLogId: existing.id,
@@ -101,6 +103,7 @@ function initSetEntry(
       isBodyweight: existing.weight === null && !existing.bandColor,
       isBand: !!existing.bandColor,
       bandColor: existing.bandColor ?? "green",
+      isSeconds,
       note: existing.note ?? "",
       reps: existing.reps != null ? String(existing.reps) : "",
       rpe: existing.rpe != null ? String(existing.rpe) : "",
@@ -112,13 +115,15 @@ function initSetEntry(
     suggestion.type !== "first_time" && suggestion.type !== "match_last"
       ? (suggestion.weight ?? ps.weight ?? null)
       : (ps.weight ?? null);
-  const suggestedReps = suggestion.reps ?? ps.repMax;
+  // For holds, pre-fill the target duration; for reps, use suggestion
+  const suggestedReps = isSeconds ? ps.repMax : (suggestion.reps ?? ps.repMax);
   return {
     setLogId: null,
     weight: suggestedWeight != null ? String(suggestedWeight) : "",
     isBodyweight: false,
     isBand: false,
     bandColor: "green",
+    isSeconds,
     note: "",
     reps: suggestedReps != null ? String(suggestedReps) : "",
     rpe: "",
@@ -381,6 +386,7 @@ export default function WorkoutLogger({
         isBodyweight: last?.isBodyweight ?? false,
         isBand: last?.isBand ?? false,
         bandColor: last?.bandColor ?? "green",
+        isSeconds: last?.isSeconds ?? false,
         note: "",
         reps: last?.reps ?? "",
         rpe: "",
@@ -726,9 +732,11 @@ export default function WorkoutLogger({
               <h2 className="text-xl font-bold leading-tight">{ex.name}</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {ex.prescribedSets.length} ×{" "}
-                {ex.prescribedSets[0]?.repMin === ex.prescribedSets[0]?.repMax
-                  ? ex.prescribedSets[0]?.repMax
-                  : `${ex.prescribedSets[0]?.repMin}–${ex.prescribedSets[0]?.repMax}`}
+                {ex.prescribedSets[0]?.unit === "secs"
+                  ? `${ex.prescribedSets[0]?.repMax}s`
+                  : ex.prescribedSets[0]?.repMin === ex.prescribedSets[0]?.repMax
+                    ? ex.prescribedSets[0]?.repMax
+                    : `${ex.prescribedSets[0]?.repMin}–${ex.prescribedSets[0]?.repMax}`}
               </p>
             </div>
             {isResuming && (
@@ -783,6 +791,7 @@ export default function WorkoutLogger({
                         : s.isBodyweight ? "BW"
                         : s.weight ? `${s.weight} lb` : null,
                       reps: s.reps || null,
+                      isSeconds: s.isSeconds,
                     }))
                     .filter((s) => s.note),
                 }))
@@ -802,7 +811,7 @@ export default function WorkoutLogger({
                         {e.sets.map((s) => (
                           <div key={s.setNum} className="flex gap-2 text-xs">
                             <span className="text-muted-foreground shrink-0 w-12">
-                              Set {s.setNum}{s.load || s.reps ? ` · ${[s.load, s.reps ? `${s.reps}r` : null].filter(Boolean).join(" × ")}` : ""}
+                              Set {s.setNum}{s.load || s.reps ? ` · ${[s.load, s.reps ? (s.isSeconds ? `${s.reps}s` : `${s.reps}r`) : null].filter(Boolean).join(" × ")}` : ""}
                             </span>
                             <span className="text-foreground">{s.note}</span>
                           </div>
@@ -923,15 +932,19 @@ export default function WorkoutLogger({
               )}
             </div>
 
-            {/* Reps */}
+            {/* Reps / Seconds */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reps</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {activeSet.isSeconds ? "Seconds" : "Reps"}
+                </p>
                 {prescribed && (
                   <p className="text-xs font-semibold text-emerald-600">
-                    {prescribed.repMin === prescribed.repMax
-                      ? `${prescribed.repMax} reps`
-                      : `${prescribed.repMin}–${prescribed.repMax} reps`}
+                    {activeSet.isSeconds
+                      ? `${prescribed.repMax}s`
+                      : prescribed.repMin === prescribed.repMax
+                        ? `${prescribed.repMax} reps`
+                        : `${prescribed.repMin}–${prescribed.repMax} reps`}
                   </p>
                 )}
               </div>
@@ -972,8 +985,8 @@ export default function WorkoutLogger({
               />
             </div>
 
-            {/* Progression hint at top of rep range */}
-            {activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && (
+            {/* Progression hint at top of rep range (reps mode only) */}
+            {!activeSet.isSeconds && activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && (
               <p className="text-xs text-emerald-700 text-center flex items-center justify-center gap-1 mb-2">
                 <TrendingUp className="w-3 h-3" />
                 Increase weight next session
@@ -1028,7 +1041,11 @@ export default function WorkoutLogger({
                     <span>
                       Set {i + 1}:
                       {entry.isBodyweight ? " BW" : entry.weight ? ` ${entry.weight} lb` : ""}
-                      {entry.reps ? ` × ${entry.reps}` : ""}
+                      {entry.reps
+                        ? entry.isSeconds
+                          ? ` ${entry.reps}s`
+                          : ` × ${entry.reps}`
+                        : ""}
                       {entry.rpe ? ` @ RPE ${entry.rpe}` : ""}
                     </span>
                   </div>
@@ -1186,9 +1203,11 @@ export default function WorkoutLogger({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {ex.prescribedSets.length} ×{" "}
                     {ex.prescribedSets[0]
-                      ? ex.prescribedSets[0].repMin === ex.prescribedSets[0].repMax
-                        ? ex.prescribedSets[0].repMax
-                        : `${ex.prescribedSets[0].repMin}–${ex.prescribedSets[0].repMax}`
+                      ? ex.prescribedSets[0].unit === "secs"
+                        ? `${ex.prescribedSets[0].repMax}s`
+                        : ex.prescribedSets[0].repMin === ex.prescribedSets[0].repMax
+                          ? ex.prescribedSets[0].repMax
+                          : `${ex.prescribedSets[0].repMin}–${ex.prescribedSets[0].repMax}`
                       : "?"}
                   </p>
                 </div>
@@ -1324,6 +1343,7 @@ function DesktopSetRow({
   onComplete: () => void;
 }) {
   const hitsTopOfRange =
+    !entry.isSeconds &&
     entry.completed &&
     repMax != null &&
     entry.reps !== "" &&
@@ -1388,12 +1408,14 @@ function DesktopSetRow({
           {entry.isBodyweight ? "BW" : entry.isBand ? "Band" : "N/A"}
         </button>
 
-        <span className="text-xs text-muted-foreground shrink-0">×</span>
+        <span className="text-xs text-muted-foreground shrink-0">
+          {entry.isSeconds ? "s" : "×"}
+        </span>
         <Input
           value={entry.reps}
           onChange={(e) => onChange({ reps: e.target.value })}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onComplete(); } }}
-          placeholder="reps"
+          placeholder={entry.isSeconds ? "sec" : "reps"}
           className="h-7 w-14 text-xs text-center px-1"
           type="number"
         />
