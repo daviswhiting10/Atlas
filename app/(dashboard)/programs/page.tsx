@@ -199,78 +199,83 @@ export default function ProgramsPage() {
             return (
               <Link key={p.id} href={`/programs/${p.id}`}>
                 <Card className="hover:border-primary/40 transition-colors cursor-pointer group">
-                  <CardContent className="py-3.5 px-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start gap-2 min-w-0">
-                          <p className="text-sm font-semibold min-w-0 line-clamp-2">{p.name}</p>
-                          {p.isDraft && (
-                            <Badge variant="outline" className="text-xs text-zinc-500 border-zinc-300 h-4 px-1.5 shrink-0 mt-px">
-                              Draft
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {p.durationWeeks}wk · {p._count.blocks} block{p._count.blocks !== 1 ? "s" : ""} · {totalWorkouts} workout{totalWorkouts !== 1 ? "s" : ""}
-                        </p>
-                        {(goals.length > 0 || conditions.length > 0) && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {goals.map((g) => (
-                              <span
-                                key={g}
-                                className={cn(
-                                  "inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium",
-                                  GOAL_COLORS[g] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"
-                                )}
-                              >
-                                {g}
-                              </span>
-                            ))}
-                            {conditions.map((c) => (
-                              <span
-                                key={c}
-                                className="inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium bg-amber-50 text-amber-700 border-amber-200"
-                              >
-                                {c}
-                              </span>
-                            ))}
-                          </div>
+                  <CardContent className="py-3.5 px-4 sm:px-5">
+
+                    {/* ── Row 1: name + badges ── */}
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                      <div className="flex items-start gap-2 min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-snug min-w-0">{p.name}</p>
+                        {p.isDraft && (
+                          <Badge variant="outline" className="text-xs text-zinc-500 border-zinc-300 h-4 px-1.5 shrink-0 mt-px">
+                            Draft
+                          </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="outline" className="text-xs">
-                          {p._count.assignments} assigned
-                        </Badge>
+                      {/* Actions — always visible on mobile, hover-only on desktop */}
+                      <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
                         <button
                           type="button"
                           onClick={(e) => duplicate(e, p.id, p.name)}
                           disabled={duplicating}
-                          title="Duplicate program"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          title="Duplicate"
+                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground touch-manipulation"
                         >
                           <Copy className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => deleteProgram(e, p.id, p.name)}
-                          title="Delete program"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                         <Link
                           href={`/programs/${p.id}/assign`}
                           onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground touch-manipulation"
                           title="Assign to client"
                         >
                           <UserPlus className="w-3.5 h-3.5" />
                         </Link>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(p.updatedAt).toLocaleDateString()}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => deleteProgram(e, p.id, p.name)}
+                          title="Delete"
+                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive touch-manipulation"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
+
+                    {/* ── Row 2: stats + assigned ── */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {p.durationWeeks}wk · {p._count.blocks} block{p._count.blocks !== 1 ? "s" : ""} · {totalWorkouts} workout{totalWorkouts !== 1 ? "s" : ""}
+                      </p>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {p._count.assignments} assigned
+                      </Badge>
+                    </div>
+
+                    {/* ── Row 3: goal / condition tags ── */}
+                    {(goals.length > 0 || conditions.length > 0) && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {goals.map((g) => (
+                          <span
+                            key={g}
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium",
+                              GOAL_COLORS[g] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"
+                            )}
+                          >
+                            {g}
+                          </span>
+                        ))}
+                        {conditions.map((c) => (
+                          <span
+                            key={c}
+                            className="inline-flex items-center px-1.5 py-0 rounded text-[10px] border font-medium bg-amber-50 text-amber-700 border-amber-200"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                   </CardContent>
                 </Card>
               </Link>
