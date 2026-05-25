@@ -722,14 +722,14 @@ export default function WorkoutLogger({
                     key={w.id}
                     type="button"
                     onClick={() => {
-                      if (!isCurrent && !isDone) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
+                      if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
                     }}
                     className={cn(
                       "shrink-0 rounded-xl px-3 py-2 text-left transition-colors border touch-manipulation",
                       isCurrent
                         ? "bg-primary text-primary-foreground border-primary"
                         : isDone
-                          ? "bg-muted/30 border-border opacity-40 cursor-default"
+                          ? "bg-muted/30 border-border opacity-40"
                           : "bg-muted/60 border-border hover:border-primary/50 hover:bg-muted"
                     )}
                   >
@@ -1289,14 +1289,14 @@ export default function WorkoutLogger({
                   key={w.id}
                   type="button"
                   onClick={() => {
-                    if (!isCurrent && !isDone) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
+                    if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
                   }}
                   className={cn(
                     "rounded-lg px-3 py-2 text-left transition-colors border text-sm",
                     isCurrent
                       ? "bg-primary text-primary-foreground border-primary"
                       : isDone
-                        ? "border-border opacity-40 cursor-default"
+                        ? "border-border opacity-40"
                         : "border-border hover:border-primary/50 hover:bg-muted/60"
                   )}
                 >
