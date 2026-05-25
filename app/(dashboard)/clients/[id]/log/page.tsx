@@ -243,6 +243,7 @@ export default async function LogPage({
       workoutName={assignedWorkout.name}
       scheduledDate={assignedWorkout.scheduledDate.toISOString()}
       assignmentName={assignedWorkout.programAssignment.name}
+      assignmentStartDate={assignedWorkout.programAssignment.startDate.toISOString()}
       exercises={exercises}
       existingWorkoutLogId={existingLog?.id ?? null}
       existingSetLogs={(existingLog?.sets ?? []) as ExistingSetLog[]}

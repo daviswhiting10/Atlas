@@ -324,7 +324,7 @@ export async function assignProgram(
 }
 
 export async function getAssignment(id: string, workspaceId: string) {
-  return prisma.programAssignment.findFirst({
+  const assignment = await prisma.programAssignment.findFirst({
     where: { id, workspaceId },
     include: {
       client: { select: { id: true, fullName: true } },
@@ -344,6 +344,29 @@ export async function getAssignment(id: string, workspaceId: string) {
       },
     },
   });
+
+  if (!assignment) return null;
+
+  // ── Repair null sections from source workout exercises ──────────────────────
+  // Sections may be null for workouts assigned before the section field was added.
+  // Fall back to the template WorkoutExercise.section, matching by order.
+  for (const workout of assignment.assignedWorkouts) {
+    const anyMissing = workout.exercises.some((e) => e.section == null);
+    if (anyMissing && workout.sourceWorkoutId) {
+      const sourceExs = await prisma.workoutExercise.findMany({
+        where: { workoutId: workout.sourceWorkoutId },
+        select: { order: true, section: true },
+      });
+      const sectionByOrder = new Map(sourceExs.map((e) => [e.order, e.section ?? null]));
+      for (const ex of workout.exercises) {
+        if (ex.section == null) {
+          ex.section = sectionByOrder.get(ex.order) ?? null;
+        }
+      }
+    }
+  }
+
+  return assignment;
 }
 
 export async function getClientAssignments(clientId: string, workspaceId: string) {

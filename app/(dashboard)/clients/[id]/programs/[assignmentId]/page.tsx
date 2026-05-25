@@ -86,7 +86,16 @@ function toDraft(ex: AssignedExercise): ExerciseDraft {
 
 // ─── Section grouping ─────────────────────────────────────────────────────────
 
+// Standard section order — matches ProgramBuilder's DEFAULT_SECTIONS.
+// Trainer-renamed sections fall through to the "any additional named" bucket.
 const SECTION_ORDER = ["Warmup", "Main A", "Main B", "Burner"];
+
+/** Human-readable label for a section key. Handles both ProgramBuilder
+ *  ("Warmup", "Main A") and any custom names the trainer may have entered. */
+function formatSectionLabel(section: string | null): string {
+  if (!section) return "General";
+  return section; // ProgramBuilder already stores display-ready names
+}
 
 type SectionGroup = { section: string | null; label: string; exs: ExerciseDraft[] };
 
@@ -101,17 +110,17 @@ function getSectionGroups(exercises: ExerciseDraft[]): SectionGroup[] {
   const result: SectionGroup[] = [];
 
   // Standard order first
-  for (const name of SECTION_ORDER) {
-    if (map.has(name)) {
-      result.push({ section: name, label: name, exs: map.get(name)! });
-      map.delete(name);
+  for (const sectionKey of SECTION_ORDER) {
+    if (map.has(sectionKey)) {
+      result.push({ section: sectionKey, label: formatSectionLabel(sectionKey), exs: map.get(sectionKey)! });
+      map.delete(sectionKey);
     }
   }
 
-  // Any additional named sections
+  // Any additional named sections (custom trainer names, or legacy lowercase values)
   Array.from(map.entries()).forEach(([key, exs]) => {
     if (key !== null) {
-      result.push({ section: key, label: key, exs });
+      result.push({ section: key, label: formatSectionLabel(key), exs });
     }
   });
 

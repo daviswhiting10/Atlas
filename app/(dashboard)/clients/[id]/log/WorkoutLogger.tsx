@@ -284,6 +284,57 @@ function findNextSlotAfterComplete(
   return null; // All complete
 }
 
+/** Walk backwards one slot in the round-robin sequence (cross-block aware). */
+function findPrevSlot(
+  exercises: LoggerExercise[],
+  exState: Record<string, ExerciseState>,
+  fromExIdx: number,
+  fromSetRound: number
+): { exIdx: number; setRound: number } | null {
+  const blocks = groupIntoBlocks(exercises);
+  const blockIdx = blocks.findIndex((b) => b.exIndices.includes(fromExIdx));
+  if (blockIdx < 0) return null;
+
+  const block = blocks[blockIdx];
+  const maxSets = block.exIndices.reduce(
+    (acc, i) => Math.max(acc, exState[exercises[i].aweId]?.sets.length ?? 0),
+    0
+  );
+
+  type Slot = { exIdx: number; setRound: number };
+  const sequence: Slot[] = [];
+  for (let round = 0; round < maxSets; round++) {
+    for (const exIdx of block.exIndices) {
+      const sets = exState[exercises[exIdx].aweId]?.sets ?? [];
+      if (round < sets.length) sequence.push({ exIdx, setRound: round });
+    }
+  }
+
+  const currentPos = sequence.findIndex(
+    (s) => s.exIdx === fromExIdx && s.setRound === fromSetRound
+  );
+
+  if (currentPos > 0) return sequence[currentPos - 1];
+
+  // First slot in block → last slot of previous block
+  for (let bi = blockIdx - 1; bi >= 0; bi--) {
+    const prevBlock = blocks[bi];
+    const prevMaxSets = prevBlock.exIndices.reduce(
+      (acc, i) => Math.max(acc, exState[exercises[i].aweId]?.sets.length ?? 0),
+      0
+    );
+    const prevSeq: Slot[] = [];
+    for (let round = 0; round < prevMaxSets; round++) {
+      for (const exIdx of prevBlock.exIndices) {
+        const sets = exState[exercises[exIdx].aweId]?.sets ?? [];
+        if (round < sets.length) prevSeq.push({ exIdx, setRound: round });
+      }
+    }
+    if (prevSeq.length > 0) return prevSeq[prevSeq.length - 1];
+  }
+
+  return null;
+}
 
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -305,6 +356,7 @@ export default function WorkoutLogger({
   workoutName,
   scheduledDate,
   assignmentName,
+  assignmentStartDate,
   exercises,
   existingWorkoutLogId,
   existingSetLogs,
@@ -316,6 +368,7 @@ export default function WorkoutLogger({
   workoutName: string;
   scheduledDate: string;
   assignmentName: string;
+  assignmentStartDate: string;
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
   existingSetLogs: ExistingSetLog[];
@@ -352,6 +405,10 @@ export default function WorkoutLogger({
   const [undoEntry, setUndoEntry] = useState<{ aweId: string; idx: number } | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartX = useRef(0);
+  // Tracks the slot just completed (shows brief "✓" flash before auto-advance)
+  const [justCompletedKey, setJustCompletedKey] = useState<string | null>(null);
+  // Allows editing a fully-logged session (suppresses the all-done completion screen)
+  const [editMode, setEditMode] = useState(false);
 
   const isResuming = existingWorkoutLogId != null;
   const dateLabel = new Date(scheduledDate).toLocaleDateString("en-US", {
@@ -372,10 +429,27 @@ export default function WorkoutLogger({
   }, [lastSetAt]);
 
   // ── Set field helpers ──────────────────────────────────────────────────────
+  // Load-related keys that auto-carry forward to uncompleted subsequent sets
+  const CARRY_KEYS: (keyof SetEntry)[] = ["weight", "isBodyweight", "isBand", "bandColor", "reps", "isSeconds"];
+
   function updateSet(aweId: string, idx: number, patch: Partial<SetEntry>) {
     setExState((prev) => {
       const sets = [...prev[aweId].sets];
       sets[idx] = { ...sets[idx], ...patch };
+
+      // Auto-carry forward load changes to uncompleted subsequent sets
+      const carryPatch: Partial<SetEntry> = {};
+      for (const key of CARRY_KEYS) {
+        if (key in patch) (carryPatch as Record<string, unknown>)[key] = patch[key as keyof typeof patch];
+      }
+      if (Object.keys(carryPatch).length > 0) {
+        for (let i = idx + 1; i < sets.length; i++) {
+          if (!sets[i].completed) {
+            sets[i] = { ...sets[i], ...carryPatch };
+          }
+        }
+      }
+
       return { ...prev, [aweId]: { ...prev[aweId], sets } };
     });
   }
@@ -441,6 +515,7 @@ export default function WorkoutLogger({
         setLastSetAt(Date.now());
         setRestSecs(0);
         setUndoEntry({ aweId, idx });
+        setJustCompletedKey(`${aweId}-${idx}`);
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
         undoTimerRef.current = setTimeout(() => setUndoEntry(null), 5000);
 
@@ -450,13 +525,55 @@ export default function WorkoutLogger({
         );
         if (next) {
           setTimeout(() => {
+            setJustCompletedKey(null);
             setCurrentExIdx(next.exIdx);
             setCurrentSetRound(next.setRound);
           }, 350);
+        } else {
+          // All done — clear the just-completed flash after a beat
+          setTimeout(() => setJustCompletedKey(null), 600);
         }
       }
     } catch {
       toast.error("Failed to save set");
+      updateSet(aweId, idx, { saving: false });
+    }
+  }
+
+  // ── Update an already-completed set (keeps completed = true) ─────────────
+  async function handleUpdateCompletedSet(aweId: string, exerciseId: string, idx: number) {
+    const entry = exState[aweId].sets[idx];
+    if (entry.saving) return;
+    updateSet(aweId, idx, { saving: true });
+    try {
+      const result = await logSet({
+        workoutLogId: workoutLogId ?? undefined,
+        assignedWorkoutId,
+        clientId,
+        exerciseId,
+        assignedWorkoutExerciseId: aweId,
+        setLogId: entry.setLogId ?? undefined,
+        setNumber: idx + 1,
+        weight: (entry.isBodyweight || entry.isBand) ? null : (entry.weight ? parseFloat(entry.weight) : null),
+        bandColor: entry.isBand ? entry.bandColor : null,
+        reps: entry.reps ? parseInt(entry.reps, 10) : null,
+        rpe: entry.rpe ? parseFloat(entry.rpe) : null,
+        note: entry.note.trim() || null,
+        completed: true,
+      });
+      if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
+      updateSet(aweId, idx, { saving: false, setLogId: result.setLogId });
+      toast.success(`Set ${idx + 1} updated`);
+      // Advance to next slot if available
+      const next = findNextSlotAfterComplete(exercises, exState, aweId, idx, currentExIdx, currentSetRound);
+      if (next) {
+        setTimeout(() => {
+          setCurrentExIdx(next.exIdx);
+          setCurrentSetRound(next.setRound);
+        }, 300);
+      }
+    } catch {
+      toast.error("Failed to update set");
       updateSet(aweId, idx, { saving: false });
     }
   }
@@ -711,12 +828,11 @@ export default function WorkoutLogger({
               .map((w) => {
                 const isCurrent = w.id === assignedWorkoutId;
                 const isDone = w.status === "LOGGED" || w.status === "SKIPPED";
-                const d = new Date(w.scheduledDate);
-                const dayLabel = d.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                });
+                const weekNum =
+                  Math.floor(
+                    (new Date(w.scheduledDate).getTime() - new Date(assignmentStartDate).getTime()) /
+                      (7 * 24 * 60 * 60 * 1000)
+                  ) + 1;
                 return (
                   <button
                     key={w.id}
@@ -737,13 +853,13 @@ export default function WorkoutLogger({
                       "text-xs font-semibold leading-tight max-w-[130px] truncate",
                       isCurrent ? "text-primary-foreground" : "text-foreground"
                     )}>
-                      {w.name}
+                      {w.name} · Wk {weekNum}
                     </p>
                     <p className={cn(
                       "text-[10px] mt-0.5",
                       isCurrent ? "text-primary-foreground/70" : "text-muted-foreground"
                     )}>
-                      {isDone ? "Done" : dayLabel} · {w.exerciseCount} ex
+                      {isDone ? "Done" : `${w.exerciseCount} ex`}
                     </p>
                   </button>
                 );
@@ -836,11 +952,18 @@ export default function WorkoutLogger({
         </div>
 
         {/* ── Set inputs ─────────────────────────────────────────────── */}
-        {allSessionDone ? (
+        {allSessionDone && !editMode ? (
           <div className="pb-4">
             <div className="text-center pt-6 pb-4">
               <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" />
               <p className="text-lg font-semibold">All sets complete!</p>
+              <button
+                type="button"
+                onClick={() => { setEditMode(true); setCurrentExIdx(0); setCurrentSetRound(0); }}
+                className="mt-3 text-sm text-primary underline touch-manipulation"
+              >
+                Edit session values
+              </button>
             </div>
 
             {/* Session notes summary */}
@@ -887,7 +1010,7 @@ export default function WorkoutLogger({
               );
             })()}
           </div>
-        ) : activeSet?.completed ? (
+        ) : justCompletedKey === `${ex.aweId}-${setIdx}` ? (
           <div className="py-10 text-center">
             <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-3" />
             <p className="text-base font-semibold text-green-700">Set {setIdx + 1} complete ✓</p>
@@ -895,6 +1018,14 @@ export default function WorkoutLogger({
           </div>
         ) : (
           <>
+            {/* Edit mode banner */}
+            {activeSet?.completed && (
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-4 text-xs font-medium"
+                style={{ background: "rgba(43,107,255,0.07)", color: "var(--blue)" }}>
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                Editing completed set — tap Update to save changes
+              </div>
+            )}
             {/* Load — Weight / Bodyweight / Band */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
@@ -1044,25 +1175,55 @@ export default function WorkoutLogger({
               />
             </div>
 
-            {/* Complete set button */}
+            {/* Complete / Update set button */}
             <button
               type="button"
-              onClick={() => handleComplete(ex.aweId, ex.exerciseId, setIdx)}
-              disabled={activeSet.saving}
-              className="w-full h-16 rounded-2xl bg-primary text-primary-foreground text-lg font-semibold flex items-center justify-center gap-2 touch-manipulation active:opacity-90 disabled:opacity-60 mb-4"
+              onClick={() => {
+                if (activeSet?.completed) {
+                  handleUpdateCompletedSet(ex.aweId, ex.exerciseId, setIdx);
+                } else {
+                  handleComplete(ex.aweId, ex.exerciseId, setIdx);
+                }
+              }}
+              disabled={activeSet?.saving}
+              className={cn(
+                "w-full h-16 rounded-2xl text-lg font-semibold flex items-center justify-center gap-2 touch-manipulation active:opacity-90 disabled:opacity-60 mb-4",
+                activeSet?.completed
+                  ? "bg-blue-600 text-white"
+                  : "bg-primary text-primary-foreground"
+              )}
             >
-              {activeSet.saving ? (
+              {activeSet?.saving ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
+              ) : activeSet?.completed ? (
+                <RotateCcw className="w-5 h-5" />
               ) : (
                 <Check className="w-5 h-5" />
               )}
-              Complete Set {setIdx + 1} of {state.sets.length}
+              {activeSet?.completed
+                ? `Update Set ${setIdx + 1}`
+                : `Complete Set ${setIdx + 1} of ${state.sets.length}`}
             </button>
+
+            {/* Back to previous set */}
+            {(() => {
+              const prevSlot = findPrevSlot(exercises, exState, currentExIdx, currentSetRound);
+              return prevSlot ? (
+                <button
+                  type="button"
+                  onClick={() => { setCurrentExIdx(prevSlot.exIdx); setCurrentSetRound(prevSlot.setRound); }}
+                  className="w-full text-center text-xs text-muted-foreground py-1.5 mb-2 touch-manipulation flex items-center justify-center gap-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  Edit previous set
+                </button>
+              ) : null;
+            })()}
 
             {/* Per-set note */}
             <div className="mb-4">
               <Input
-                value={activeSet.note}
+                value={activeSet?.note ?? ""}
                 onChange={(e) => updateSet(ex.aweId, setIdx, { note: e.target.value })}
                 placeholder="Set note (optional) — band color, form cue, how it felt…"
                 className="text-sm rounded-xl border-2 h-10 px-3"
@@ -1121,11 +1282,16 @@ export default function WorkoutLogger({
             <div className="px-4 pb-3 space-y-1">
               {state.sets.map((entry, i) =>
                 entry.completed ? (
-                  <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setCurrentSetRound(i)}
+                    className="w-full flex items-center gap-2 text-xs text-muted-foreground text-left touch-manipulation hover:text-foreground py-0.5"
+                  >
                     <Check className="w-3 h-3 text-green-600 shrink-0" />
                     <span>
                       Set {i + 1}:
-                      {entry.isBodyweight ? " BW" : entry.weight ? ` ${entry.weight} lb` : ""}
+                      {entry.isBodyweight ? " BW" : entry.isBand ? ` ${entry.bandColor} band` : entry.weight ? ` ${entry.weight} lb` : ""}
                       {entry.reps
                         ? entry.isSeconds
                           ? ` ${entry.reps}s`
@@ -1133,7 +1299,8 @@ export default function WorkoutLogger({
                         : ""}
                       {entry.rpe ? ` @ RPE ${entry.rpe}` : ""}
                     </span>
-                  </div>
+                    <span className="ml-auto text-[10px] text-primary opacity-0 group-hover:opacity-100">Edit</span>
+                  </button>
                 ) : null
               )}
             </div>
@@ -1278,12 +1445,11 @@ export default function WorkoutLogger({
             .map((w) => {
               const isCurrent = w.id === assignedWorkoutId;
               const isDone = w.status === "LOGGED" || w.status === "SKIPPED";
-              const d = new Date(w.scheduledDate);
-              const dayLabel = d.toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              });
+              const weekNum =
+                Math.floor(
+                  (new Date(w.scheduledDate).getTime() - new Date(assignmentStartDate).getTime()) /
+                    (7 * 24 * 60 * 60 * 1000)
+                ) + 1;
               return (
                 <button
                   key={w.id}
@@ -1301,11 +1467,13 @@ export default function WorkoutLogger({
                   )}
                 >
                   <span className={cn("font-medium", isCurrent ? "text-primary-foreground" : "text-foreground")}>
-                    {w.name}
+                    {w.name} · Wk {weekNum}
                   </span>
-                  <span className={cn("ml-1.5 text-xs", isCurrent ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                    {isDone ? "Done" : dayLabel}
-                  </span>
+                  {isDone && (
+                    <span className={cn("ml-1.5 text-xs", isCurrent ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                      Done
+                    </span>
+                  )}
                 </button>
               );
             })}
