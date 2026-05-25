@@ -111,7 +111,7 @@ export function MobileNav() {
       {/* ── Bottom tab bar ──────────────────────────────────────────────── */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="h-16 flex items-stretch">
           {/* Left tabs */}

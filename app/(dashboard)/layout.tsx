@@ -10,8 +10,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
-      {/* pb-24 on mobile reserves space above the bottom tab bar + safe area */}
-      <main className="md:ml-56 min-h-screen pb-24 md:pb-0">
+      {/* pb-nav-safe reserves space above the fixed bottom tab bar + home indicator */}
+      <main className="md:ml-56 min-h-screen pb-nav-safe">
         {children}
       </main>
       <MobileNav />
