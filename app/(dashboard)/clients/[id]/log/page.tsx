@@ -235,6 +235,7 @@ export default async function LogPage({
 
   return (
     <WorkoutLogger
+      key={assignedWorkout.id}
       clientId={clientId}
       clientName={client.fullName}
       assignedWorkoutId={assignedWorkout.id}
