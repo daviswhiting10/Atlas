@@ -701,7 +701,15 @@ export default function WorkoutLogger({
         {/* ── Day picker ────────────────────────────────────────────── */}
         {availableWorkouts.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1 scrollbar-none">
-            {availableWorkouts.map((w) => {
+            {[...availableWorkouts]
+              .sort((a, b) => {
+                // Extract the trailing number from the name ("Day 1" → 1, "Day 2" → 2)
+                // so the picker always shows Day 1 → Day 2 → Day 3 regardless of scheduled dates
+                const numA = parseInt(a.name.replace(/\D+/g, "")) || 0;
+                const numB = parseInt(b.name.replace(/\D+/g, "")) || 0;
+                return numA - numB;
+              })
+              .map((w) => {
               const isCurrent = w.id === assignedWorkoutId;
               const d = new Date(w.scheduledDate);
               const dayLabel = d.toLocaleDateString("en-US", {
