@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronDown, ChevronRight, Save, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Save, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SetsTable, type SetDraft } from "@/app/(dashboard)/programs/_components/SetsTable";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
@@ -28,9 +28,10 @@ type AssignedExercise = {
   id: string;
   exerciseId: string;
   order: number;
+  section: string | null;
   prescribedSets: SetShape[];
   notes: string | null;
-  exercise: { id: string; name: string; movementPattern: string; equipment: string };
+  exercise: { id: string; name: string; movementPattern?: string; equipment?: string };
 };
 
 type AssignedWorkout = {
@@ -61,6 +62,7 @@ type ExerciseDraft = {
   id?: string;
   exerciseId: string;
   exerciseName: string;
+  section: string | null;
   order: number;
   prescribedSets: SetDraft[];
   notes: string;
@@ -75,10 +77,51 @@ function toDraft(ex: AssignedExercise): ExerciseDraft {
     id: ex.id,
     exerciseId: ex.exerciseId,
     exerciseName: ex.exercise.name,
+    section: ex.section ?? null,
     order: ex.order,
     prescribedSets: ex.prescribedSets.map((s) => ({ isBodyweight: false, ...s })),
     notes: ex.notes ?? "",
   };
+}
+
+// ─── Section grouping ─────────────────────────────────────────────────────────
+
+const SECTION_ORDER = ["Warmup", "Main A", "Main B", "Burner"];
+
+type SectionGroup = { section: string | null; label: string; exs: ExerciseDraft[] };
+
+function getSectionGroups(exercises: ExerciseDraft[]): SectionGroup[] {
+  const map = new Map<string | null, ExerciseDraft[]>();
+  for (const ex of exercises) {
+    const key = ex.section;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(ex);
+  }
+
+  const result: SectionGroup[] = [];
+
+  // Standard order first
+  for (const name of SECTION_ORDER) {
+    if (map.has(name)) {
+      result.push({ section: name, label: name, exs: map.get(name)! });
+      map.delete(name);
+    }
+  }
+
+  // Any additional named sections
+  for (const [key, exs] of map.entries()) {
+    if (key !== null) {
+      result.push({ section: key, label: key, exs });
+      map.delete(key);
+    }
+  }
+
+  // Unsectioned exercises last
+  if (map.has(null)) {
+    result.push({ section: null, label: "General", exs: map.get(null)! });
+  }
+
+  return result;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,14 +172,15 @@ function WorkoutEditor({
     []
   );
 
-  function addExercise(ex: ExerciseOption) {
+  function addExerciseToSection(ex: ExerciseOption, section: string | null) {
     setExercises((prev) => [
       ...prev,
       {
         _key: k(),
         exerciseId: ex.id,
         exerciseName: ex.name,
-        order: prev.length + 1,
+        section,
+        order: prev.length + 1, // will be recomputed on save
         prescribedSets: [
           { setNumber: 1, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
           { setNumber: 2, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
@@ -148,14 +192,41 @@ function WorkoutEditor({
   }
 
   function removeExercise(eKey: string) {
-    setExercises((prev) =>
-      prev.filter((e) => e._key !== eKey).map((e, i) => ({ ...e, order: i + 1 }))
-    );
+    setExercises((prev) => prev.filter((e) => e._key !== eKey));
+  }
+
+  function moveExercise(exKey: string, direction: "up" | "down") {
+    setExercises((prev) => {
+      const ex = prev.find((e) => e._key === exKey);
+      if (!ex) return prev;
+
+      // Move within the same section only
+      const sectionExs = prev.filter((e) => e.section === ex.section);
+      const posInSection = sectionExs.findIndex((e) => e._key === exKey);
+      if (direction === "up" && posInSection === 0) return prev;
+      if (direction === "down" && posInSection === sectionExs.length - 1) return prev;
+
+      const swapWith =
+        direction === "up"
+          ? sectionExs[posInSection - 1]
+          : sectionExs[posInSection + 1];
+
+      const next = [...prev];
+      const idxA = next.findIndex((e) => e._key === exKey);
+      const idxB = next.findIndex((e) => e._key === swapWith._key);
+      [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
+      return next;
+    });
   }
 
   async function save() {
     setSaving(true);
     try {
+      // Flatten sections in display order, reassign global order 1..n
+      const groups = getSectionGroups(exercises);
+      const flatInOrder = groups.flatMap((g) => g.exs);
+      const exercisesWithOrder = flatInOrder.map((e, i) => ({ ...e, order: i + 1 }));
+
       const res = await fetch(
         `/api/assignments/${workspaceAssignmentId}/workouts/${workout.id}`,
         {
@@ -164,10 +235,11 @@ function WorkoutEditor({
           body: JSON.stringify({
             loggedBy,
             scheduledDate,
-            exercises: exercises.map((e) => ({
+            exercises: exercisesWithOrder.map((e) => ({
               id: e.id,
               exerciseId: e.exerciseId,
               order: e.order,
+              section: e.section ?? null,
               prescribedSets: e.prescribedSets,
               notes: e.notes || null,
             })),
@@ -187,11 +259,21 @@ function WorkoutEditor({
 
       const updated = await res.json();
       toast.success("Workout saved");
+
+      // Re-init drafts from saved data to pick up generated IDs and confirmed orders
+      if (Array.isArray(updated?.exercises)) {
+        setExercises(
+          (updated.exercises as AssignedExercise[]).map(toDraft)
+        );
+      }
       onSaved(updated);
     } finally {
       setSaving(false);
     }
   }
+
+  const groups = getSectionGroups(exercises);
+  const hasAnySection = exercises.some((e) => e.section !== null);
 
   return (
     <div className="mt-3 space-y-3">
@@ -206,7 +288,6 @@ function WorkoutEditor({
             className="text-xs h-7 rounded-md border border-input px-2 bg-background"
           />
         </div>
-      {/* In-person / At-home toggle */}
         <span className="text-xs text-muted-foreground">Logged by:</span>
         <button
           type="button"
@@ -222,29 +303,123 @@ function WorkoutEditor({
         </button>
       </div>
 
-      {/* Exercises */}
-      {exercises.map((ex) => (
-        <div key={ex._key} className="border rounded p-3 bg-background">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">{ex.order}. {ex.exerciseName}</span>
-            <button
-              type="button"
-              onClick={() => removeExercise(ex._key)}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <SetsTable
-            sets={ex.prescribedSets}
-            onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
-          />
+      {/* Exercises grouped by section */}
+      {hasAnySection ? (
+        <div className="space-y-4">
+          {groups.map((group) => (
+            <div key={group.section ?? "__unsectioned__"}>
+              {/* Section header */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-primary">
+                  {group.label}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">{group.exs.length} ex</span>
+              </div>
+
+              {/* Exercises in this section */}
+              <div className="space-y-2 ml-1">
+                {group.exs.map((ex, exIdx) => (
+                  <div key={ex._key} className="border rounded p-3 bg-background">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {/* Up / down reorder */}
+                        <div className="flex flex-col shrink-0">
+                          <button
+                            type="button"
+                            disabled={exIdx === 0}
+                            onClick={() => moveExercise(ex._key, "up")}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                            title="Move up"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={exIdx === group.exs.length - 1}
+                            onClick={() => moveExercise(ex._key, "down")}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                            title="Move down"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <span className="text-sm font-medium truncate">
+                          {exIdx + 1}. {ex.exerciseName}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeExercise(ex._key)}
+                        className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <SetsTable
+                      sets={ex.prescribedSets}
+                      onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-section add */}
+              <div className="mt-2 ml-1">
+                <ExercisePicker
+                  onSelect={(ex) => addExerciseToSection(ex, group.section)}
+                  placeholder={`+ Add to ${group.label}...`}
+                />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      ) : (
+        /* Flat list for workouts with no sections */
+        <div className="space-y-2">
+          {exercises.map((ex, idx) => (
+            <div key={ex._key} className="border rounded p-3 bg-background">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => moveExercise(ex._key, "up")}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === exercises.length - 1}
+                      onClick={() => moveExercise(ex._key, "down")}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <span className="text-sm font-medium truncate">{idx + 1}. {ex.exerciseName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeExercise(ex._key)}
+                  className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <SetsTable
+                sets={ex.prescribedSets}
+                onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
+              />
+            </div>
+          ))}
+          <ExercisePicker onSelect={(ex) => addExerciseToSection(ex, null)} placeholder="+ Add exercise..." />
+        </div>
+      )}
 
-      <ExercisePicker onSelect={addExercise} placeholder="+ Add exercise..." />
-
-      <Button size="sm" onClick={save} disabled={saving} className="w-full">
+      <Button size="sm" onClick={save} disabled={saving} className="w-full mt-2">
         {saving ? (
           <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving...</>
         ) : (
