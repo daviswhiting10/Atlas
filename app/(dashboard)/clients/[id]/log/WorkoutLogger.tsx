@@ -1714,9 +1714,20 @@ function DesktopSetRow({
           {entry.isBodyweight ? "BW" : entry.isBand ? "Band" : "N/A"}
         </button>
 
-        <span className="text-xs text-muted-foreground shrink-0">
+        {/* Reps/Secs toggle — click to switch unit */}
+        <button
+          type="button"
+          title={entry.isSeconds ? "Switch to reps" : "Switch to seconds"}
+          onClick={() => onChange({ isSeconds: !entry.isSeconds })}
+          className={cn(
+            "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors font-medium",
+            entry.isSeconds
+              ? "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+              : "border-border text-muted-foreground hover:border-muted-foreground"
+          )}
+        >
           {entry.isSeconds ? "s" : "×"}
-        </span>
+        </button>
         <Input
           value={entry.reps}
           onChange={(e) => onChange({ reps: e.target.value })}

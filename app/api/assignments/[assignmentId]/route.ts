@@ -3,6 +3,18 @@ import { withWorkspace } from "@/lib/api/middleware";
 import { getAssignment } from "@/lib/db/programs";
 import { prisma } from "@/lib/db/client";
 
+export const DELETE = withWorkspace<{ assignmentId: string }>(
+  async (_req, { workspaceId }, { params }) => {
+    const { assignmentId } = await params;
+    const deleted = await prisma.programAssignment.deleteMany({
+      where: { id: assignmentId, workspaceId },
+    });
+    if (deleted.count === 0)
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+);
+
 export const GET = withWorkspace<{ assignmentId: string }>(
   async (_req, { workspaceId }, { params }) => {
     const { assignmentId } = await params;

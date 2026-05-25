@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -442,9 +442,11 @@ function WorkoutEditor({
 
 export default function AssignedProgramPage() {
   const { id: clientId, assignmentId } = useParams<{ id: string; assignmentId: string }>();
+  const router = useRouter();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetch(`/api/assignments/${assignmentId}`)
@@ -466,6 +468,19 @@ export default function AssignedProgramPage() {
           }
         : prev
     );
+  }
+
+  async function deleteAssignment() {
+    if (!confirm("Remove this program from the client? All scheduled workouts and logged data will be permanently deleted.")) return;
+    setDeleting(true);
+    const res = await fetch(`/api/assignments/${assignmentId}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("Failed to remove program");
+      setDeleting(false);
+      return;
+    }
+    toast.success("Program removed");
+    router.push(`/clients/${clientId}`);
   }
 
   async function resetSession(workoutId: string) {
@@ -533,12 +548,28 @@ export default function AssignedProgramPage() {
             </Link>
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={assignment.status === "ACTIVE" ? "border-green-200 text-green-700" : ""}
-        >
-          {assignment.status}
-        </Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge
+            variant="outline"
+            className={assignment.status === "ACTIVE" ? "border-green-200 text-green-700" : ""}
+          >
+            {assignment.status}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={deleteAssignment}
+            disabled={deleting}
+            className="h-8 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            title="Remove program from client"
+          >
+            {deleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Week-by-week workout list */}
