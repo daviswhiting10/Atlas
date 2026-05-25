@@ -1,5 +1,4 @@
 import { Trophy, Flame, TrendingUp, Target, Award, Dumbbell, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { MilestoneRecord } from "./ProgressShell";
 

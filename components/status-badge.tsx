@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 type ClientStatus = "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
 
 const config: Record<
