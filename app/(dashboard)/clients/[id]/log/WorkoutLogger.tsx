@@ -42,11 +42,24 @@ type SetEntry = {
   setLogId: string | null;
   weight: string;
   isBodyweight: boolean;
+  isBand: boolean;
+  bandColor: string; // "yellow"|"red"|"green"|"blue"|"black"|"purple"
+  note: string;
   reps: string;
   rpe: string;
   completed: boolean;
   saving: boolean;
 };
+
+// Band colors — order = lightest → heaviest
+const BAND_COLORS = [
+  { id: "yellow",  label: "Yellow",  hex: "#EAB308" },
+  { id: "red",     label: "Red",     hex: "#EF4444" },
+  { id: "green",   label: "Green",   hex: "#22C55E" },
+  { id: "blue",    label: "Blue",    hex: "#3B82F6" },
+  { id: "black",   label: "Black",   hex: "#18181B" },
+  { id: "purple",  label: "Purple",  hex: "#A855F7" },
+] as const;
 
 type ExerciseState = {
   sets: SetEntry[];
@@ -85,7 +98,10 @@ function initSetEntry(
     return {
       setLogId: existing.id,
       weight: existing.weight != null ? String(existing.weight) : "",
-      isBodyweight: existing.weight === null,
+      isBodyweight: existing.weight === null && !existing.bandColor,
+      isBand: !!existing.bandColor,
+      bandColor: existing.bandColor ?? "green",
+      note: existing.note ?? "",
       reps: existing.reps != null ? String(existing.reps) : "",
       rpe: existing.rpe != null ? String(existing.rpe) : "",
       completed: existing.completed,
@@ -101,6 +117,9 @@ function initSetEntry(
     setLogId: null,
     weight: suggestedWeight != null ? String(suggestedWeight) : "",
     isBodyweight: false,
+    isBand: false,
+    bandColor: "green",
+    note: "",
     reps: suggestedReps != null ? String(suggestedReps) : "",
     rpe: "",
     completed: false,
@@ -288,8 +307,11 @@ export default function WorkoutLogger({
       const last = sets[sets.length - 1];
       const newSet: SetEntry = {
         setLogId: null,
-        weight: last?.isBodyweight ? "" : (last?.weight ?? ""),
+        weight: (last?.isBodyweight || last?.isBand) ? "" : (last?.weight ?? ""),
         isBodyweight: last?.isBodyweight ?? false,
+        isBand: last?.isBand ?? false,
+        bandColor: last?.bandColor ?? "green",
+        note: "",
         reps: last?.reps ?? "",
         rpe: "",
         completed: false,
@@ -320,9 +342,11 @@ export default function WorkoutLogger({
         assignedWorkoutExerciseId: aweId,
         setLogId: entry.setLogId ?? undefined,
         setNumber: idx + 1,
-        weight: entry.isBodyweight ? null : (entry.weight ? parseFloat(entry.weight) : null),
+        weight: (entry.isBodyweight || entry.isBand) ? null : (entry.weight ? parseFloat(entry.weight) : null),
+        bandColor: entry.isBand ? entry.bandColor : null,
         reps: entry.reps ? parseInt(entry.reps, 10) : null,
         rpe: entry.rpe ? parseFloat(entry.rpe) : null,
+        note: entry.note.trim() || null,
         completed: !entry.completed,
       });
       if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
@@ -658,10 +682,54 @@ export default function WorkoutLogger({
 
         {/* ── Set inputs ─────────────────────────────────────────────── */}
         {allSessionDone ? (
-          <div className="py-10 text-center">
-            <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
-            <p className="text-lg font-semibold">All sets complete!</p>
-            <p className="text-sm text-muted-foreground mt-1">Tap Finish to save the session.</p>
+          <div className="pb-4">
+            <div className="text-center pt-6 pb-4">
+              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+              <p className="text-lg font-semibold">All sets complete!</p>
+            </div>
+
+            {/* Session notes summary */}
+            {(() => {
+              const notedExercises = exercises
+                .map((e) => ({
+                  name: e.name,
+                  sets: exState[e.aweId].sets
+                    .map((s, i) => ({ setNum: i + 1, note: s.note.trim(), load:
+                      s.isBand
+                        ? (BAND_COLORS.find(b => b.id === s.bandColor)?.label ?? s.bandColor) + " band"
+                        : s.isBodyweight ? "BW"
+                        : s.weight ? `${s.weight} lb` : null,
+                      reps: s.reps || null,
+                    }))
+                    .filter((s) => s.note),
+                }))
+                .filter((e) => e.sets.length > 0);
+
+              if (notedExercises.length === 0) return (
+                <p className="text-xs text-center text-muted-foreground mb-4">No set notes this session.</p>
+              );
+
+              return (
+                <div className="space-y-3 mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">Session Notes</p>
+                  {notedExercises.map((e) => (
+                    <div key={e.name} className="rounded-xl border bg-muted/30 px-4 py-3">
+                      <p className="text-sm font-semibold mb-2">{e.name}</p>
+                      <div className="space-y-1.5">
+                        {e.sets.map((s) => (
+                          <div key={s.setNum} className="flex gap-2 text-xs">
+                            <span className="text-muted-foreground shrink-0 w-12">
+                              Set {s.setNum}{s.load || s.reps ? ` · ${[s.load, s.reps ? `${s.reps}r` : null].filter(Boolean).join(" × ")}` : ""}
+                            </span>
+                            <span className="text-foreground">{s.note}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         ) : activeSet?.completed ? (
           <div className="py-10 text-center">
@@ -671,28 +739,78 @@ export default function WorkoutLogger({
           </div>
         ) : (
           <>
-            {/* Weight */}
+            {/* Load — Weight / Bodyweight / Band */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Weight</p>
-                {prescribed?.weight != null && !activeSet.isBodyweight && (
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Load</p>
+                {prescribed?.weight != null && !activeSet.isBodyweight && !activeSet.isBand && (
                   <p className="text-xs font-semibold text-emerald-600">Prescribed: {prescribed.weight} lb</p>
                 )}
               </div>
-              {activeSet.isBodyweight ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-16 rounded-xl border-2 bg-muted flex items-center justify-center text-lg font-semibold">
-                    N/A
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => updateSet(ex.aweId, setIdx, { isBodyweight: false, weight: "" })}
-                    className="text-sm text-muted-foreground underline touch-manipulation"
-                  >
-                    Add lb
-                  </button>
+
+              {/* Load-type toggle row */}
+              <div className="flex gap-1.5 mb-3">
+                {(["weight", "band", "bw"] as const).map((mode) => {
+                  const active =
+                    mode === "weight" ? (!activeSet.isBodyweight && !activeSet.isBand) :
+                    mode === "band"   ? activeSet.isBand :
+                    activeSet.isBodyweight;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateSet(ex.aweId, setIdx, {
+                        isBodyweight: mode === "bw",
+                        isBand: mode === "band",
+                        weight: mode !== "weight" ? "" : activeSet.weight,
+                      })}
+                      className={cn(
+                        "flex-1 h-9 rounded-xl text-xs font-semibold border-2 transition-colors touch-manipulation",
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground"
+                      )}
+                    >
+                      {mode === "weight" ? "Weight" : mode === "band" ? "Band" : "BW"}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Band color picker */}
+              {activeSet.isBand && (
+                <div className="flex gap-2 justify-between mb-1">
+                  {BAND_COLORS.map(({ id, label, hex }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      title={label}
+                      onClick={() => updateSet(ex.aweId, setIdx, { bandColor: id })}
+                      className={cn(
+                        "flex-1 h-12 rounded-xl border-2 transition-all touch-manipulation flex items-center justify-center",
+                        activeSet.bandColor === id
+                          ? "border-foreground scale-105 shadow-md"
+                          : "border-transparent opacity-70"
+                      )}
+                      style={{ backgroundColor: hex }}
+                    >
+                      {activeSet.bandColor === id && (
+                        <Check className="w-4 h-4 text-white drop-shadow" strokeWidth={3} />
+                      )}
+                    </button>
+                  ))}
                 </div>
-              ) : (
+              )}
+
+              {/* BW display */}
+              {activeSet.isBodyweight && (
+                <div className="h-16 rounded-xl border-2 bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground">
+                  Bodyweight
+                </div>
+              )}
+
+              {/* Weight input */}
+              {!activeSet.isBodyweight && !activeSet.isBand && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -717,13 +835,6 @@ export default function WorkoutLogger({
                     className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateSet(ex.aweId, setIdx, { isBodyweight: true, weight: "" })}
-                    className="text-xs font-medium text-muted-foreground border rounded-lg px-2 h-9 touch-manipulation"
-                  >
-                    N/A
                   </button>
                 </div>
               )}
@@ -766,6 +877,17 @@ export default function WorkoutLogger({
               )}
               Complete Set {setIdx + 1}
             </button>
+
+            {/* Per-set note */}
+            <div className="mb-4">
+              <Input
+                value={activeSet.note}
+                onChange={(e) => updateSet(ex.aweId, setIdx, { note: e.target.value })}
+                placeholder="Set note (optional) — band color, form cue, how it felt…"
+                className="text-sm rounded-xl border-2 h-10 px-3"
+                style={{ fontSize: "16px" }}
+              />
+            </div>
 
             {/* Progression hint at top of rep range */}
             {activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && (
@@ -1111,8 +1233,24 @@ function DesktopSetRow({
       <div className={cn("flex items-center gap-1.5 transition-opacity", entry.completed && "opacity-60")}>
         <span className="text-xs text-muted-foreground w-5 shrink-0 text-right">{idx + 1}</span>
 
-        {/* Weight / BW toggle */}
-        {entry.isBodyweight ? (
+        {/* Load type: weight / BW / band */}
+        {entry.isBand ? (
+          <div className="flex items-center gap-1 shrink-0">
+            {BAND_COLORS.map(({ id, hex }) => (
+              <button
+                key={id}
+                type="button"
+                title={id}
+                onClick={() => onChange({ bandColor: id })}
+                className={cn(
+                  "w-5 h-5 rounded-full border-2 transition-all",
+                  entry.bandColor === id ? "border-foreground scale-110" : "border-transparent opacity-60"
+                )}
+                style={{ backgroundColor: hex }}
+              />
+            ))}
+          </div>
+        ) : entry.isBodyweight ? (
           <button
             type="button"
             onClick={() => onChange({ isBodyweight: false, weight: "" })}
@@ -1130,17 +1268,23 @@ function DesktopSetRow({
             step="2.5"
           />
         )}
+
+        {/* Load mode toggle: BW / Band / N/A */}
         <button
           type="button"
-          onClick={() => onChange({ isBodyweight: !entry.isBodyweight, weight: "" })}
+          onClick={() => {
+            if (!entry.isBodyweight && !entry.isBand) onChange({ isBodyweight: true, isBand: false, weight: "" });
+            else if (entry.isBodyweight) onChange({ isBodyweight: false, isBand: true });
+            else onChange({ isBodyweight: false, isBand: false });
+          }}
           className={cn(
-            "text-xs px-1 h-7 rounded border shrink-0 transition-colors",
-            entry.isBodyweight
-              ? "border-emerald-400 text-emerald-700 bg-emerald-50"
-              : "border-border text-muted-foreground hover:border-muted-foreground"
+            "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors",
+            entry.isBodyweight ? "border-emerald-400 text-emerald-700 bg-emerald-50" :
+            entry.isBand ? "border-blue-400 text-blue-700 bg-blue-50" :
+            "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >
-          N/A
+          {entry.isBodyweight ? "BW" : entry.isBand ? "Band" : "N/A"}
         </button>
 
         <span className="text-xs text-muted-foreground shrink-0">×</span>
@@ -1178,6 +1322,16 @@ function DesktopSetRow({
         >
           {entry.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
         </button>
+      </div>
+
+      {/* Per-set note (desktop) */}
+      <div className="pl-7">
+        <Input
+          value={entry.note}
+          onChange={(e) => onChange({ note: e.target.value })}
+          placeholder="Set note…"
+          className="h-6 text-xs px-2 text-muted-foreground border-transparent hover:border-border focus:border-border bg-transparent"
+        />
       </div>
 
       {hitsTopOfRange && (

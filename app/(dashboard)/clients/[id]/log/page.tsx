@@ -42,8 +42,10 @@ export type ExistingSetLog = {
   assignedWorkoutExerciseId: string | null;
   setNumber: number;
   weight: number | null;
+  bandColor: string | null;
   reps: number | null;
   rpe: number | null;
+  note: string | null;
   completed: boolean;
 };
 
@@ -184,8 +186,10 @@ export default async function LogPage({
           assignedWorkoutExerciseId: true,
           setNumber: true,
           weight: true,
+          bandColor: true,
           reps: true,
           rpe: true,
+          note: true,
           completed: true,
         },
       },

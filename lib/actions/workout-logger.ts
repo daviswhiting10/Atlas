@@ -40,8 +40,10 @@ export async function logSet(input: {
   setLogId?: string;
   setNumber: number;
   weight: number | null;
+  bandColor: string | null;
   reps: number | null;
   rpe: number | null;
+  note: string | null;
   completed: boolean;
 }): Promise<{ workoutLogId: string; setLogId: string }> {
   const { workspaceId } = await requireWorkspace();
@@ -89,8 +91,10 @@ export async function logSet(input: {
       where: { id: input.setLogId },
       data: {
         weight: input.weight,
+        bandColor: input.bandColor,
         reps: input.reps,
         rpe: input.rpe,
+        note: input.note,
         completed: input.completed,
       },
     });
@@ -104,8 +108,10 @@ export async function logSet(input: {
         assignedWorkoutExerciseId: input.assignedWorkoutExerciseId ?? null,
         setNumber: input.setNumber,
         weight: input.weight,
+        bandColor: input.bandColor,
         reps: input.reps,
         rpe: input.rpe,
+        note: input.note,
         completed: input.completed,
       },
       select: { id: true },

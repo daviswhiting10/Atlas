@@ -415,8 +415,10 @@ model SetLog {
   assignedWorkoutExercise   AssignedWorkoutExercise? @relation(fields: [assignedWorkoutExerciseId], references: [id])
   setNumber                 Int
   weight                    Float?
+  bandColor                 String?                  // null = weighted/BW; "yellow"|"red"|"green"|"blue"|"black"|"purple"
   reps                      Int?
   rpe                       Float?                   // per-set RPE (1–10)
+  note                      String?                  @db.Text  // per-set coach note
   completed                 Boolean                  @default(true)
   createdAt                 DateTime                 @default(now())
 
