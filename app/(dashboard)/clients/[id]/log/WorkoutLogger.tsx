@@ -293,6 +293,7 @@ type WorkoutOption = {
   name: string;
   scheduledDate: string; // ISO string
   exerciseCount: number;
+  status: "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
 };
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -703,49 +704,50 @@ export default function WorkoutLogger({
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1 scrollbar-none">
             {[...availableWorkouts]
               .sort((a, b) => {
-                // Extract the trailing number from the name ("Day 1" → 1, "Day 2" → 2)
-                // so the picker always shows Day 1 → Day 2 → Day 3 regardless of scheduled dates
                 const numA = parseInt(a.name.replace(/\D+/g, "")) || 0;
                 const numB = parseInt(b.name.replace(/\D+/g, "")) || 0;
                 return numA - numB;
               })
               .map((w) => {
-              const isCurrent = w.id === assignedWorkoutId;
-              const d = new Date(w.scheduledDate);
-              const dayLabel = d.toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              });
-              return (
-                <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
-                  }}
-                  className={cn(
-                    "shrink-0 rounded-xl px-3 py-2 text-left transition-colors border touch-manipulation",
-                    isCurrent
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted/60 border-border hover:border-primary/50 hover:bg-muted"
-                  )}
-                >
-                  <p className={cn(
-                    "text-xs font-semibold leading-tight max-w-[130px] truncate",
-                    isCurrent ? "text-primary-foreground" : "text-foreground"
-                  )}>
-                    {w.name}
-                  </p>
-                  <p className={cn(
-                    "text-[10px] mt-0.5",
-                    isCurrent ? "text-primary-foreground/70" : "text-muted-foreground"
-                  )}>
-                    {dayLabel} · {w.exerciseCount} ex
-                  </p>
-                </button>
-              );
-            })}
+                const isCurrent = w.id === assignedWorkoutId;
+                const isDone = w.status === "LOGGED" || w.status === "SKIPPED";
+                const d = new Date(w.scheduledDate);
+                const dayLabel = d.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                });
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => {
+                      if (!isCurrent && !isDone) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
+                    }}
+                    className={cn(
+                      "shrink-0 rounded-xl px-3 py-2 text-left transition-colors border touch-manipulation",
+                      isCurrent
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : isDone
+                          ? "bg-muted/30 border-border opacity-40 cursor-default"
+                          : "bg-muted/60 border-border hover:border-primary/50 hover:bg-muted"
+                    )}
+                  >
+                    <p className={cn(
+                      "text-xs font-semibold leading-tight max-w-[130px] truncate",
+                      isCurrent ? "text-primary-foreground" : "text-foreground"
+                    )}>
+                      {w.name}
+                    </p>
+                    <p className={cn(
+                      "text-[10px] mt-0.5",
+                      isCurrent ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
+                      {isDone ? "Done" : dayLabel} · {w.exerciseCount} ex
+                    </p>
+                  </button>
+                );
+              })}
           </div>
         )}
 
@@ -1010,6 +1012,27 @@ export default function WorkoutLogger({
                   </p>
                 )}
               </div>
+              {/* Reps / Secs unit toggle */}
+              <div className="flex gap-1.5 mb-3">
+                {(["reps", "secs"] as const).map((mode) => {
+                  const active = mode === "secs" ? activeSet.isSeconds : !activeSet.isSeconds;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateSet(ex.aweId, setIdx, { isSeconds: mode === "secs" })}
+                      className={cn(
+                        "flex-1 h-9 rounded-xl text-xs font-semibold border-2 transition-colors touch-manipulation",
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground"
+                      )}
+                    >
+                      {mode === "reps" ? "Reps" : "Secs"}
+                    </button>
+                  );
+                })}
+              </div>
               <Input
                 value={activeSet.reps}
                 onChange={(e) => updateSet(ex.aweId, setIdx, { reps: e.target.value })}
@@ -1246,37 +1269,46 @@ export default function WorkoutLogger({
       {/* Day picker (desktop) */}
       {availableWorkouts.length > 1 && (
         <div className="flex gap-2 flex-wrap mb-5">
-          {availableWorkouts.map((w) => {
-            const isCurrent = w.id === assignedWorkoutId;
-            const d = new Date(w.scheduledDate);
-            const dayLabel = d.toLocaleDateString("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            });
-            return (
-              <button
-                key={w.id}
-                type="button"
-                onClick={() => {
-                  if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
-                }}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-left transition-colors border text-sm",
-                  isCurrent
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border hover:border-primary/50 hover:bg-muted/60"
-                )}
-              >
-                <span className={cn("font-medium", isCurrent ? "text-primary-foreground" : "text-foreground")}>
-                  {w.name}
-                </span>
-                <span className={cn("ml-1.5 text-xs", isCurrent ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                  {dayLabel}
-                </span>
-              </button>
-            );
-          })}
+          {[...availableWorkouts]
+            .sort((a, b) => {
+              const numA = parseInt(a.name.replace(/\D+/g, "")) || 0;
+              const numB = parseInt(b.name.replace(/\D+/g, "")) || 0;
+              return numA - numB;
+            })
+            .map((w) => {
+              const isCurrent = w.id === assignedWorkoutId;
+              const isDone = w.status === "LOGGED" || w.status === "SKIPPED";
+              const d = new Date(w.scheduledDate);
+              const dayLabel = d.toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              });
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => {
+                    if (!isCurrent && !isDone) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
+                  }}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-left transition-colors border text-sm",
+                    isCurrent
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : isDone
+                        ? "border-border opacity-40 cursor-default"
+                        : "border-border hover:border-primary/50 hover:bg-muted/60"
+                  )}
+                >
+                  <span className={cn("font-medium", isCurrent ? "text-primary-foreground" : "text-foreground")}>
+                    {w.name}
+                  </span>
+                  <span className={cn("ml-1.5 text-xs", isCurrent ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                    {isDone ? "Done" : dayLabel}
+                  </span>
+                </button>
+              );
+            })}
         </div>
       )}
 

@@ -195,17 +195,18 @@ export default async function LogPage({
     })
   );
 
-  // ── All planned workouts for this client (day-picker) ─────────────────────
+  // ── All workouts for this client (day-picker) — include logged so they show blurred ──
   const availableWorkouts = await prisma.assignedWorkout.findMany({
     where: {
       programAssignment: { clientId, workspaceId, status: "ACTIVE" },
-      status: "PLANNED",
+      // No status filter — show PLANNED + LOGGED + SKIPPED so completed days appear blurred
     },
     orderBy: { order: "asc" },
     select: {
       id: true,
       name: true,
       scheduledDate: true,
+      status: true,
       _count: { select: { exercises: true } },
     },
   });
@@ -250,6 +251,7 @@ export default async function LogPage({
         name: w.name,
         scheduledDate: w.scheduledDate.toISOString(),
         exerciseCount: w._count.exercises,
+        status: w.status,
       }))}
     />
   );
