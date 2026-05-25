@@ -53,7 +53,7 @@ function StrengthView({ data }: { data: ProgressData }) {
                     className={cn(
                       "text-xs font-medium px-1.5 py-0.5 rounded-full",
                       kl.pctChange > 0
-                        ? "bg-emerald-50 text-emerald-700"
+                        ? "bg-green-50 text-green-700"
                         : "bg-red-50 text-red-600"
                     )}
                   >

@@ -6,19 +6,19 @@ type ClientStatus = "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
 const config: Record<ClientStatus, { label: string; className: string }> = {
   PROSPECT: {
     label: "Prospect",
-    className: "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-100",
+    className: "border-[var(--line)] text-[var(--ink-soft)] bg-[var(--muted)] hover:bg-[var(--muted)]",
   },
   ACTIVE: {
     label: "Active",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50",
+    className: "border-green-300 text-green-700 bg-green-50 hover:bg-green-50",
   },
   AT_RISK: {
     label: "At Risk",
-    className: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50",
+    className: "border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-50",
   },
   CHURNED: {
     label: "Churned",
-    className: "bg-red-50 text-red-700 border-red-200 hover:bg-red-50",
+    className: "border-red-300 text-red-700 bg-red-50 hover:bg-red-50",
   },
 };
 
@@ -34,12 +34,12 @@ export function StatusBadge({ status }: { status: ClientStatus }) {
 type LeadStatus = "NEW" | "CONTACTED" | "REPLIED" | "BOOKED" | "CONVERTED" | "DEAD";
 
 const leadConfig: Record<LeadStatus, { label: string; className: string }> = {
-  NEW: { label: "New", className: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50" },
-  CONTACTED: { label: "Contacted", className: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-50" },
-  REPLIED: { label: "Replied", className: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50" },
-  BOOKED: { label: "Booked", className: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50" },
-  CONVERTED: { label: "Converted", className: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50" },
-  DEAD: { label: "Dead", className: "bg-zinc-100 text-zinc-500 border-zinc-200 hover:bg-zinc-100" },
+  NEW:       { label: "New",       className: "border-blue-300  text-blue-700   bg-blue-50  hover:bg-blue-50" },
+  CONTACTED: { label: "Contacted", className: "border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-50" },
+  REPLIED:   { label: "Replied",   className: "border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-50" },
+  BOOKED:    { label: "Booked",    className: "border-amber-300  text-amber-700  bg-amber-50 hover:bg-amber-50" },
+  CONVERTED: { label: "Converted", className: "border-green-300  text-green-700  bg-green-50 hover:bg-green-50" },
+  DEAD:      { label: "Dead",      className: "border-[var(--line)] text-[var(--ink-mute)] bg-[var(--muted)] hover:bg-[var(--muted)]" },
 };
 
 export function LeadStatusBadge({ status }: { status: string }) {

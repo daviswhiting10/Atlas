@@ -29,7 +29,7 @@ export default async function InboxPage() {
           <Zap className="w-4 h-4 md:w-5 md:h-5 text-primary" />
           <span className="text-xs md:text-sm font-medium text-primary">Atlas</span>
         </div>
-        <h1 className="text-xl md:text-2xl font-bold tracking-tight">{greeting}, Davis.</h1>
+        <h1 className="font-display text-2xl md:text-3xl" style={{ color: "var(--ink)" }}>{greeting}, Davis.</h1>
         <p className="text-muted-foreground mt-0.5 text-sm">
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </p>
@@ -45,19 +45,19 @@ export default async function InboxPage() {
         </Card>
         <Card>
           <CardContent className="pt-4 md:pt-5">
-            <div className="text-2xl font-bold text-emerald-600">{activeClients.length}</div>
+            <div className="text-2xl font-bold" style={{ color: "var(--success)" }}>{activeClients.length}</div>
             <div className="text-xs text-muted-foreground mt-0.5">Active</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 md:pt-5">
-            <div className="text-2xl font-bold text-amber-600">{atRiskClients.length}</div>
+            <div className="text-2xl font-bold" style={{ color: "var(--warn)" }}>{atRiskClients.length}</div>
             <div className="text-xs text-muted-foreground mt-0.5">At Risk</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 md:pt-5">
-            <div className="text-2xl font-bold text-blue-600">{prospects.length}</div>
+            <div className="text-2xl font-bold" style={{ color: "var(--blue)" }}>{prospects.length}</div>
             <div className="text-xs text-muted-foreground mt-0.5">Prospects</div>
           </CardContent>
         </Card>

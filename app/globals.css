@@ -20,77 +20,156 @@
   }
 }
 
+/* ── Aura blobs ────────────────────────────────────────────────────────────
+   Two subtly animated blurred circles that float behind all content.
+   Fixed, z-index -1, pointer-events none so they never block interaction.  */
+.aura {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.07;
+  background: var(--blue);
+}
+.aura-tl {
+  width: 640px;
+  height: 640px;
+  top: -220px;
+  left: -120px;
+  animation: aura-tl 14s ease-in-out infinite alternate;
+}
+.aura-br {
+  width: 520px;
+  height: 520px;
+  bottom: -160px;
+  right: -100px;
+  animation: aura-br 18s ease-in-out infinite alternate;
+}
+@keyframes aura-tl {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(70px, 50px) scale(1.12); }
+}
+@keyframes aura-br {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-50px, -70px) scale(1.1); }
+}
+
+/* ── Card hover lift utility ───────────────────────────────────────────────
+   Apply `.card-lift` alongside any card element for the hover effect.      */
+.card-lift {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(37, 99, 235, 0.12);
+}
+
 @layer base {
   :root {
-    --background: oklch(0.985 0 0);
-    --foreground: oklch(0.12 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.12 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.12 0 0);
-    --primary: oklch(0.55 0.22 255);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.96 0 0);
-    --secondary-foreground: oklch(0.2 0 0);
-    --muted: oklch(0.96 0 0);
-    --muted-foreground: oklch(0.5 0 0);
-    --accent: oklch(0.94 0.04 255);
-    --accent-foreground: oklch(0.4 0.15 255);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(0.9 0 0);
-    --input: oklch(0.9 0 0);
-    --ring: oklch(0.55 0.22 255);
-    --radius: 0.5rem;
-    --sidebar: oklch(0.08 0 0);
-    --sidebar-foreground: oklch(0.85 0 0);
-    --sidebar-primary: oklch(0.6 0.22 255);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.14 0 0);
-    --sidebar-accent-foreground: oklch(0.92 0 0);
-    --sidebar-border: oklch(0.18 0 0);
-    --sidebar-ring: oklch(0.55 0.22 255);
+    /* ── Atlas design tokens ──────────────────────────────────── */
+    --bone:       #F6F3EE;   /* page bg — warm off-white              */
+    --paper:      #FFFFFF;   /* card / surface bg                     */
+    --ink:        #18181B;   /* primary text                          */
+    --ink-soft:   #52525B;   /* secondary text                        */
+    --ink-mute:   #A1A1AA;   /* placeholder / muted text              */
+    --line:       #E4E0D8;   /* borders / dividers                    */
+    --blue:       #2563EB;   /* ONE accent — interactive blue         */
+    --blue-deep:  #1D4ED8;   /* blue hover / pressed                  */
+    --blue-soft:  #EFF6FF;   /* blue tint bg (badge, chip)            */
+    --success:    #16A34A;   /* green for positive states             */
+    --warn:       #D97706;   /* amber for warnings / moderate states  */
+
+    /* ── Shadcn/ui token remaps ───────────────────────────────── */
+    --background:            var(--bone);
+    --foreground:            var(--ink);
+    --card:                  var(--paper);
+    --card-foreground:       var(--ink);
+    --popover:               var(--paper);
+    --popover-foreground:    var(--ink);
+    --primary:               var(--blue);
+    --primary-foreground:    #FFFFFF;
+    --secondary:             var(--blue-soft);
+    --secondary-foreground:  var(--blue-deep);
+    --muted:                 #F4F4F5;
+    --muted-foreground:      var(--ink-mute);
+    --accent:                var(--blue-soft);
+    --accent-foreground:     var(--blue-deep);
+    --destructive:           #DC2626;
+    --destructive-foreground:#FFFFFF;
+    --border:                var(--line);
+    --input:                 var(--line);
+    --ring:                  var(--blue);
+    --radius:                0.5rem;
+
+    /* ── Sidebar (always dark regardless of light/dark mode) ─── */
+    --sidebar:                       #07090F;
+    --sidebar-foreground:            #C4C4CC;
+    --sidebar-primary:               var(--blue);
+    --sidebar-primary-foreground:    #FFFFFF;
+    --sidebar-accent:                #111420;
+    --sidebar-accent-foreground:     #E4E4E7;
+    --sidebar-border:                #1A1D2E;
+    --sidebar-ring:                  var(--blue);
   }
 
+  /* Dark mode — full page dark (not sidebar, which is always dark) */
   .dark {
-    --background: oklch(0.1 0 0);
-    --foreground: oklch(0.95 0 0);
-    --card: oklch(0.14 0 0);
-    --card-foreground: oklch(0.95 0 0);
-    --popover: oklch(0.14 0 0);
-    --popover-foreground: oklch(0.95 0 0);
-    --primary: oklch(0.65 0.22 255);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.2 0 0);
-    --secondary-foreground: oklch(0.9 0 0);
-    --muted: oklch(0.2 0 0);
-    --muted-foreground: oklch(0.6 0 0);
-    --accent: oklch(0.22 0.06 255);
-    --accent-foreground: oklch(0.75 0.18 255);
-    --destructive: oklch(0.65 0.22 27);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 10%);
-    --ring: oklch(0.65 0.22 255);
-    --sidebar: oklch(0.08 0 0);
-    --sidebar-foreground: oklch(0.85 0 0);
-    --sidebar-primary: oklch(0.65 0.22 255);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.14 0 0);
-    --sidebar-accent-foreground: oklch(0.92 0 0);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.65 0.22 255);
+    --bone:       #0E0F14;
+    --paper:      #16181F;
+    --ink:        #F0F0F2;
+    --ink-soft:   #A8A8B3;
+    --ink-mute:   #60606A;
+    --line:       #2A2B35;
+    --blue:       #3B82F6;
+    --blue-deep:  #2563EB;
+    --blue-soft:  #1E3A5F;
+
+    --background:            var(--bone);
+    --foreground:            var(--ink);
+    --card:                  var(--paper);
+    --card-foreground:       var(--ink);
+    --popover:               var(--paper);
+    --popover-foreground:    var(--ink);
+    --primary:               var(--blue);
+    --primary-foreground:    #FFFFFF;
+    --secondary:             var(--blue-soft);
+    --secondary-foreground:  #93C5FD;
+    --muted:                 #1F2028;
+    --muted-foreground:      var(--ink-mute);
+    --accent:                var(--blue-soft);
+    --accent-foreground:     #93C5FD;
+    --destructive:           #EF4444;
+    --destructive-foreground:#FFFFFF;
+    --border:                var(--line);
+    --input:                 var(--line);
+    --ring:                  var(--blue);
+
+    --sidebar:               #07090F;
+    --sidebar-foreground:    #C4C4CC;
+    --sidebar-primary:       var(--blue);
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent:        #111420;
+    --sidebar-accent-foreground: #E4E4E7;
+    --sidebar-border:        #1A1D2E;
+    --sidebar-ring:          var(--blue);
   }
 
   body {
     background-color: var(--background);
     color: var(--foreground);
+    font-family: var(--font-body), Georgia, serif;
     /* Push all content below the iOS status bar / notch when using viewportFit=cover */
     padding-top: env(safe-area-inset-top, 0px);
   }
 
   html {
-    font-family: var(--font-sans), system-ui, sans-serif;
+    font-family: var(--font-body), Georgia, serif;
+  }
+
+  /* Headings default to Instrument Serif */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), Georgia, serif;
   }
 
   /* Prevent iOS zoom on input focus — all inputs must be >= 16px */

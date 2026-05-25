@@ -25,16 +25,16 @@ function getMilestoneIcon(type: string): React.ElementType {
 }
 
 const ACCENT_MAP: Record<string, string> = {
-  first_session:     "bg-emerald-50 text-emerald-600 border-emerald-200",
+  first_session:     "bg-green-50 text-green-700 border-green-200",
   session_7_streak:  "bg-orange-50  text-orange-600  border-orange-200",
   session_25:        "bg-violet-50  text-violet-600  border-violet-200",
   session_50:        "bg-violet-50  text-violet-600  border-violet-200",
   session_100:       "bg-violet-50  text-violet-600  border-violet-200",
   first_pr:          "bg-blue-50    text-blue-600    border-blue-200",
   first_exercise_logged: "bg-zinc-50 text-zinc-600   border-zinc-200",
-  weight_5lb:        "bg-emerald-50 text-emerald-600 border-emerald-200",
-  weight_10lb:       "bg-emerald-50 text-emerald-600 border-emerald-200",
-  weight_25lb:       "bg-emerald-50 text-emerald-600 border-emerald-200",
+  weight_5lb:        "bg-green-50 text-green-700 border-green-200",
+  weight_10lb:       "bg-green-50 text-green-700 border-green-200",
+  weight_25lb:       "bg-green-50 text-green-700 border-green-200",
 };
 
 function getMilestoneAccent(type: string): string {

@@ -761,7 +761,7 @@ export default function WorkoutLogger({
                     bi === posInBlock
                       ? "w-6 h-2 bg-primary"
                       : done
-                      ? "w-2 h-2 bg-emerald-500"
+                      ? "w-2 h-2 bg-green-500"
                       : "w-2 h-2 bg-muted-foreground/30"
                   )}
                 />
@@ -808,8 +808,8 @@ export default function WorkoutLogger({
           {/* Progression suggestion */}
           {s.type === "progress" && (
             <div className="flex items-center gap-1 mt-1.5">
-              <TrendingUp className="w-3 h-3 text-emerald-600 shrink-0" />
-              <p className="text-xs text-emerald-700">{s.reasoning}</p>
+              <TrendingUp className="w-3 h-3 text-green-700 shrink-0" />
+              <p className="text-xs text-green-700">{s.reasoning}</p>
             </div>
           )}
           {s.type === "deload" && (
@@ -829,7 +829,7 @@ export default function WorkoutLogger({
         {allSessionDone ? (
           <div className="pb-4">
             <div className="text-center pt-6 pb-4">
-              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" />
               <p className="text-lg font-semibold">All sets complete!</p>
             </div>
 
@@ -879,8 +879,8 @@ export default function WorkoutLogger({
           </div>
         ) : activeSet?.completed ? (
           <div className="py-10 text-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
-            <p className="text-base font-semibold text-emerald-700">Set {setIdx + 1} complete ✓</p>
+            <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-3" />
+            <p className="text-base font-semibold text-green-700">Set {setIdx + 1} complete ✓</p>
             <p className="text-sm text-muted-foreground mt-1">Moving to next exercise…</p>
           </div>
         ) : (
@@ -890,7 +890,7 @@ export default function WorkoutLogger({
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Load</p>
                 {prescribed?.weight != null && !activeSet.isBodyweight && !activeSet.isBand && (
-                  <p className="text-xs font-semibold text-emerald-600">Prescribed: {prescribed.weight} lb</p>
+                  <p className="text-xs font-semibold text-green-700">Prescribed: {prescribed.weight} lb</p>
                 )}
               </div>
 
@@ -993,7 +993,7 @@ export default function WorkoutLogger({
                   {activeSet.isSeconds ? "Seconds" : "Reps"}
                 </p>
                 {prescribed && (
-                  <p className="text-xs font-semibold text-emerald-600">
+                  <p className="text-xs font-semibold text-green-700">
                     {activeSet.isSeconds
                       ? `${prescribed.repMax}s`
                       : prescribed.repMin === prescribed.repMax
@@ -1041,7 +1041,7 @@ export default function WorkoutLogger({
 
             {/* Progression hint at top of rep range (reps mode only) */}
             {!activeSet.isSeconds && activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && (
-              <p className="text-xs text-emerald-700 text-center flex items-center justify-center gap-1 mb-2">
+              <p className="text-xs text-green-700 text-center flex items-center justify-center gap-1 mb-2">
                 <TrendingUp className="w-3 h-3" />
                 Increase weight next session
               </p>
@@ -1091,7 +1091,7 @@ export default function WorkoutLogger({
               {state.sets.map((entry, i) =>
                 entry.completed ? (
                   <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                    <Check className="w-3 h-3 text-green-600 shrink-0" />
                     <span>
                       Set {i + 1}:
                       {entry.isBodyweight ? " BW" : entry.weight ? ` ${entry.weight} lb` : ""}
@@ -1113,7 +1113,7 @@ export default function WorkoutLogger({
         <div className="mt-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Notes</p>
           {state.noteAdded ? (
-            <p className="text-xs text-emerald-600 py-2">Note saved ✓</p>
+            <p className="text-xs text-green-700 py-2">Note saved ✓</p>
           ) : (
             <div className="space-y-2">
               <Textarea
@@ -1311,8 +1311,8 @@ export default function WorkoutLogger({
 
                 {s.type === "progress" && (
                   <div className="flex items-center gap-1 mt-1">
-                    <TrendingUp className="w-3 h-3 text-emerald-600 shrink-0" />
-                    <p className="text-xs text-emerald-700">{s.reasoning}</p>
+                    <TrendingUp className="w-3 h-3 text-green-700 shrink-0" />
+                    <p className="text-xs text-green-700">{s.reasoning}</p>
                   </div>
                 )}
                 {s.type === "hold" && hasLastData && (
@@ -1361,7 +1361,7 @@ export default function WorkoutLogger({
 
                 <div className="pt-2 border-t mt-2">
                   {state.noteAdded ? (
-                    <p className="text-xs text-emerald-600">Note saved ✓</p>
+                    <p className="text-xs text-green-700">Note saved ✓</p>
                   ) : (
                     <div className="flex gap-1.5">
                       <Input
@@ -1491,7 +1491,7 @@ function DesktopSetRow({
           }}
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors",
-            entry.isBodyweight ? "border-emerald-400 text-emerald-700 bg-emerald-50" :
+            entry.isBodyweight ? "border-green-400 text-green-700 bg-green-50" :
             entry.isBand ? "border-blue-400 text-blue-700 bg-blue-50" :
             "border-border text-muted-foreground hover:border-muted-foreground"
           )}
@@ -1530,8 +1530,8 @@ function DesktopSetRow({
           className={cn(
             "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
             entry.completed
-              ? "bg-emerald-500 border-emerald-500 text-white"
-              : "border-border text-muted-foreground hover:border-emerald-400 hover:text-emerald-600"
+              ? "bg-green-500 border-green-500 text-white"
+              : "border-border text-muted-foreground hover:border-green-400 hover:text-green-700"
           )}
         >
           {entry.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
@@ -1549,7 +1549,7 @@ function DesktopSetRow({
       </div>
 
       {hitsTopOfRange && (
-        <p className="text-xs text-emerald-700 pl-7 flex items-center gap-1">
+        <p className="text-xs text-green-700 pl-7 flex items-center gap-1">
           <TrendingUp className="w-3 h-3 shrink-0" />
           Increase weight next session
         </p>

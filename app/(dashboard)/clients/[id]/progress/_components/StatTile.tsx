@@ -20,7 +20,7 @@ export function StatTile({ label, value, sub, delta, deltaPositive }: Props) {
           className={cn(
             "text-xs font-medium mt-1",
             deltaPositive === true
-              ? "text-emerald-600"
+              ? "text-green-700"
               : deltaPositive === false
               ? "text-red-500"
               : "text-muted-foreground"

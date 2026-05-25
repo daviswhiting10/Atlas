@@ -84,18 +84,18 @@ const GOAL_LABELS: Record<string, string> = {
 };
 
 const GOAL_AVATAR_BG: Record<string, string> = {
-  weight_loss: "bg-emerald-100 text-emerald-700",
-  hypertrophy: "bg-blue-100 text-blue-700",
-  pain_mgmt: "bg-amber-100 text-amber-700",
-  performance: "bg-violet-100 text-violet-700",
-  general: "bg-zinc-100 text-zinc-600",
+  weight_loss: "bg-green-50 text-green-700",
+  hypertrophy: "bg-blue-50 text-blue-700",
+  pain_mgmt: "bg-amber-50 text-amber-700",
+  performance: "bg-violet-50 text-violet-700",
+  general: "bg-muted text-muted-foreground",
 };
 
 const STATUS_CONFIG = {
-  PROSPECT: { label: "Prospect", className: "bg-zinc-100 text-zinc-600 border-zinc-200" },
-  ACTIVE: { label: "Active", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  AT_RISK: { label: "At Risk", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  CHURNED: { label: "Churned", className: "bg-red-50 text-red-700 border-red-200" },
+  PROSPECT: { label: "Prospect", className: "border border-[var(--line)] text-[var(--ink-soft)] bg-[var(--muted)]" },
+  ACTIVE: { label: "Active", className: "border border-green-300 text-green-700 bg-green-50" },
+  AT_RISK: { label: "At Risk", className: "border border-amber-300 text-amber-700 bg-amber-50" },
+  CHURNED: { label: "Churned", className: "border border-red-300 text-red-700 bg-red-50" },
 };
 
 function getInitials(name: string) {
@@ -219,7 +219,7 @@ export default function ClientDetailPage() {
   // ── Computed values ──────────────────────────────────────────────────────
   const statusCfg = STATUS_CONFIG[client.status] ?? STATUS_CONFIG.PROSPECT;
   const goalLabel = client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null;
-  const avatarBg = client.primaryGoal ? (GOAL_AVATAR_BG[client.primaryGoal] ?? "bg-zinc-100 text-zinc-600") : "bg-zinc-100 text-zinc-600";
+  const avatarBg = client.primaryGoal ? (GOAL_AVATAR_BG[client.primaryGoal] ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground";
   const activeProgram = client.programAssignments.find((a) => a.status === "ACTIVE");
   const redFlags = client.intakeForms[0]?.redFlags ?? null;
   const { monday, sunday } = getWeekBounds();
@@ -315,7 +315,7 @@ export default function ClientDetailPage() {
 
       {/* Retention flag banner */}
       {client.retentionFlag && (
-        <div className="mb-4 px-4 py-2.5 rounded-lg border border-amber-200 bg-amber-50/60 flex items-start gap-2">
+        <div className="mb-4 px-4 py-2.5 rounded-lg border border-amber-200 bg-amber-50 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
           <p className="text-sm text-amber-800">{client.retentionFlag}</p>
         </div>
@@ -565,22 +565,30 @@ export default function ClientDetailPage() {
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Retention score</span>
-                      <span className={cn(
-                        "text-sm font-semibold",
-                        client.retentionScore >= 70 ? "text-emerald-600" :
-                        client.retentionScore >= 40 ? "text-amber-600" : "text-red-600"
-                      )}>
+                      <span
+                        className="text-sm font-semibold"
+                        style={{
+                          color: client.retentionScore >= 70
+                            ? "var(--success)"
+                            : client.retentionScore >= 40
+                            ? "var(--warn)"
+                            : "var(--destructive)",
+                        }}
+                      >
                         {client.retentionScore}/100
                       </span>
                     </div>
                     <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
-                        className={cn(
-                          "h-full rounded-full",
-                          client.retentionScore >= 70 ? "bg-emerald-500" :
-                          client.retentionScore >= 40 ? "bg-amber-500" : "bg-red-500"
-                        )}
-                        style={{ width: `${client.retentionScore}%` }}
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${client.retentionScore}%`,
+                          background: client.retentionScore >= 70
+                            ? "var(--success)"
+                            : client.retentionScore >= 40
+                            ? "var(--warn)"
+                            : "var(--destructive)",
+                        }}
                       />
                     </div>
                   </CardContent>
@@ -635,7 +643,7 @@ export default function ClientDetailPage() {
                         variant="outline"
                         className={cn(
                           "text-xs capitalize",
-                          a.status === "ACTIVE" && "border-emerald-200 text-emerald-700"
+                          a.status === "ACTIVE" && "border-green-200 text-green-700"
                         )}
                       >
                         {a.status.toLowerCase()}

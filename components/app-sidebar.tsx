@@ -55,13 +55,32 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 h-screen w-56 flex-col bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] z-40" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+    <aside
+      className="hidden md:flex fixed left-0 top-0 h-screen w-56 flex-col z-40"
+      style={{
+        background: "#07090F",
+        borderRight: "1px solid #1A1D2E",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 h-14 border-b border-[var(--sidebar-border)]">
-        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--sidebar-primary)]">
+      <div
+        className="flex items-center gap-2.5 px-4 h-14"
+        style={{ borderBottom: "1px solid #1A1D2E" }}
+      >
+        <div
+          className="flex items-center justify-center w-7 h-7 rounded-md"
+          style={{
+            background: "var(--blue)",
+            boxShadow: "0 0 12px 2px rgba(37, 99, 235, 0.45)",
+          }}
+        >
           <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
         </div>
-        <span className="text-[var(--sidebar-foreground)] font-semibold tracking-tight text-base">
+        <span
+          className="font-display text-base tracking-tight"
+          style={{ color: "#E4E4E7" }}
+        >
           Atlas
         </span>
       </div>
@@ -70,7 +89,10 @@ export function AppSidebar() {
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         {navItems.map((group) => (
           <div key={group.label} className="mb-5">
-            <p className="text-xs font-medium text-zinc-500 px-2 mb-1 uppercase tracking-wider">
+            <p
+              className="text-[10px] font-medium px-2 mb-1 uppercase tracking-widest"
+              style={{ color: "#3F3F52" }}
+            >
               {group.label}
             </p>
             {group.items.map(({ href, icon: Icon, label }) => {
@@ -80,13 +102,25 @@ export function AppSidebar() {
                   key={href}
                   href={href}
                   className={cn(
-                    "flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors",
+                    "relative flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors",
                     active
-                      ? "bg-[var(--sidebar-accent)] text-white font-medium"
-                      : "text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)] hover:text-white"
+                      ? "text-white"
+                      : "hover:text-white"
                   )}
+                  style={
+                    active
+                      ? {
+                          background: "#111420",
+                          color: "#FFFFFF",
+                          boxShadow: "inset 2px 0 0 var(--blue)",
+                        }
+                      : { color: "#8888A0" }
+                  }
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon
+                    className="w-4 h-4 shrink-0"
+                    style={{ color: active ? "var(--blue)" : undefined }}
+                  />
                   {label}
                 </Link>
               );
@@ -96,25 +130,39 @@ export function AppSidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-[var(--sidebar-border)] p-2">
+      <div style={{ borderTop: "1px solid #1A1D2E" }} className="p-2">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors",
-            pathname === "/settings"
-              ? "bg-[var(--sidebar-accent)] text-white"
-              : "text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)] hover:text-white"
+            "flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors"
           )}
+          style={
+            pathname === "/settings"
+              ? {
+                  background: "#111420",
+                  color: "#FFFFFF",
+                  boxShadow: "inset 2px 0 0 var(--blue)",
+                }
+              : { color: "#8888A0" }
+          }
         >
-          <Settings className="w-4 h-4 shrink-0" />
+          <Settings
+            className="w-4 h-4 shrink-0"
+            style={{ color: pathname === "/settings" ? "var(--blue)" : undefined }}
+          />
           Settings
         </Link>
         <div className="mt-2 px-2 py-2">
-          <p className="text-xs font-medium text-zinc-400">Davis Whiting</p>
-          <p className="text-xs text-zinc-600">NASM CPT · CNC</p>
+          <p className="text-xs font-medium" style={{ color: "#6B6B80" }}>
+            Davis Whiting
+          </p>
+          <p className="text-xs" style={{ color: "#3F3F52" }}>
+            NASM CPT · CNC
+          </p>
           <button
             onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
-            className="mt-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="mt-2 text-xs transition-colors hover:text-red-400"
+            style={{ color: "#3F3F52" }}
           >
             Sign out
           </button>

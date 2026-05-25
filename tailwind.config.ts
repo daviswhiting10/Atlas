@@ -8,6 +8,13 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        body: ["var(--font-body)", "Georgia", "serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
+        heading: ["var(--font-display)", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        sans: ["var(--font-body)", "Georgia", "serif"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
@@ -52,11 +59,24 @@ const config: Config = {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
+        // Design-system semantic tokens (direct CSS var access)
+        bone: "var(--bone)",
+        paper: "var(--paper)",
+        ink: "var(--ink)",
+        "ink-soft": "var(--ink-soft)",
+        "ink-mute": "var(--ink-mute)",
+        line: "var(--line)",
+        blue: "var(--blue)",
+        "blue-deep": "var(--blue-deep)",
+        "blue-soft": "var(--blue-soft)",
+        success: "var(--success)",
+        warn: "var(--warn)",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        card: "18px",
       },
     },
   },

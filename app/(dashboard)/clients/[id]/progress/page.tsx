@@ -28,7 +28,7 @@ const GOAL_CONFIG: Record<
     label: "Body Weight Trend",
     heroMetric: "weight",
     color: "#10b981",
-    accentClass: "text-emerald-600",
+    accentClass: "text-green-700",
   },
   hypertrophy: {
     label: "Strength Composite",
@@ -282,7 +282,7 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
                   </div>
                   <E1RMLineChart data={series} color={color} height={90} />
                   {kl.pctChange != null && (
-                    <p className={cn("text-xs font-medium mt-1", kl.pctChange >= 0 ? "text-emerald-600" : "text-red-500")}>
+                    <p className={cn("text-xs font-medium mt-1", kl.pctChange >= 0 ? "text-green-700" : "text-red-500")}>
                       {kl.pctChange > 0 ? "+" : ""}{kl.pctChange.toFixed(1)}% from baseline
                     </p>
                   )}

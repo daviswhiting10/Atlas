@@ -106,12 +106,20 @@ export function MobileNav() {
     MORE_LINKS.some((l) => pathname.startsWith(l.href)) ||
     pathname.startsWith("/sessions");
 
+  // Shared tab item styles
+  const tabBase =
+    "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium tracking-wide transition-colors min-h-[44px]";
+
   return (
     <>
       {/* ── Bottom tab bar ──────────────────────────────────────────────── */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        className="fixed bottom-0 left-0 right-0 z-50 border-t md:hidden"
+        style={{
+          background: "var(--paper)",
+          borderColor: "var(--line)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
       >
         <div className="h-16 flex items-stretch">
           {/* Left tabs */}
@@ -122,12 +130,12 @@ export function MobileNav() {
                 key={id}
                 href={href}
                 onClick={haptic}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors min-h-[44px]",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
+                className={cn(tabBase)}
+                style={{ color: active ? "var(--blue)" : "var(--ink-mute)" }}
               >
-                <Icon className={cn("w-5 h-5", active ? "stroke-[2.5]" : "stroke-[1.5]")} />
+                <Icon
+                  className={cn("w-5 h-5", active ? "stroke-[2.5]" : "stroke-[1.5]")}
+                />
                 {label}
               </Link>
             );
@@ -136,12 +144,10 @@ export function MobileNav() {
           {/* Log tab — opens client picker */}
           <button
             onClick={openLogPicker}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors min-h-[44px]",
-              logActive || logPickerOpen
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            )}
+            className={cn(tabBase)}
+            style={{
+              color: logActive || logPickerOpen ? "var(--blue)" : "var(--ink-mute)",
+            }}
           >
             <ClipboardList
               className={cn(
@@ -160,12 +166,12 @@ export function MobileNav() {
                 key={id}
                 href={href}
                 onClick={haptic}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors min-h-[44px]",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
+                className={cn(tabBase)}
+                style={{ color: active ? "var(--blue)" : "var(--ink-mute)" }}
               >
-                <Icon className={cn("w-5 h-5", active ? "stroke-[2.5]" : "stroke-[1.5]")} />
+                <Icon
+                  className={cn("w-5 h-5", active ? "stroke-[2.5]" : "stroke-[1.5]")}
+                />
                 {label}
               </Link>
             );
@@ -174,12 +180,10 @@ export function MobileNav() {
           {/* More tab */}
           <button
             onClick={() => { haptic(); setMoreOpen(true); }}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors min-h-[44px]",
-              moreOpen || moreActive
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            )}
+            className={cn(tabBase)}
+            style={{
+              color: moreOpen || moreActive ? "var(--blue)" : "var(--ink-mute)",
+            }}
           >
             <MoreHorizontal
               className={cn(
@@ -196,27 +200,48 @@ export function MobileNav() {
       {logPickerOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/40 md:hidden"
+            className="fixed inset-0 z-50 bg-black/30 md:hidden backdrop-blur-sm"
             onClick={() => setLogPickerOpen(false)}
           />
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl md:hidden flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] md:hidden flex flex-col"
             style={{
+              background: "var(--paper)",
+              borderTop: "1px solid var(--line)",
               paddingBottom: "env(safe-area-inset-bottom)",
               maxHeight: "75vh",
             }}
           >
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div
+                className="w-10 h-1 rounded-full"
+                style={{ background: "var(--line)" }}
+              />
+            </div>
+
             {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b shrink-0">
+            <div
+              className="flex items-center justify-between px-5 pt-3 pb-3"
+              style={{ borderBottom: "1px solid var(--line)" }}
+            >
               <div>
-                <p className="font-semibold text-base">Log a Session</p>
-                <p className="text-xs text-muted-foreground">Select a client to begin</p>
+                <p
+                  className="font-display text-lg"
+                  style={{ color: "var(--ink)" }}
+                >
+                  Log a Session
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--ink-mute)" }}>
+                  Select a client to begin
+                </p>
               </div>
               <button
                 onClick={() => setLogPickerOpen(false)}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                style={{ background: "var(--muted)" }}
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" style={{ color: "var(--ink-soft)" }} />
               </button>
             </div>
 
@@ -225,11 +250,18 @@ export function MobileNav() {
               {logLoading ? (
                 <div className="space-y-2 px-5 pt-2">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-[60px] bg-muted rounded-xl animate-pulse" />
+                    <div
+                      key={i}
+                      className="h-[60px] rounded-xl animate-pulse"
+                      style={{ background: "var(--muted)" }}
+                    />
                   ))}
                 </div>
               ) : logClients.length === 0 ? (
-                <div className="px-5 py-10 text-center text-sm text-muted-foreground">
+                <div
+                  className="px-5 py-10 text-center text-sm"
+                  style={{ color: "var(--ink-mute)" }}
+                >
                   No active clients found.
                 </div>
               ) : (
@@ -237,10 +269,17 @@ export function MobileNav() {
                   <button
                     key={client.id}
                     onClick={() => pickClient(client.id)}
-                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/50 active:bg-muted transition-colors touch-manipulation"
+                    className="w-full flex items-center justify-between px-5 py-3.5 transition-colors touch-manipulation active:opacity-70"
+                    style={{ color: "var(--ink)" }}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                        style={{
+                          background: "var(--blue-soft)",
+                          color: "var(--blue)",
+                        }}
+                      >
                         {client.fullName
                           .split(" ")
                           .map((n) => n[0])
@@ -250,7 +289,10 @@ export function MobileNav() {
                       </div>
                       <span className="text-sm font-medium">{client.fullName}</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <ChevronRight
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: "var(--ink-mute)" }}
+                    />
                   </button>
                 ))
               )}
@@ -263,56 +305,89 @@ export function MobileNav() {
       {moreOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/40 md:hidden"
+            className="fixed inset-0 z-50 bg-black/30 md:hidden backdrop-blur-sm"
             onClick={() => setMoreOpen(false)}
           />
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl md:hidden"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] md:hidden"
+            style={{
+              background: "var(--paper)",
+              borderTop: "1px solid var(--line)",
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
           >
-            {/* Handle + header */}
-            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b">
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div
+                className="w-10 h-1 rounded-full"
+                style={{ background: "var(--line)" }}
+              />
+            </div>
+
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-5 pt-3 pb-3"
+              style={{ borderBottom: "1px solid var(--line)" }}
+            >
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-foreground flex items-center justify-center">
-                  <Zap className="w-3.5 h-3.5 text-background" strokeWidth={2.5} />
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center"
+                  style={{
+                    background: "var(--blue)",
+                    boxShadow: "0 0 8px 1px rgba(37,99,235,0.4)",
+                  }}
+                >
+                  <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
                 </div>
-                <span className="font-semibold text-sm">Atlas</span>
+                <span
+                  className="font-display text-base"
+                  style={{ color: "var(--ink)" }}
+                >
+                  Atlas
+                </span>
               </div>
               <button
                 onClick={() => setMoreOpen(false)}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                style={{ background: "var(--muted)" }}
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" style={{ color: "var(--ink-soft)" }} />
               </button>
             </div>
 
             {/* Links */}
             <div className="py-2">
-              {MORE_LINKS.map(({ href, icon: Icon, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMoreOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-5 py-3.5 text-sm font-medium transition-colors",
-                    pathname.startsWith(href)
-                      ? "text-primary"
-                      : "text-foreground hover:bg-muted"
-                  )}
-                >
-                  <Icon className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  {label}
-                </Link>
-              ))}
+              {MORE_LINKS.map(({ href, icon: Icon, label }) => {
+                const active = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMoreOpen(false)}
+                    className="flex items-center gap-3 px-5 py-3.5 text-sm font-medium transition-colors"
+                    style={{ color: active ? "var(--blue)" : "var(--ink)" }}
+                  >
+                    <Icon
+                      className="w-5 h-5 shrink-0"
+                      style={{ color: active ? "var(--blue)" : "var(--ink-mute)" }}
+                    />
+                    {label}
+                  </Link>
+                );
+              })}
             </div>
 
             {/* Sign out */}
-            <div className="border-t mx-5 pt-3 pb-4">
+            <div
+              className="mx-5 pt-3 pb-4"
+              style={{ borderTop: "1px solid var(--line)" }}
+            >
               <button
                 onClick={() =>
                   signOut({ callbackUrl: `${window.location.origin}/login` })
                 }
-                className="flex items-center gap-3 w-full py-3 text-sm font-medium text-destructive"
+                className="flex items-center gap-3 w-full py-3 text-sm font-medium"
+                style={{ color: "#DC2626" }}
               >
                 <LogOut className="w-5 h-5 shrink-0" />
                 Sign out

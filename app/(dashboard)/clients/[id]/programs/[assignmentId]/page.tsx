@@ -126,10 +126,10 @@ function getSectionGroups(exercises: ExerciseDraft[]): SectionGroup[] {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  PLANNED: "bg-zinc-100 text-zinc-600",
-  LOGGED: "bg-emerald-50 text-emerald-700",
-  SKIPPED: "bg-amber-50 text-amber-700",
-  RESCHEDULED: "bg-blue-50 text-blue-700",
+  PLANNED: "border border-[var(--line)] bg-[var(--muted)] text-[var(--ink-soft)]",
+  LOGGED: "border border-green-300 bg-green-50 text-green-700",
+  SKIPPED: "border border-amber-300 bg-amber-50 text-amber-700",
+  RESCHEDULED: "border border-blue-300 bg-blue-50 text-blue-700",
 };
 
 function groupByWeek(workouts: AssignedWorkout[], startDate: string) {
@@ -508,7 +508,7 @@ export default function AssignedProgramPage() {
         </div>
         <Badge
           variant="outline"
-          className={assignment.status === "ACTIVE" ? "border-emerald-200 text-emerald-700" : ""}
+          className={assignment.status === "ACTIVE" ? "border-green-200 text-green-700" : ""}
         >
           {assignment.status}
         </Badge>
