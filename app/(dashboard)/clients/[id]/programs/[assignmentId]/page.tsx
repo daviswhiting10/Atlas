@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Save, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Save, Loader2, Trash2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SetsTable, type SetDraft } from "@/app/(dashboard)/programs/_components/SetsTable";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
@@ -459,6 +459,19 @@ export default function AssignedProgramPage() {
     );
   }
 
+  async function resetSession(workoutId: string) {
+    if (!confirm("Reset this session to Planned? The logged data will be deleted.")) return;
+    const res = await fetch(`/api/assignments/${assignmentId}/workouts/${workoutId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "PLANNED" }),
+    });
+    if (!res.ok) { toast.error("Failed to reset session"); return; }
+    const updated = await res.json();
+    handleWorkoutSaved(updated);
+    toast.success("Session reset to Planned");
+  }
+
   if (loading) {
     return (
       <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-4xl">
@@ -583,6 +596,16 @@ export default function AssignedProgramPage() {
                             >
                               {workout.status}
                             </Badge>
+                            {workout.status === "LOGGED" && (
+                              <button
+                                type="button"
+                                title="Reset to Planned"
+                                onClick={(e) => { e.stopPropagation(); resetSession(workout.id); }}
+                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 

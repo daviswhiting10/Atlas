@@ -396,8 +396,13 @@ export async function updateAssignedWorkout(
       },
     });
 
+    // If resetting to PLANNED, delete the associated WorkoutLog (and cascade SetLogs)
+    if (data.status === "PLANNED" && existing.workoutLog) {
+      await tx.workoutLog.delete({ where: { id: existing.workoutLog.id } });
+    }
+
     // Sync WorkoutLog.date so "Last session" reflects the corrected date
-    if (newScheduledDate != null && existing.workoutLog) {
+    if (newScheduledDate != null && existing.workoutLog && data.status !== "PLANNED") {
       await tx.workoutLog.update({
         where: { id: existing.workoutLog.id },
         data: { date: newScheduledDate },
