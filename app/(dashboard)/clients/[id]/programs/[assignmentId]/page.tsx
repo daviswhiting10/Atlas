@@ -109,12 +109,11 @@ function getSectionGroups(exercises: ExerciseDraft[]): SectionGroup[] {
   }
 
   // Any additional named sections
-  for (const [key, exs] of map.entries()) {
+  Array.from(map.entries()).forEach(([key, exs]) => {
     if (key !== null) {
       result.push({ section: key, label: key, exs });
-      map.delete(key);
     }
-  }
+  });
 
   // Unsectioned exercises last
   if (map.has(null)) {
