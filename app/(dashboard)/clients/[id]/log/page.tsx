@@ -195,6 +195,21 @@ export default async function LogPage({
     })
   );
 
+  // ── All planned workouts for this client (day-picker) ─────────────────────
+  const availableWorkouts = await prisma.assignedWorkout.findMany({
+    where: {
+      programAssignment: { clientId, workspaceId, status: "ACTIVE" },
+      status: "PLANNED",
+    },
+    orderBy: { scheduledDate: "asc" },
+    select: {
+      id: true,
+      name: true,
+      scheduledDate: true,
+      _count: { select: { exercises: true } },
+    },
+  });
+
   // ── Check for existing partial session (resume support) ────────────────────
   const existingLog = await prisma.workoutLog.findUnique({
     where: { assignedWorkoutId: assignedWorkout.id },
@@ -229,6 +244,12 @@ export default async function LogPage({
       exercises={exercises}
       existingWorkoutLogId={existingLog?.id ?? null}
       existingSetLogs={(existingLog?.sets ?? []) as ExistingSetLog[]}
+      availableWorkouts={availableWorkouts.map((w) => ({
+        id: w.id,
+        name: w.name,
+        scheduledDate: w.scheduledDate.toISOString(),
+        exerciseCount: w._count.exercises,
+      }))}
     />
   );
 }

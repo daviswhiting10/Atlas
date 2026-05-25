@@ -286,6 +286,15 @@ function findNextSlotAfterComplete(
 
 
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type WorkoutOption = {
+  id: string;
+  name: string;
+  scheduledDate: string; // ISO string
+  exerciseCount: number;
+};
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function WorkoutLogger({
@@ -298,6 +307,7 @@ export default function WorkoutLogger({
   exercises,
   existingWorkoutLogId,
   existingSetLogs,
+  availableWorkouts,
 }: {
   clientId: string;
   clientName: string;
@@ -308,6 +318,7 @@ export default function WorkoutLogger({
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
   existingSetLogs: ExistingSetLog[];
+  availableWorkouts: WorkoutOption[];
 }) {
   const router = useRouter();
 
@@ -686,6 +697,49 @@ export default function WorkoutLogger({
             Done
           </Button>
         </div>
+
+        {/* ── Day picker ────────────────────────────────────────────── */}
+        {availableWorkouts.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1 scrollbar-none">
+            {availableWorkouts.map((w) => {
+              const isCurrent = w.id === assignedWorkoutId;
+              const d = new Date(w.scheduledDate);
+              const dayLabel = d.toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              });
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => {
+                    if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-xl px-3 py-2 text-left transition-colors border touch-manipulation",
+                    isCurrent
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/60 border-border hover:border-primary/50 hover:bg-muted"
+                  )}
+                >
+                  <p className={cn(
+                    "text-xs font-semibold leading-tight max-w-[130px] truncate",
+                    isCurrent ? "text-primary-foreground" : "text-foreground"
+                  )}>
+                    {w.name}
+                  </p>
+                  <p className={cn(
+                    "text-[10px] mt-0.5",
+                    isCurrent ? "text-primary-foreground/70" : "text-muted-foreground"
+                  )}>
+                    {dayLabel} · {w.exerciseCount} ex
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── Block label + progress dots (scoped to current block) ──── */}
         <div className="mb-4">
@@ -1154,7 +1208,7 @@ export default function WorkoutLogger({
         {clientName}
       </Link>
 
-      <div className="flex items-start justify-between mb-5 gap-3">
+      <div className="flex items-start justify-between mb-4 gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight leading-tight">{workoutName}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -1173,6 +1227,43 @@ export default function WorkoutLogger({
           </Button>
         </div>
       </div>
+
+      {/* Day picker (desktop) */}
+      {availableWorkouts.length > 1 && (
+        <div className="flex gap-2 flex-wrap mb-5">
+          {availableWorkouts.map((w) => {
+            const isCurrent = w.id === assignedWorkoutId;
+            const d = new Date(w.scheduledDate);
+            const dayLabel = d.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            });
+            return (
+              <button
+                key={w.id}
+                type="button"
+                onClick={() => {
+                  if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-left transition-colors border text-sm",
+                  isCurrent
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:border-primary/50 hover:bg-muted/60"
+                )}
+              >
+                <span className={cn("font-medium", isCurrent ? "text-primary-foreground" : "text-foreground")}>
+                  {w.name}
+                </span>
+                <span className={cn("ml-1.5 text-xs", isCurrent ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                  {dayLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Exercise cards — grouped by block */}
       <div className="space-y-4">
