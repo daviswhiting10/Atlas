@@ -310,6 +310,7 @@ export async function assignProgram(
                 order: ex.order,
                 prescribedSets: ex.prescribedSets as never,
                 notes: ex.notes ?? null,
+                section: ex.section ?? null,
               },
             });
           }
@@ -419,6 +420,7 @@ export async function updateAssignedWorkout(
               order: ex.order,
               prescribedSets: ex.prescribedSets,
               notes: ex.notes ?? null,
+              section: ex.section ?? null,
             },
           });
         } else {
@@ -430,6 +432,7 @@ export async function updateAssignedWorkout(
               order: ex.order,
               prescribedSets: ex.prescribedSets,
               notes: ex.notes ?? null,
+              section: ex.section ?? null,
             },
           });
         }

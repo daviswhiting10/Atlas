@@ -145,28 +145,69 @@ function buildInitialState(
   return state;
 }
 
-// ── Round-robin helpers ────────────────────────────────────────────────────────
+// ── Block + round-robin helpers ────────────────────────────────────────────────
 
-/** Find the first incomplete (exIdx, setRound) slot in round-robin order. */
-function findFirstIncompleteSlot(
+/** A contiguous group of exercises sharing the same section label. */
+type ExBlock = { section: string | null; exIndices: number[] };
+
+/** Group exercises into blocks by section, preserving order. */
+function groupIntoBlocks(exercises: LoggerExercise[]): ExBlock[] {
+  const blocks: ExBlock[] = [];
+  for (let i = 0; i < exercises.length; i++) {
+    const sec = exercises[i].section;
+    const last = blocks[blocks.length - 1];
+    if (last && last.section === sec) {
+      last.exIndices.push(i);
+    } else {
+      blocks.push({ section: sec, exIndices: [i] });
+    }
+  }
+  return blocks;
+}
+
+/** Human-readable block label. */
+function formatBlockLabel(section: string | null): string {
+  if (!section) return "";
+  if (section === "warmup") return "Warm-up";
+  if (section === "finisher") return "Finisher";
+  // "block_a" → "Block A"
+  return section.replace(/^block_/, "Block ").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** First incomplete slot within a single block. Returns null if block is done. */
+function findFirstSlotInBlock(
+  block: ExBlock,
   exercises: LoggerExercise[],
   state: Record<string, ExerciseState>
-): { exIdx: number; setRound: number } {
-  const maxSets = Math.max(...exercises.map((ex) => state[ex.aweId]?.sets.length ?? 0), 1);
+): { exIdx: number; setRound: number } | null {
+  const maxSets = Math.max(...block.exIndices.map((i) => state[exercises[i].aweId]?.sets.length ?? 0), 1);
   for (let setRound = 0; setRound < maxSets; setRound++) {
-    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+    for (const exIdx of block.exIndices) {
       const sets = state[exercises[exIdx].aweId]?.sets ?? [];
       if (setRound < sets.length && !sets[setRound].completed) {
         return { exIdx, setRound };
       }
     }
   }
+  return null;
+}
+
+/** Find the first incomplete slot across all blocks (for initialization/resume). */
+function findFirstIncompleteSlot(
+  exercises: LoggerExercise[],
+  state: Record<string, ExerciseState>
+): { exIdx: number; setRound: number } {
+  for (const block of groupIntoBlocks(exercises)) {
+    const slot = findFirstSlotInBlock(block, exercises, state);
+    if (slot) return slot;
+  }
   return { exIdx: 0, setRound: 0 };
 }
 
 /**
- * After completing (completedAweId, completedSetIdx), find the next
- * incomplete slot in round-robin order starting from (fromExIdx, fromSetRound).
+ * After completing (completedAweId, completedSetIdx), find the next slot.
+ * Stays within the current block until all its rounds are done, then moves
+ * to the first slot of the next block.
  */
 function findNextSlotAfterComplete(
   exercises: LoggerExercise[],
@@ -187,23 +228,40 @@ function findNextSlotAfterComplete(
     },
   };
 
-  // Try subsequent exercises in the same round
-  for (let exIdx = fromExIdx + 1; exIdx < exercises.length; exIdx++) {
+  const blocks = groupIntoBlocks(exercises);
+  const currentBlockIdx = blocks.findIndex((b) => b.exIndices.includes(fromExIdx));
+  if (currentBlockIdx < 0) return null;
+
+  const currentBlock = blocks[currentBlockIdx];
+  const posInBlock = currentBlock.exIndices.indexOf(fromExIdx);
+
+  // 1. Remaining exercises in the same round of this block
+  for (let bi = posInBlock + 1; bi < currentBlock.exIndices.length; bi++) {
+    const exIdx = currentBlock.exIndices[bi];
     const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
     if (fromSetRound < sets.length && !sets[fromSetRound].completed) {
       return { exIdx, setRound: fromSetRound };
     }
   }
 
-  // Try subsequent rounds from exercise 0
-  const maxSets = Math.max(...exercises.map((ex) => simState[ex.aweId]?.sets.length ?? 0), 1);
+  // 2. Next rounds within this block (start from first exercise in block)
+  const maxSets = Math.max(
+    ...currentBlock.exIndices.map((i) => simState[exercises[i].aweId]?.sets.length ?? 0),
+    1
+  );
   for (let setRound = fromSetRound + 1; setRound < maxSets; setRound++) {
-    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+    for (const exIdx of currentBlock.exIndices) {
       const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
       if (setRound < sets.length && !sets[setRound].completed) {
         return { exIdx, setRound };
       }
     }
+  }
+
+  // 3. Block fully done — move to first slot in the next block
+  for (let bi = currentBlockIdx + 1; bi < blocks.length; bi++) {
+    const slot = findFirstSlotInBlock(blocks[bi], exercises, simState);
+    if (slot) return slot;
   }
 
   return null; // All complete
@@ -469,24 +527,28 @@ export default function WorkoutLogger({
     });
   }
 
-  // ── Swipe between exercises (mobile) ─────────────────────────────────────
+  // ── Swipe between exercises (mobile) — block-scoped ─────────────────────
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX;
   }
   function handleTouchEnd(e: React.TouchEvent) {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) < 60) return;
+    const blocks = groupIntoBlocks(exercises);
+    const currentBlock = blocks.find((b) => b.exIndices.includes(currentExIdx));
+    if (!currentBlock) return;
+    const posInBlock = currentBlock.exIndices.indexOf(currentExIdx);
     if (diff > 0) {
-      // Swipe left → next exercise or next round
-      if (currentExIdx < exercises.length - 1) {
-        setCurrentExIdx((i) => i + 1);
+      // Swipe left → next exercise in block, or next round in block
+      if (posInBlock < currentBlock.exIndices.length - 1) {
+        setCurrentExIdx(currentBlock.exIndices[posInBlock + 1]);
       } else {
-        setCurrentExIdx(0);
+        setCurrentExIdx(currentBlock.exIndices[0]);
         setCurrentSetRound((r) => r + 1);
       }
     }
-    if (diff < 0 && currentExIdx > 0) {
-      setCurrentExIdx((i) => i - 1);
+    if (diff < 0 && posInBlock > 0) {
+      setCurrentExIdx(currentBlock.exIndices[posInBlock - 1]);
     }
   }
 
@@ -570,7 +632,16 @@ export default function WorkoutLogger({
     const lastStr = formatLastSets(ex.lastSets);
     const prescribed = ex.prescribedSets[setIdx] ?? ex.prescribedSets[0] ?? null;
     const repMax = prescribed?.repMax ?? null;
-    const totalRounds = Math.max(...exercises.map((e) => exState[e.aweId].sets.length));
+
+    // Block-scoped context
+    const blocks = groupIntoBlocks(exercises);
+    const currentBlock = blocks.find((b) => b.exIndices.includes(currentExIdx))!;
+    const posInBlock = currentBlock.exIndices.indexOf(currentExIdx);
+    const blockLabel = formatBlockLabel(currentBlock.section);
+    const totalRounds = Math.max(
+      ...currentBlock.exIndices.map((i) => exState[exercises[i].aweId]?.sets.length ?? 0),
+      1
+    );
 
     return (
       <div
@@ -579,7 +650,7 @@ export default function WorkoutLogger({
         onTouchEnd={handleTouchEnd}
       >
         {/* ── Top bar ───────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <Link
             href={`/clients/${clientId}`}
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2")}
@@ -598,26 +669,33 @@ export default function WorkoutLogger({
           </Button>
         </div>
 
-        {/* ── Exercise progress dots ─────────────────────────────────── */}
-        <div className="flex items-center justify-center gap-1.5 mb-4">
-          {exercises.map((_, i) => {
-            const exSets = exState[exercises[i].aweId]?.sets ?? [];
-            const done = exSets.every((s) => s.completed);
-            return (
-              <button
-                key={i}
-                onClick={() => setCurrentExIdx(i)}
-                className={cn(
-                  "rounded-full transition-all touch-manipulation",
-                  i === currentExIdx
-                    ? "w-6 h-2 bg-primary"
-                    : done
-                    ? "w-2 h-2 bg-emerald-500"
-                    : "w-2 h-2 bg-muted-foreground/30"
-                )}
-              />
-            );
-          })}
+        {/* ── Block label + progress dots (scoped to current block) ──── */}
+        <div className="mb-4">
+          {blockLabel && (
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary text-center mb-2">
+              {blockLabel}
+            </p>
+          )}
+          <div className="flex items-center justify-center gap-1.5">
+            {currentBlock.exIndices.map((exI, bi) => {
+              const exSets = exState[exercises[exI].aweId]?.sets ?? [];
+              const done = exSets.every((s) => s.completed);
+              return (
+                <button
+                  key={exI}
+                  onClick={() => setCurrentExIdx(exI)}
+                  className={cn(
+                    "rounded-full transition-all touch-manipulation",
+                    bi === posInBlock
+                      ? "w-6 h-2 bg-primary"
+                      : done
+                      ? "w-2 h-2 bg-emerald-500"
+                      : "w-2 h-2 bg-muted-foreground/30"
+                  )}
+                />
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Exercise header ────────────────────────────────────────── */}
@@ -626,7 +704,7 @@ export default function WorkoutLogger({
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <p className="text-xs font-medium text-muted-foreground">
-                  Exercise {currentExIdx + 1} of {exercises.length}
+                  Exercise {posInBlock + 1} of {currentBlock.exIndices.length}
                 </p>
                 <span className="text-muted-foreground/40 text-xs">·</span>
                 <p className="text-xs font-semibold text-primary">
@@ -984,12 +1062,16 @@ export default function WorkoutLogger({
           )}
         </div>
 
-        {/* ── Exercise navigation ────────────────────────────────────── */}
+        {/* ── Exercise navigation (block-scoped) ────────────────────── */}
         <div className="flex gap-3 mt-5">
           <button
             type="button"
-            onClick={() => setCurrentExIdx((i) => Math.max(0, i - 1))}
-            disabled={currentExIdx === 0}
+            onClick={() => {
+              if (posInBlock > 0) {
+                setCurrentExIdx(currentBlock.exIndices[posInBlock - 1]);
+              }
+            }}
+            disabled={posInBlock === 0}
             className="flex-1 h-12 rounded-xl border flex items-center justify-center gap-1 text-sm font-medium disabled:opacity-30 touch-manipulation active:bg-muted"
           >
             <ChevronLeft className="w-4 h-4" /> Prev
@@ -1007,11 +1089,11 @@ export default function WorkoutLogger({
             <button
               type="button"
               onClick={() => {
-                // Manual advance: next exercise in round, or first exercise of next round
-                if (currentExIdx < exercises.length - 1) {
-                  setCurrentExIdx((i) => i + 1);
+                if (posInBlock < currentBlock.exIndices.length - 1) {
+                  setCurrentExIdx(currentBlock.exIndices[posInBlock + 1]);
                 } else {
-                  setCurrentExIdx(0);
+                  // End of block exercises — wrap to next round of this block
+                  setCurrentExIdx(currentBlock.exIndices[0]);
                   setCurrentSetRound((r) => r + 1);
                 }
               }}
@@ -1063,16 +1145,29 @@ export default function WorkoutLogger({
         </div>
       </div>
 
-      {/* Exercise cards */}
+      {/* Exercise cards — grouped by block */}
       <div className="space-y-4">
-        {exercises.map((ex) => {
+        {exercises.map((ex, exI) => {
           const state = exState[ex.aweId];
           const lastStr = formatLastSets(ex.lastSets);
           const s = ex.suggestion;
           const hasLastData = ex.lastSets.length > 0;
+          // Show a block header when section changes
+          const prevSection = exI > 0 ? exercises[exI - 1].section : "__start__";
+          const showBlockHeader = ex.section !== prevSection && ex.section != null;
+          const blockHeaderLabel = formatBlockLabel(ex.section);
 
           return (
-            <Card key={ex.aweId}>
+            <div key={ex.aweId}>
+              {showBlockHeader && (
+                <div className="flex items-center gap-3 pt-1 pb-0">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    {blockHeaderLabel}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+              )}
+            <Card>
               <CardHeader className="pb-2 pt-4 px-4">
                 <div className="min-w-0">
                   <CardTitle className="text-sm font-semibold leading-tight">{ex.name}</CardTitle>
@@ -1173,6 +1268,7 @@ export default function WorkoutLogger({
                 </div>
               </CardContent>
             </Card>
+            </div>
           );
         })}
       </div>

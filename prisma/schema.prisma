@@ -378,6 +378,7 @@ model AssignedWorkoutExercise {
   order             Int
   prescribedSets    Json // SetShape[]
   notes             String? @db.Text
+  section           String? // "warmup" | "block_a" | "block_b" | "finisher" — copied from WorkoutExercise
 
   assignedWorkout AssignedWorkout @relation(fields: [assignedWorkoutId], references: [id], onDelete: Cascade)
   exercise        Exercise        @relation(fields: [exerciseId], references: [id])
