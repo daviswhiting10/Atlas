@@ -958,7 +958,7 @@ export default function WorkoutLogger({
               ) : (
                 <Check className="w-5 h-5" />
               )}
-              Complete Set {setIdx + 1}
+              Complete Set {setIdx + 1} of {state.sets.length}
             </button>
 
             {/* Per-set note */}
