@@ -206,8 +206,12 @@ function findFirstIncompleteSlot(
 
 /**
  * After completing (completedAweId, completedSetIdx), find the next slot.
- * Stays within the current block until all its rounds are done, then moves
- * to the first slot of the next block.
+ *
+ * Algorithm: build the full round-robin sequence for the current block
+ * (round 0 of all exercises, then round 1, etc.), locate where we are,
+ * and return the first INCOMPLETE slot that comes after.  Only after the
+ * whole block is done do we advance to the first incomplete slot of the
+ * next block.
  */
 function findNextSlotAfterComplete(
   exercises: LoggerExercise[],
@@ -217,8 +221,8 @@ function findNextSlotAfterComplete(
   fromExIdx: number,
   fromSetRound: number
 ): { exIdx: number; setRound: number } | null {
-  // Simulate the completion
-  const simState = {
+  // Build simulated state that includes this completion
+  const simState: Record<string, ExerciseState> = {
     ...exState,
     [completedAweId]: {
       ...exState[completedAweId],
@@ -229,37 +233,45 @@ function findNextSlotAfterComplete(
   };
 
   const blocks = groupIntoBlocks(exercises);
-  const currentBlockIdx = blocks.findIndex((b) => b.exIndices.includes(fromExIdx));
-  if (currentBlockIdx < 0) return null;
+  const blockIdx = blocks.findIndex((b) => b.exIndices.includes(fromExIdx));
+  if (blockIdx < 0) return null;
 
-  const currentBlock = blocks[currentBlockIdx];
-  const posInBlock = currentBlock.exIndices.indexOf(fromExIdx);
+  const block = blocks[blockIdx];
 
-  // 1. Remaining exercises in the same round of this block
-  for (let bi = posInBlock + 1; bi < currentBlock.exIndices.length; bi++) {
-    const exIdx = currentBlock.exIndices[bi];
-    const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
-    if (fromSetRound < sets.length && !sets[fromSetRound].completed) {
-      return { exIdx, setRound: fromSetRound };
-    }
-  }
+  // Max prescribed sets across all exercises in this block
+  const maxSets = block.exIndices.reduce((acc, i) => {
+    return Math.max(acc, simState[exercises[i].aweId]?.sets.length ?? 0);
+  }, 0);
 
-  // 2. Next rounds within this block (start from first exercise in block)
-  const maxSets = Math.max(
-    ...currentBlock.exIndices.map((i) => simState[exercises[i].aweId]?.sets.length ?? 0),
-    1
-  );
-  for (let setRound = fromSetRound + 1; setRound < maxSets; setRound++) {
-    for (const exIdx of currentBlock.exIndices) {
+  // Build the complete ordered round-robin sequence for this block:
+  //   [(round=0, ex0), (round=0, ex1), …, (round=1, ex0), …]
+  type Slot = { exIdx: number; setRound: number };
+  const sequence: Slot[] = [];
+  for (let round = 0; round < maxSets; round++) {
+    for (const exIdx of block.exIndices) {
       const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
-      if (setRound < sets.length && !sets[setRound].completed) {
-        return { exIdx, setRound };
+      if (round < sets.length) {
+        sequence.push({ exIdx, setRound: round });
       }
     }
   }
 
-  // 3. Block fully done — move to first slot in the next block
-  for (let bi = currentBlockIdx + 1; bi < blocks.length; bi++) {
+  // Find where the just-completed slot sits in the sequence
+  const currentPos = sequence.findIndex(
+    (s) => s.exIdx === fromExIdx && s.setRound === fromSetRound
+  );
+
+  // Walk forward from the next position; return the first INCOMPLETE slot
+  for (let i = currentPos + 1; i < sequence.length; i++) {
+    const { exIdx, setRound } = sequence[i];
+    const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
+    if (sets[setRound] && !sets[setRound].completed) {
+      return { exIdx, setRound };
+    }
+  }
+
+  // Every slot in this block is done → advance to first incomplete slot in next block
+  for (let bi = blockIdx + 1; bi < blocks.length; bi++) {
     const slot = findFirstSlotInBlock(blocks[bi], exercises, simState);
     if (slot) return slot;
   }

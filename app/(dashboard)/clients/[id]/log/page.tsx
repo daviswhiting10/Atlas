@@ -137,6 +137,22 @@ export default async function LogPage({
     );
   }
 
+  // ── Fallback: load source workout sections (repairs data wiped by old Zod bug) ─
+  // When AssignedWorkoutExercise.section is null (caused by the pre-fix update path
+  // that didn't include section in the Zod schema), we read section directly from
+  // the template WorkoutExercise, matching by order.
+  const anyMissingSection = assignedWorkout.exercises.some((e) => e.section == null);
+  const sourceSectionByOrder = new Map<number, string | null>();
+  if (anyMissingSection && assignedWorkout.sourceWorkoutId) {
+    const sourceExercises = await prisma.workoutExercise.findMany({
+      where: { workoutId: assignedWorkout.sourceWorkoutId },
+      select: { order: true, section: true },
+    });
+    for (const ex of sourceExercises) {
+      sourceSectionByOrder.set(ex.order, ex.section ?? null);
+    }
+  }
+
   // ── Per-exercise: last performance + note + suggestion ──────────────────────
   const goal = client.primaryGoal ?? "general";
 
@@ -161,12 +177,15 @@ export default async function LogPage({
         exerciseLoadType: loadType,
       });
 
+      // Use the assigned section, falling back to the source workout's section
+      const section = awe.section ?? sourceSectionByOrder.get(awe.order) ?? null;
+
       return {
         aweId: awe.id,
         exerciseId: awe.exerciseId,
         name: awe.exercise.name,
         movementPattern: awe.exercise.movementPattern,
-        section: awe.section ?? null,
+        section,
         prescribedSets,
         lastSets,
         lastNote,
