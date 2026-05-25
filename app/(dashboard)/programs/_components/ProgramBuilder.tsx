@@ -368,7 +368,10 @@ export function ProgramBuilder({ programId, initial }: Props) {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight mb-4">
+        <h1
+          className="font-display leading-[1.04] tracking-[-0.01em] mb-4"
+          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+        >
           {programId ? "Edit Program" : "New Program"}
         </h1>
 

@@ -93,8 +93,13 @@ export default function SettingsPage() {
   return (
     <div className="p-8 max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
+        <h1
+          className="font-display leading-[1.04] tracking-[-0.01em]"
+          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+        >
+          Settings
+        </h1>
+        <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>
           Your trainer profile and voice — injected into every AI generation.
         </p>
       </div>

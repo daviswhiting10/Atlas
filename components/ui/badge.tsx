@@ -1,35 +1,38 @@
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
-
 import { cn } from "@/lib/utils"
 
+// All badges are outlined — no filled defaults.
+// Blue-soft (#7BA7FF) is for glows only — badge bg uses rgba(--blue, 0.07).
 const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 font-body text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-[var(--blue)]/40 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
-        // default = outlined blue
+        // Blue outlined — primary/brand state
         default:
-          "border-[var(--blue)] bg-[var(--blue-soft)] text-[var(--blue-deep)] dark:bg-[var(--blue-soft)] dark:text-blue-200",
-        // secondary = outlined ink
+          "border-[rgba(43,107,255,0.30)] bg-[rgba(43,107,255,0.07)] text-[var(--blue-deep)]",
+        // Ink outlined — neutral/secondary
         secondary:
           "border-[var(--line)] bg-transparent text-[var(--ink-soft)]",
-        // destructive = outlined red
+        // Red outlined — error/destructive
         destructive:
-          "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400",
-        // outline = generic outlined
+          "border-[rgba(200,52,26,0.30)] bg-[rgba(200,52,26,0.06)] text-[var(--destructive)]",
+        // Neutral outlined
         outline:
           "border-[var(--line)] bg-transparent text-[var(--ink)]",
-        // success = outlined green
+        // Green outlined — success
         success:
-          "border-green-300 bg-green-50 text-[var(--success)] dark:border-green-800 dark:bg-green-950/30 dark:text-green-400",
-        // warn = outlined amber
+          "border-[rgba(31,122,77,0.30)] bg-[rgba(31,122,77,0.07)] text-[var(--success)]",
+        // Amber outlined — warning
         warn:
-          "border-amber-300 bg-amber-50 text-[var(--warn)] dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400",
+          "border-[rgba(180,83,9,0.30)] bg-[rgba(180,83,9,0.07)] text-[var(--warn)]",
+        // Ghost — subtle
         ghost:
           "border-transparent bg-[var(--muted)] text-[var(--ink-mute)]",
-        link: "border-transparent text-[var(--blue)] underline-offset-4 hover:underline",
+        link:
+          "border-transparent text-[var(--blue)] underline-offset-4 hover:underline",
       },
     },
     defaultVariants: {
@@ -47,16 +50,11 @@ function Badge({
   return useRender({
     defaultTagName: "span",
     props: mergeProps<"span">(
-      {
-        className: cn(badgeVariants({ variant }), className),
-      },
+      { className: cn(badgeVariants({ variant }), className) },
       props
     ),
     render,
-    state: {
-      slot: "badge",
-      variant,
-    },
+    state: { slot: "badge", variant },
   })
 }
 

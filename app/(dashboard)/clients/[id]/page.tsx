@@ -87,7 +87,7 @@ const GOAL_AVATAR_BG: Record<string, string> = {
   weight_loss: "bg-green-50 text-green-700",
   hypertrophy: "bg-blue-50 text-blue-700",
   pain_mgmt: "bg-amber-50 text-amber-700",
-  performance: "bg-violet-50 text-violet-700",
+  performance: "bg-[rgba(43,107,255,0.07)] text-[var(--blue)]",
   general: "bg-muted text-muted-foreground",
 };
 
@@ -246,7 +246,7 @@ export default function ClientDetailPage() {
           </div>
           {/* Name + meta */}
           <div className="min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight truncate">{client.fullName}</h1>
+            <h1 className="font-display leading-[1.04] tracking-[-0.01em] truncate" style={{ fontSize: "clamp(1.5rem, 3vw, 2.25rem)", color: "var(--ink)" }}>{client.fullName}</h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -522,7 +522,7 @@ export default function ClientDetailPage() {
                               "text-[10px] h-4 px-1",
                               flag.severity === "high" ? "border-red-300 text-red-700" :
                               flag.severity === "medium" ? "border-amber-300 text-amber-700" :
-                              "border-zinc-300 text-zinc-600"
+                              "border-[var(--line)] text-[var(--ink-soft)]"
                             )}
                           >
                             {flag.severity}

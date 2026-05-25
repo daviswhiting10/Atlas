@@ -294,8 +294,8 @@ function WorkoutEditor({
           className={cn(
             "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
             loggedBy === "TRAINER"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-orange-50 text-orange-700 border-orange-300"
+              ? "bg-[var(--blue)] text-white border-[var(--blue)]"
+              : "border-[var(--line)] text-[var(--ink-soft)] bg-[var(--muted)]"
           )}
         >
           {loggedBy === "TRAINER" ? "In-person (I log)" : "At-home (client logs)"}
@@ -309,10 +309,10 @@ function WorkoutEditor({
             <div key={group.section ?? "__unsectioned__"}>
               {/* Section header */}
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold uppercase tracking-widest text-primary">
+                <span className="font-body text-xs font-medium uppercase tracking-widest" style={{ color: "var(--blue)" }}>
                   {group.label}
                 </span>
-                <div className="flex-1 h-px bg-border" />
+                <div className="flex-1 h-px" style={{ background: "var(--line)" }} />
                 <span className="text-xs text-muted-foreground">{group.exs.length} ex</span>
               </div>
 
@@ -497,7 +497,12 @@ export default function AssignedProgramPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{assignment.name}</h1>
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em]"
+            style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)", color: "var(--ink)" }}
+          >
+            {assignment.name}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Started {new Date(assignment.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             {" · "}
@@ -566,8 +571,8 @@ export default function AssignedProgramPage() {
                               className={cn(
                                 "text-xs px-2 py-0.5 rounded-full font-medium",
                                 workout.loggedBy === "TRAINER"
-                                  ? "bg-primary/10 text-primary"
-                                  : "bg-orange-50 text-orange-700"
+                                  ? "bg-[rgba(43,107,255,0.08)] text-[var(--blue)]"
+                                  : "bg-[var(--muted)] text-[var(--ink-soft)]"
                               )}
                             >
                               {workout.loggedBy === "TRAINER" ? "In-person" : "At-home"}

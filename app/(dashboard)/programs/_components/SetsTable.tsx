@@ -89,8 +89,19 @@ export function SetsTable({ sets, onChange, readOnly = false }: Props) {
                   title={allSecs ? "Switch to reps" : "Switch to seconds (holds)"}
                   className={
                     allSecs
-                      ? "px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-100 text-violet-700 border border-violet-300 hover:bg-violet-200 transition-colors"
-                      : "px-2 py-0.5 rounded text-[11px] font-medium text-muted-foreground border border-transparent hover:border-border hover:text-foreground transition-colors"
+                      ? "px-2 py-0.5 rounded font-body text-[11px] font-medium border transition-colors"
+                      : "px-2 py-0.5 rounded font-body text-[11px] font-medium border border-transparent transition-colors"
+                  }
+                  style={
+                    allSecs
+                      ? {
+                          background: "rgba(43,107,255,0.08)",
+                          color: "var(--blue)",
+                          borderColor: "rgba(43,107,255,0.30)",
+                        }
+                      : {
+                          color: "var(--ink-mute)",
+                        }
                   }
                 >
                   {allSecs ? "Sec ⇄" : "Reps ⇄"}

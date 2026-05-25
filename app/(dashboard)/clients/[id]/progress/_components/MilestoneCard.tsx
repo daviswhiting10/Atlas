@@ -24,24 +24,40 @@ function getMilestoneIcon(type: string): React.ElementType {
   return Award;
 }
 
-const ACCENT_MAP: Record<string, string> = {
-  first_session:     "bg-green-50 text-green-700 border-green-200",
-  session_7_streak:  "bg-orange-50  text-orange-600  border-orange-200",
-  session_25:        "bg-violet-50  text-violet-600  border-violet-200",
-  session_50:        "bg-violet-50  text-violet-600  border-violet-200",
-  session_100:       "bg-violet-50  text-violet-600  border-violet-200",
-  first_pr:          "bg-blue-50    text-blue-600    border-blue-200",
-  first_exercise_logged: "bg-zinc-50 text-zinc-600   border-zinc-200",
-  weight_5lb:        "bg-green-50 text-green-700 border-green-200",
-  weight_10lb:       "bg-green-50 text-green-700 border-green-200",
-  weight_25lb:       "bg-green-50 text-green-700 border-green-200",
-};
+// All milestone accents use the two-token approach: border/bg/color inline styles
+type AccentStyle = { border: string; bg: string; color: string };
 
-function getMilestoneAccent(type: string): string {
-  if (ACCENT_MAP[type]) return ACCENT_MAP[type];
-  if (type.startsWith("strength_")) return "bg-blue-50 text-blue-600 border-blue-200";
-  if (type.startsWith("plate_")) return "bg-amber-50 text-amber-600 border-amber-200";
-  return "bg-zinc-50 text-zinc-600 border-zinc-200";
+function getMilestoneAccent(type: string): AccentStyle {
+  // Success (weight loss milestones)
+  const successAccent: AccentStyle = {
+    border: "rgba(31,122,77,0.30)",
+    bg: "rgba(31,122,77,0.07)",
+    color: "var(--success)",
+  };
+  // Blue (strength / session milestones)
+  const blueAccent: AccentStyle = {
+    border: "rgba(43,107,255,0.30)",
+    bg: "rgba(43,107,255,0.07)",
+    color: "var(--blue)",
+  };
+  // Warn (plate milestones)
+  const warnAccent: AccentStyle = {
+    border: "rgba(180,83,9,0.30)",
+    bg: "rgba(180,83,9,0.07)",
+    color: "var(--warn)",
+  };
+  // Neutral
+  const neutralAccent: AccentStyle = {
+    border: "var(--line)",
+    bg: "rgba(11,15,26,0.04)",
+    color: "var(--ink-soft)",
+  };
+
+  if (type === "first_session" || type.startsWith("weight_")) return successAccent;
+  if (type === "first_pr" || type.startsWith("strength_") || type.startsWith("session_"))
+    return blueAccent;
+  if (type.startsWith("plate_")) return warnAccent;
+  return neutralAccent;
 }
 
 type Props = {
@@ -55,16 +71,24 @@ export function MilestoneCard({ milestone, compact = false }: Props) {
 
   if (compact) {
     return (
-      <div className="flex items-start gap-3 snap-start min-w-[200px] max-w-[240px] rounded-xl border bg-card px-3 py-3">
-        <span className={cn("w-8 h-8 rounded-full border flex items-center justify-center shrink-0", accent)}>
+      <div
+        className="flex items-start gap-3 snap-start min-w-[200px] max-w-[240px] rounded-[18px] px-3 py-3"
+        style={{ border: "1px solid var(--line)", background: "var(--paper)" }}
+      >
+        <span
+          className="w-8 h-8 rounded-full border flex items-center justify-center shrink-0"
+          style={{ borderColor: accent.border, background: accent.bg, color: accent.color }}
+        >
           <Icon className="w-4 h-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-xs font-semibold leading-tight truncate">{milestone.title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">
+          <p className="font-body text-xs font-medium leading-tight truncate" style={{ color: "var(--ink)" }}>
+            {milestone.title}
+          </p>
+          <p className="font-body text-xs mt-0.5 leading-tight line-clamp-2" style={{ color: "var(--ink-mute)" }}>
             {milestone.description}
           </p>
-          <p className="text-[10px] text-muted-foreground/60 mt-1">
+          <p className="font-body text-[10px] mt-1" style={{ color: "var(--ink-mute)", opacity: 0.6 }}>
             {format(new Date(milestone.achievedAt), "MMM d, yyyy")}
           </p>
         </div>
@@ -73,22 +97,27 @@ export function MilestoneCard({ milestone, compact = false }: Props) {
   }
 
   return (
-    <div className="flex items-start gap-4 py-4 border-b last:border-0">
-      <span className={cn("w-10 h-10 rounded-full border flex items-center justify-center shrink-0 mt-0.5", accent)}>
+    <div className="flex items-start gap-4 py-4" style={{ borderBottom: "1px solid var(--line)" }}>
+      <span
+        className="w-10 h-10 rounded-full border flex items-center justify-center shrink-0 mt-0.5"
+        style={{ borderColor: accent.border, background: accent.bg, color: accent.color }}
+      >
         <Icon className="w-5 h-5" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold leading-tight">{milestone.title}</p>
-          <p className="text-xs text-muted-foreground shrink-0">
+          <p className="font-body text-sm font-medium leading-tight" style={{ color: "var(--ink)" }}>
+            {milestone.title}
+          </p>
+          <p className="font-body text-xs shrink-0" style={{ color: "var(--ink-mute)" }}>
             {format(new Date(milestone.achievedAt), "MMM d")}
           </p>
         </div>
-        <p className="text-sm text-muted-foreground mt-0.5 leading-tight">
+        <p className="font-body text-sm mt-0.5 leading-tight" style={{ color: "var(--ink-mute)" }}>
           {milestone.description}
         </p>
         {milestone.metricValue != null && (
-          <p className="text-xs text-muted-foreground/70 mt-1">
+          <p className="font-body text-xs mt-1" style={{ color: "var(--ink-mute)", opacity: 0.7 }}>
             {milestone.metricValue} {milestone.metricUnit}
             {milestone.exerciseName && ` · ${milestone.exerciseName}`}
           </p>

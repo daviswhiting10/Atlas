@@ -11,9 +11,7 @@
 }
 
 /* ── Mobile nav clearance ──────────────────────────────────────────────────
-   Ensures page content is never hidden under the fixed bottom tab bar.
-   Only applied below Tailwind's md breakpoint (< 768px).
-   Outside @layer so it outranks any Tailwind utility classes.        */
+   Only applied below md breakpoint. Outside @layer so it wins over Tailwind. */
 @media (max-width: 767px) {
   .pb-nav-safe {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
@@ -21,66 +19,67 @@
 }
 
 /* ── Aura blobs ────────────────────────────────────────────────────────────
-   Two subtly animated blurred circles that float behind all content.
-   Fixed, z-index -1, pointer-events none so they never block interaction.  */
+   Two large blurred circles behind all content. Fixed, z-index -1.
+   Spec: TL 900×900 rgba(43,107,255,0.22) blur 80px, 22s anim
+         BR 1100×1100 rgba(123,167,255,0.20) blur 80px, 28s anim       */
 .aura {
   position: fixed;
   z-index: -1;
   pointer-events: none;
   border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.07;
-  background: var(--blue);
+  filter: blur(80px);
+  will-change: transform;
 }
 .aura-tl {
-  width: 640px;
-  height: 640px;
-  top: -220px;
-  left: -120px;
-  animation: aura-tl 14s ease-in-out infinite alternate;
+  width: 900px;
+  height: 900px;
+  top: -300px;
+  left: -200px;
+  background: rgba(43, 107, 255, 0.22);
+  animation: aura-tl 22s ease-in-out infinite alternate;
 }
 .aura-br {
-  width: 520px;
-  height: 520px;
-  bottom: -160px;
-  right: -100px;
-  animation: aura-br 18s ease-in-out infinite alternate;
+  width: 1100px;
+  height: 1100px;
+  bottom: -350px;
+  right: -250px;
+  background: rgba(123, 167, 255, 0.20);
+  animation: aura-br 28s ease-in-out infinite alternate;
 }
 @keyframes aura-tl {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(70px, 50px) scale(1.12); }
+  from { transform: translate(0, 0); }
+  to   { transform: translate(80px, 80px); }
 }
 @keyframes aura-br {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-50px, -70px) scale(1.1); }
+  from { transform: translate(0, 0); }
+  to   { transform: translate(-80px, -80px); }
 }
 
-/* ── Card hover lift utility ───────────────────────────────────────────────
-   Apply `.card-lift` alongside any card element for the hover effect.      */
+/* ── Card hover lift — apply .card-lift to any card for the effect ─────── */
 .card-lift {
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px -4px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 30px 60px -30px rgba(43, 107, 255, 0.30);
 }
 
 @layer base {
   :root {
-    /* ── Atlas design tokens ──────────────────────────────────── */
-    --bone:       #F6F3EE;   /* page bg — warm off-white              */
-    --paper:      #FFFFFF;   /* card / surface bg                     */
-    --ink:        #18181B;   /* primary text                          */
-    --ink-soft:   #52525B;   /* secondary text                        */
-    --ink-mute:   #A1A1AA;   /* placeholder / muted text              */
-    --line:       #E4E0D8;   /* borders / dividers                    */
-    --blue:       #2563EB;   /* ONE accent — interactive blue         */
-    --blue-deep:  #1D4ED8;   /* blue hover / pressed                  */
-    --blue-soft:  #EFF6FF;   /* blue tint bg (badge, chip)            */
-    --success:    #16A34A;   /* green for positive states             */
-    --warn:       #D97706;   /* amber for warnings / moderate states  */
+    /* ── Atlas design-system tokens (spec-exact values) ──────── */
+    --bone:       #F7F5F0;            /* page background         */
+    --paper:      #FBFAF7;            /* card / surface          */
+    --ink:        #0B0F1A;            /* primary text            */
+    --ink-soft:   #3A4255;            /* secondary text          */
+    --ink-mute:   #6B7280;            /* tertiary / labels       */
+    --line:       rgba(11,15,26,0.08);/* borders                 */
+    --blue:       #2B6BFF;            /* single accent           */
+    --blue-deep:  #1947C4;            /* accent hover / pressed  */
+    --blue-soft:  #7BA7FF;            /* glows only              */
+    --success:    #1F7A4D;            /* green states            */
+    --warn:       #B45309;            /* amber / at-risk states  */
 
-    /* ── Shadcn/ui token remaps ───────────────────────────────── */
+    /* ── Shadcn token remaps ─────────────────────────────────── */
     --background:            var(--bone);
     --foreground:            var(--ink);
     --card:                  var(--paper);
@@ -89,41 +88,42 @@
     --popover-foreground:    var(--ink);
     --primary:               var(--blue);
     --primary-foreground:    #FFFFFF;
-    --secondary:             var(--blue-soft);
+    --secondary:             rgba(43,107,255,0.07);
     --secondary-foreground:  var(--blue-deep);
-    --muted:                 #F4F4F5;
+    --muted:                 rgba(11,15,26,0.04);
     --muted-foreground:      var(--ink-mute);
-    --accent:                var(--blue-soft);
+    --accent:                rgba(43,107,255,0.07);
     --accent-foreground:     var(--blue-deep);
-    --destructive:           #DC2626;
+    --destructive:           #C8341A;
     --destructive-foreground:#FFFFFF;
     --border:                var(--line);
     --input:                 var(--line);
     --ring:                  var(--blue);
     --radius:                0.5rem;
 
-    /* ── Sidebar (always dark regardless of light/dark mode) ─── */
-    --sidebar:                       #07090F;
-    --sidebar-foreground:            #C4C4CC;
-    --sidebar-primary:               var(--blue);
-    --sidebar-primary-foreground:    #FFFFFF;
-    --sidebar-accent:                #111420;
-    --sidebar-accent-foreground:     #E4E4E7;
-    --sidebar-border:                #1A1D2E;
-    --sidebar-ring:                  var(--blue);
+    /* ── Sidebar always dark ─────────────────────────────────── */
+    --sidebar:                    #07090F;
+    --sidebar-foreground:         #B0B4BF;
+    --sidebar-primary:            var(--blue);
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent:             #0F1218;
+    --sidebar-accent-foreground:  #E4E6EC;
+    --sidebar-border:             rgba(255,255,255,0.06);
+    --sidebar-ring:               var(--blue);
   }
 
-  /* Dark mode — full page dark (not sidebar, which is always dark) */
   .dark {
-    --bone:       #0E0F14;
-    --paper:      #16181F;
-    --ink:        #F0F0F2;
-    --ink-soft:   #A8A8B3;
-    --ink-mute:   #60606A;
-    --line:       #2A2B35;
-    --blue:       #3B82F6;
-    --blue-deep:  #2563EB;
-    --blue-soft:  #1E3A5F;
+    --bone:       #0C0E14;
+    --paper:      #131620;
+    --ink:        #EEF0F5;
+    --ink-soft:   #A0A8BC;
+    --ink-mute:   #5A6278;
+    --line:       rgba(238,240,245,0.08);
+    --blue:       #4A82FF;
+    --blue-deep:  #2B6BFF;
+    --blue-soft:  #7BA7FF;
+    --success:    #26A461;
+    --warn:       #D17A2C;
 
     --background:            var(--bone);
     --foreground:            var(--ink);
@@ -133,33 +133,32 @@
     --popover-foreground:    var(--ink);
     --primary:               var(--blue);
     --primary-foreground:    #FFFFFF;
-    --secondary:             var(--blue-soft);
+    --secondary:             rgba(74,130,255,0.10);
     --secondary-foreground:  #93C5FD;
-    --muted:                 #1F2028;
+    --muted:                 rgba(238,240,245,0.05);
     --muted-foreground:      var(--ink-mute);
-    --accent:                var(--blue-soft);
+    --accent:                rgba(74,130,255,0.10);
     --accent-foreground:     #93C5FD;
-    --destructive:           #EF4444;
+    --destructive:           #E05A40;
     --destructive-foreground:#FFFFFF;
     --border:                var(--line);
     --input:                 var(--line);
     --ring:                  var(--blue);
 
-    --sidebar:               #07090F;
-    --sidebar-foreground:    #C4C4CC;
-    --sidebar-primary:       var(--blue);
+    --sidebar:                    #07090F;
+    --sidebar-foreground:         #B0B4BF;
+    --sidebar-primary:            var(--blue);
     --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent:        #111420;
-    --sidebar-accent-foreground: #E4E4E7;
-    --sidebar-border:        #1A1D2E;
-    --sidebar-ring:          var(--blue);
+    --sidebar-accent:             #0F1218;
+    --sidebar-accent-foreground:  #E4E6EC;
+    --sidebar-border:             rgba(255,255,255,0.06);
+    --sidebar-ring:               var(--blue);
   }
 
   body {
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-body), Georgia, serif;
-    /* Push all content below the iOS status bar / notch when using viewportFit=cover */
     padding-top: env(safe-area-inset-top, 0px);
   }
 
@@ -167,12 +166,13 @@
     font-family: var(--font-body), Georgia, serif;
   }
 
-  /* Headings default to Instrument Serif */
+  /* Display headings default to Instrument Serif */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display), Georgia, serif;
+    font-weight: 400;
   }
 
-  /* Prevent iOS zoom on input focus — all inputs must be >= 16px */
+  /* Prevent iOS zoom on input focus */
   @media (max-width: 767px) {
     input, textarea, select {
       font-size: 16px !important;

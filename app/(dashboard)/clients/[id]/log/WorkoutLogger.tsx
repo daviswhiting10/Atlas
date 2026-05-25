@@ -1210,10 +1210,17 @@ export default function WorkoutLogger({
 
       <div className="flex items-start justify-between mb-4 gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight leading-tight">{workoutName}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em] leading-tight"
+            style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", color: "var(--ink)" }}
+          >
+            {workoutName}
+          </h1>
+          <p className="font-body text-sm mt-0.5" style={{ color: "var(--ink-mute)" }}>
             {assignmentName} · {dateLabel}
-            {isResuming && <span className="ml-2 text-amber-600 font-medium">Resuming</span>}
+            {isResuming && (
+              <span className="ml-2 font-medium" style={{ color: "var(--warn)" }}>Resuming</span>
+            )}
           </p>
         </div>
         <div className="flex gap-2 shrink-0">

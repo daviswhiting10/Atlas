@@ -91,8 +91,13 @@ export default function ProgramIdeaPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-violet-500" />
-          <h1 className="text-xl font-bold tracking-tight">AI Program Idea</h1>
+          <Sparkles className="w-5 h-5" style={{ color: "var(--blue)" }} />
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em]"
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)", color: "var(--ink)" }}
+          >
+            AI Program Idea
+          </h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           Describe a client in plain language. Get a full NASM OPT-based session outline to use as a starting point.
@@ -152,7 +157,7 @@ export default function ProgramIdeaPage() {
             dangerouslySetInnerHTML={{ __html: renderMarkdown(output) }}
           />
           {loading && (
-            <span className="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse rounded-sm" />
+            <span className="inline-block w-1.5 h-4 ml-0.5 animate-pulse rounded-sm" style={{ background: "var(--blue)" }} />
           )}
         </div>
       )}

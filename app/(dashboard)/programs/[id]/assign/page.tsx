@@ -99,7 +99,12 @@ export default function AssignProgramPage() {
         Back to program
       </Link>
 
-      <h1 className="text-2xl font-bold tracking-tight mb-1">Assign Program</h1>
+      <h1
+        className="font-display leading-[1.04] tracking-[-0.01em] mb-1"
+        style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+      >
+        Assign Program
+      </h1>
       <p className="text-sm text-muted-foreground mb-6">
         This creates an independent copy for the client. Edits won&apos;t affect the template.
       </p>

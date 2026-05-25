@@ -63,9 +63,9 @@ function StrengthView({ data }: { data: ProgressData }) {
                 )}
               </div>
               <div className="flex items-baseline gap-3 mb-3">
-                <p className="text-2xl font-bold" style={{ color }}>
+                <p className="font-display italic leading-none" style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)", color }}>
                   {kl.currentE1RM?.toFixed(0) ?? "—"}
-                  <span className="text-sm font-normal text-muted-foreground ml-1">lb e1RM</span>
+                  <span className="font-body text-sm ml-1" style={{ color: "var(--ink-mute)" }}>lb e1RM</span>
                 </p>
               </div>
 

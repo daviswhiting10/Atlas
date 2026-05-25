@@ -27,32 +27,32 @@ const GOAL_CONFIG: Record<
   weight_loss: {
     label: "Body Weight Trend",
     heroMetric: "weight",
-    color: "#10b981",
-    accentClass: "text-green-700",
+    color: "var(--success)",
+    accentClass: "",
   },
   hypertrophy: {
     label: "Strength Composite",
     heroMetric: "strength",
-    color: "#3b82f6",
-    accentClass: "text-blue-600",
+    color: "var(--blue)",
+    accentClass: "",
   },
   performance: {
     label: "Strength Composite",
     heroMetric: "strength",
-    color: "#8b5cf6",
-    accentClass: "text-violet-600",
+    color: "var(--blue)",
+    accentClass: "",
   },
   general: {
     label: "Weekly Sessions",
     heroMetric: "sessions",
-    color: "#6366f1",
-    accentClass: "text-indigo-600",
+    color: "var(--blue)",
+    accentClass: "",
   },
   pain_mgmt: {
     label: "Body Weight Trend",
     heroMetric: "weight",
-    color: "#f59e0b",
-    accentClass: "text-amber-600",
+    color: "var(--warn)",
+    accentClass: "",
   },
 };
 
@@ -60,7 +60,7 @@ const DEFAULT_GOAL_CONFIG = {
   label: "Strength Composite",
   heroMetric: "strength" as const,
   color: "#6366f1",
-  accentClass: "text-indigo-600",
+  accentClass: "",
 };
 
 // ── Hero data builders ────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
               {heroLabel}
             </p>
             {heroData.length > 0 && (
-              <p className={cn("text-4xl font-bold tracking-tight mt-1", cfg.accentClass)}>
+              <p className="font-display italic leading-none mt-1" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", color: cfg.color }}>
                 {heroUnit === "kg"
                   ? `${heroData[heroData.length - 1].value.toFixed(1)} kg`
                   : heroUnit === "%"

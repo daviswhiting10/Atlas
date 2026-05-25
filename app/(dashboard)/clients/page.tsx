@@ -95,8 +95,13 @@ export default function ClientsPage() {
     <div className="p-8 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em]"
+            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+          >
+            Clients
+          </h1>
+          <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>
             {clients.length} total · {clients.filter((c) => c.status === "ACTIVE").length} active
           </p>
         </div>

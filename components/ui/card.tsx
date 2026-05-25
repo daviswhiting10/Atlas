@@ -1,5 +1,4 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
 function Card({
@@ -13,10 +12,11 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-[18px] bg-card py-4 text-sm text-card-foreground border border-[var(--line)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-[18px] *:[img:last-child]:rounded-b-[18px]",
+        "group/card flex flex-col gap-4 overflow-hidden rounded-[18px] bg-card py-4 text-sm text-card-foreground has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-[18px] *:[img:last-child]:rounded-b-[18px]",
         lift && "card-lift",
         className
       )}
+      style={{ border: "1px solid var(--line)" }}
       {...props}
     />
   )
@@ -40,7 +40,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-display text-base leading-snug font-normal group-data-[size=sm]/card:text-sm",
+        "font-display text-base leading-snug group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}
@@ -52,7 +52,8 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground font-body", className)}
+      className={cn("text-sm font-body", className)}
+      style={{ color: "var(--ink-mute)" }}
       {...props}
     />
   )
@@ -62,10 +63,7 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
+      className={cn("col-start-2 row-span-2 row-start-1 self-start justify-self-end", className)}
       {...props}
     />
   )
@@ -85,10 +83,8 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-[18px] border-t bg-muted/40 p-4 group-data-[size=sm]/card:p-3",
-        className
-      )}
+      className={cn("flex items-center rounded-b-[18px] p-4 group-data-[size=sm]/card:p-3", className)}
+      style={{ borderTop: "1px solid var(--line)", background: "rgba(11,15,26,0.02)" }}
       {...props}
     />
   )

@@ -206,7 +206,7 @@ export default function OutreachPage() {
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Outreach</h1>
+        <h1 className="font-display leading-[1.04] tracking-[-0.01em]" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}>Outreach</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
           Generate AI-personalized messages or use templates.
         </p>

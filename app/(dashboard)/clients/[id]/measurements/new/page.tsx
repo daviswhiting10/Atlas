@@ -144,7 +144,12 @@ export default function NewMeasurementPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Log measurement</h1>
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em]"
+            style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", color: "var(--ink)" }}
+          >
+            Log measurement
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             All fields optional — enter what you have.
           </p>
@@ -155,8 +160,8 @@ export default function NewMeasurementPage() {
           className={cn(
             "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
             inbodyMode
-              ? "bg-violet-50 text-violet-700 border-violet-300"
-              : "bg-background text-muted-foreground border-border hover:border-foreground"
+              ? "bg-[rgba(43,107,255,0.08)] text-[var(--blue)] border-[rgba(43,107,255,0.30)]"
+              : "border-[var(--line)] text-[var(--ink-mute)] hover:border-[var(--ink-soft)]"
           )}
         >
           <Zap className="w-3.5 h-3.5" />

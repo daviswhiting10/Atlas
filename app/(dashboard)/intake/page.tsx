@@ -228,8 +228,13 @@ export default function IntakePage() {
     return (
       <div className="p-4 sm:p-8 max-w-2xl">
         <div className="flex items-center gap-2 mb-6">
-          <CheckCircle className="w-5 h-5 text-emerald-600" />
-          <h1 className="text-xl font-bold">Intake Complete</h1>
+          <CheckCircle className="w-5 h-5 text-green-700" />
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em]"
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)", color: "var(--ink)" }}
+          >
+            Intake Complete
+          </h1>
         </div>
 
         <Card className="mb-4">
@@ -258,7 +263,7 @@ export default function IntakePage() {
                             ? "border-red-300 text-red-700"
                             : flag.severity === "medium"
                             ? "border-amber-300 text-amber-700"
-                            : "border-zinc-300 text-zinc-600"
+                            : "border-[var(--line)] text-[var(--ink-soft)]"
                         }
                       >
                         {flag.severity}
@@ -294,7 +299,12 @@ export default function IntakePage() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Goal Setting Session</h1>
+          <h1
+            className="font-display leading-[1.04] tracking-[-0.01em]"
+            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+          >
+            Goal Setting Session
+          </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
             {mode === "form"
               ? "Fill out with your client."

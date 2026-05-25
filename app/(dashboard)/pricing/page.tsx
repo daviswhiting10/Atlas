@@ -10,7 +10,12 @@ export default function PricingPage() {
   return (
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Pricing</h1>
+        <h1
+          className="font-display leading-[1.04] tracking-[-0.01em]"
+          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+        >
+          Pricing
+        </h1>
         <p className="text-muted-foreground text-sm mt-0.5">
           Davis Whiting · NASM CPT · Life Time Columbia, MD · 513-828-8682
         </p>
@@ -18,8 +23,8 @@ export default function PricingPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Dynamic Personal Training */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h2 className="text-base font-bold text-primary mb-4 pb-3 border-b border-border">
+        <div className="rounded-[18px] p-6" style={{ border: "1px solid var(--line)", background: "var(--paper)" }}>
+          <h2 className="font-display text-base mb-4 pb-3" style={{ borderBottom: "1px solid var(--line)", color: "var(--ink)" }}>
             Dynamic Personal Training 1:1
           </h2>
 
@@ -85,8 +90,8 @@ export default function PricingPage() {
         </div>
 
         {/* Dynamic Stretch */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h2 className="text-base font-bold text-primary mb-4 pb-3 border-b border-border">
+        <div className="rounded-[18px] p-6" style={{ border: "1px solid var(--line)", background: "var(--paper)" }}>
+          <h2 className="font-display text-base mb-4 pb-3" style={{ borderBottom: "1px solid var(--line)", color: "var(--ink)" }}>
             Dynamic Stretch
           </h2>
 

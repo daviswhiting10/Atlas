@@ -142,8 +142,13 @@ export default function SessionsPage() {
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Log Session</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
+        <h1
+          className="font-display leading-[1.04] tracking-[-0.01em]"
+          style={{ fontSize: "clamp(2rem, 4vw, 3rem)", color: "var(--ink)" }}
+        >
+          Log Session
+        </h1>
+        <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>
           Speak or type post-session notes. Atlas structures them into SOAP format.
         </p>
       </div>
@@ -180,8 +185,8 @@ export default function SessionsPage() {
         </CardHeader>
         <CardContent>
           {recording && (
-            <div className="flex items-center gap-2 mb-2 text-xs text-red-600">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <div className="flex items-center gap-2 mb-2 font-body text-xs" style={{ color: "var(--destructive)" }}>
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--destructive)" }} />
               Recording...
             </div>
           )}
@@ -226,25 +231,51 @@ export default function SessionsPage() {
           ))}
 
           {structuredNote.wins && structuredNote.wins.length > 0 && (
-            <Card className="border-emerald-200 bg-emerald-50/40">
-              <CardContent className="pt-4 pb-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 mb-2">Wins</p>
-                <ul className="space-y-0.5">
-                  {structuredNote.wins.map((w, i) => <li key={i} className="text-sm text-emerald-800">• {w}</li>)}
-                </ul>
-              </CardContent>
-            </Card>
+            <div
+              className="rounded-[18px] p-4"
+              style={{
+                border: "1px solid rgba(31,122,77,0.25)",
+                background: "rgba(31,122,77,0.05)",
+              }}
+            >
+              <p
+                className="font-body text-xs font-medium uppercase tracking-wider mb-2"
+                style={{ color: "var(--success)" }}
+              >
+                Wins
+              </p>
+              <ul className="space-y-0.5">
+                {structuredNote.wins.map((w, i) => (
+                  <li key={i} className="font-body text-sm" style={{ color: "var(--ink-soft)" }}>
+                    · {w}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {structuredNote.concerns && structuredNote.concerns.length > 0 && (
-            <Card className="border-amber-200 bg-amber-50/40">
-              <CardContent className="pt-4 pb-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-2">Concerns</p>
-                <ul className="space-y-0.5">
-                  {structuredNote.concerns.map((c, i) => <li key={i} className="text-sm text-amber-800">• {c}</li>)}
-                </ul>
-              </CardContent>
-            </Card>
+            <div
+              className="rounded-[18px] p-4"
+              style={{
+                border: "1px solid rgba(180,83,9,0.25)",
+                background: "rgba(180,83,9,0.05)",
+              }}
+            >
+              <p
+                className="font-body text-xs font-medium uppercase tracking-wider mb-2"
+                style={{ color: "var(--warn)" }}
+              >
+                Concerns
+              </p>
+              <ul className="space-y-0.5">
+                {structuredNote.concerns.map((c, i) => (
+                  <li key={i} className="font-body text-sm" style={{ color: "var(--ink-soft)" }}>
+                    · {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {structuredNote.nextSessionFocus && (
