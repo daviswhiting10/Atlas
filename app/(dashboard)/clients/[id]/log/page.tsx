@@ -201,7 +201,7 @@ export default async function LogPage({
       programAssignment: { clientId, workspaceId, status: "ACTIVE" },
       status: "PLANNED",
     },
-    orderBy: { scheduledDate: "asc" },
+    orderBy: { order: "asc" },
     select: {
       id: true,
       name: true,
