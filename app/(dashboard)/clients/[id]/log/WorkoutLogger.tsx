@@ -126,6 +126,70 @@ function buildInitialState(
   return state;
 }
 
+// ── Round-robin helpers ────────────────────────────────────────────────────────
+
+/** Find the first incomplete (exIdx, setRound) slot in round-robin order. */
+function findFirstIncompleteSlot(
+  exercises: LoggerExercise[],
+  state: Record<string, ExerciseState>
+): { exIdx: number; setRound: number } {
+  const maxSets = Math.max(...exercises.map((ex) => state[ex.aweId]?.sets.length ?? 0), 1);
+  for (let setRound = 0; setRound < maxSets; setRound++) {
+    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+      const sets = state[exercises[exIdx].aweId]?.sets ?? [];
+      if (setRound < sets.length && !sets[setRound].completed) {
+        return { exIdx, setRound };
+      }
+    }
+  }
+  return { exIdx: 0, setRound: 0 };
+}
+
+/**
+ * After completing (completedAweId, completedSetIdx), find the next
+ * incomplete slot in round-robin order starting from (fromExIdx, fromSetRound).
+ */
+function findNextSlotAfterComplete(
+  exercises: LoggerExercise[],
+  exState: Record<string, ExerciseState>,
+  completedAweId: string,
+  completedSetIdx: number,
+  fromExIdx: number,
+  fromSetRound: number
+): { exIdx: number; setRound: number } | null {
+  // Simulate the completion
+  const simState = {
+    ...exState,
+    [completedAweId]: {
+      ...exState[completedAweId],
+      sets: exState[completedAweId].sets.map((s, i) =>
+        i === completedSetIdx ? { ...s, completed: true } : s
+      ),
+    },
+  };
+
+  // Try subsequent exercises in the same round
+  for (let exIdx = fromExIdx + 1; exIdx < exercises.length; exIdx++) {
+    const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
+    if (fromSetRound < sets.length && !sets[fromSetRound].completed) {
+      return { exIdx, setRound: fromSetRound };
+    }
+  }
+
+  // Try subsequent rounds from exercise 0
+  const maxSets = Math.max(...exercises.map((ex) => simState[ex.aweId]?.sets.length ?? 0), 1);
+  for (let setRound = fromSetRound + 1; setRound < maxSets; setRound++) {
+    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+      const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
+      if (setRound < sets.length && !sets[setRound].completed) {
+        return { exIdx, setRound };
+      }
+    }
+  }
+
+  return null; // All complete
+}
+
 
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -167,7 +231,16 @@ export default function WorkoutLogger({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // ── Mobile-specific state ────────────────────────────────────────────────────
-  const [currentExIdx, setCurrentExIdx] = useState(0);
+  const [currentExIdx, setCurrentExIdx] = useState<number>(() => {
+    if (existingSetLogs.length === 0) return 0;
+    const init = buildInitialState(exercises, existingSetLogs);
+    return findFirstIncompleteSlot(exercises, init).exIdx;
+  });
+  const [currentSetRound, setCurrentSetRound] = useState<number>(() => {
+    if (existingSetLogs.length === 0) return 0;
+    const init = buildInitialState(exercises, existingSetLogs);
+    return findFirstIncompleteSlot(exercises, init).setRound;
+  });
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
   const [restSecs, setRestSecs] = useState(0);
   const [undoEntry, setUndoEntry] = useState<{ aweId: string; idx: number } | null>(null);
@@ -258,13 +331,24 @@ export default function WorkoutLogger({
         completed: !entry.completed,
         setLogId: result.setLogId,
       });
-      // Mobile: start rest timer + undo window
+      // Mobile: start rest timer + undo window + round-robin auto-advance
       if (!entry.completed) {
         setLastSetAt(Date.now());
         setRestSecs(0);
         setUndoEntry({ aweId, idx });
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
         undoTimerRef.current = setTimeout(() => setUndoEntry(null), 5000);
+
+        // Auto-advance to next slot in round-robin order
+        const next = findNextSlotAfterComplete(
+          exercises, exState, aweId, idx, currentExIdx, currentSetRound
+        );
+        if (next) {
+          setTimeout(() => {
+            setCurrentExIdx(next.exIdx);
+            setCurrentSetRound(next.setRound);
+          }, 350);
+        }
       }
     } catch {
       toast.error("Failed to save set");
@@ -277,6 +361,12 @@ export default function WorkoutLogger({
     if (!undoEntry) return;
     const { aweId, idx } = undoEntry;
     updateSet(aweId, idx, { completed: false, setLogId: null });
+    // Navigate back to the undone slot
+    const exIdx = exercises.findIndex((ex) => ex.aweId === aweId);
+    if (exIdx >= 0) {
+      setCurrentExIdx(exIdx);
+      setCurrentSetRound(idx);
+    }
     setUndoEntry(null);
     setLastSetAt(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
@@ -369,8 +459,18 @@ export default function WorkoutLogger({
   function handleTouchEnd(e: React.TouchEvent) {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) < 60) return;
-    if (diff > 0 && currentExIdx < exercises.length - 1) setCurrentExIdx((i) => i + 1);
-    if (diff < 0 && currentExIdx > 0) setCurrentExIdx((i) => i - 1);
+    if (diff > 0) {
+      // Swipe left → next exercise or next round
+      if (currentExIdx < exercises.length - 1) {
+        setCurrentExIdx((i) => i + 1);
+      } else {
+        setCurrentExIdx(0);
+        setCurrentSetRound((r) => r + 1);
+      }
+    }
+    if (diff < 0 && currentExIdx > 0) {
+      setCurrentExIdx((i) => i - 1);
+    }
   }
 
   // ── Shared SOAP panel (used in both layouts) ──────────────────────────────
@@ -444,13 +544,16 @@ export default function WorkoutLogger({
   const mobileView = (() => {
     const ex = exercises[currentExIdx];
     const state = exState[ex.aweId];
-    const activeIdx = getActiveSetIdx(ex.aweId);
-    const allDone = activeIdx >= state.sets.length;
-    const activeSet = state.sets[activeIdx];
+    const setIdx = currentSetRound;
+    const activeSet = state.sets[setIdx];
+    const allSessionDone = exercises.every((e) =>
+      exState[e.aweId].sets.every((s) => s.completed)
+    );
     const s = ex.suggestion;
     const lastStr = formatLastSets(ex.lastSets);
-    const prescribed = ex.prescribedSets[activeIdx] ?? ex.prescribedSets[0] ?? null;
+    const prescribed = ex.prescribedSets[setIdx] ?? ex.prescribedSets[0] ?? null;
     const repMax = prescribed?.repMax ?? null;
+    const totalRounds = Math.max(...exercises.map((e) => exState[e.aweId].sets.length));
 
     return (
       <div
@@ -504,9 +607,15 @@ export default function WorkoutLogger({
         <div className="mb-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground mb-0.5">
-                Exercise {currentExIdx + 1} of {exercises.length}
-              </p>
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Exercise {currentExIdx + 1} of {exercises.length}
+                </p>
+                <span className="text-muted-foreground/40 text-xs">·</span>
+                <p className="text-xs font-semibold text-primary">
+                  Set {setIdx + 1} of {totalRounds}
+                </p>
+              </div>
               <h2 className="text-xl font-bold leading-tight">{ex.name}</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {ex.prescribedSets.length} ×{" "}
@@ -548,15 +657,17 @@ export default function WorkoutLogger({
         </div>
 
         {/* ── Set inputs ─────────────────────────────────────────────── */}
-        {allDone ? (
+        {allSessionDone ? (
           <div className="py-10 text-center">
             <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
-            <p className="text-lg font-semibold">Exercise complete!</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {currentExIdx < exercises.length - 1
-                ? "Swipe or tap Next →"
-                : "Tap Done to finish the session."}
-            </p>
+            <p className="text-lg font-semibold">All sets complete!</p>
+            <p className="text-sm text-muted-foreground mt-1">Tap Finish to save the session.</p>
+          </div>
+        ) : activeSet?.completed ? (
+          <div className="py-10 text-center">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+            <p className="text-base font-semibold text-emerald-700">Set {setIdx + 1} complete ✓</p>
+            <p className="text-sm text-muted-foreground mt-1">Moving to next exercise…</p>
           </div>
         ) : (
           <>
@@ -575,7 +686,7 @@ export default function WorkoutLogger({
                   </div>
                   <button
                     type="button"
-                    onClick={() => updateSet(ex.aweId, activeIdx, { isBodyweight: false, weight: "" })}
+                    onClick={() => updateSet(ex.aweId, setIdx, { isBodyweight: false, weight: "" })}
                     className="text-sm text-muted-foreground underline touch-manipulation"
                   >
                     Add lb
@@ -585,14 +696,14 @@ export default function WorkoutLogger({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => adjustWeight(ex.aweId, activeIdx, -2.5)}
+                    onClick={() => adjustWeight(ex.aweId, setIdx, -2.5)}
                     className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     −
                   </button>
                   <Input
                     value={activeSet.weight}
-                    onChange={(e) => updateSet(ex.aweId, activeIdx, { weight: e.target.value })}
+                    onChange={(e) => updateSet(ex.aweId, setIdx, { weight: e.target.value })}
                     className="flex-1 h-16 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                     type="number"
                     inputMode="decimal"
@@ -602,14 +713,14 @@ export default function WorkoutLogger({
                   />
                   <button
                     type="button"
-                    onClick={() => adjustWeight(ex.aweId, activeIdx, 2.5)}
+                    onClick={() => adjustWeight(ex.aweId, setIdx, 2.5)}
                     className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
                   >
                     +
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateSet(ex.aweId, activeIdx, { isBodyweight: true, weight: "" })}
+                    onClick={() => updateSet(ex.aweId, setIdx, { isBodyweight: true, weight: "" })}
                     className="text-xs font-medium text-muted-foreground border rounded-lg px-2 h-9 touch-manipulation"
                   >
                     N/A
@@ -632,7 +743,7 @@ export default function WorkoutLogger({
               </div>
               <Input
                 value={activeSet.reps}
-                onChange={(e) => updateSet(ex.aweId, activeIdx, { reps: e.target.value })}
+                onChange={(e) => updateSet(ex.aweId, setIdx, { reps: e.target.value })}
                 className="w-full h-20 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                 type="number"
                 inputMode="numeric"
@@ -644,7 +755,7 @@ export default function WorkoutLogger({
             {/* Complete set button */}
             <button
               type="button"
-              onClick={() => handleComplete(ex.aweId, ex.exerciseId, activeIdx)}
+              onClick={() => handleComplete(ex.aweId, ex.exerciseId, setIdx)}
               disabled={activeSet.saving}
               className="w-full h-16 rounded-2xl bg-primary text-primary-foreground text-lg font-semibold flex items-center justify-center gap-2 touch-manipulation active:opacity-90 disabled:opacity-60 mb-4"
             >
@@ -653,7 +764,7 @@ export default function WorkoutLogger({
               ) : (
                 <Check className="w-5 h-5" />
               )}
-              Complete Set
+              Complete Set {setIdx + 1}
             </button>
 
             {/* Progression hint at top of rep range */}
@@ -768,15 +879,7 @@ export default function WorkoutLogger({
           >
             <ChevronLeft className="w-4 h-4" /> Prev
           </button>
-          {currentExIdx < exercises.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => setCurrentExIdx((i) => i + 1)}
-              className="flex-1 h-12 rounded-xl border flex items-center justify-center gap-1 text-sm font-medium touch-manipulation active:bg-muted"
-            >
-              Next <ChevronRight className="w-4 h-4" />
-            </button>
-          ) : (
+          {allSessionDone ? (
             <button
               type="button"
               onClick={handleCompleteSession}
@@ -784,6 +887,22 @@ export default function WorkoutLogger({
               className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold disabled:opacity-40 touch-manipulation"
             >
               {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : "Finish session"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                // Manual advance: next exercise in round, or first exercise of next round
+                if (currentExIdx < exercises.length - 1) {
+                  setCurrentExIdx((i) => i + 1);
+                } else {
+                  setCurrentExIdx(0);
+                  setCurrentSetRound((r) => r + 1);
+                }
+              }}
+              className="flex-1 h-12 rounded-xl border flex items-center justify-center gap-1 text-sm font-medium touch-manipulation active:bg-muted"
+            >
+              Next <ChevronRight className="w-4 h-4" />
             </button>
           )}
         </div>
