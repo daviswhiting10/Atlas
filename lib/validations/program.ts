@@ -74,6 +74,7 @@ export const UpdateAssignedWorkoutSchema = z.object({
         order: z.number().int().min(1),
         prescribedSets: z.array(SetSchema).min(1),
         notes: z.string().nullable().optional(),
+        section: z.string().nullable().optional(),
       })
     )
     .optional(),
