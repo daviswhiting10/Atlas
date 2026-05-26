@@ -144,7 +144,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
 
   const nameToId = new Map<string, { id: string; name: string }>();
   await Promise.all(
-    [...allNames].map(async (name) => {
+    Array.from(allNames).map(async (name) => {
       const resolved = await resolveExercise(name);
       nameToId.set(name, resolved);
     })
