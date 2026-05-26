@@ -78,21 +78,16 @@ export default async function LogPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ workoutId?: string }>;
 }) {
-  const session = await auth();
+  // ── Group 1: auth + route params resolve in parallel ─────────────────────────
+  const [session, { id: clientId }, { workoutId }] = await Promise.all([
+    auth(),
+    params,
+    searchParams,
+  ]);
   const workspaceId = session?.user?.workspaceId;
   if (!workspaceId) redirect("/login");
 
-  const { id: clientId } = await params;
-  const { workoutId } = await searchParams;
-
-  // ── Load client ─────────────────────────────────────────────────────────────
-  const client = await prisma.clientProfile.findFirst({
-    where: { id: clientId, workspaceId, deletedAt: null },
-    select: { id: true, fullName: true, primaryGoal: true },
-  });
-  if (!client) notFound();
-
-  // ── Load target workout ─────────────────────────────────────────────────────
+  // ── Group 2: client profile + target workout — independent of each other ─────
   const workoutWhere = workoutId
     ? { id: workoutId, programAssignment: { clientId, workspaceId } }
     : {
@@ -104,34 +99,41 @@ export default async function LogPage({
         status: "PLANNED" as const,
       };
 
-  const assignedWorkout = await prisma.assignedWorkout.findFirst({
-    where: workoutWhere,
-    orderBy: workoutId ? undefined : { scheduledDate: "asc" },
-    include: {
-      exercises: {
-        orderBy: { order: "asc" },
-        include: {
-          exercise: {
-            select: {
-              id: true,
-              name: true,
-              movementPattern: true,
-              equipment: true,
+  const [client, assignedWorkout] = await Promise.all([
+    prisma.clientProfile.findFirst({
+      where: { id: clientId, workspaceId, deletedAt: null },
+      select: { id: true, fullName: true, primaryGoal: true },
+    }),
+    prisma.assignedWorkout.findFirst({
+      where: workoutWhere,
+      orderBy: workoutId ? undefined : { scheduledDate: "asc" },
+      include: {
+        exercises: {
+          orderBy: { order: "asc" },
+          include: {
+            exercise: {
+              select: {
+                id: true,
+                name: true,
+                movementPattern: true,
+                equipment: true,
+              },
+            },
+          },
+        },
+        programAssignment: {
+          select: {
+            name: true,
+            startDate: true,
+            sourceProgram: {
+              select: { goalTags: true },
             },
           },
         },
       },
-      programAssignment: {
-        select: {
-          name: true,
-          startDate: true,
-          sourceProgram: {
-            select: { goalTags: true },
-          },
-        },
-      },
-    },
-  });
+    }),
+  ]);
+  if (!client) notFound();
 
   // ── No workout to log ───────────────────────────────────────────────────────
   if (!assignedWorkout) {
@@ -147,66 +149,107 @@ export default async function LogPage({
     );
   }
 
-  // ── Fallback: load source workout sections (repairs data wiped by old Zod bug) ─
-  // When AssignedWorkoutExercise.section is null (caused by the pre-fix update path
-  // that didn't include section in the Zod schema), we read section directly from
-  // the template WorkoutExercise, matching by order.
+  // ── Group 3: everything that depends on assignedWorkout, all independent of each other ─
+  // sourceExercises: section fallback for old data; prevWorkout: "last time" reference;
+  // availableWorkouts: day-picker; existingLog: resume support.
   const anyMissingSection = assignedWorkout.exercises.some((e) => e.section == null);
-  const sourceSectionByOrder = new Map<number, string | null>();
-  if (anyMissingSection && assignedWorkout.sourceWorkoutId) {
-    const sourceExercises = await prisma.workoutExercise.findMany({
-      where: { workoutId: assignedWorkout.sourceWorkoutId },
-      select: { order: true, section: true },
-    });
-    for (const ex of sourceExercises) {
-      sourceSectionByOrder.set(ex.order, ex.section ?? null);
-    }
-  }
 
-  // ── Previous occurrence of this same workout template (for "Prev week" reference) ─
-  // Find the most recent LOGGED assigned workout with the same sourceWorkoutId,
-  // scheduled before today's workout. Used to show "Performed X lb last time."
-  const prevWorkoutSetsByExercise: Record<string, PrevSet[]> = {};
-  if (assignedWorkout.sourceWorkoutId) {
-    const prevWorkout = await prisma.assignedWorkout.findFirst({
-      where: {
-        sourceWorkoutId: assignedWorkout.sourceWorkoutId,
-        programAssignment: { clientId, workspaceId },
-        status: "LOGGED",
-        scheduledDate: { lt: assignedWorkout.scheduledDate },
-      },
-      orderBy: { scheduledDate: "desc" },
-      select: {
-        workoutLog: {
-          select: {
-            sets: {
-              where: { completed: true },
-              orderBy: { setNumber: "asc" },
-              select: {
-                exerciseId: true,
-                weight: true,
-                bandColor: true,
-                reps: true,
-                rpe: true,
+  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog] =
+    await Promise.all([
+      // (a) Source section fallback — only fetch if any section is null
+      anyMissingSection && assignedWorkout.sourceWorkoutId
+        ? prisma.workoutExercise.findMany({
+            where: { workoutId: assignedWorkout.sourceWorkoutId },
+            select: { order: true, section: true },
+          })
+        : Promise.resolve([] as Array<{ order: number; section: string | null }>),
+
+      // (b) Previous occurrence of this same workout template
+      assignedWorkout.sourceWorkoutId
+        ? prisma.assignedWorkout.findFirst({
+            where: {
+              sourceWorkoutId: assignedWorkout.sourceWorkoutId,
+              programAssignment: { clientId, workspaceId },
+              status: "LOGGED",
+              scheduledDate: { lt: assignedWorkout.scheduledDate },
+            },
+            orderBy: { scheduledDate: "desc" },
+            select: {
+              workoutLog: {
+                select: {
+                  sets: {
+                    where: { completed: true },
+                    orderBy: { setNumber: "asc" },
+                    select: {
+                      exerciseId: true,
+                      weight: true,
+                      bandColor: true,
+                      reps: true,
+                      rpe: true,
+                    },
+                  },
+                },
               },
+            },
+          })
+        : Promise.resolve(null),
+
+      // (c) All workouts for the day-picker (PLANNED + LOGGED + SKIPPED)
+      prisma.assignedWorkout.findMany({
+        where: { programAssignment: { clientId, workspaceId, status: "ACTIVE" } },
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          name: true,
+          scheduledDate: true,
+          status: true,
+          _count: { select: { exercises: true } },
+        },
+      }),
+
+      // (d) Existing partial session (resume support)
+      prisma.workoutLog.findUnique({
+        where: { assignedWorkoutId: assignedWorkout.id },
+        select: {
+          id: true,
+          sets: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              exerciseId: true,
+              assignedWorkoutExerciseId: true,
+              setNumber: true,
+              weight: true,
+              bandColor: true,
+              reps: true,
+              rpe: true,
+              note: true,
+              completed: true,
             },
           },
         },
-      },
-    });
+      }),
+    ]);
 
-    for (const set of prevWorkout?.workoutLog?.sets ?? []) {
-      if (!set.exerciseId) continue;
-      (prevWorkoutSetsByExercise[set.exerciseId] ??= []).push({
-        weight: set.weight,
-        bandColor: set.bandColor,
-        reps: set.reps,
-        rpe: set.rpe,
-      });
-    }
+  // Build section lookup from source exercises
+  const sourceSectionByOrder = new Map<number, string | null>();
+  for (const ex of sourceExercisesRaw) {
+    sourceSectionByOrder.set(ex.order, ex.section ?? null);
   }
 
-  // ── Per-exercise: last performance + note + suggestion ──────────────────────
+  // Build prev-workout sets lookup
+  const prevWorkoutSetsByExercise: Record<string, PrevSet[]> = {};
+  for (const set of prevWorkout?.workoutLog?.sets ?? []) {
+    if (!set.exerciseId) continue;
+    (prevWorkoutSetsByExercise[set.exerciseId] ??= []).push({
+      weight: set.weight,
+      bandColor: set.bandColor,
+      reps: set.reps,
+      rpe: set.rpe,
+    });
+  }
+
+  // ── Per-exercise: last performance + note + suggestion (already parallel) ───
   const goal = client.primaryGoal ?? "general";
 
   const exercises: LoggerExercise[] = await Promise.all(
@@ -230,7 +273,6 @@ export default async function LogPage({
         exerciseLoadType: loadType,
       });
 
-      // Use the assigned section, falling back to the source workout's section
       const section = awe.section ?? sourceSectionByOrder.get(awe.order) ?? null;
 
       return {
@@ -247,45 +289,6 @@ export default async function LogPage({
       };
     })
   );
-
-  // ── All workouts for this client (day-picker) — include logged so they show blurred ──
-  const availableWorkouts = await prisma.assignedWorkout.findMany({
-    where: {
-      programAssignment: { clientId, workspaceId, status: "ACTIVE" },
-      // No status filter — show PLANNED + LOGGED + SKIPPED so completed days appear blurred
-    },
-    orderBy: { order: "asc" },
-    select: {
-      id: true,
-      name: true,
-      scheduledDate: true,
-      status: true,
-      _count: { select: { exercises: true } },
-    },
-  });
-
-  // ── Check for existing partial session (resume support) ────────────────────
-  const existingLog = await prisma.workoutLog.findUnique({
-    where: { assignedWorkoutId: assignedWorkout.id },
-    select: {
-      id: true,
-      sets: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          exerciseId: true,
-          assignedWorkoutExerciseId: true,
-          setNumber: true,
-          weight: true,
-          bandColor: true,
-          reps: true,
-          rpe: true,
-          note: true,
-          completed: true,
-        },
-      },
-    },
-  });
 
   return (
     <WorkoutLogger

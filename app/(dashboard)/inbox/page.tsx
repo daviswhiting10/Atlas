@@ -12,9 +12,13 @@ import { ProspectFollowUpButton } from "./_components/ProspectFollowUpButton";
 export default async function InboxPage() {
   const session = await auth();
   const workspaceId = session?.user?.workspaceId;
-  const clients = workspaceId
-    ? (await runRetentionHeuristic(workspaceId), await getClients(workspaceId))
-    : [];
+  // runRetentionHeuristic must finish before getClients so the read sees updated statuses.
+  // These are intentionally sequential (write-then-read), not a parallelization target.
+  let clients: Awaited<ReturnType<typeof getClients>> = [];
+  if (workspaceId) {
+    await runRetentionHeuristic(workspaceId);
+    clients = await getClients(workspaceId);
+  }
 
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
   const atRiskClients  = clients.filter((c) => c.status === "AT_RISK");
