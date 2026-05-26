@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withWorkspace } from "@/lib/api/middleware";
-import { callAIVision, MODELS } from "@/lib/ai/client";
+import { callAIVision, MODELS, type ImageInput } from "@/lib/ai/client";
 import { buildProgramImportPrompt } from "@/lib/ai/prompts/program-import";
 import { prisma } from "@/lib/db/client";
 import { MovementPattern } from "@/app/generated/prisma/client";
@@ -28,9 +28,16 @@ type ParsedProgram = {
   days: ParsedDay[];
 };
 
+const ALLOWED_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+] as const;
+type AllowedType = (typeof ALLOWED_TYPES)[number];
+
 // ─── Exercise resolver ───────────────────────────────────────────────────────
 
-// Returns the DB exercise id for a given name, creating it if it doesn't exist.
 async function resolveExercise(name: string): Promise<{ id: string; name: string }> {
   // 1) exact match
   let ex = await prisma.exercise.findFirst({
@@ -39,7 +46,7 @@ async function resolveExercise(name: string): Promise<{ id: string; name: string
   });
   if (ex) return ex;
 
-  // 2) contains match (pick the closest / first alphabetically)
+  // 2) contains match
   ex = await prisma.exercise.findFirst({
     where: { name: { contains: name, mode: "insensitive" } },
     select: { id: true, name: true },
@@ -47,16 +54,16 @@ async function resolveExercise(name: string): Promise<{ id: string; name: string
   });
   if (ex) return ex;
 
-  // 3) create a new global exercise
+  // 3) auto-create as a global exercise
   const slug =
     name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") +
     "-" +
     Date.now();
-  const created = await prisma.exercise.create({
+  return prisma.exercise.create({
     data: {
       name,
       slug,
-      movementPattern: MovementPattern.LOCOMOTION, // placeholder — user can edit
+      movementPattern: MovementPattern.LOCOMOTION, // placeholder
       equipment: "other",
       primaryMuscles: [],
       secondaryMuscles: [],
@@ -65,45 +72,48 @@ async function resolveExercise(name: string): Promise<{ id: string; name: string
     },
     select: { id: true, name: true },
   });
-  return created;
 }
 
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
   const formData = await req.formData();
-  const imageFile = formData.get("image") as File | null;
   const notes = (formData.get("notes") as string | null) ?? undefined;
 
-  if (!imageFile) {
-    return NextResponse.json({ error: "image is required" }, { status: 400 });
+  // Collect images — sent as image0, image1, image2 … from the client
+  const images: ImageInput[] = [];
+  let idx = 0;
+  while (true) {
+    const file = formData.get(`image${idx}`) as File | null;
+    if (!file) break;
+    if (!ALLOWED_TYPES.includes(file.type as AllowedType)) {
+      return NextResponse.json(
+        { error: `image${idx}: must be PNG, JPEG, GIF, or WebP` },
+        { status: 400 }
+      );
+    }
+    const buf = await file.arrayBuffer();
+    images.push({
+      base64: Buffer.from(buf).toString("base64"),
+      mediaType: file.type as AllowedType,
+    });
+    idx++;
   }
 
-  // Validate type
-  const allowed = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
-  type AllowedType = (typeof allowed)[number];
-  if (!allowed.includes(imageFile.type as AllowedType)) {
-    return NextResponse.json(
-      { error: "Image must be PNG, JPEG, GIF, or WebP" },
-      { status: 400 }
-    );
+  if (images.length === 0) {
+    return NextResponse.json({ error: "At least one image is required" }, { status: 400 });
   }
 
-  // Convert to base64
-  const arrayBuffer = await imageFile.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
-
-  // Step 1: Parse image with Claude Vision
-  const { system, user } = buildProgramImportPrompt(notes);
+  // Step 1: Parse all images in one Vision call
+  const { system, user } = buildProgramImportPrompt(images.length, notes);
   let rawContent: string;
   try {
     const result = await callAIVision({
       system,
       user,
-      imageBase64: base64,
-      mediaType: imageFile.type as AllowedType,
+      images,
       model: MODELS.sonnet,
-      maxTokens: 4096,
+      maxTokens: 8192,
       feature: "program-import",
       workspaceId,
       userId,
@@ -114,10 +124,9 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     return NextResponse.json({ error: "AI parsing failed" }, { status: 500 });
   }
 
-  // Step 2: Parse JSON from AI response
+  // Step 2: Parse JSON
   let parsed: ParsedProgram;
   try {
-    // Strip potential markdown fences in case the model adds them anyway
     const cleaned = rawContent
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```\s*$/, "")
@@ -131,8 +140,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     );
   }
 
-  // Step 3: Resolve all exercise names → DB ids
-  // Collect all unique exercise names first to avoid duplicate DB calls
+  // Step 3: Resolve all unique exercise names → DB ids
   const allNames = new Set<string>();
   for (const day of parsed.days) {
     for (const section of day.sections) {
@@ -167,8 +175,6 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
       exercises: section.exercises.map((ex, eIdx) => {
         const resolved = nameToId.get(ex.name)!;
         const numSets = Math.max(1, ex.sets);
-
-        // Build prescribed sets
         const prescribedSets = Array.from({ length: numSets }, (_, i) => ({
           setNumber: i + 1,
           weight: null as number | null,
@@ -180,7 +186,6 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
           restSeconds: ex.restSeconds ?? null,
           notes: [ex.loadNote, ex.tempo].filter(Boolean).join(" | ") || "",
         }));
-
         return {
           _key: key(),
           exerciseId: resolved.id,

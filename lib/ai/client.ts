@@ -114,11 +114,17 @@ export async function callAI({
 
 // ─── Vision call ─────────────────────────────────────────────────────────────
 
+export type ImageInput = {
+  base64: string;
+  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+};
+
 export type CallAIVisionParams = {
   system: string;
   user: string;
-  imageBase64: string;
-  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  /** One or more images. For multiple images each is sent as an image block
+   *  followed by a short label text block so the model knows the order. */
+  images: ImageInput[];
   model?: (typeof MODELS)[keyof typeof MODELS];
   maxTokens?: number;
   feature?: string;
@@ -129,8 +135,7 @@ export type CallAIVisionParams = {
 export async function callAIVision({
   system,
   user,
-  imageBase64,
-  mediaType,
+  images,
   model = MODELS.sonnet,
   maxTokens = 4096,
   feature,
@@ -139,26 +144,29 @@ export async function callAIVision({
 }: CallAIVisionParams): Promise<CallAIResult> {
   const start = Date.now();
 
+  // Build content blocks: for each image emit [image_block, label_text], then
+  // append the main user instruction at the end.
+  type ContentBlock =
+    | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+    | { type: "text"; text: string };
+
+  const content: ContentBlock[] = [];
+  images.forEach((img, i) => {
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: img.mediaType, data: img.base64 },
+    });
+    if (images.length > 1) {
+      content.push({ type: "text", text: `[Screenshot ${i + 1} of ${images.length}]` });
+    }
+  });
+  content.push({ type: "text", text: user });
+
   const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
     system,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: mediaType,
-              data: imageBase64,
-            },
-          },
-          { type: "text", text: user },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
 
   const content =
