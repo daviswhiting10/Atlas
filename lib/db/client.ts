@@ -18,4 +18,9 @@ function createPrismaClient(): PrismaClient {
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Cache on globalThis in all environments.
+// - Dev: prevents multiple clients from hot-reload module churn.
+// - Prod (Vercel Node.js): module cache already prevents re-execution within
+//   a warm instance, but caching here makes behaviour consistent and guards
+//   against any bundler edge cases that re-evaluate this module.
+globalForPrisma.prisma = prisma;
