@@ -146,11 +146,8 @@ export async function callAIVision({
 
   // Build content blocks: for each image emit [image_block, label_text], then
   // append the main user instruction at the end.
-  type ContentBlock =
-    | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
-    | { type: "text"; text: string };
-
-  const content: ContentBlock[] = [];
+  // Use the SDK's own ContentBlockParam so media_type stays a literal union.
+  const content: Anthropic.Messages.ContentBlockParam[] = [];
   images.forEach((img, i) => {
     content.push({
       type: "image",
