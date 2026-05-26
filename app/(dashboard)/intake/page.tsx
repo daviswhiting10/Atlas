@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CheckCircle, AlertTriangle, Loader2, Upload, Plus } from "lucide-react";
 
@@ -225,6 +224,104 @@ export default function IntakePage() {
 
   // ── Result screen ──────────────────────────────────────────────────────────
   if (result) {
+    const clientName = clients.find((c) => c.id === clientId)?.fullName ?? "Client";
+
+    // Build recap sections from filled-in form fields
+    type RecapField = { label: string; value: string };
+    type RecapSection = { title: string; fields: RecapField[] };
+
+    function filled(fields: RecapField[]): RecapField[] {
+      return fields.filter((f) => f.value.trim() !== "" && f.value !== "no");
+    }
+
+    const recapSections: RecapSection[] = [
+      {
+        title: "Demographics",
+        fields: filled([
+          { label: "Date", value: form.date },
+          { label: "Age", value: form.age },
+          { label: "Phone", value: form.phoneNumber },
+          { label: "Email", value: form.email },
+          { label: "Weight", value: form.weight },
+          { label: "Height", value: form.height },
+          { label: "Fat Mass", value: form.fatMass },
+          { label: "Lean Mass", value: form.leanMass },
+          { label: "BFP", value: form.bfp },
+          { label: "VF", value: form.vf },
+          ...(form.pacemakerOrPregnant === "yes" ? [{ label: "Pacemaker / Pregnant", value: "Yes" }] : []),
+        ]),
+      },
+      {
+        title: "Goals",
+        fields: filled([
+          { label: "Goal 1", value: form.goal1 },
+          { label: "Goal 2", value: form.goal2 },
+          { label: "Goal 3", value: form.goal3 },
+          { label: "Why Important", value: form.whyImportant },
+        ]),
+      },
+      {
+        title: "Exercise & Movement",
+        fields: filled([
+          { label: "Current Exercise", value: form.currentExercise },
+          { label: "NEAT / Job", value: form.neatMovementJob },
+        ]),
+      },
+      {
+        title: "Nutrition",
+        fields: filled([
+          { label: "Breakfast", value: form.nutritionBreakfast },
+          { label: "Lunch", value: form.nutritionLunch },
+          { label: "Dinner", value: form.nutritionDinner },
+          { label: "Snacks", value: form.nutritionSnacks },
+          { label: "Drinks", value: form.nutritionDrinks },
+          { label: "Supplements", value: form.nutritionSupplements },
+          { label: "Suggested LTH", value: form.suggestedLTH },
+        ]),
+      },
+      {
+        title: "Coaching & Classes",
+        fields: filled([
+          { label: "Prior Coaching", value: form.priorCoaching },
+          { label: "Class Recommendations", value: form.classRecommendations },
+        ]),
+      },
+      {
+        title: "Motivation & Mindset",
+        fields: filled([
+          { label: "Biggest Motivation", value: form.biggestMotivation },
+          { label: "Biggest Challenge", value: form.biggestChallenge },
+          { label: "Support System", value: form.supportSystem },
+        ]),
+      },
+      {
+        title: "Schedule",
+        fields: filled([
+          { label: "Days / Week", value: form.daysPerWeek },
+          { label: "Preferred Time", value: form.preferredTime },
+        ]),
+      },
+      {
+        title: "Injuries & Medical",
+        fields: filled([
+          { label: "Injuries / Medications", value: form.injuriesMedications },
+        ]),
+      },
+      {
+        title: "Confidence",
+        fields: filled([
+          { label: "Confidence Score", value: form.confidenceScore ? `${form.confidenceScore} / 10` : "" },
+          { label: "Limiting Factor", value: form.limitingFactor },
+        ]),
+      },
+      {
+        title: "Additional Notes",
+        fields: filled([
+          { label: "Notes", value: form.additionalNotes },
+        ]),
+      },
+    ].filter((s) => s.fields.length > 0);
+
     return (
       <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
         <div className="flex items-center gap-2 mb-6">
@@ -237,39 +334,24 @@ export default function IntakePage() {
           </h1>
         </div>
 
-        <Card className="mb-4">
-          <CardContent className="pt-5">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">AI CLIENT SUMMARY</p>
-            <p className="text-sm leading-relaxed text-muted-foreground">{result.aiSummary}</p>
-          </CardContent>
-        </Card>
-
-        {result.redFlags.length > 0 && (
-          <Card className="mb-4 border-red-200 bg-red-50/50">
-            <CardContent className="pt-5">
-              <p className="text-xs font-semibold text-red-700 flex items-center gap-1.5 mb-3">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                RED FLAGS ({result.redFlags.length})
+        {mode === "form" && recapSections.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="pt-5 pb-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                {clientName} — Session Recap
               </p>
-              <div className="space-y-2">
-                {result.redFlags.map((flag, i) => (
-                  <div key={i} className="p-3 bg-white rounded border border-red-100">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-red-800">{flag.issue}</span>
-                      <Badge
-                        variant="outline"
-                        className={
-                          flag.severity === "high"
-                            ? "border-red-300 text-red-700"
-                            : flag.severity === "medium"
-                            ? "border-amber-300 text-amber-700"
-                            : "border-[var(--line)] text-[var(--ink-soft)]"
-                        }
-                      >
-                        {flag.severity}
-                      </Badge>
+              <div className="space-y-5">
+                {recapSections.map((section) => (
+                  <div key={section.title}>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">{section.title}</p>
+                    <div className="space-y-1.5">
+                      {section.fields.map((field) => (
+                        <div key={field.label} className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                          <span className="text-muted-foreground shrink-0">{field.label}</span>
+                          <span style={{ color: "var(--ink)" }} className="break-words">{field.value}</span>
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-xs text-muted-foreground">{flag.recommendedAction}</p>
                   </div>
                 ))}
               </div>
@@ -449,17 +531,17 @@ export default function IntakePage() {
               Why did you join LT and what are your most important health &amp; fitness goals?
             </Label>
             <div className="space-y-2 pl-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground w-4 shrink-0">1.</span>
-                <Input value={form.goal1} onChange={set("goal1")} placeholder="First goal..." />
+              <div className="flex items-start gap-2">
+                <span className="text-sm text-muted-foreground w-4 shrink-0 pt-2">1.</span>
+                <Textarea value={form.goal1} onChange={set("goal1")} placeholder="First goal..." rows={2} className="resize-none" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground w-4 shrink-0">2.</span>
-                <Input value={form.goal2} onChange={set("goal2")} placeholder="Second goal..." />
+              <div className="flex items-start gap-2">
+                <span className="text-sm text-muted-foreground w-4 shrink-0 pt-2">2.</span>
+                <Textarea value={form.goal2} onChange={set("goal2")} placeholder="Second goal..." rows={2} className="resize-none" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground w-4 shrink-0">3.</span>
-                <Input value={form.goal3} onChange={set("goal3")} placeholder="Third goal..." />
+              <div className="flex items-start gap-2">
+                <span className="text-sm text-muted-foreground w-4 shrink-0 pt-2">3.</span>
+                <Textarea value={form.goal3} onChange={set("goal3")} placeholder="Third goal..." rows={2} className="resize-none" />
               </div>
             </div>
           </div>
@@ -492,10 +574,12 @@ export default function IntakePage() {
 
           <div className="space-y-1.5">
             <Label>NEAT Movement / Job</Label>
-            <Input
+            <Textarea
               value={form.neatMovementJob}
               onChange={set("neatMovementJob")}
               placeholder="e.g. desk job, on feet all day, construction..."
+              rows={2}
+              className="resize-none"
             />
           </div>
 
@@ -507,39 +591,43 @@ export default function IntakePage() {
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Breakfast</Label>
-              <Input value={form.nutritionBreakfast} onChange={set("nutritionBreakfast")} placeholder="Typical breakfast?" />
+              <Textarea value={form.nutritionBreakfast} onChange={set("nutritionBreakfast")} placeholder="Typical breakfast?" rows={2} className="resize-none" />
             </div>
             <div className="space-y-1.5">
               <Label>Lunch</Label>
-              <Input value={form.nutritionLunch} onChange={set("nutritionLunch")} placeholder="Typical lunch?" />
+              <Textarea value={form.nutritionLunch} onChange={set("nutritionLunch")} placeholder="Typical lunch?" rows={2} className="resize-none" />
             </div>
             <div className="space-y-1.5">
               <Label>Dinner</Label>
-              <Input value={form.nutritionDinner} onChange={set("nutritionDinner")} placeholder="Typical dinner?" />
+              <Textarea value={form.nutritionDinner} onChange={set("nutritionDinner")} placeholder="Typical dinner?" rows={2} className="resize-none" />
             </div>
             <div className="space-y-1.5">
               <Label>Snacks</Label>
-              <Input value={form.nutritionSnacks} onChange={set("nutritionSnacks")} placeholder="Any snacks throughout the day?" />
+              <Textarea value={form.nutritionSnacks} onChange={set("nutritionSnacks")} placeholder="Any snacks throughout the day?" rows={2} className="resize-none" />
             </div>
             <div className="space-y-1.5">
               <Label>Drinks (caffeine / alcohol / water)</Label>
-              <Input
+              <Textarea
                 value={form.nutritionDrinks}
                 onChange={set("nutritionDrinks")}
                 placeholder="Coffee, energy drinks, alcohol frequency, water oz..."
+                rows={2}
+                className="resize-none"
               />
             </div>
             <div className="space-y-1.5">
               <Label>Current Supplements</Label>
-              <Input
+              <Textarea
                 value={form.nutritionSupplements}
                 onChange={set("nutritionSupplements")}
                 placeholder="Protein powder, creatine, vitamins, none..."
+                rows={2}
+                className="resize-none"
               />
             </div>
             <div className="space-y-1.5">
               <Label>Suggested LTH</Label>
-              <Input value={form.suggestedLTH} onChange={set("suggestedLTH")} placeholder="" />
+              <Textarea value={form.suggestedLTH} onChange={set("suggestedLTH")} placeholder="" rows={2} className="resize-none" />
             </div>
           </div>
 
@@ -558,7 +646,7 @@ export default function IntakePage() {
 
           <div className="space-y-1.5">
             <Label>Class Recommendations (if needed)</Label>
-            <Input value={form.classRecommendations} onChange={set("classRecommendations")} placeholder="" />
+            <Textarea value={form.classRecommendations} onChange={set("classRecommendations")} placeholder="" rows={2} className="resize-none" />
           </div>
 
           {/* ── Motivation & Mindset ── */}
@@ -566,12 +654,12 @@ export default function IntakePage() {
 
           <div className="space-y-1.5">
             <Label>What is your biggest motivation?</Label>
-            <Input value={form.biggestMotivation} onChange={set("biggestMotivation")} placeholder="What gets you out of bed?" />
+            <Textarea value={form.biggestMotivation} onChange={set("biggestMotivation")} placeholder="What gets you out of bed?" rows={2} className="resize-none" />
           </div>
 
           <div className="space-y-1.5">
             <Label>What is your biggest challenge?</Label>
-            <Input value={form.biggestChallenge} onChange={set("biggestChallenge")} placeholder="What has gotten in the way before?" />
+            <Textarea value={form.biggestChallenge} onChange={set("biggestChallenge")} placeholder="What has gotten in the way before?" rows={2} className="resize-none" />
           </div>
 
           <div className="space-y-1.5">
@@ -601,7 +689,7 @@ export default function IntakePage() {
 
           <div className="space-y-1.5">
             <Label>What time of day works best for you?</Label>
-            <Input value={form.preferredTime} onChange={set("preferredTime")} placeholder="e.g. early morning, evenings after 6pm..." />
+            <Textarea value={form.preferredTime} onChange={set("preferredTime")} placeholder="e.g. early morning, evenings after 6pm..." rows={2} className="resize-none" />
           </div>
 
           {/* ── Injuries & Medical ── */}

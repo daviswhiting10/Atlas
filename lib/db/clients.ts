@@ -67,6 +67,7 @@ export async function updateClient(
     retentionScore: number;
     retentionFlag: string;
     lastContactAt: Date;
+    reachOutDate: Date | null;
   }>
 ) {
   // updateMany to enforce workspaceId scoping on the write path too

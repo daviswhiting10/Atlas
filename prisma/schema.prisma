@@ -129,6 +129,7 @@ model ClientProfile {
   retentionScore     Int?
   retentionFlag      String?
   lastContactAt      DateTime?
+  reachOutDate       DateTime?
   deletedAt          DateTime?
   keyLiftIds         String[]            @default([])
   goalTargets        Json?

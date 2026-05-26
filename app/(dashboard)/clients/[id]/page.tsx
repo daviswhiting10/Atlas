@@ -52,6 +52,7 @@ type Client = {
   retentionScore: number | null;
   retentionFlag: string | null;
   lastContactAt: string | null;
+  reachOutDate: string | null;
   createdAt: string;
   programAssignments: ProgramAssignment[];
   sessionNotes: Array<{ id: string; date: string; rawInput: string; rpeAvg: number | null }>;
@@ -179,6 +180,18 @@ export default function ClientDetailPage() {
     await fetch(`/api/clients/${id}`, { method: "DELETE" });
     toast.success("Client deleted");
     router.push("/clients");
+  }
+
+  async function setReachOutDate(date: string | null) {
+    const res = await fetch(`/api/clients/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reachOutDate: date ? new Date(date + "T12:00:00").toISOString() : null }),
+    });
+    if (res.ok) {
+      setClient((prev) => (prev ? { ...prev, reachOutDate: date } : null));
+      toast.success(date ? "Reach-out date set" : "Reach-out date cleared");
+    }
   }
 
   async function deleteWorkoutLog(logId: string, e: React.MouseEvent) {
@@ -318,6 +331,39 @@ export default function ClientDetailPage() {
         <div className="mb-4 px-4 py-2.5 rounded-lg border border-amber-200 bg-amber-50 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
           <p className="text-sm text-amber-800">{client.retentionFlag}</p>
+        </div>
+      )}
+
+      {/* Reach-out date (prospects only) */}
+      {client.status === "PROSPECT" && (
+        <div className="mb-4 px-4 py-2.5 rounded-lg border border-[var(--line)] bg-[var(--paper)] flex items-center gap-3 flex-wrap">
+          <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="font-body text-sm" style={{ color: "var(--ink-mute)" }}>Reach-out date</span>
+          {client.reachOutDate ? (
+            <span className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>
+              {new Date(client.reachOutDate.slice(0, 10) + "T12:00:00").toLocaleDateString("en-US", {
+                weekday: "short", month: "short", day: "numeric",
+              })}
+            </span>
+          ) : (
+            <span className="font-body text-sm italic" style={{ color: "var(--ink-mute)" }}>Not set</span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <input
+              type="date"
+              value={client.reachOutDate ? client.reachOutDate.slice(0, 10) : ""}
+              onChange={(e) => setReachOutDate(e.target.value || null)}
+              className="font-body text-xs rounded-md border border-[var(--line)] px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-[var(--blue)]"
+            />
+            {client.reachOutDate && (
+              <button
+                onClick={() => setReachOutDate(null)}
+                className="font-body text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       )}
 

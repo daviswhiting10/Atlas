@@ -3,10 +3,11 @@ import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
-import { AlertTriangle, ClipboardList, MessageSquare, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, ClipboardList, MessageSquare, Users } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LogSessionCard } from "./_components/LogSessionCard";
+import { ProspectFollowUpButton } from "./_components/ProspectFollowUpButton";
 
 export default async function InboxPage() {
   const session = await auth();
@@ -126,6 +127,63 @@ export default async function InboxPage() {
           </div>
         </div>
       )}
+
+      {/* ── Prospect follow-up reminders ─────────────────────────────── */}
+      {(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const followUps = clients.filter((c) => c.status === "PROSPECT" && (c as any).reachOutDate != null);
+        if (followUps.length === 0) return null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return (
+          <div
+            className="mb-6 rounded-[18px] p-4"
+            style={{
+              border: "1px solid rgba(43,107,255,0.2)",
+              background: "rgba(43,107,255,0.04)",
+            }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarClock className="w-4 h-4 shrink-0" style={{ color: "var(--blue)" }} />
+              <p className="font-body text-sm font-medium" style={{ color: "var(--blue)" }}>
+                {followUps.length} prospect follow-up{followUps.length > 1 ? "s" : ""} scheduled
+              </p>
+            </div>
+            <div className="space-y-2">
+              {followUps.map((client) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const rod: Date = (client as any).reachOutDate as Date;
+                const due = new Date(rod.toISOString().slice(0, 10) + "T12:00:00");
+                const isPast = due < today;
+                const label = isPast
+                  ? "Overdue"
+                  : due.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                return (
+                  <div
+                    key={client.id}
+                    className="flex items-center justify-between py-2 px-3 rounded-xl"
+                    style={{ background: "var(--paper)", border: "1px solid var(--line)" }}
+                  >
+                    <div>
+                      <Link
+                        href={`/clients/${client.id}`}
+                        className="font-body text-sm font-medium hover:underline"
+                        style={{ color: "var(--ink)" }}
+                      >
+                        {client.fullName}
+                      </Link>
+                      <p className="font-body text-xs mt-0.5" style={{ color: isPast ? "var(--warn)" : "var(--ink-mute)" }}>
+                        Follow up: {label}
+                      </p>
+                    </div>
+                    <ProspectFollowUpButton clientId={client.id} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Quick actions ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
