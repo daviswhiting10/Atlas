@@ -169,7 +169,7 @@ export async function callAIVision({
     messages: [{ role: "user", content }],
   });
 
-  const content =
+  const text =
     response.content[0].type === "text" ? response.content[0].text : "";
   const latencyMs = Date.now() - start;
 
@@ -199,7 +199,7 @@ export async function callAIVision({
   }
 
   return {
-    content,
+    content: text,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
     model,
