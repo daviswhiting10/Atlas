@@ -80,10 +80,6 @@ function computeWeek(startDate: string, scheduledDate: string): number {
   return Math.max(1, Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1);
 }
 
-function slotLabel(slot: WorkoutSlot): string {
-  return `Week ${slot.weekNumber} — ${slot.workoutName}`;
-}
-
 // ── Slot Picker Dialog ─────────────────────────────────────────────────────────
 
 function SlotPickerDialog({
