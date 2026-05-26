@@ -112,6 +112,93 @@ export async function callAI({
   };
 }
 
+// ─── Vision call ─────────────────────────────────────────────────────────────
+
+export type CallAIVisionParams = {
+  system: string;
+  user: string;
+  imageBase64: string;
+  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  model?: (typeof MODELS)[keyof typeof MODELS];
+  maxTokens?: number;
+  feature?: string;
+  workspaceId?: string;
+  userId?: string;
+};
+
+export async function callAIVision({
+  system,
+  user,
+  imageBase64,
+  mediaType,
+  model = MODELS.sonnet,
+  maxTokens = 4096,
+  feature,
+  workspaceId,
+  userId,
+}: CallAIVisionParams): Promise<CallAIResult> {
+  const start = Date.now();
+
+  const response = await getClient().messages.create({
+    model,
+    max_tokens: maxTokens,
+    system,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mediaType,
+              data: imageBase64,
+            },
+          },
+          { type: "text", text: user },
+        ],
+      },
+    ],
+  });
+
+  const content =
+    response.content[0].type === "text" ? response.content[0].text : "";
+  const latencyMs = Date.now() - start;
+
+  console.log(
+    `[AI:vision] model=${model} in=${response.usage.input_tokens} out=${response.usage.output_tokens} latency=${latencyMs}ms`
+  );
+
+  if (workspaceId) {
+    prisma.usageLog
+      .create({
+        data: {
+          workspaceId,
+          feature: feature ?? "unknown",
+          model,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+          costCents: estimateCostCents(
+            model,
+            response.usage.input_tokens,
+            response.usage.output_tokens
+          ),
+          latencyMs,
+          userId: userId ?? null,
+        },
+      })
+      .catch((err: unknown) => console.error("[UsageLog] Write failed:", err));
+  }
+
+  return {
+    content,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    model,
+    latencyMs,
+  };
+}
+
 export async function* callAIStream({
   system,
   user,

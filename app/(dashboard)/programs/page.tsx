@@ -6,7 +6,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Dumbbell, Copy, UserPlus, Trash2, Sparkles } from "lucide-react";
+import { Plus, Dumbbell, Copy, UserPlus, Trash2, Sparkles, ImageUp } from "lucide-react";
 import { toast } from "sonner";
 
 type Program = {
@@ -115,6 +115,10 @@ export default function ProgramsPage() {
           <Link href="/programs/idea" className={buttonVariants({ variant: "outline" })}>
             <Sparkles className="w-4 h-4 mr-1.5" style={{ color: "var(--blue)" }} />
             AI Idea
+          </Link>
+          <Link href="/programs/import" className={buttonVariants({ variant: "outline" })}>
+            <ImageUp className="w-4 h-4 mr-1.5" style={{ color: "var(--blue)" }} />
+            Import
           </Link>
           <Link href="/programs/new" className={buttonVariants()}>
             <Plus className="w-4 h-4 mr-1.5" />

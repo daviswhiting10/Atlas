@@ -130,12 +130,19 @@ function makeInitial(): ProgramState {
 }
 
 const DRAFT_KEY = "atlas-program-draft-v2"; // v2 = new section-based structure
+const IMPORT_KEY = "atlas-program-import"; // set by /programs/import page
 
 export function ProgramBuilder({ programId, initial }: Props) {
   const router = useRouter();
   const [prog, setProg] = useState<ProgramState>(() => {
     if (!programId && !initial && typeof window !== "undefined") {
       try {
+        // Check for imported data first (takes priority over in-progress draft)
+        const imported = localStorage.getItem(IMPORT_KEY);
+        if (imported) {
+          localStorage.removeItem(IMPORT_KEY);
+          return JSON.parse(imported) as ProgramState;
+        }
         const saved = localStorage.getItem(DRAFT_KEY);
         if (saved) return JSON.parse(saved) as ProgramState;
       } catch {}
