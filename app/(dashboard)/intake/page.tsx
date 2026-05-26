@@ -230,9 +230,8 @@ export default function IntakePage() {
     type RecapField = { label: string; value: string };
     type RecapSection = { title: string; fields: RecapField[] };
 
-    function filled(fields: RecapField[]): RecapField[] {
-      return fields.filter((f) => f.value.trim() !== "" && f.value !== "no");
-    }
+    const filled = (fields: RecapField[]): RecapField[] =>
+      fields.filter((f) => f.value.trim() !== "" && f.value !== "no");
 
     const recapSections: RecapSection[] = [
       {
