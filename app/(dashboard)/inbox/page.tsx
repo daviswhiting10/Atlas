@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getClients, runRetentionHeuristic } from "@/lib/db/clients";
 import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,44 +10,86 @@ import { cn } from "@/lib/utils";
 import { LogSessionCard } from "./_components/LogSessionCard";
 import { ProspectFollowUpButton } from "./_components/ProspectFollowUpButton";
 
-export default async function InboxPage() {
-  const session = await auth();
-  const workspaceId = session?.user?.workspaceId;
-  // runRetentionHeuristic must finish before getClients so the read sees updated statuses.
-  // These are intentionally sequential (write-then-read), not a parallelization target.
-  let clients: Awaited<ReturnType<typeof getClients>> = [];
-  if (workspaceId) {
-    await runRetentionHeuristic(workspaceId);
-    clients = await getClients(workspaceId);
-  }
+// ── Skeleton ───────────────────────────────────────────────────────────────────
+// Mirrors the visual structure of the data section so nothing jumps on load.
+
+function InboxSkeleton() {
+  return (
+    <div>
+      {/* Stat strip */}
+      <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4 md:gap-4 md:mb-10">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="pt-4 pb-3">
+              <div className="h-14 w-12 rounded-lg bg-muted animate-pulse mb-1" />
+              <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+        {[0, 1, 2].map((i) => (
+          <Card key={i}>
+            <CardContent className="py-4 px-4 min-h-[72px] sm:min-h-[120px]">
+              <div className="flex items-center gap-3 sm:flex-col sm:items-start sm:pt-1 sm:gap-2">
+                <div className="w-9 h-9 rounded-[10px] bg-muted animate-pulse shrink-0" />
+                <div className="space-y-1.5">
+                  <div className="h-3 w-20 rounded bg-muted animate-pulse" />
+                  <div className="h-2.5 w-28 rounded bg-muted animate-pulse" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Client list */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+        </CardHeader>
+        <CardContent className="p-0 md:px-4 md:pb-4">
+          <div className="divide-y divide-[var(--line)] md:divide-y-0 md:space-y-0.5">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 px-4 md:px-2 py-3 md:py-2">
+                <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />
+                <div className="flex-1 space-y-1.5 min-w-0">
+                  <div className="h-3 w-32 rounded bg-muted animate-pulse" />
+                  <div className="h-2.5 w-20 rounded bg-muted animate-pulse" />
+                </div>
+                <div className="h-7 w-12 rounded-md bg-muted animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Data component ─────────────────────────────────────────────────────────────
+// Async server component — this is the only part that waits on the database.
+// Wrapped in <Suspense> by the page shell so the heading renders immediately.
+
+async function InboxContent({ workspaceId }: { workspaceId: string }) {
+  // Write-then-read: heuristic must finish before getClients sees updated statuses.
+  await runRetentionHeuristic(workspaceId);
+  const clients = await getClients(workspaceId);
 
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
   const atRiskClients  = clients.filter((c) => c.status === "AT_RISK");
   const prospects      = clients.filter((c) => c.status === "PROSPECT");
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const followUps = clients.filter((c) => c.status === "PROSPECT" && (c as any).reachOutDate != null);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
-      {/* ── Page heading — Instrument Serif, italic name ─────────────── */}
-      <div className="mb-6 md:mb-10">
-        <h1
-          className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--ink)" }}
-        >
-          {greeting},&nbsp;<em>Davis.</em>
-        </h1>
-        <p className="font-body text-sm mt-1.5" style={{ color: "var(--ink-mute)" }}>
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-      </div>
-
-      {/* ── Stat strip — numbers in Instrument Serif italic ──────────── */}
+    <>
+      {/* ── Stat strip ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4 md:gap-4 md:mb-10">
         {[
           { value: clients.length,       label: "Total Clients", color: "var(--ink)" },
@@ -90,10 +133,7 @@ export default async function InboxPage() {
               <div
                 key={client.id}
                 className="flex items-center justify-between py-2 px-3 rounded-xl"
-                style={{
-                  background: "var(--paper)",
-                  border: "1px solid var(--line)",
-                }}
+                style={{ background: "var(--paper)", border: "1px solid var(--line)" }}
               >
                 <div>
                   <Link
@@ -133,65 +173,57 @@ export default async function InboxPage() {
       )}
 
       {/* ── Prospect follow-up reminders ─────────────────────────────── */}
-      {(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const followUps = clients.filter((c) => c.status === "PROSPECT" && (c as any).reachOutDate != null);
-        if (followUps.length === 0) return null;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return (
-          <div
-            className="mb-6 rounded-[18px] p-4"
-            style={{
-              border: "1px solid rgba(43,107,255,0.2)",
-              background: "rgba(43,107,255,0.04)",
-            }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <CalendarClock className="w-4 h-4 shrink-0" style={{ color: "var(--blue)" }} />
-              <p className="font-body text-sm font-medium" style={{ color: "var(--blue)" }}>
-                {followUps.length} prospect follow-up{followUps.length > 1 ? "s" : ""} scheduled
-              </p>
-            </div>
-            <div className="space-y-2">
-              {followUps.map((client) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const rod: Date = (client as any).reachOutDate as Date;
-                const due = new Date(rod.toISOString().slice(0, 10) + "T12:00:00");
-                const isPast = due < today;
-                const label = isPast
-                  ? "Overdue"
-                  : due.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                return (
-                  <div
-                    key={client.id}
-                    className="flex items-center justify-between py-2 px-3 rounded-xl"
-                    style={{ background: "var(--paper)", border: "1px solid var(--line)" }}
-                  >
-                    <div>
-                      <Link
-                        href={`/clients/${client.id}`}
-                        className="font-body text-sm font-medium hover:underline"
-                        style={{ color: "var(--ink)" }}
-                      >
-                        {client.fullName}
-                      </Link>
-                      <p className="font-body text-xs mt-0.5" style={{ color: isPast ? "var(--warn)" : "var(--ink-mute)" }}>
-                        Follow up: {label}
-                      </p>
-                    </div>
-                    <ProspectFollowUpButton clientId={client.id} />
-                  </div>
-                );
-              })}
-            </div>
+      {followUps.length > 0 && (
+        <div
+          className="mb-6 rounded-[18px] p-4"
+          style={{
+            border: "1px solid rgba(43,107,255,0.2)",
+            background: "rgba(43,107,255,0.04)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarClock className="w-4 h-4 shrink-0" style={{ color: "var(--blue)" }} />
+            <p className="font-body text-sm font-medium" style={{ color: "var(--blue)" }}>
+              {followUps.length} prospect follow-up{followUps.length > 1 ? "s" : ""} scheduled
+            </p>
           </div>
-        );
-      })()}
+          <div className="space-y-2">
+            {followUps.map((client) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const rod: Date = (client as any).reachOutDate as Date;
+              const due = new Date(rod.toISOString().slice(0, 10) + "T12:00:00");
+              const isPast = due < today;
+              const label = isPast
+                ? "Overdue"
+                : due.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <div
+                  key={client.id}
+                  className="flex items-center justify-between py-2 px-3 rounded-xl"
+                  style={{ background: "var(--paper)", border: "1px solid var(--line)" }}
+                >
+                  <div>
+                    <Link
+                      href={`/clients/${client.id}`}
+                      className="font-body text-sm font-medium hover:underline"
+                      style={{ color: "var(--ink)" }}
+                    >
+                      {client.fullName}
+                    </Link>
+                    <p className="font-body text-xs mt-0.5" style={{ color: isPast ? "var(--warn)" : "var(--ink-mute)" }}>
+                      Follow up: {label}
+                    </p>
+                  </div>
+                  <ProspectFollowUpButton clientId={client.id} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Quick actions ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-        {/* Add Client */}
         <Link href="/clients">
           <Card lift className="cursor-pointer">
             <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
@@ -206,10 +238,8 @@ export default async function InboxPage() {
           </Card>
         </Link>
 
-        {/* Log Session — client picker dialog */}
         <LogSessionCard clients={clients.map((c) => ({ id: c.id, fullName: c.fullName, primaryGoal: c.primaryGoal ?? null, status: c.status }))} />
 
-        {/* Outreach */}
         <Link href="/outreach">
           <Card lift className="cursor-pointer">
             <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
@@ -233,10 +263,7 @@ export default async function InboxPage() {
               <span className="md:hidden">Start Session</span>
               <span className="hidden md:inline">All Clients</span>
             </CardTitle>
-            <Link
-              href="/clients"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-            >
+            <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
               View all
             </Link>
           </CardHeader>
@@ -247,16 +274,10 @@ export default async function InboxPage() {
                   key={client.id}
                   className="flex items-center gap-3 px-4 md:px-2 py-3 md:py-2 md:rounded-xl md:hover:bg-[rgba(11,15,26,0.03)] transition-colors"
                 >
-                  <Link
-                    href={`/clients/${client.id}`}
-                    className="flex items-center gap-3 flex-1 min-w-0"
-                  >
+                  <Link href={`/clients/${client.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center font-body text-xs font-medium shrink-0"
-                      style={{
-                        background: "rgba(43,107,255,0.08)",
-                        color: "var(--blue)",
-                      }}
+                      style={{ background: "rgba(43,107,255,0.08)", color: "var(--blue)" }}
                     >
                       {client.fullName.charAt(0)}
                     </div>
@@ -273,18 +294,13 @@ export default async function InboxPage() {
                   </Link>
                   <Link
                     href={`/clients/${client.id}/log`}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" }),
-                      "md:hidden shrink-0 gap-1.5"
-                    )}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "md:hidden shrink-0 gap-1.5")}
                   >
                     <ClipboardList className="w-3.5 h-3.5" />
                     Log
                   </Link>
                   <div className="hidden md:block shrink-0">
-                    <StatusBadge
-                      status={client.status as "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED"}
-                    />
+                    <StatusBadge status={client.status as "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED"} />
                   </div>
                 </div>
               ))}
@@ -300,17 +316,55 @@ export default async function InboxPage() {
             >
               <Users className="w-7 h-7" style={{ color: "var(--blue)" }} />
             </div>
-            <h3 className="font-display text-xl mb-1" style={{ color: "var(--ink)" }}>
-              No clients yet
-            </h3>
+            <h3 className="font-display text-xl mb-1" style={{ color: "var(--ink)" }}>No clients yet</h3>
             <p className="font-body text-sm mb-5 max-w-xs" style={{ color: "var(--ink-mute)" }}>
               Add your first client to get started. Atlas will help you track, program, and retain them.
             </p>
-            <Link href="/clients" className={buttonVariants()}>
-              Add first client
-            </Link>
+            <Link href="/clients" className={buttonVariants()}>Add first client</Link>
           </CardContent>
         </Card>
+      )}
+    </>
+  );
+}
+
+// ── Page shell ─────────────────────────────────────────────────────────────────
+// Only awaits auth() (fast cookie/JWT read — Auth.js caches per request).
+// The heading renders immediately; InboxContent streams in behind the skeleton.
+
+export default async function InboxPage() {
+  const session = await auth();
+  const workspaceId = session?.user?.workspaceId;
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  return (
+    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
+      {/* Renders immediately — no data dependency */}
+      <div className="mb-6 md:mb-10">
+        <h1
+          className="font-display leading-[1.04] tracking-[-0.01em]"
+          style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--ink)" }}
+        >
+          {greeting},&nbsp;<em>Davis.</em>
+        </h1>
+        <p className="font-body text-sm mt-1.5" style={{ color: "var(--ink-mute)" }}>
+          {new Date().toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+      </div>
+
+      {/* Skeleton swapped for real content once InboxContent resolves */}
+      {workspaceId ? (
+        <Suspense fallback={<InboxSkeleton />}>
+          <InboxContent workspaceId={workspaceId} />
+        </Suspense>
+      ) : (
+        <InboxSkeleton />
       )}
     </div>
   );
