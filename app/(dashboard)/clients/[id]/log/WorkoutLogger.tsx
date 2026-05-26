@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -33,6 +34,7 @@ import {
   logSet,
   completeSession,
   addExerciseNote,
+  updateSessionDate,
 } from "@/lib/actions/workout-logger";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog, PrevSet } from "./page";
 
@@ -426,8 +428,25 @@ export default function WorkoutLogger({
   // Allows editing a fully-logged session (suppresses the all-done completion screen)
   const [editMode, setEditMode] = useState(false);
 
+  // ── Session date (trainer can correct it) ─────────────────────────────────
+  // Initialise to the workout's scheduledDate as a YYYY-MM-DD string
+  const [logDate, setLogDate] = useState<string>(
+    () => new Date(scheduledDate).toISOString().slice(0, 10)
+  );
+
+  async function handleDateChange(newDate: string) {
+    setLogDate(newDate);
+    if (workoutLogId) {
+      try {
+        await updateSessionDate({ workoutLogId, date: newDate });
+      } catch {
+        toast.error("Couldn't update session date");
+      }
+    }
+  }
+
   const isResuming = existingWorkoutLogId != null;
-  const dateLabel = new Date(scheduledDate).toLocaleDateString("en-US", {
+  const dateLabel = new Date(logDate + "T12:00:00").toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -519,6 +538,7 @@ export default function WorkoutLogger({
         rpe: entry.rpe ? parseFloat(entry.rpe) : null,
         note: entry.note.trim() || null,
         completed: !entry.completed,
+        date: workoutLogId ? undefined : logDate, // pass override only on first create
       });
       if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
       updateSet(aweId, idx, {
@@ -576,6 +596,7 @@ export default function WorkoutLogger({
         rpe: entry.rpe ? parseFloat(entry.rpe) : null,
         note: entry.note.trim() || null,
         completed: true,
+        date: workoutLogId ? undefined : logDate,
       });
       if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
       updateSet(aweId, idx, { saving: false, setLogId: result.setLogId });
@@ -830,6 +851,20 @@ export default function WorkoutLogger({
             {completing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1" />}
             Done
           </Button>
+        </div>
+
+        {/* ── Session date chip ─────────────────────────────────────── */}
+        <div className="flex items-center justify-center mb-2">
+          <label className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground bg-muted/40 cursor-pointer hover:bg-muted/70 transition-colors touch-manipulation">
+            <Calendar className="w-3 h-3 shrink-0" />
+            <span>{dateLabel}</span>
+            <input
+              type="date"
+              value={logDate}
+              onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+            />
+          </label>
         </div>
 
         {/* ── Day picker ────────────────────────────────────────────── */}
@@ -1437,12 +1472,25 @@ export default function WorkoutLogger({
           >
             {workoutName}
           </h1>
-          <p className="font-body text-sm mt-0.5" style={{ color: "var(--ink-mute)" }}>
-            {assignmentName} · {dateLabel}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="font-body text-sm" style={{ color: "var(--ink-mute)" }}>
+              {assignmentName}
+            </span>
+            <span className="text-muted-foreground/50 text-sm">·</span>
+            <label className="relative inline-flex items-center gap-1 text-sm font-medium cursor-pointer group" style={{ color: "var(--ink-mute)" }}>
+              <Calendar className="w-3.5 h-3.5 shrink-0 group-hover:text-foreground transition-colors" />
+              <span className="group-hover:text-foreground transition-colors underline-offset-2 group-hover:underline">{dateLabel}</span>
+              <input
+                type="date"
+                value={logDate}
+                onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              />
+            </label>
             {isResuming && (
-              <span className="ml-2 font-medium" style={{ color: "var(--warn)" }}>Resuming</span>
+              <span className="font-medium text-sm" style={{ color: "var(--warn)" }}>Resuming</span>
             )}
-          </p>
+          </div>
         </div>
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={() => router.push(`/clients/${clientId}`)}>

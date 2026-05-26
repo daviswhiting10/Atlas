@@ -45,6 +45,8 @@ export async function logSet(input: {
   rpe: number | null;
   note: string | null;
   completed: boolean;
+  /** Override the WorkoutLog date when creating it (YYYY-MM-DD). Defaults to scheduledDate. */
+  date?: string;
 }): Promise<{ workoutLogId: string; setLogId: string }> {
   const { workspaceId } = await requireWorkspace();
 
@@ -69,12 +71,15 @@ export async function logSet(input: {
     if (existing) {
       workoutLogId = existing.id;
     } else {
-      // Use the scheduled date so "Last session" reflects when it happened
+      // Use provided date if trainer overrode it, otherwise fall back to scheduledDate
+      const logDate = input.date
+        ? new Date(input.date)
+        : assignedWorkout.scheduledDate;
       const created = await prisma.workoutLog.create({
         data: {
           clientId: input.clientId,
           assignedWorkoutId: input.assignedWorkoutId,
-          date: assignedWorkout.scheduledDate,
+          date: logDate,
         },
         select: { id: true },
       });
@@ -300,6 +305,28 @@ export async function getLastPerformance(
   return sets
     .filter((s) => s.workoutLog.date.toISOString().slice(0, 10) === mostRecentDate)
     .map(({ weight, reps, rpe, completed }) => ({ weight, reps, rpe, completed }));
+}
+
+// ── updateSessionDate ──────────────────────────────────────────────────────────
+//
+// Lets the trainer correct the date on an already-started WorkoutLog.
+
+export async function updateSessionDate(input: {
+  workoutLogId: string;
+  date: string; // YYYY-MM-DD
+}): Promise<void> {
+  const { workspaceId } = await requireWorkspace();
+
+  const log = await prisma.workoutLog.findFirst({
+    where: { id: input.workoutLogId, client: { workspaceId } },
+    select: { id: true },
+  });
+  if (!log) throw new Error("Workout log not found");
+
+  await prisma.workoutLog.update({
+    where: { id: input.workoutLogId },
+    data: { date: new Date(input.date) },
+  });
 }
 
 // ── getLastExerciseNote ────────────────────────────────────────────────────────
