@@ -108,9 +108,7 @@ function buildWeeklyStrengthSeries(data: ProgressData): WeeklyStrengthPoint[] {
 
   // Collect all week-starts across key lifts
   const allWeeks = new Set<string>();
-  for (const k of weekMax.keys()) {
-    allWeeks.add(k.split("__")[1]);
-  }
+  Array.from(weekMax.keys()).forEach((k) => allWeeks.add(k.split("__")[1]));
 
   const result: WeeklyStrengthPoint[] = [];
   for (const ws of Array.from(allWeeks).sort()) {
