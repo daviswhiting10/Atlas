@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Copy, CheckCheck, Loader2, Sparkles } from "lucide-react";
+import { Copy, CheckCheck, Loader2, Sparkles, Bookmark } from "lucide-react";
 import Link from "next/link";
 
 type Client = { id: string; fullName: string };
@@ -89,8 +89,24 @@ Please confirm by 5PM today to avoid late cancellation.`,
 ];
 
 function TemplateCard({ template }: { template: (typeof TEMPLATES)[0] }) {
-  const [body, setBody] = useState(template.body);
+  const storageKey = `atlas-outreach-default-${template.id}`;
+
+  // Initialise from saved default → factory default
+  const [body, setBody] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return saved;
+    }
+    return template.body;
+  });
+  const [savedDefault, setSavedDefault] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(storageKey) ?? template.body;
+    }
+    return template.body;
+  });
   const [copied, setCopied] = useState(false);
+  const [defaultSaved, setDefaultSaved] = useState(false);
 
   function copy() {
     navigator.clipboard.writeText(body);
@@ -98,6 +114,20 @@ function TemplateCard({ template }: { template: (typeof TEMPLATES)[0] }) {
     setTimeout(() => setCopied(false), 2000);
     toast.success("Copied to clipboard");
   }
+
+  function setAsDefault() {
+    localStorage.setItem(storageKey, body);
+    setSavedDefault(body);
+    setDefaultSaved(true);
+    setTimeout(() => setDefaultSaved(false), 2000);
+    toast.success("Saved as your default");
+  }
+
+  function reset() {
+    setBody(savedDefault);
+  }
+
+  const isDirty = body !== savedDefault;
 
   return (
     <Card>
@@ -107,7 +137,16 @@ function TemplateCard({ template }: { template: (typeof TEMPLATES)[0] }) {
           <p className="text-xs text-muted-foreground mt-0.5">{template.channel}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setBody(template.body)} className="text-xs">
+          {isDirty && (
+            <Button variant="outline" size="sm" onClick={setAsDefault} className="text-xs gap-1">
+              {defaultSaved ? (
+                <><CheckCheck className="w-3 h-3" />Saved</>
+              ) : (
+                <><Bookmark className="w-3 h-3" />Set default</>
+              )}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={reset} className="text-xs" disabled={!isDirty}>
             Reset
           </Button>
           <Button size="sm" onClick={copy}>
@@ -126,7 +165,12 @@ function TemplateCard({ template }: { template: (typeof TEMPLATES)[0] }) {
           rows={body.split("\n").length + 2}
           className="font-mono text-sm resize-none"
         />
-        <p className="text-xs text-muted-foreground mt-2">Fill in the blanks (______), then copy.</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          Fill in the blanks (______), then copy.
+          {savedDefault !== template.body && (
+            <span className="ml-2 text-blue-600">Custom default saved.</span>
+          )}
+        </p>
       </CardContent>
     </Card>
   );

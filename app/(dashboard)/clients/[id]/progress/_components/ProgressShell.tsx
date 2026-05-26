@@ -96,10 +96,9 @@ export type ProgressData = {
 // ── Sub-nav tabs ──────────────────────────────────────────────────────────────
 
 const TABS = [
-  { label: "Overview",   href: "" },
-  { label: "Strength",   href: "/strength" },
-  { label: "Body",       href: "/body" },
-  { label: "Milestones", href: "/milestones" },
+  { label: "Overview", href: "" },
+  { label: "Strength", href: "/strength" },
+  { label: "Body",     href: "/body" },
 ];
 
 // ── Shell component ───────────────────────────────────────────────────────────

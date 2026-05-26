@@ -7,60 +7,31 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { ProgressShell, useProgressData, type ProgressData } from "./_components/ProgressShell";
 import { StatTile } from "./_components/StatTile";
-import { MilestoneCard } from "./_components/MilestoneCard";
 import { HeroProgressChart, type HeroDataPoint } from "@/components/charts/HeroProgressChart";
 import { E1RMLineChart, type E1RMPoint } from "@/components/charts/E1RMLineChart";
-import { VolumeBarChart } from "@/components/charts/VolumeBarChart";
 import { WeightTrendChart } from "@/components/charts/WeightTrendChart";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
+import { format } from "date-fns";
 
 // ── Goal-driven config ────────────────────────────────────────────────────────
 
 const GOAL_CONFIG: Record<
   string,
-  {
-    label: string;
-    heroMetric: "weight" | "strength" | "sessions";
-    color: string;
-    accentClass: string;
-  }
+  { label: string; heroMetric: "weight" | "strength" | "sessions"; color: string }
 > = {
-  weight_loss: {
-    label: "Body Weight Trend",
-    heroMetric: "weight",
-    color: "var(--success)",
-    accentClass: "",
-  },
-  hypertrophy: {
-    label: "Strength Composite",
-    heroMetric: "strength",
-    color: "var(--blue)",
-    accentClass: "",
-  },
-  performance: {
-    label: "Strength Composite",
-    heroMetric: "strength",
-    color: "var(--blue)",
-    accentClass: "",
-  },
-  general: {
-    label: "Weekly Sessions",
-    heroMetric: "sessions",
-    color: "var(--blue)",
-    accentClass: "",
-  },
-  pain_mgmt: {
-    label: "Body Weight Trend",
-    heroMetric: "weight",
-    color: "var(--warn)",
-    accentClass: "",
-  },
+  weight_loss:  { label: "Body Weight Trend",    heroMetric: "weight",   color: "var(--success)" },
+  hypertrophy:  { label: "Strength Composite",   heroMetric: "strength", color: "var(--blue)" },
+  performance:  { label: "Strength Composite",   heroMetric: "strength", color: "var(--blue)" },
+  general:      { label: "Weekly Sessions",      heroMetric: "sessions", color: "var(--blue)" },
+  pain_mgmt:    { label: "Body Weight Trend",    heroMetric: "weight",   color: "var(--warn)" },
 };
 
 const DEFAULT_GOAL_CONFIG = {
   label: "Strength Composite",
   heroMetric: "strength" as const,
   color: "#6366f1",
-  accentClass: "",
 };
 
 // ── Hero data builders ────────────────────────────────────────────────────────
@@ -70,21 +41,16 @@ function buildWeightHero(data: ProgressData): HeroDataPoint[] {
 }
 
 function buildStrengthHero(data: ProgressData): HeroDataPoint[] {
-  // Composite % change from baseline, bucketed by date
   const { keyLifts, strengthSeries } = data;
   if (keyLifts.length === 0) return [];
-
-  // Map: date → composite % change
   const byDate = new Map<string, number[]>();
   for (const pt of strengthSeries) {
-    if (!keyLifts.find((kl) => kl.exerciseId === pt.exerciseId)) continue;
-    const kl = keyLifts.find((kl) => kl.exerciseId === pt.exerciseId)!;
-    if (kl.baselineE1RM == null || kl.baselineE1RM === 0) continue;
+    const kl = keyLifts.find((kl) => kl.exerciseId === pt.exerciseId);
+    if (!kl || kl.baselineE1RM == null || kl.baselineE1RM === 0) continue;
     const pct = ((pt.e1RM - kl.baselineE1RM) / kl.baselineE1RM) * 100;
     if (!byDate.has(pt.date)) byDate.set(pt.date, []);
     byDate.get(pt.date)!.push(pct);
   }
-
   return Array.from(byDate.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, pcts]) => ({
@@ -109,16 +75,125 @@ function buildLiftSeries(data: ProgressData, exerciseId: string): E1RMPoint[] {
   });
 }
 
-const LIFT_COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"];
+// ── Weekly strength progress ──────────────────────────────────────────────────
+//
+// Groups strengthSeries by week, computes the best e1RM per key lift per week,
+// then averages the % change from each lift's baseline. Uses the Epley-derived
+// e1RM (already in strengthSeries) so 20 lb × 15 reps correctly beats
+// 20 lb × 10 reps even though rep count dropped.
 
-// ── Stats builders ────────────────────────────────────────────────────────────
+type WeeklyStrengthPoint = { weekStart: string; pctChange: number; liftCount: number };
+
+function buildWeeklyStrengthSeries(data: ProgressData): WeeklyStrengthPoint[] {
+  const { keyLifts, strengthSeries } = data;
+  if (keyLifts.length === 0) return [];
+
+  // ISO week-start (Mon) for a date string
+  function toWeekStart(dateStr: string): string {
+    const d = new Date(dateStr + "T12:00:00");
+    const day = d.getDay(); // 0=Sun
+    const diff = (day === 0 ? -6 : 1 - day);
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + diff);
+    return mon.toISOString().slice(0, 10);
+  }
+
+  // For each (exerciseId, weekStart) keep the max e1RM
+  const weekMax = new Map<string, number>(); // `${exId}__${weekStart}`
+  for (const pt of strengthSeries) {
+    const ws = toWeekStart(pt.date);
+    const k = `${pt.exerciseId}__${ws}`;
+    weekMax.set(k, Math.max(weekMax.get(k) ?? 0, pt.e1RM));
+  }
+
+  // Collect all week-starts across key lifts
+  const allWeeks = new Set<string>();
+  for (const k of weekMax.keys()) {
+    allWeeks.add(k.split("__")[1]);
+  }
+
+  const result: WeeklyStrengthPoint[] = [];
+  for (const ws of Array.from(allWeeks).sort()) {
+    const pcts: number[] = [];
+    for (const kl of keyLifts) {
+      if (kl.baselineE1RM == null || kl.baselineE1RM === 0) continue;
+      const best = weekMax.get(`${kl.exerciseId}__${ws}`);
+      if (best == null) continue;
+      pcts.push(((best - kl.baselineE1RM) / kl.baselineE1RM) * 100);
+    }
+    if (pcts.length > 0) {
+      result.push({
+        weekStart: ws,
+        pctChange: Math.round((pcts.reduce((a, b) => a + b, 0) / pcts.length) * 10) / 10,
+        liftCount: pcts.length,
+      });
+    }
+  }
+  return result;
+}
+
+// ── Weekly strength chart ─────────────────────────────────────────────────────
+
+function WeeklyStrengthChart({ data, color = "var(--blue)" }: { data: WeeklyStrengthPoint[]; color?: string }) {
+  if (data.length === 0) return null;
+  const maxAbs = Math.max(...data.map((d) => Math.abs(d.pctChange)), 1);
+
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={12}>
+        <XAxis
+          dataKey="weekStart"
+          tickFormatter={(d: string) => format(new Date(d + "T00:00:00"), "MMM d")}
+          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+          axisLine={false} tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+          axisLine={false} tickLine={false} width={32}
+          tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
+        />
+        <Tooltip
+          cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            const pt = payload[0].payload as WeeklyStrengthPoint;
+            return (
+              <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
+                <p className="text-muted-foreground mb-1">
+                  {label ? `Week of ${format(new Date(label + "T00:00:00"), "MMM d")}` : ""}
+                </p>
+                <p className="font-semibold text-foreground">
+                  {pt.pctChange > 0 ? "+" : ""}{pt.pctChange.toFixed(1)}% vs baseline
+                </p>
+                <p className="text-muted-foreground">{pt.liftCount} lift{pt.liftCount !== 1 ? "s" : ""} tracked</p>
+              </div>
+            );
+          }}
+        />
+        <Bar dataKey="pctChange" radius={[3, 3, 0, 0]} isAnimationActive animationDuration={600}>
+          {data.map((entry, i) => (
+            <Cell
+              key={i}
+              fill={entry.pctChange >= 0 ? color : "var(--destructive)"}
+              fillOpacity={0.4 + 0.6 * (Math.abs(entry.pctChange) / maxAbs)}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ── Stats builder ─────────────────────────────────────────────────────────────
+
+const LIFT_COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"];
 
 function computeStats(data: ProgressData, goal: string) {
   const cfg = GOAL_CONFIG[goal] ?? DEFAULT_GOAL_CONFIG;
 
   if (cfg.heroMetric === "weight" && data.weightSeries.length > 0) {
     const first = data.weightSeries[0];
-    const last = data.weightSeries[data.lastMeasurement ? data.weightSeries.length - 1 : 0];
+    const last = data.weightSeries[data.weightSeries.length - 1];
     const deltaKg = last.ema - first.ema;
     const deltaLb = deltaKg * 2.20462;
     const lastKg = data.lastMeasurement?.bodyWeightKg ?? last.weightKg;
@@ -144,7 +219,6 @@ function computeStats(data: ProgressData, goal: string) {
 
   return [
     { label: "Sessions", value: String(data.totalSessions), sub: "total logged" },
-    { label: "Milestones", value: String(data.milestones.length), sub: "earned" },
   ];
 }
 
@@ -154,7 +228,6 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
   const goal = data.client.primaryGoal ?? "general";
   const cfg = GOAL_CONFIG[goal] ?? DEFAULT_GOAL_CONFIG;
 
-  // Fall back to strength hero if goal is weight-based but no measurements yet
   const weightHero = buildWeightHero(data);
   const strengthHero = buildStrengthHero(data);
   let heroData: HeroDataPoint[];
@@ -180,23 +253,19 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
   }
 
   const stats = computeStats(data, goal);
-  const recentMilestones = data.milestones.slice(0, 5);
   const hasData = heroData.length > 0;
-
-  // Key lifts that have actual data
   const keyLiftsWithData = data.keyLifts.filter((kl) =>
     data.strengthSeries.some((s) => s.exerciseId === kl.exerciseId)
   );
+  const weeklyStrength = buildWeeklyStrengthSeries(data);
 
   return (
     <div className="space-y-6">
-      {/* Hero chart band */}
+      {/* Hero chart */}
       <div className="rounded-2xl border bg-card overflow-hidden">
         <div className="flex items-start justify-between px-5 pt-5 pb-2">
           <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              {heroLabel}
-            </p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{heroLabel}</p>
             {heroData.length > 0 && (
               <p className="font-display italic leading-none mt-1" style={{ fontSize: "clamp(2rem, 5vw, 4rem)", color: cfg.color }}>
                 {heroUnit === "kg"
@@ -256,15 +325,12 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
         ))}
       </div>
 
-      {/* Key lifts — shown for all goals when session data exists */}
+      {/* Key lifts */}
       {keyLiftsWithData.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold">Key lifts</p>
-            <Link
-              href={`/clients/${clientId}/progress/strength`}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
+            <Link href={`/clients/${clientId}/progress/strength`} className="text-xs text-muted-foreground hover:text-foreground">
               Full strength view →
             </Link>
           </div>
@@ -295,17 +361,20 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
 
       {/* Secondary charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Volume bar chart */}
-        {data.volumeSeries.length > 0 && (
+        {/* Weekly strength progress (replaces raw volume) */}
+        {weeklyStrength.length > 0 && (
           <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Weekly Volume (lb)
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+              Weekly Strength Progress
             </p>
-            <VolumeBarChart data={data.volumeSeries} color={cfg.color} />
+            <p className="text-xs text-muted-foreground mb-3">
+              Avg e1RM change vs baseline across key lifts
+            </p>
+            <WeeklyStrengthChart data={weeklyStrength} color={cfg.color} />
           </div>
         )}
 
-        {/* Body weight trend — shown for all goals when data exists */}
+        {/* Body weight trend */}
         {data.weightSeries.length > 0 && (
           <div className="rounded-xl border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
@@ -315,7 +384,6 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
           </div>
         )}
 
-        {/* Nudge to log body weight if none yet */}
         {data.weightSeries.length === 0 && data.totalSessions > 0 && (
           <div className="rounded-xl border border-dashed bg-card p-4 flex flex-col items-center justify-center gap-2 text-center">
             <p className="text-xs text-muted-foreground">No body measurements yet</p>
@@ -329,33 +397,6 @@ function ProgressOverview({ data, clientId }: { data: ProgressData; clientId: st
           </div>
         )}
       </div>
-
-      {/* Recent milestones */}
-      {recentMilestones.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold">Recent milestones</p>
-            <Link
-              href={`/clients/${clientId}/progress/milestones`}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2">
-            {recentMilestones.map((m) => (
-              <MilestoneCard key={m.id} milestone={m} compact />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Empty milestone state */}
-      {recentMilestones.length === 0 && data.totalSessions > 0 && (
-        <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground text-sm">
-          Milestones are earned automatically as clients log sessions and hit new PRs.
-        </div>
-      )}
     </div>
   );
 }

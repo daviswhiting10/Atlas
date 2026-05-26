@@ -3,9 +3,10 @@ import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
-import { AlertTriangle, ClipboardList, MessageSquare, Users, TrendingUp } from "lucide-react";
+import { AlertTriangle, ClipboardList, MessageSquare, Users } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { LogSessionCard } from "./_components/LogSessionCard";
 
 export default async function InboxPage() {
   const session = await auth();
@@ -126,34 +127,40 @@ export default async function InboxPage() {
         </div>
       )}
 
-      {/* ── Quick actions — grid on desktop, stacked on mobile ──────── */}
+      {/* ── Quick actions ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-        {[
-          { href: "/clients",  icon: Users,         title: "Add Client",  desc: "New intake or import" },
-          { href: "/sessions", icon: TrendingUp,     title: "Log Session", desc: "Post-session notes" },
-          { href: "/outreach", icon: MessageSquare,  title: "Outreach",    desc: "Generate messages" },
-        ].map(({ href, icon: Icon, title, desc }) => (
-          <Link key={href} href={href}>
-            <Card lift className="cursor-pointer">
-              <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
-                <div
-                  className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(43,107,255,0.08)" }}
-                >
-                  <Icon className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
-                </div>
-                <div>
-                  <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>
-                    {title}
-                  </p>
-                  <p className="font-body text-xs" style={{ color: "var(--ink-mute)" }}>
-                    {desc}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        {/* Add Client */}
+        <Link href="/clients">
+          <Card lift className="cursor-pointer">
+            <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
+              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: "rgba(43,107,255,0.08)" }}>
+                <Users className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
+              </div>
+              <div>
+                <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>Add Client</p>
+                <p className="font-body text-xs" style={{ color: "var(--ink-mute)" }}>New intake or import</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Log Session — client picker dialog */}
+        <LogSessionCard clients={clients.map((c) => ({ id: c.id, fullName: c.fullName, primaryGoal: c.primaryGoal ?? null, status: c.status }))} />
+
+        {/* Outreach */}
+        <Link href="/outreach">
+          <Card lift className="cursor-pointer">
+            <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
+              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: "rgba(43,107,255,0.08)" }}>
+                <MessageSquare className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
+              </div>
+              <div>
+                <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>Outreach</p>
+                <p className="font-body text-xs" style={{ color: "var(--ink-mute)" }}>Generate messages</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* ── Client list ───────────────────────────────────────────────── */}
