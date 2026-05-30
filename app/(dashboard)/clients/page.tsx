@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useContentFade } from "@/hooks/use-content-fade";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,7 @@ export default function ClientsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const phase = useContentFade(loading);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -204,61 +206,71 @@ export default function ClientsPage() {
         </Select>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-16 flex flex-col items-center text-center">
-            <Users className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="font-medium">No clients found</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {search || filterStatus !== "all" ? "Try adjusting your filters" : "Add your first client above"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <div className="divide-y divide-border">
-            {filtered.map((client) => (
-              <Link
-                key={client.id}
-                href={`/clients/${client.id}`}
-                className="flex items-center justify-between px-5 py-4 min-h-[60px] hover:bg-muted/40 active:bg-muted/60 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                    {client.fullName.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{client.fullName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {client.email ?? "No email"}
-                      {client.primaryGoal ? ` · ${GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs text-muted-foreground">
-                      {client._count.sessionNotes} sessions · {client._count.programAssignments} programs
-                    </p>
-                    {client.retentionScore != null && (
-                      <p className="text-xs font-mono text-muted-foreground">
-                        Retention: {client.retentionScore}/100
-                      </p>
-                    )}
-                  </div>
-                  <StatusBadge status={client.status} />
-                </div>
-              </Link>
+      <div className="relative">
+        {phase !== "done" && (
+          <div
+            className={"space-y-2" + (phase === "fading" ? " absolute inset-0 pointer-events-none opacity-0" : "")}
+            aria-hidden={phase === "fading"}
+          >
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
             ))}
           </div>
-        </Card>
-      )}
+        )}
+        {phase !== "loading" && (
+          <div className={phase === "fading" ? "animate-in fade-in-0 duration-200 ease-out" : undefined}>
+            {filtered.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-16 flex flex-col items-center text-center">
+                  <Users className="w-10 h-10 text-muted-foreground mb-3" />
+                  <p className="font-medium">No clients found</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {search || filterStatus !== "all" ? "Try adjusting your filters" : "Add your first client above"}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <div className="divide-y divide-border">
+                  {filtered.map((client) => (
+                    <Link
+                      key={client.id}
+                      href={`/clients/${client.id}`}
+                      className="flex items-center justify-between px-5 py-4 min-h-[60px] hover:bg-muted/40 active:bg-muted/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                          {client.fullName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{client.fullName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {client.email ?? "No email"}
+                            {client.primaryGoal ? ` · ${GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-xs text-muted-foreground">
+                            {client._count.sessionNotes} sessions · {client._count.programAssignments} programs
+                          </p>
+                          {client.retentionScore != null && (
+                            <p className="text-xs font-mono text-muted-foreground">
+                              Retention: {client.retentionScore}/100
+                            </p>
+                          )}
+                        </div>
+                        <StatusBadge status={client.status} />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

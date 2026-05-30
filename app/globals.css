@@ -79,6 +79,23 @@
   }
 }
 
+/* ── Radix tab panel fade ──────────────────────────────────────────────── */
+[role="tabpanel"][data-state="active"] {
+  animation: tab-panel-in 180ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes tab-panel-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer base {
   :root {
     /* ── Atlas design-system tokens (spec-exact values) ──────── */

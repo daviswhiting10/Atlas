@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useContentFade } from "@/hooks/use-content-fade";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
@@ -55,6 +56,7 @@ export default function ProgramsPage() {
   const router = useRouter();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
+  const phase = useContentFade(loading);
   const [goalFilter, setGoalFilter] = useState<string | null>(null);
   const [condFilter, setCondFilter] = useState<string | null>(null);
   const [duplicating, startDuplicate] = useTransition();
@@ -183,13 +185,20 @@ export default function ProgramsPage() {
         </div>
       )}
 
-      {loading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
-          ))}
-        </div>
-      ) : programs.length === 0 ? (
+      <div className="relative">
+        {phase !== "done" && (
+          <div
+            className={"space-y-2" + (phase === "fading" ? " absolute inset-0 pointer-events-none opacity-0" : "")}
+            aria-hidden={phase === "fading"}
+          >
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        )}
+        {phase !== "loading" && (
+        <div className={phase === "fading" ? "animate-in fade-in-0 duration-200 ease-out" : undefined}>
+        {programs.length === 0 ? (
         <Card>
           <CardContent className="py-16 flex flex-col items-center text-center">
             <div
@@ -317,6 +326,9 @@ export default function ProgramsPage() {
           })}
         </div>
       )}
+        </div>
+        )}
+      </div>
     </div>
   );
 }

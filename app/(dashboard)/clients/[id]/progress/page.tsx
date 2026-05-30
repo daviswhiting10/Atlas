@@ -5,15 +5,32 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import { ProgressShell, useProgressData, type ProgressData } from "./_components/ProgressShell";
 import { StatTile } from "./_components/StatTile";
-import { HeroProgressChart, type HeroDataPoint } from "@/components/charts/HeroProgressChart";
-import { E1RMLineChart, type E1RMPoint } from "@/components/charts/E1RMLineChart";
-import { WeightTrendChart } from "@/components/charts/WeightTrendChart";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
-import { format } from "date-fns";
+import type { HeroDataPoint } from "@/components/charts/HeroProgressChart";
+import type { E1RMPoint } from "@/components/charts/E1RMLineChart";
+import type { WeeklyStrengthPoint } from "@/components/charts/WeeklyStrengthChart";
+
+const HeroProgressChart = dynamic(
+  () => import("@/components/charts/HeroProgressChart").then((m) => ({ default: m.HeroProgressChart })),
+  { ssr: false }
+);
+
+const E1RMLineChart = dynamic(
+  () => import("@/components/charts/E1RMLineChart").then((m) => ({ default: m.E1RMLineChart })),
+  { ssr: false }
+);
+
+const WeightTrendChart = dynamic(
+  () => import("@/components/charts/WeightTrendChart").then((m) => ({ default: m.WeightTrendChart })),
+  { ssr: false }
+);
+
+const WeeklyStrengthChart = dynamic(
+  () => import("@/components/charts/WeeklyStrengthChart").then((m) => ({ default: m.WeeklyStrengthChart })),
+  { ssr: false }
+);
 
 // ── Goal-driven config ────────────────────────────────────────────────────────
 
@@ -82,8 +99,6 @@ function buildLiftSeries(data: ProgressData, exerciseId: string): E1RMPoint[] {
 // e1RM (already in strengthSeries) so 20 lb × 15 reps correctly beats
 // 20 lb × 10 reps even though rep count dropped.
 
-type WeeklyStrengthPoint = { weekStart: string; pctChange: number; liftCount: number };
-
 function buildWeeklyStrengthSeries(data: ProgressData): WeeklyStrengthPoint[] {
   const { keyLifts, strengthSeries } = data;
   if (keyLifts.length === 0) return [];
@@ -128,58 +143,6 @@ function buildWeeklyStrengthSeries(data: ProgressData): WeeklyStrengthPoint[] {
     }
   }
   return result;
-}
-
-// ── Weekly strength chart ─────────────────────────────────────────────────────
-
-function WeeklyStrengthChart({ data, color = "var(--blue)" }: { data: WeeklyStrengthPoint[]; color?: string }) {
-  if (data.length === 0) return null;
-  const maxAbs = Math.max(...data.map((d) => Math.abs(d.pctChange)), 1);
-
-  return (
-    <ResponsiveContainer width="100%" height={160}>
-      <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={12}>
-        <XAxis
-          dataKey="weekStart"
-          tickFormatter={(d: string) => format(new Date(d + "T00:00:00"), "MMM d")}
-          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-          axisLine={false} tickLine={false}
-        />
-        <YAxis
-          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-          axisLine={false} tickLine={false} width={32}
-          tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
-        />
-        <Tooltip
-          cursor={{ fill: "var(--muted)", opacity: 0.3 }}
-          content={({ active, payload, label }) => {
-            if (!active || !payload?.length) return null;
-            const pt = payload[0].payload as WeeklyStrengthPoint;
-            return (
-              <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
-                <p className="text-muted-foreground mb-1">
-                  {label ? `Week of ${format(new Date(label + "T00:00:00"), "MMM d")}` : ""}
-                </p>
-                <p className="font-semibold text-foreground">
-                  {pt.pctChange > 0 ? "+" : ""}{pt.pctChange.toFixed(1)}% vs baseline
-                </p>
-                <p className="text-muted-foreground">{pt.liftCount} lift{pt.liftCount !== 1 ? "s" : ""} tracked</p>
-              </div>
-            );
-          }}
-        />
-        <Bar dataKey="pctChange" radius={[3, 3, 0, 0]} isAnimationActive animationDuration={600}>
-          {data.map((entry, i) => (
-            <Cell
-              key={i}
-              fill={entry.pctChange >= 0 ? color : "var(--destructive)"}
-              fillOpacity={0.4 + 0.6 * (Math.abs(entry.pctChange) / maxAbs)}
-            />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
 }
 
 // ── Stats builder ─────────────────────────────────────────────────────────────

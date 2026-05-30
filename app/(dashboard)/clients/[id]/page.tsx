@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useContentFade } from "@/hooks/use-content-fade";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -142,11 +143,16 @@ export default function ClientDetailPage() {
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const phase = useContentFade(loading);
 
   useEffect(() => {
     fetch(`/api/clients/${id}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then(setClient)
+      .catch(() => setClient(null))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -206,7 +212,7 @@ export default function ClientDetailPage() {
     toast.success("Session deleted");
   }
 
-  if (loading) {
+  if (phase === "loading") {
     return (
       <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl space-y-4">
         <div className="h-8 w-32 bg-muted rounded animate-pulse" />
@@ -243,7 +249,7 @@ export default function ClientDetailPage() {
   const lastSession = client.workoutLogs[0] ?? null;
 
   return (
-    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-5xl pb-12">
+    <div className={cn("px-5 pt-5 md:px-8 md:pt-8 md:max-w-5xl pb-12", phase === "fading" && "animate-in fade-in-0 duration-200 ease-out")}>
       {/* Back */}
       <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-3 -ml-2")}>
         <ArrowLeft className="w-4 h-4 mr-1" />

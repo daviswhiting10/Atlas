@@ -9,6 +9,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LogSessionCard } from "./_components/LogSessionCard";
 import { ProspectFollowUpButton } from "./_components/ProspectFollowUpButton";
+import { FadeIn } from "@/components/fade-in";
 
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 // Mirrors the visual structure of the data section so nothing jumps on load.
@@ -88,7 +89,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
   today.setHours(0, 0, 0, 0);
 
   return (
-    <>
+    <FadeIn>
       {/* ── Stat strip ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4 md:gap-4 md:mb-10">
         {[
@@ -324,7 +325,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
           </CardContent>
         </Card>
       )}
-    </>
+    </FadeIn>
   );
 }
 

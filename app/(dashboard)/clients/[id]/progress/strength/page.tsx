@@ -1,10 +1,20 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ProgressShell, useProgressData, type ProgressData, type StrengthPoint } from "../_components/ProgressShell";
-import { E1RMLineChart, type E1RMPoint } from "@/components/charts/E1RMLineChart";
-import { VolumeBarChart } from "@/components/charts/VolumeBarChart";
+import type { E1RMPoint } from "@/components/charts/E1RMLineChart";
 import { cn } from "@/lib/utils";
+
+const E1RMLineChart = dynamic(
+  () => import("@/components/charts/E1RMLineChart").then((m) => ({ default: m.E1RMLineChart })),
+  { ssr: false }
+);
+
+const VolumeBarChart = dynamic(
+  () => import("@/components/charts/VolumeBarChart").then((m) => ({ default: m.VolumeBarChart })),
+  { ssr: false }
+);
 
 const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"];
 

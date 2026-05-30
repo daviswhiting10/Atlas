@@ -5,13 +5,18 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   ProgressShell,
   useProgressData,
   type ProgressData,
 } from "../_components/ProgressShell";
-import { WeightTrendChart } from "@/components/charts/WeightTrendChart";
 import { format } from "date-fns";
+
+const WeightTrendChart = dynamic(
+  () => import("@/components/charts/WeightTrendChart").then((m) => ({ default: m.WeightTrendChart })),
+  { ssr: false }
+);
 
 function delta(
   current: number | null,
