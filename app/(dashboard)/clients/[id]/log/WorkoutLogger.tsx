@@ -767,17 +767,23 @@ export default function WorkoutLogger({
     const days = [...availableWorkouts]
       .filter((w) => getWeekNum(w) === newWeek)
       .sort((a, b) => a.name.localeCompare(b.name));
-    // Keep current workout if it lives in this week; else first planned; else first
     const keep = days.find((w) => w.id === assignedWorkoutId);
     const next = keep ?? days.find((w) => w.status === "PLANNED") ?? days[0];
-    if (next) setPickerDayId(next.id);
+    if (next) {
+      setPickerDayId(next.id);
+      // Navigate immediately — week change always targets a specific workout
+      if (next.id !== assignedWorkoutId) {
+        router.push(`/clients/${clientId}/log?workoutId=${next.id}`);
+      }
+    }
   }
 
   function handlePickerDayChange(workoutId: string) {
-    setPickerDayId(workoutId);
+    // Navigate first — don't let the state update cause a stutter before push
     if (workoutId !== assignedWorkoutId) {
       router.push(`/clients/${clientId}/log?workoutId=${workoutId}`);
     }
+    setPickerDayId(workoutId);
   }
 
   // ── Shared day picker — native <select> triggers iOS wheel on mobile ──────
