@@ -434,6 +434,15 @@ export default function WorkoutLogger({
     () => new Date(scheduledDate).toISOString().slice(0, 10)
   );
 
+  // ── Week / day picker ────────────────────────────────────────────────────
+  const currentWorkoutWeek =
+    Math.floor(
+      (new Date(scheduledDate).getTime() - new Date(assignmentStartDate).getTime()) /
+        (7 * 24 * 60 * 60 * 1000)
+    ) + 1;
+  const [pickerWeek, setPickerWeek] = useState(currentWorkoutWeek);
+  const [pickerDayId, setPickerDayId] = useState(assignedWorkoutId);
+
   async function handleDateChange(newDate: string) {
     setLogDate(newDate);
     if (workoutLogId) {
@@ -736,6 +745,82 @@ export default function WorkoutLogger({
     }
   }
 
+  // ── Week / day picker helpers ─────────────────────────────────────────────
+
+  function getWeekNum(w: { scheduledDate: string }): number {
+    return (
+      Math.floor(
+        (new Date(w.scheduledDate).getTime() - new Date(assignmentStartDate).getTime()) /
+          (7 * 24 * 60 * 60 * 1000)
+      ) + 1
+    );
+  }
+
+  const allWeeks = Array.from(new Set(availableWorkouts.map(getWeekNum))).sort((a, b) => a - b);
+
+  const workoutsInPickerWeek = [...availableWorkouts]
+    .filter((w) => getWeekNum(w) === pickerWeek)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  function handlePickerWeekChange(newWeek: number) {
+    setPickerWeek(newWeek);
+    const days = [...availableWorkouts]
+      .filter((w) => getWeekNum(w) === newWeek)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    // Keep current workout if it lives in this week; else first planned; else first
+    const keep = days.find((w) => w.id === assignedWorkoutId);
+    const next = keep ?? days.find((w) => w.status === "PLANNED") ?? days[0];
+    if (next) setPickerDayId(next.id);
+  }
+
+  function handlePickerDayChange(workoutId: string) {
+    setPickerDayId(workoutId);
+    if (workoutId !== assignedWorkoutId) {
+      router.push(`/clients/${clientId}/log?workoutId=${workoutId}`);
+    }
+  }
+
+  // ── Shared day picker — native <select> triggers iOS wheel on mobile ──────
+  const dayPicker = availableWorkouts.length > 1 ? (
+    <div className="flex gap-2 mb-3">
+      {/* Week selector — hidden when there's only one week */}
+      {allWeeks.length > 1 && (
+        <div className="relative flex-1">
+          <select
+            value={pickerWeek}
+            onChange={(e) => handlePickerWeekChange(Number(e.target.value))}
+            className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 pr-9 text-sm font-medium appearance-none focus:outline-none focus:border-primary touch-manipulation"
+            style={{ fontSize: "16px" }}
+          >
+            {allWeeks.map((wk) => (
+              <option key={wk} value={wk}>
+                Week {wk}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        </div>
+      )}
+      {/* Day selector */}
+      <div className="relative flex-1">
+        <select
+          value={pickerDayId}
+          onChange={(e) => handlePickerDayChange(e.target.value)}
+          className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 pr-9 text-sm font-medium appearance-none focus:outline-none focus:border-primary touch-manipulation"
+          style={{ fontSize: "16px" }}
+        >
+          {workoutsInPickerWeek.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+              {w.status === "LOGGED" ? " ✓" : w.status === "SKIPPED" ? " –" : ""}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+      </div>
+    </div>
+  ) : null;
+
   // ── Shared SOAP panel (used in both layouts) ──────────────────────────────
   const soapPanel = (
     <div className="mt-4 border rounded-lg overflow-hidden">
@@ -800,12 +885,31 @@ export default function WorkoutLogger({
     </div>
   );
 
+  // Guard — crash-safe for workouts that have no exercises yet
+  if (exercises.length === 0) {
+    return (
+      <div className="px-5 pt-12 text-center space-y-3">
+        <p className="text-muted-foreground text-sm">
+          This workout has no exercises. Add exercises in the program builder first.
+        </p>
+        <Link
+          href={`/clients/${clientId}`}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Back to {clientName}
+        </Link>
+      </div>
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // MOBILE LAYOUT  (hidden on md+)
   // ═══════════════════════════════════════════════════════════════════════════
 
   const mobileView = (() => {
-    const ex = exercises[currentExIdx];
+    const safeExIdx = Math.min(currentExIdx, exercises.length - 1);
+    const ex = exercises[safeExIdx];
     const state = exState[ex.aweId];
     const setIdx = currentSetRound;
     const activeSet = state.sets[setIdx];
@@ -819,8 +923,8 @@ export default function WorkoutLogger({
 
     // Block-scoped context
     const blocks = groupIntoBlocks(exercises);
-    const currentBlock = blocks.find((b) => b.exIndices.includes(currentExIdx))!;
-    const posInBlock = currentBlock.exIndices.indexOf(currentExIdx);
+    const currentBlock = blocks.find((b) => b.exIndices.includes(safeExIdx)) ?? blocks[0]!;
+    const posInBlock = currentBlock.exIndices.indexOf(safeExIdx);
     const blockLabel = formatBlockLabel(currentBlock.section);
     const totalRounds = Math.max(
       ...currentBlock.exIndices.map((i) => exState[exercises[i].aweId]?.sets.length ?? 0),
@@ -868,55 +972,7 @@ export default function WorkoutLogger({
         </div>
 
         {/* ── Day picker ────────────────────────────────────────────── */}
-        {availableWorkouts.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1 scrollbar-none">
-            {[...availableWorkouts]
-              .sort((a, b) => {
-                const numA = parseInt(a.name.replace(/\D+/g, "")) || 0;
-                const numB = parseInt(b.name.replace(/\D+/g, "")) || 0;
-                return numA - numB;
-              })
-              .map((w) => {
-                const isCurrent = w.id === assignedWorkoutId;
-                const isDone = w.status === "LOGGED" || w.status === "SKIPPED";
-                const weekNum =
-                  Math.floor(
-                    (new Date(w.scheduledDate).getTime() - new Date(assignmentStartDate).getTime()) /
-                      (7 * 24 * 60 * 60 * 1000)
-                  ) + 1;
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => {
-                      if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
-                    }}
-                    className={cn(
-                      "shrink-0 rounded-xl px-3 py-2 text-left transition-colors border touch-manipulation",
-                      isCurrent
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : isDone
-                          ? "bg-muted/30 border-border opacity-40"
-                          : "bg-muted/60 border-border hover:border-primary/50 hover:bg-muted"
-                    )}
-                  >
-                    <p className={cn(
-                      "text-xs font-semibold leading-tight max-w-[130px] truncate",
-                      isCurrent ? "text-primary-foreground" : "text-foreground"
-                    )}>
-                      {w.name} · Wk {weekNum}
-                    </p>
-                    <p className={cn(
-                      "text-[10px] mt-0.5",
-                      isCurrent ? "text-primary-foreground/70" : "text-muted-foreground"
-                    )}>
-                      {isDone ? "Done" : `${w.exerciseCount} ex`}
-                    </p>
-                  </button>
-                );
-              })}
-          </div>
-        )}
+        {dayPicker}
 
         {/* ── Block label + progress dots (scoped to current block) ──── */}
         <div className="mb-4">
@@ -1505,51 +1561,7 @@ export default function WorkoutLogger({
       </div>
 
       {/* Day picker (desktop) */}
-      {availableWorkouts.length > 1 && (
-        <div className="flex gap-2 flex-wrap mb-5">
-          {[...availableWorkouts]
-            .sort((a, b) => {
-              const numA = parseInt(a.name.replace(/\D+/g, "")) || 0;
-              const numB = parseInt(b.name.replace(/\D+/g, "")) || 0;
-              return numA - numB;
-            })
-            .map((w) => {
-              const isCurrent = w.id === assignedWorkoutId;
-              const isDone = w.status === "LOGGED" || w.status === "SKIPPED";
-              const weekNum =
-                Math.floor(
-                  (new Date(w.scheduledDate).getTime() - new Date(assignmentStartDate).getTime()) /
-                    (7 * 24 * 60 * 60 * 1000)
-                ) + 1;
-              return (
-                <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isCurrent) router.push(`/clients/${clientId}/log?workoutId=${w.id}`);
-                  }}
-                  className={cn(
-                    "rounded-lg px-3 py-2 text-left transition-colors border text-sm",
-                    isCurrent
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : isDone
-                        ? "border-border opacity-40"
-                        : "border-border hover:border-primary/50 hover:bg-muted/60"
-                  )}
-                >
-                  <span className={cn("font-medium", isCurrent ? "text-primary-foreground" : "text-foreground")}>
-                    {w.name} · Wk {weekNum}
-                  </span>
-                  {isDone && (
-                    <span className={cn("ml-1.5 text-xs", isCurrent ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                      Done
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-        </div>
-      )}
+      {dayPicker}
 
       {/* Exercise cards — grouped by block */}
       <div className="space-y-4">

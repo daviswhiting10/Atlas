@@ -24,7 +24,6 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
-  GripVertical,
   Save,
   UserPlus,
 } from "lucide-react";
@@ -184,6 +183,18 @@ export function ProgramBuilder({ programId, initial }: Props) {
     }));
   }
 
+  function moveDay(dKey: string, direction: "up" | "down") {
+    setProg((p) => {
+      const idx = p.days.findIndex((d) => d._key === dKey);
+      if (direction === "up" && idx === 0) return p;
+      if (direction === "down" && idx === p.days.length - 1) return p;
+      const next = [...p.days];
+      const swap = direction === "up" ? idx - 1 : idx + 1;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return { ...p, days: next.map((d, i) => ({ ...d, order: i + 1 })) };
+    });
+  }
+
   const updateDay = useCallback(
     (dKey: string, fn: (d: DayInput) => DayInput) =>
       setProg((p) => ({ ...p, days: p.days.map((d) => (d._key === dKey ? fn(d) : d)) })),
@@ -249,6 +260,18 @@ export function ProgramBuilder({ programId, initial }: Props) {
         .filter((e) => e._key !== eKey)
         .map((e, i) => ({ ...e, order: i + 1 })),
     }));
+  }
+
+  function moveExercise(dKey: string, sKey: string, eKey: string, direction: "up" | "down") {
+    updateSection(dKey, sKey, (s) => {
+      const idx = s.exercises.findIndex((e) => e._key === eKey);
+      if (direction === "up" && idx === 0) return s;
+      if (direction === "down" && idx === s.exercises.length - 1) return s;
+      const next = [...s.exercises];
+      const swap = direction === "up" ? idx - 1 : idx + 1;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return { ...s, exercises: next.map((e, i) => ({ ...e, order: i + 1 })) };
+    });
   }
 
   function updateExercise(
@@ -471,7 +494,27 @@ export function ProgramBuilder({ programId, initial }: Props) {
             {/* Day header */}
             <CardHeader className="py-3 px-4">
               <div className="flex items-center gap-3">
-                <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+                {/* Day reorder buttons */}
+                <div className="flex flex-col shrink-0">
+                  <button
+                    type="button"
+                    disabled={prog.days.findIndex((d) => d._key === day._key) === 0}
+                    onClick={() => moveDay(day._key, "up")}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                    title="Move workout up"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={prog.days.findIndex((d) => d._key === day._key) === prog.days.length - 1}
+                    onClick={() => moveDay(day._key, "down")}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                    title="Move workout down"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => updateDay(day._key, (d) => ({ ...d, open: !d.open }))}
@@ -573,12 +616,33 @@ export function ProgramBuilder({ programId, initial }: Props) {
                     {/* Section exercises */}
                     {section.open && (
                       <div className="px-3 pb-3 space-y-3">
-                        {section.exercises.map((ex) => (
+                        {section.exercises.map((ex, exIdx) => (
                           <div key={ex._key} className="bg-background border rounded p-3">
                             <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs font-medium text-muted-foreground w-4">
-                                  {ex.order}.
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {/* Exercise reorder buttons */}
+                                <div className="flex flex-col shrink-0">
+                                  <button
+                                    type="button"
+                                    disabled={exIdx === 0}
+                                    onClick={() => moveExercise(day._key, section._key, ex._key, "up")}
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                                    title="Move up"
+                                  >
+                                    <ChevronDown className="w-3 h-3 rotate-180" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={exIdx === section.exercises.length - 1}
+                                    onClick={() => moveExercise(day._key, section._key, ex._key, "down")}
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                                    title="Move down"
+                                  >
+                                    <ChevronDown className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <span className="text-xs font-medium text-muted-foreground w-4 shrink-0">
+                                  {exIdx + 1}.
                                 </span>
                                 <span className="text-sm font-medium truncate">
                                   {ex.exerciseName}

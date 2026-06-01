@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Link2, Link2Off, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Link2, Link2Off, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -262,6 +262,8 @@ export default function SessionDetailPage() {
   const [saving, setSaving] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [setDrafts, setSetDrafts] = useState<Record<string, SetLog>>({});
+  const [savingSets, setSavingSets] = useState(false);
 
   useEffect(() => {
     fetch(`/api/sessions/${workoutLogId}`)
@@ -269,10 +271,48 @@ export default function SessionDetailPage() {
       .then((data: SessionDetail) => {
         setSession(data);
         setDateValue(data.date.slice(0, 10));
+        const init: Record<string, SetLog> = {};
+        for (const s of data.sets) init[s.id] = { ...s };
+        setSetDrafts(init);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [workoutLogId]);
+
+  function updateSetDraft(setId: string, changes: Partial<SetLog>) {
+    setSetDrafts((prev) => ({ ...prev, [setId]: { ...prev[setId], ...changes } }));
+  }
+
+  const isDirty = session?.sets.some((s) => {
+    const d = setDrafts[s.id];
+    return d && (d.weight !== s.weight || d.reps !== s.reps || d.rpe !== s.rpe || d.completed !== s.completed);
+  }) ?? false;
+
+  async function saveSets() {
+    if (!session) return;
+    setSavingSets(true);
+    try {
+      const res = await fetch(`/api/sessions/${workoutLogId}/sets`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sets: session.sets.map((s) => {
+            const d = setDrafts[s.id] ?? s;
+            return { id: s.id, weight: d.weight, reps: d.reps, rpe: d.rpe, completed: d.completed };
+          }),
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setSession((prev) =>
+        prev ? { ...prev, sets: prev.sets.map((s) => ({ ...s, ...(setDrafts[s.id] ?? {}) })) } : prev
+      );
+      toast.success("Sets saved");
+    } catch {
+      toast.error("Could not save sets");
+    } finally {
+      setSavingSets(false);
+    }
+  }
 
   async function saveDate() {
     if (!session) return;
@@ -468,7 +508,7 @@ export default function SessionDetailPage() {
         )}
       </div>
 
-      {/* Sets by exercise */}
+      {/* Sets by exercise — inline editable */}
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           No sets logged for this session.
@@ -483,33 +523,91 @@ export default function SessionDetailPage() {
               <div className="divide-y">
                 <div className="grid grid-cols-4 px-4 py-1.5 text-xs text-muted-foreground font-medium">
                   <span>Set</span>
-                  <span className="text-right">Weight</span>
+                  <span className="text-right">Weight (lb)</span>
                   <span className="text-right">Reps</span>
                   <span className="text-right">RPE</span>
                 </div>
-                {g.sets.map((s) => (
-                  <div
-                    key={s.id}
-                    className={cn(
-                      "grid grid-cols-4 px-4 py-2 text-sm",
-                      !s.completed && "opacity-40"
-                    )}
-                  >
-                    <span className="text-muted-foreground">{s.setNumber}</span>
-                    <span className="text-right font-medium">
-                      {s.weight != null ? `${s.weight} lb` : "BW"}
-                    </span>
-                    <span className="text-right font-medium">
-                      {s.reps != null ? s.reps : "—"}
-                    </span>
-                    <span className="text-right text-muted-foreground">
-                      {s.rpe != null ? s.rpe : "—"}
-                    </span>
-                  </div>
-                ))}
+                {g.sets.map((s) => {
+                  const d = setDrafts[s.id] ?? s;
+                  return (
+                    <div
+                      key={s.id}
+                      className={cn(
+                        "grid grid-cols-4 items-center px-4 py-1.5 text-sm",
+                        !d.completed && "opacity-50"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        title={d.completed ? "Mark incomplete" : "Mark complete"}
+                        onClick={() => updateSetDraft(s.id, { completed: !d.completed })}
+                        className="text-xs text-muted-foreground hover:text-foreground text-left w-fit"
+                      >
+                        {s.setNumber}
+                      </button>
+                      <div className="flex justify-end">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={d.weight ?? ""}
+                          onChange={(e) =>
+                            updateSetDraft(s.id, {
+                              weight: e.target.value !== "" ? parseFloat(e.target.value) : null,
+                            })
+                          }
+                          placeholder="BW"
+                          className="w-16 text-right text-sm font-medium bg-transparent border-b border-transparent hover:border-muted-foreground focus:border-primary focus:outline-none py-0.5 transition-colors"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={d.reps ?? ""}
+                          onChange={(e) =>
+                            updateSetDraft(s.id, {
+                              reps: e.target.value !== "" ? parseInt(e.target.value, 10) : null,
+                            })
+                          }
+                          placeholder="—"
+                          className="w-12 text-right text-sm font-medium bg-transparent border-b border-transparent hover:border-muted-foreground focus:border-primary focus:outline-none py-0.5 transition-colors"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="1"
+                          max="10"
+                          value={d.rpe ?? ""}
+                          onChange={(e) =>
+                            updateSetDraft(s.id, {
+                              rpe: e.target.value !== "" ? parseFloat(e.target.value) : null,
+                            })
+                          }
+                          placeholder="—"
+                          className="w-12 text-right text-sm bg-transparent border-b border-transparent hover:border-muted-foreground focus:border-primary focus:outline-none py-0.5 transition-colors"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
+
+          {/* Save button — appears only when sets have been changed */}
+          {isDirty && (
+            <Button onClick={saveSets} disabled={savingSets} className="w-full">
+              {savingSets ? (
+                <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving…</>
+              ) : (
+                <><Save className="w-3.5 h-3.5 mr-1.5" />Save changes</>
+              )}
+            </Button>
+          )}
         </div>
       )}
 
