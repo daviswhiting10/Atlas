@@ -423,6 +423,7 @@ export default function WorkoutLogger({
   const [undoEntry, setUndoEntry] = useState<{ aweId: string; idx: number } | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartX = useRef(0);
+  const dateInputRef = useRef<HTMLInputElement>(null);
   // Tracks the slot just completed (shows brief "✓" flash before auto-advance)
   const [justCompletedKey, setJustCompletedKey] = useState<string | null>(null);
   // Allows editing a fully-logged session (suppresses the all-done completion screen)
@@ -965,16 +966,14 @@ export default function WorkoutLogger({
 
         {/* ── Session date chip ─────────────────────────────────────── */}
         <div className="flex items-center justify-center mb-2">
-          <label className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground bg-muted/40 cursor-pointer hover:bg-muted/70 transition-colors touch-manipulation">
+          <button
+            type="button"
+            onClick={() => dateInputRef.current?.showPicker()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-muted/70 transition-colors touch-manipulation"
+          >
             <Calendar className="w-3 h-3 shrink-0" />
             <span>{dateLabel}</span>
-            <input
-              type="date"
-              value={logDate}
-              onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-            />
-          </label>
+          </button>
         </div>
 
         {/* ── Day picker ────────────────────────────────────────────── */}
@@ -1539,16 +1538,22 @@ export default function WorkoutLogger({
               {assignmentName}
             </span>
             <span className="text-muted-foreground/50 text-sm">·</span>
-            <label className="relative inline-flex items-center gap-1 text-sm font-medium cursor-pointer group" style={{ color: "var(--ink-mute)" }}>
-              <Calendar className="w-3.5 h-3.5 shrink-0 group-hover:text-foreground transition-colors" />
-              <span className="group-hover:text-foreground transition-colors underline-offset-2 group-hover:underline">{dateLabel}</span>
-              <input
-                type="date"
-                value={logDate}
-                onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-              />
-            </label>
+            <button
+              type="button"
+              onClick={() => dateInputRef.current?.showPicker()}
+              className="inline-flex items-center gap-1 text-sm font-medium cursor-pointer hover:text-foreground transition-colors underline-offset-2 hover:underline"
+              style={{ color: "var(--ink-mute)" }}
+            >
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span>{dateLabel}</span>
+            </button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={logDate}
+              onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
+              className="sr-only"
+            />
             {isResuming && (
               <span className="font-medium text-sm" style={{ color: "var(--warn)" }}>Resuming</span>
             )}
