@@ -225,6 +225,18 @@ export function ProgramBuilder({ programId, initial }: Props) {
     }));
   }
 
+  function moveSection(dKey: string, sKey: string, direction: "up" | "down") {
+    updateDay(dKey, (d) => {
+      const idx = d.sections.findIndex((s) => s._key === sKey);
+      if (direction === "up" && idx === 0) return d;
+      if (direction === "down" && idx === d.sections.length - 1) return d;
+      const next = [...d.sections];
+      const swap = direction === "up" ? idx - 1 : idx + 1;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return { ...d, sections: next };
+    });
+  }
+
   const updateSection = useCallback(
     (dKey: string, sKey: string, fn: (s: SectionInput) => SectionInput) =>
       updateDay(dKey, (d) => ({
@@ -572,6 +584,27 @@ export function ProgramBuilder({ programId, initial }: Props) {
                   <div key={section._key} className="border rounded-md bg-muted/20">
                     {/* Section header */}
                     <div className="flex items-center gap-2 px-3 py-2">
+                      {/* Section reorder buttons */}
+                      <div className="flex flex-col shrink-0">
+                        <button
+                          type="button"
+                          disabled={day.sections.findIndex((s) => s._key === section._key) === 0}
+                          onClick={() => moveSection(day._key, section._key, "up")}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                          title="Move block up"
+                        >
+                          <ChevronDown className="w-3 h-3 rotate-180" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={day.sections.findIndex((s) => s._key === section._key) === day.sections.length - 1}
+                          onClick={() => moveSection(day._key, section._key, "down")}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                          title="Move block down"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
