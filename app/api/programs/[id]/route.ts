@@ -24,8 +24,14 @@ export const PATCH = withWorkspace<{ id: string }>(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    const program = await upsertProgram(workspaceId, parsed.data, id);
-    return NextResponse.json(program);
+    try {
+      const program = await upsertProgram(workspaceId, parsed.data, id);
+      return NextResponse.json(program);
+    } catch (err) {
+      console.error("[PATCH /api/programs/:id]", err);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return NextResponse.json({ error: { formErrors: [message], fieldErrors: {} } }, { status: 500 });
+    }
   }
 );
 
