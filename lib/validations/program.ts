@@ -3,13 +3,13 @@ import { z } from "zod";
 export const SetSchema = z
   .object({
     setNumber: z.number().int().positive(),
-    weight: z.number().nullable().optional(),
-    unit: z.enum(["reps", "secs"]).optional().catch(undefined), // coerce unknown values to undefined (treated as "reps")
-    repMin: z.number().int().min(0),
-    repMax: z.number().int().min(0),
-    rpe: z.number().min(1).max(10).nullable().optional(),
-    restSeconds: z.number().int().positive().nullable().optional(),
-    notes: z.string().optional(),
+    weight: z.number().nullable().optional().catch(null),
+    unit: z.enum(["reps", "secs"]).optional().catch(undefined),
+    repMin: z.number().int().min(0).catch(0),
+    repMax: z.number().int().min(0).catch(0),
+    rpe: z.number().min(1).max(10).nullable().optional().catch(null),
+    restSeconds: z.number().int().min(1).nullable().optional().catch(null),
+    notes: z.string().optional().catch(""),
   })
   .refine((d) => d.repMin <= d.repMax, {
     message: "repMin must be ≤ repMax",
