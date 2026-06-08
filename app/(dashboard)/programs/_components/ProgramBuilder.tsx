@@ -375,7 +375,13 @@ export function ProgramBuilder({ programId, initial }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err?.error?.formErrors?.[0] ?? "Save failed");
+        const msg =
+          err?.error?.formErrors?.[0] ??
+          (Object.values(err?.error?.fieldErrors ?? {}).flat() as string[])[0] ??
+          (typeof err?.error === "string" ? err.error : null) ??
+          `Save failed (${res.status})`;
+        console.error("[save] API error", res.status, err);
+        toast.error(msg);
         return;
       }
       const saved = await res.json();
