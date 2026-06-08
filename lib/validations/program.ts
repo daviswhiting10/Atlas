@@ -4,7 +4,7 @@ export const SetSchema = z
   .object({
     setNumber: z.number().int().positive(),
     weight: z.number().nullable().optional(),
-    unit: z.enum(["reps", "secs"]).optional(), // "secs" for holds/time-based sets
+    unit: z.enum(["reps", "secs"]).optional().catch(undefined), // coerce unknown values to undefined (treated as "reps")
     repMin: z.number().int().min(0),
     repMax: z.number().int().min(0),
     rpe: z.number().min(1).max(10).nullable().optional(),
