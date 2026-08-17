@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Save, Loader2, Trash2, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Save, Loader2, Trash2, RotateCcw, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SetsTable, type SetDraft } from "@/app/(dashboard)/programs/_components/SetsTable";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
@@ -156,6 +156,14 @@ function groupByWeek(workouts: AssignedWorkout[], startDate: string) {
 
 // ─── Workout editor (inline) ──────────────────────────────────────────────────
 
+type SectionMeta = { key: string; name: string };
+
+function initSectionMetas(drafts: ExerciseDraft[]): SectionMeta[] {
+  return getSectionGroups(drafts)
+    .filter((g) => g.section !== null)
+    .map((g) => ({ key: k(), name: g.section! }));
+}
+
 function WorkoutEditor({
   workout,
   workspaceAssignmentId,
@@ -167,6 +175,9 @@ function WorkoutEditor({
 }) {
   const [exercises, setExercises] = useState<ExerciseDraft[]>(
     workout.exercises.map(toDraft)
+  );
+  const [sections, setSections] = useState<SectionMeta[]>(() =>
+    initSectionMetas(workout.exercises.map(toDraft))
   );
   const [loggedBy, setLoggedBy] = useState<"TRAINER" | "CLIENT">(workout.loggedBy);
   const [scheduledDate, setScheduledDate] = useState(
@@ -203,6 +214,20 @@ function WorkoutEditor({
     setExercises((prev) => prev.filter((e) => e._key !== eKey));
   }
 
+  function addBlock() {
+    setSections((prev) => [...prev, { key: k(), name: `Block ${prev.length + 1}` }]);
+  }
+
+  function renameSection(sKey: string, newName: string) {
+    const meta = sections.find((s) => s.key === sKey);
+    if (!meta || meta.name === newName) return;
+    const oldName = meta.name;
+    setSections((prev) => prev.map((s) => (s.key === sKey ? { ...s, name: newName } : s)));
+    setExercises((prev) =>
+      prev.map((e) => (e.section === oldName ? { ...e, section: newName } : e))
+    );
+  }
+
   function moveExercise(exKey: string, direction: "up" | "down") {
     setExercises((prev) => {
       const ex = prev.find((e) => e._key === exKey);
@@ -230,9 +255,12 @@ function WorkoutEditor({
   async function save() {
     setSaving(true);
     try {
-      // Flatten sections in display order, reassign global order 1..n
-      const groups = getSectionGroups(exercises);
-      const flatInOrder = groups.flatMap((g) => g.exs);
+      // Flatten in section display order, then unsectioned/orphaned last
+      const knownSectionNames = new Set(sections.map((s) => s.name));
+      const flatInOrder = [
+        ...sections.flatMap((sec) => exercises.filter((e) => e.section === sec.name)),
+        ...exercises.filter((e) => e.section === null || !knownSectionNames.has(e.section!)),
+      ];
       const exercisesWithOrder = flatInOrder.map((e, i) => ({ ...e, order: i + 1 }));
 
       const res = await fetch(
@@ -270,9 +298,9 @@ function WorkoutEditor({
 
       // Re-init drafts from saved data to pick up generated IDs and confirmed orders
       if (Array.isArray(updated?.exercises)) {
-        setExercises(
-          (updated.exercises as AssignedExercise[]).map(toDraft)
-        );
+        const updatedDrafts = (updated.exercises as AssignedExercise[]).map(toDraft);
+        setExercises(updatedDrafts);
+        setSections(initSectionMetas(updatedDrafts));
       }
       onSaved(updated);
     } finally {
@@ -280,8 +308,9 @@ function WorkoutEditor({
     }
   }
 
-  const groups = getSectionGroups(exercises);
-  const hasAnySection = exercises.some((e) => e.section !== null);
+  const hasAnySection = sections.length > 0 || exercises.some((e) => e.section !== null);
+  const knownSectionNames = new Set(sections.map((s) => s.name));
+  const generalExs = exercises.filter((e) => e.section === null || !knownSectionNames.has(e.section!));
 
   return (
     <div className="mt-3 space-y-3">
@@ -314,47 +343,113 @@ function WorkoutEditor({
       {/* Exercises grouped by section */}
       {hasAnySection ? (
         <div className="space-y-4">
-          {groups.map((group) => (
-            <div key={group.section ?? "__unsectioned__"}>
-              {/* Section header */}
+          {sections.map((sec) => {
+            const secExs = exercises.filter((e) => e.section === sec.name);
+            return (
+              <div key={sec.key}>
+                {/* Section header with editable name */}
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    value={sec.name}
+                    onChange={(e) => renameSection(sec.key, e.target.value)}
+                    className="font-body text-xs font-medium uppercase tracking-widest bg-transparent border-0 outline-none focus:underline min-w-0 w-auto"
+                    style={{ color: "var(--blue)" }}
+                  />
+                  <div className="flex-1 h-px" style={{ background: "var(--line)" }} />
+                  <span className="text-xs text-muted-foreground">{secExs.length} ex</span>
+                </div>
+
+                {/* Exercises in this section */}
+                <div className="space-y-2 ml-1">
+                  {secExs.map((ex, exIdx) => (
+                    <div key={ex._key} className="border rounded p-3 bg-background">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex flex-col shrink-0">
+                            <button
+                              type="button"
+                              disabled={exIdx === 0}
+                              onClick={() => moveExercise(ex._key, "up")}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                              title="Move up"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={exIdx === secExs.length - 1}
+                              onClick={() => moveExercise(ex._key, "down")}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                              title="Move down"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <span className="text-sm font-medium truncate">
+                            {exIdx + 1}. {ex.exerciseName}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeExercise(ex._key)}
+                          className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <SetsTable
+                        sets={ex.prescribedSets}
+                        onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Per-section add */}
+                <div className="mt-2 ml-1">
+                  <ExercisePicker
+                    onSelect={(ex) => addExerciseToSection(ex, sec.name)}
+                    placeholder={`+ Add to ${sec.name}...`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* General group for unsectioned / orphaned exercises */}
+          {generalExs.length > 0 && (
+            <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-body text-xs font-medium uppercase tracking-widest" style={{ color: "var(--blue)" }}>
-                  {group.label}
+                  General
                 </span>
                 <div className="flex-1 h-px" style={{ background: "var(--line)" }} />
-                <span className="text-xs text-muted-foreground">{group.exs.length} ex</span>
+                <span className="text-xs text-muted-foreground">{generalExs.length} ex</span>
               </div>
-
-              {/* Exercises in this section */}
               <div className="space-y-2 ml-1">
-                {group.exs.map((ex, exIdx) => (
+                {generalExs.map((ex, exIdx) => (
                   <div key={ex._key} className="border rounded p-3 bg-background">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {/* Up / down reorder */}
                         <div className="flex flex-col shrink-0">
                           <button
                             type="button"
                             disabled={exIdx === 0}
                             onClick={() => moveExercise(ex._key, "up")}
                             className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                            title="Move up"
                           >
                             <ChevronUp className="w-3 h-3" />
                           </button>
                           <button
                             type="button"
-                            disabled={exIdx === group.exs.length - 1}
+                            disabled={exIdx === generalExs.length - 1}
                             onClick={() => moveExercise(ex._key, "down")}
                             className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                            title="Move down"
                           >
                             <ChevronDown className="w-3 h-3" />
                           </button>
                         </div>
-                        <span className="text-sm font-medium truncate">
-                          {exIdx + 1}. {ex.exerciseName}
-                        </span>
+                        <span className="text-sm font-medium truncate">{exIdx + 1}. {ex.exerciseName}</span>
                       </div>
                       <button
                         type="button"
@@ -371,16 +466,18 @@ function WorkoutEditor({
                   </div>
                 ))}
               </div>
-
-              {/* Per-section add */}
-              <div className="mt-2 ml-1">
-                <ExercisePicker
-                  onSelect={(ex) => addExerciseToSection(ex, group.section)}
-                  placeholder={`+ Add to ${group.label}...`}
-                />
-              </div>
             </div>
-          ))}
+          )}
+
+          {/* Add block */}
+          <button
+            type="button"
+            onClick={addBlock}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground border border-dashed rounded-md py-2 hover:text-foreground hover:border-foreground/40 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            Add block
+          </button>
         </div>
       ) : (
         /* Flat list for workouts with no sections */
@@ -424,6 +521,14 @@ function WorkoutEditor({
             </div>
           ))}
           <ExercisePicker onSelect={(ex) => addExerciseToSection(ex, null)} placeholder="+ Add exercise..." />
+          <button
+            type="button"
+            onClick={addBlock}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground border border-dashed rounded-md py-2 hover:text-foreground hover:border-foreground/40 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            Add block
+          </button>
         </div>
       )}
 

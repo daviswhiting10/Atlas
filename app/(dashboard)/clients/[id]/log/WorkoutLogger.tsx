@@ -13,12 +13,10 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   Calendar,
   Check,
-  CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Loader2,
   Mic,
@@ -29,13 +27,16 @@ import {
   TrendingUp,
   AlertTriangle,
   RotateCcw,
+  X,
 } from "lucide-react";
 import {
   logSet,
   completeSession,
   addExerciseNote,
   updateSessionDate,
+  swapExercise,
 } from "@/lib/actions/workout-logger";
+import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog, PrevSet } from "./page";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -168,7 +169,7 @@ function buildInitialState(
   return state;
 }
 
-// ── Block + round-robin helpers ────────────────────────────────────────────────
+// ── Block helpers ───────────────────────────────────────────────────────────────
 
 /** A contiguous group of exercises sharing the same section label. */
 type ExBlock = { section: string | null; exIndices: number[] };
@@ -196,164 +197,6 @@ function formatBlockLabel(section: string | null): string {
   // "block_a" → "Block A"
   return section.replace(/^block_/, "Block ").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-
-/** First incomplete slot within a single block. Returns null if block is done. */
-function findFirstSlotInBlock(
-  block: ExBlock,
-  exercises: LoggerExercise[],
-  state: Record<string, ExerciseState>
-): { exIdx: number; setRound: number } | null {
-  const maxSets = Math.max(...block.exIndices.map((i) => state[exercises[i].aweId]?.sets.length ?? 0), 1);
-  for (let setRound = 0; setRound < maxSets; setRound++) {
-    for (const exIdx of block.exIndices) {
-      const sets = state[exercises[exIdx].aweId]?.sets ?? [];
-      if (setRound < sets.length && !sets[setRound].completed) {
-        return { exIdx, setRound };
-      }
-    }
-  }
-  return null;
-}
-
-/** Find the first incomplete slot across all blocks (for initialization/resume). */
-function findFirstIncompleteSlot(
-  exercises: LoggerExercise[],
-  state: Record<string, ExerciseState>
-): { exIdx: number; setRound: number } {
-  for (const block of groupIntoBlocks(exercises)) {
-    const slot = findFirstSlotInBlock(block, exercises, state);
-    if (slot) return slot;
-  }
-  return { exIdx: 0, setRound: 0 };
-}
-
-/**
- * After completing (completedAweId, completedSetIdx), find the next slot.
- *
- * Algorithm: build the full round-robin sequence for the current block
- * (round 0 of all exercises, then round 1, etc.), locate where we are,
- * and return the first INCOMPLETE slot that comes after.  Only after the
- * whole block is done do we advance to the first incomplete slot of the
- * next block.
- */
-function findNextSlotAfterComplete(
-  exercises: LoggerExercise[],
-  exState: Record<string, ExerciseState>,
-  completedAweId: string,
-  completedSetIdx: number,
-  fromExIdx: number,
-  fromSetRound: number
-): { exIdx: number; setRound: number } | null {
-  // Build simulated state that includes this completion
-  const simState: Record<string, ExerciseState> = {
-    ...exState,
-    [completedAweId]: {
-      ...exState[completedAweId],
-      sets: exState[completedAweId].sets.map((s, i) =>
-        i === completedSetIdx ? { ...s, completed: true } : s
-      ),
-    },
-  };
-
-  const blocks = groupIntoBlocks(exercises);
-  const blockIdx = blocks.findIndex((b) => b.exIndices.includes(fromExIdx));
-  if (blockIdx < 0) return null;
-
-  const block = blocks[blockIdx];
-
-  // Max prescribed sets across all exercises in this block
-  const maxSets = block.exIndices.reduce((acc, i) => {
-    return Math.max(acc, simState[exercises[i].aweId]?.sets.length ?? 0);
-  }, 0);
-
-  // Build the complete ordered round-robin sequence for this block:
-  //   [(round=0, ex0), (round=0, ex1), …, (round=1, ex0), …]
-  type Slot = { exIdx: number; setRound: number };
-  const sequence: Slot[] = [];
-  for (let round = 0; round < maxSets; round++) {
-    for (const exIdx of block.exIndices) {
-      const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
-      if (round < sets.length) {
-        sequence.push({ exIdx, setRound: round });
-      }
-    }
-  }
-
-  // Find where the just-completed slot sits in the sequence
-  const currentPos = sequence.findIndex(
-    (s) => s.exIdx === fromExIdx && s.setRound === fromSetRound
-  );
-
-  // Walk forward from the next position; return the first INCOMPLETE slot
-  for (let i = currentPos + 1; i < sequence.length; i++) {
-    const { exIdx, setRound } = sequence[i];
-    const sets = simState[exercises[exIdx].aweId]?.sets ?? [];
-    if (sets[setRound] && !sets[setRound].completed) {
-      return { exIdx, setRound };
-    }
-  }
-
-  // Every slot in this block is done → advance to first incomplete slot in next block
-  for (let bi = blockIdx + 1; bi < blocks.length; bi++) {
-    const slot = findFirstSlotInBlock(blocks[bi], exercises, simState);
-    if (slot) return slot;
-  }
-
-  return null; // All complete
-}
-
-/** Walk backwards one slot in the round-robin sequence (cross-block aware). */
-function findPrevSlot(
-  exercises: LoggerExercise[],
-  exState: Record<string, ExerciseState>,
-  fromExIdx: number,
-  fromSetRound: number
-): { exIdx: number; setRound: number } | null {
-  const blocks = groupIntoBlocks(exercises);
-  const blockIdx = blocks.findIndex((b) => b.exIndices.includes(fromExIdx));
-  if (blockIdx < 0) return null;
-
-  const block = blocks[blockIdx];
-  const maxSets = block.exIndices.reduce(
-    (acc, i) => Math.max(acc, exState[exercises[i].aweId]?.sets.length ?? 0),
-    0
-  );
-
-  type Slot = { exIdx: number; setRound: number };
-  const sequence: Slot[] = [];
-  for (let round = 0; round < maxSets; round++) {
-    for (const exIdx of block.exIndices) {
-      const sets = exState[exercises[exIdx].aweId]?.sets ?? [];
-      if (round < sets.length) sequence.push({ exIdx, setRound: round });
-    }
-  }
-
-  const currentPos = sequence.findIndex(
-    (s) => s.exIdx === fromExIdx && s.setRound === fromSetRound
-  );
-
-  if (currentPos > 0) return sequence[currentPos - 1];
-
-  // First slot in block → last slot of previous block
-  for (let bi = blockIdx - 1; bi >= 0; bi--) {
-    const prevBlock = blocks[bi];
-    const prevMaxSets = prevBlock.exIndices.reduce(
-      (acc, i) => Math.max(acc, exState[exercises[i].aweId]?.sets.length ?? 0),
-      0
-    );
-    const prevSeq: Slot[] = [];
-    for (let round = 0; round < prevMaxSets; round++) {
-      for (const exIdx of prevBlock.exIndices) {
-        const sets = exState[exercises[exIdx].aweId]?.sets ?? [];
-        if (round < sets.length) prevSeq.push({ exIdx, setRound: round });
-      }
-    }
-    if (prevSeq.length > 0) return prevSeq[prevSeq.length - 1];
-  }
-
-  return null;
-}
-
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -407,27 +250,33 @@ export default function WorkoutLogger({
   const [completing, startComplete] = useTransition();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  // ── Swap exercise (mid-workout substitution) ────────────────────────────────
+  const [swappingAweId, setSwappingAweId] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState(false);
+
+  // ── Collapsible blocks (mobile) — start with the first unfinished block open ──
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<number>>(() => {
+    const initial = buildInitialState(exercises, existingSetLogs);
+    const blocks = groupIntoBlocks(exercises);
+    const idx = blocks.findIndex((b) =>
+      b.exIndices.some((exI) => initial[exercises[exI].aweId].sets.some((s) => !s.completed))
+    );
+    return new Set([idx === -1 ? 0 : idx]);
+  });
+
+  function toggleBlock(bi: number) {
+    setExpandedBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(bi)) next.delete(bi);
+      else next.add(bi);
+      return next;
+    });
+  }
+
   // ── Mobile-specific state ────────────────────────────────────────────────────
-  const [currentExIdx, setCurrentExIdx] = useState<number>(() => {
-    if (existingSetLogs.length === 0) return 0;
-    const init = buildInitialState(exercises, existingSetLogs);
-    return findFirstIncompleteSlot(exercises, init).exIdx;
-  });
-  const [currentSetRound, setCurrentSetRound] = useState<number>(() => {
-    if (existingSetLogs.length === 0) return 0;
-    const init = buildInitialState(exercises, existingSetLogs);
-    return findFirstIncompleteSlot(exercises, init).setRound;
-  });
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
   const [restSecs, setRestSecs] = useState(0);
-  const [undoEntry, setUndoEntry] = useState<{ aweId: string; idx: number } | null>(null);
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchStartX = useRef(0);
   const dateInputRef = useRef<HTMLInputElement>(null);
-  // Tracks the slot just completed (shows brief "✓" flash before auto-advance)
-  const [justCompletedKey, setJustCompletedKey] = useState<string | null>(null);
-  // Allows editing a fully-logged session (suppresses the all-done completion screen)
-  const [editMode, setEditMode] = useState(false);
 
   // ── Session date (trainer can correct it) ─────────────────────────────────
   // Initialise to the workout's scheduledDate as a YYYY-MM-DD string
@@ -556,29 +405,13 @@ export default function WorkoutLogger({
         completed: !entry.completed,
         setLogId: result.setLogId,
       });
-      // Mobile: start rest timer + undo window + round-robin auto-advance
+      // Mobile: start rest timer + show an "Undo" toast
       if (!entry.completed) {
         setLastSetAt(Date.now());
         setRestSecs(0);
-        setUndoEntry({ aweId, idx });
-        setJustCompletedKey(`${aweId}-${idx}`);
-        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-        undoTimerRef.current = setTimeout(() => setUndoEntry(null), 5000);
-
-        // Auto-advance to next slot in round-robin order
-        const next = findNextSlotAfterComplete(
-          exercises, exState, aweId, idx, currentExIdx, currentSetRound
-        );
-        if (next) {
-          setTimeout(() => {
-            setJustCompletedKey(null);
-            setCurrentExIdx(next.exIdx);
-            setCurrentSetRound(next.setRound);
-          }, 350);
-        } else {
-          // All done — clear the just-completed flash after a beat
-          setTimeout(() => setJustCompletedKey(null), 600);
-        }
+        toast.success(`Set ${idx + 1} logged`, {
+          action: { label: "Undo", onClick: () => handleUndo(aweId, idx) },
+        });
       }
     } catch {
       toast.error("Failed to save set");
@@ -611,14 +444,6 @@ export default function WorkoutLogger({
       if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
       updateSet(aweId, idx, { saving: false, setLogId: result.setLogId });
       toast.success(`Set ${idx + 1} updated`);
-      // Advance to next slot if available
-      const next = findNextSlotAfterComplete(exercises, exState, aweId, idx, currentExIdx, currentSetRound);
-      if (next) {
-        setTimeout(() => {
-          setCurrentExIdx(next.exIdx);
-          setCurrentSetRound(next.setRound);
-        }, 300);
-      }
     } catch {
       toast.error("Failed to update set");
       updateSet(aweId, idx, { saving: false });
@@ -626,19 +451,8 @@ export default function WorkoutLogger({
   }
 
   // ── Undo last set ─────────────────────────────────────────────────────────
-  function handleUndo() {
-    if (!undoEntry) return;
-    const { aweId, idx } = undoEntry;
+  function handleUndo(aweId: string, idx: number) {
     updateSet(aweId, idx, { completed: false, setLogId: null });
-    // Navigate back to the undone slot
-    const exIdx = exercises.findIndex((ex) => ex.aweId === aweId);
-    if (exIdx >= 0) {
-      setCurrentExIdx(exIdx);
-      setCurrentSetRound(idx);
-    }
-    setUndoEntry(null);
-    setLastSetAt(null);
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     toast("Set undone");
   }
 
@@ -657,6 +471,21 @@ export default function WorkoutLogger({
     } catch {
       setExState((prev) => ({ ...prev, [aweId]: { ...prev[aweId], noteSaving: false } }));
       toast.error("Failed to save note");
+    }
+  }
+
+  // ── Swap exercise (mid-workout substitution) ──────────────────────────────
+  async function handleSwapExercise(aweId: string, newEx: ExerciseOption) {
+    setSwapping(true);
+    try {
+      await swapExercise({ assignedWorkoutExerciseId: aweId, exerciseId: newEx.id });
+      toast.success(`Switched to ${newEx.name}`);
+      setSwappingAweId(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't switch exercise");
+    } finally {
+      setSwapping(false);
     }
   }
 
@@ -719,31 +548,6 @@ export default function WorkoutLogger({
         toast.error("Failed to complete session");
       }
     });
-  }
-
-  // ── Swipe between exercises (mobile) — block-scoped ─────────────────────
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-  }
-  function handleTouchEnd(e: React.TouchEvent) {
-    const diff = touchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(diff) < 60) return;
-    const blocks = groupIntoBlocks(exercises);
-    const currentBlock = blocks.find((b) => b.exIndices.includes(currentExIdx));
-    if (!currentBlock) return;
-    const posInBlock = currentBlock.exIndices.indexOf(currentExIdx);
-    if (diff > 0) {
-      // Swipe left → next exercise in block, or next round in block
-      if (posInBlock < currentBlock.exIndices.length - 1) {
-        setCurrentExIdx(currentBlock.exIndices[posInBlock + 1]);
-      } else {
-        setCurrentExIdx(currentBlock.exIndices[0]);
-        setCurrentSetRound((r) => r + 1);
-      }
-    }
-    if (diff < 0 && posInBlock > 0) {
-      setCurrentExIdx(currentBlock.exIndices[posInBlock - 1]);
-    }
   }
 
   // ── Week / day picker helpers ─────────────────────────────────────────────
@@ -911,604 +715,231 @@ export default function WorkoutLogger({
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MOBILE LAYOUT  (hidden on md+)
+  // MOBILE LAYOUT  (hidden on md+) — full scrollable workout view
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const mobileView = (() => {
-    const safeExIdx = Math.min(currentExIdx, exercises.length - 1);
-    const ex = exercises[safeExIdx];
-    const state = exState[ex.aweId];
-    const setIdx = currentSetRound;
-    const activeSet = state.sets[setIdx];
-    const allSessionDone = exercises.every((e) =>
-      exState[e.aweId].sets.every((s) => s.completed)
-    );
-    const s = ex.suggestion;
-    const lastStr = formatLastSets(ex.lastSets);
-    const prescribed = ex.prescribedSets[setIdx] ?? ex.prescribedSets[0] ?? null;
-    const repMax = prescribed?.repMax ?? null;
-
-    // Block-scoped context
-    const blocks = groupIntoBlocks(exercises);
-    const currentBlock = blocks.find((b) => b.exIndices.includes(safeExIdx)) ?? blocks[0]!;
-    const posInBlock = currentBlock.exIndices.indexOf(safeExIdx);
-    const blockLabel = formatBlockLabel(currentBlock.section);
-    const totalRounds = Math.max(
-      ...currentBlock.exIndices.map((i) => exState[exercises[i].aweId]?.sets.length ?? 0),
-      1
-    );
-
-    return (
-      <div
-        className="md:hidden px-4 pt-2 pb-4"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* ── Top bar ───────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-3">
-          <Link
-            href={`/clients/${clientId}`}
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2")}
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            <span className="max-w-[100px] truncate">{clientName}</span>
-          </Link>
+  const mobileView = (
+    <div className="md:hidden px-4 pt-2 pb-28">
+      {/* ── Top bar ───────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-2 mb-2 bg-background/95 backdrop-blur border-b flex items-center justify-between">
+        <Link
+          href={`/clients/${clientId}`}
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2")}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          <span className="max-w-[100px] truncate">{clientName}</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          {isResuming && (
+            <span className="text-xs font-semibold" style={{ color: "var(--warn)" }}>
+              Resuming
+            </span>
+          )}
           <Button
             size="sm"
             disabled={completing || !anyCompleted}
             onClick={handleCompleteSession}
             variant="outline"
           >
-            {completing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1" />}
+            {completing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Check className="w-3.5 h-3.5 mr-1" />
+            )}
             Done
           </Button>
         </div>
+      </div>
 
-        {/* ── Session date chip ─────────────────────────────────────── */}
-        <div className="flex items-center justify-center mb-2">
-          <button
-            type="button"
-            onClick={() => dateInputRef.current?.showPicker()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-muted/70 transition-colors touch-manipulation"
-          >
-            <Calendar className="w-3 h-3 shrink-0" />
-            <span>{dateLabel}</span>
-          </button>
-        </div>
+      {/* ── Session date chip ─────────────────────────────────────── */}
+      <div className="flex items-center justify-center mb-2">
+        <button
+          type="button"
+          onClick={() => dateInputRef.current?.showPicker()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-muted/70 transition-colors touch-manipulation"
+        >
+          <Calendar className="w-3 h-3 shrink-0" />
+          <span>{dateLabel}</span>
+        </button>
+      </div>
 
-        {/* ── Day picker ────────────────────────────────────────────── */}
-        {dayPicker}
+      {/* ── Day picker ────────────────────────────────────────────── */}
+      {dayPicker}
 
-        {/* ── Block label + progress dots (scoped to current block) ──── */}
-        <div className="mb-4">
-          {blockLabel && (
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary text-center mb-2">
-              {blockLabel}
-            </p>
-          )}
-          <div className="flex items-center justify-center gap-1.5">
-            {currentBlock.exIndices.map((exI, bi) => {
-              const exSets = exState[exercises[exI].aweId]?.sets ?? [];
-              const done = exSets.every((s) => s.completed);
-              return (
-                <button
-                  key={exI}
-                  onClick={() => setCurrentExIdx(exI)}
-                  className={cn(
-                    "rounded-full transition-all touch-manipulation",
-                    bi === posInBlock
-                      ? "w-6 h-2 bg-primary"
-                      : done
-                      ? "w-2 h-2 bg-green-500"
-                      : "w-2 h-2 bg-muted-foreground/30"
-                  )}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Exercise header ────────────────────────────────────────── */}
-        <div className="mb-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Exercise {posInBlock + 1} of {currentBlock.exIndices.length}
-                </p>
-                <span className="text-muted-foreground/40 text-xs">·</span>
-                <p className="text-xs font-semibold text-primary">
-                  Set {setIdx + 1} of {totalRounds}
-                </p>
-              </div>
-              <h2 className="text-xl font-bold leading-tight">{ex.name}</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {ex.prescribedSets.length} ×{" "}
-                {ex.prescribedSets[0]?.unit === "secs"
-                  ? `${ex.prescribedSets[0]?.repMax}s`
-                  : ex.prescribedSets[0]?.repMin === ex.prescribedSets[0]?.repMax
-                    ? ex.prescribedSets[0]?.repMax
-                    : `${ex.prescribedSets[0]?.repMin}–${ex.prescribedSets[0]?.repMax}`}
-              </p>
-            </div>
-            {isResuming && (
-              <span className="text-xs text-amber-600 font-medium shrink-0 mt-1">Resuming</span>
-            )}
-          </div>
-
-          {lastStr && (
-            <p className="text-xs text-muted-foreground mt-1.5">Last: {lastStr}</p>
-          )}
-          {/* Previous week reference — same workout, one week prior */}
-          {ex.prevWorkoutSets.length > 0 && (
-            <p className="text-xs mt-1" style={{ color: "var(--blue)" }}>
-              <span className="font-semibold">Prev week:</span>{" "}
-              {formatPrevSets(ex.prevWorkoutSets)}
-            </p>
-          )}
-          {!ex.lastSets.length && !ex.prevWorkoutSets.length && (
-            <p className="text-xs text-muted-foreground italic mt-1.5">First time — start conservative.</p>
-          )}
-
-          {/* Progression suggestion */}
-          {s.type === "progress" && (
-            <div className="flex items-center gap-1 mt-1.5">
-              <TrendingUp className="w-3 h-3 text-green-700 shrink-0" />
-              <p className="text-xs text-green-700">{s.reasoning}</p>
-            </div>
-          )}
-          {s.type === "deload" && (
-            <div className="flex items-center gap-1 mt-1.5">
-              <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
-              <p className="text-xs text-red-700">{s.reasoning}</p>
-            </div>
-          )}
-          {ex.lastNote && (
-            <p className="text-xs text-muted-foreground italic mt-1.5 border-l-2 border-muted pl-2">
-              {ex.lastNote}
-            </p>
-          )}
-        </div>
-
-        {/* ── Set inputs ─────────────────────────────────────────────── */}
-        {allSessionDone && !editMode ? (
-          <div className="pb-4">
-            <div className="text-center pt-6 pb-4">
-              <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" />
-              <p className="text-lg font-semibold">All sets complete!</p>
-              <button
-                type="button"
-                onClick={() => { setEditMode(true); setCurrentExIdx(0); setCurrentSetRound(0); }}
-                className="mt-3 text-sm text-primary underline touch-manipulation"
-              >
-                Edit session values
-              </button>
-            </div>
-
-            {/* Session notes summary */}
-            {(() => {
-              const notedExercises = exercises
-                .map((e) => ({
-                  name: e.name,
-                  sets: exState[e.aweId].sets
-                    .map((s, i) => ({ setNum: i + 1, note: s.note.trim(), load:
-                      s.isBand
-                        ? (BAND_COLORS.find(b => b.id === s.bandColor)?.label ?? s.bandColor) + " band"
-                        : s.isBodyweight ? "BW"
-                        : s.weight ? `${s.weight} lb` : null,
-                      reps: s.reps || null,
-                      isSeconds: s.isSeconds,
-                    }))
-                    .filter((s) => s.note),
-                }))
-                .filter((e) => e.sets.length > 0);
-
-              if (notedExercises.length === 0) return (
-                <p className="text-xs text-center text-muted-foreground mb-4">No set notes this session.</p>
-              );
-
-              return (
-                <div className="space-y-3 mb-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">Session Notes</p>
-                  {notedExercises.map((e) => (
-                    <div key={e.name} className="rounded-xl border bg-muted/30 px-4 py-3">
-                      <p className="text-sm font-semibold mb-2">{e.name}</p>
-                      <div className="space-y-1.5">
-                        {e.sets.map((s) => (
-                          <div key={s.setNum} className="flex gap-2 text-xs">
-                            <span className="text-muted-foreground shrink-0 w-12">
-                              Set {s.setNum}{s.load || s.reps ? ` · ${[s.load, s.reps ? (s.isSeconds ? `${s.reps}s` : `${s.reps}r`) : null].filter(Boolean).join(" × ")}` : ""}
-                            </span>
-                            <span className="text-foreground">{s.note}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-        ) : justCompletedKey === `${ex.aweId}-${setIdx}` ? (
-          <div className="py-10 text-center">
-            <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-3" />
-            <p className="text-base font-semibold text-green-700">Set {setIdx + 1} complete ✓</p>
-            <p className="text-sm text-muted-foreground mt-1">Moving to next exercise…</p>
-          </div>
-        ) : (
-          <>
-            {/* Edit mode banner */}
-            {activeSet?.completed && (
-              <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-4 text-xs font-medium"
-                style={{ background: "rgba(43,107,255,0.07)", color: "var(--blue)" }}>
-                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-                Editing completed set — tap Update to save changes
-              </div>
-            )}
-            {/* Load — Weight / Bodyweight / Band */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Load</p>
-                {prescribed?.weight != null && !activeSet.isBodyweight && !activeSet.isBand && (
-                  <p className="text-xs font-semibold text-green-700">Prescribed: {prescribed.weight} lb</p>
-                )}
-              </div>
-
-              {/* Load-type toggle row */}
-              <div className="flex gap-1.5 mb-3">
-                {(["weight", "band", "bw"] as const).map((mode) => {
-                  const active =
-                    mode === "weight" ? (!activeSet.isBodyweight && !activeSet.isBand) :
-                    mode === "band"   ? activeSet.isBand :
-                    activeSet.isBodyweight;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => updateSet(ex.aweId, setIdx, {
-                        isBodyweight: mode === "bw",
-                        isBand: mode === "band",
-                        weight: mode !== "weight" ? "" : activeSet.weight,
-                      })}
-                      className={cn(
-                        "flex-1 h-9 rounded-xl text-xs font-semibold border-2 transition-colors touch-manipulation",
-                        active
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground"
-                      )}
-                    >
-                      {mode === "weight" ? "Weight" : mode === "band" ? "Band" : "BW"}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Band color picker */}
-              {activeSet.isBand && (
-                <div className="flex gap-2 justify-between mb-1">
-                  {BAND_COLORS.map(({ id, label, hex }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      title={label}
-                      onClick={() => updateSet(ex.aweId, setIdx, { bandColor: id })}
-                      className={cn(
-                        "flex-1 h-12 rounded-xl border-2 transition-all touch-manipulation flex items-center justify-center",
-                        activeSet.bandColor === id
-                          ? "border-foreground scale-105 shadow-md"
-                          : "border-transparent opacity-70"
-                      )}
-                      style={{ backgroundColor: hex }}
-                    >
-                      {activeSet.bandColor === id && (
-                        <Check className="w-4 h-4 text-white drop-shadow" strokeWidth={3} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* BW display */}
-              {activeSet.isBodyweight && (
-                <div className="h-16 rounded-xl border-2 bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground">
-                  Bodyweight
-                </div>
-              )}
-
-              {/* Weight input */}
-              {!activeSet.isBodyweight && !activeSet.isBand && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => adjustWeight(ex.aweId, setIdx, -2.5)}
-                    className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
-                  >
-                    −
-                  </button>
-                  <Input
-                    value={activeSet.weight}
-                    onChange={(e) => updateSet(ex.aweId, setIdx, { weight: e.target.value })}
-                    className="flex-1 h-16 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                    type="number"
-                    inputMode="decimal"
-                    step="2.5"
-                    style={{ fontSize: "1.75rem" }}
-                    placeholder="lb"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => adjustWeight(ex.aweId, setIdx, 2.5)}
-                    className="w-16 h-16 rounded-xl border-2 shadow-md flex items-center justify-center text-2xl font-light touch-manipulation select-none active:bg-muted"
-                  >
-                    +
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Reps / Seconds */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {activeSet.isSeconds ? "Seconds" : "Reps"}
-                </p>
-                {prescribed && (
-                  <p className="text-xs font-semibold text-green-700">
-                    {activeSet.isSeconds
-                      ? `${prescribed.repMax}s`
-                      : prescribed.repMin === prescribed.repMax
-                        ? `${prescribed.repMax} reps`
-                        : `${prescribed.repMin}–${prescribed.repMax} reps`}
-                  </p>
-                )}
-              </div>
-              {/* Reps / Secs unit toggle */}
-              <div className="flex gap-1.5 mb-3">
-                {(["reps", "secs"] as const).map((mode) => {
-                  const active = mode === "secs" ? activeSet.isSeconds : !activeSet.isSeconds;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => updateSet(ex.aweId, setIdx, { isSeconds: mode === "secs" })}
-                      className={cn(
-                        "flex-1 h-9 rounded-xl text-xs font-semibold border-2 transition-colors touch-manipulation",
-                        active
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground"
-                      )}
-                    >
-                      {mode === "reps" ? "Reps" : "Secs"}
-                    </button>
-                  );
-                })}
-              </div>
-              <Input
-                value={activeSet.reps}
-                onChange={(e) => updateSet(ex.aweId, setIdx, { reps: e.target.value })}
-                className="w-full h-20 text-center font-bold rounded-xl border-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                type="number"
-                inputMode="numeric"
-                style={{ fontSize: "2.5rem" }}
-                placeholder="—"
-              />
-            </div>
-
-            {/* Complete / Update set button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (activeSet?.completed) {
-                  handleUpdateCompletedSet(ex.aweId, ex.exerciseId, setIdx);
-                } else {
-                  handleComplete(ex.aweId, ex.exerciseId, setIdx);
-                }
-              }}
-              disabled={activeSet?.saving}
-              className={cn(
-                "w-full h-16 rounded-2xl text-lg font-semibold flex items-center justify-center gap-2 touch-manipulation active:opacity-90 disabled:opacity-60 mb-4",
-                activeSet?.completed
-                  ? "bg-blue-600 text-white"
-                  : "bg-primary text-primary-foreground"
-              )}
-            >
-              {activeSet?.saving ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : activeSet?.completed ? (
-                <RotateCcw className="w-5 h-5" />
-              ) : (
-                <Check className="w-5 h-5" />
-              )}
-              {activeSet?.completed
-                ? `Update Set ${setIdx + 1}`
-                : `Complete Set ${setIdx + 1} of ${state.sets.length}`}
-            </button>
-
-            {/* Back to previous set */}
-            {(() => {
-              const prevSlot = findPrevSlot(exercises, exState, currentExIdx, currentSetRound);
-              return prevSlot ? (
+      {/* ── Exercise list, grouped by block ─────────────────────────── */}
+      <div className="space-y-3">
+        {groupIntoBlocks(exercises).map((block, bi) => {
+          const blockLabel = formatBlockLabel(block.section);
+          const isCollapsible = !!blockLabel;
+          const isExpanded = !isCollapsible || expandedBlocks.has(bi);
+          const totalSets = block.exIndices.reduce(
+            (sum, exI) => sum + exState[exercises[exI].aweId].sets.length,
+            0
+          );
+          const doneSets = block.exIndices.reduce(
+            (sum, exI) => sum + exState[exercises[exI].aweId].sets.filter((s) => s.completed).length,
+            0
+          );
+          const blockDone = totalSets > 0 && doneSets === totalSets;
+          return (
+            <div key={bi} className="space-y-3">
+              {blockLabel && (
                 <button
                   type="button"
-                  onClick={() => { setCurrentExIdx(prevSlot.exIdx); setCurrentSetRound(prevSlot.setRound); }}
-                  className="w-full text-center text-xs text-muted-foreground py-1.5 mb-2 touch-manipulation flex items-center justify-center gap-1"
+                  onClick={() => toggleBlock(bi)}
+                  className="w-full flex items-center gap-2 pt-1 touch-manipulation"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  Edit previous set
-                </button>
-              ) : null;
-            })()}
-
-            {/* Per-set note */}
-            <div className="mb-4">
-              <Input
-                value={activeSet?.note ?? ""}
-                onChange={(e) => updateSet(ex.aweId, setIdx, { note: e.target.value })}
-                placeholder="Set note (optional) — band color, form cue, how it felt…"
-                className="text-sm rounded-xl border-2 h-10 px-3"
-                style={{ fontSize: "16px" }}
-              />
-            </div>
-
-            {/* Progression hint at top of rep range (reps mode only) */}
-            {!activeSet.isSeconds && activeSet.completed && repMax != null && activeSet.reps !== "" && parseInt(activeSet.reps, 10) >= repMax && (
-              <p className="text-xs text-green-700 text-center flex items-center justify-center gap-1 mb-2">
-                <TrendingUp className="w-3 h-3" />
-                Increase weight next session
-              </p>
-            )}
-          </>
-        )}
-
-        {/* ── Rest timer ─────────────────────────────────────────────── */}
-        {lastSetAt && (
-          <div className="flex items-center justify-center gap-3 mt-2 mb-3">
-            <Timer className="w-4 h-4 text-muted-foreground" />
-            <span className="font-mono text-2xl tabular-nums text-muted-foreground">
-              {formatRest(restSecs)}
-            </span>
-            <button
-              type="button"
-              onClick={() => { setLastSetAt(Date.now()); setRestSecs(0); }}
-              className="text-xs text-muted-foreground underline touch-manipulation"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* ── Undo (5-second window) ─────────────────────────────────── */}
-        {undoEntry && (
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="w-full text-center text-sm text-amber-600 underline py-2 touch-manipulation"
-          >
-            Undo last set
-          </button>
-        )}
-
-        {/* ── Completed sets (collapsible) ───────────────────────────── */}
-        {state.sets.some((s) => s.completed) && (
-          <div className="mt-3 border rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => {}}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-muted-foreground"
-            >
-              <span>Completed sets ({state.sets.filter((s) => s.completed).length})</span>
-            </button>
-            <div className="px-4 pb-3 space-y-1">
-              {state.sets.map((entry, i) =>
-                entry.completed ? (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setCurrentSetRound(i)}
-                    className="w-full flex items-center gap-2 text-xs text-muted-foreground text-left touch-manipulation hover:text-foreground py-0.5"
-                  >
-                    <Check className="w-3 h-3 text-green-600 shrink-0" />
-                    <span>
-                      Set {i + 1}:
-                      {entry.isBodyweight ? " BW" : entry.isBand ? ` ${entry.bandColor} band` : entry.weight ? ` ${entry.weight} lb` : ""}
-                      {entry.reps
-                        ? entry.isSeconds
-                          ? ` ${entry.reps}s`
-                          : ` × ${entry.reps}`
-                        : ""}
-                      {entry.rpe ? ` @ RPE ${entry.rpe}` : ""}
+                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
+                    {blockLabel}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                  {blockDone ? (
+                    <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                      {doneSets}/{totalSets}
                     </span>
-                    <span className="ml-auto text-[10px] text-primary opacity-0 group-hover:opacity-100">Edit</span>
-                  </button>
-                ) : null
+                  )}
+                  {isExpanded ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  )}
+                </button>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Coach note ────────────────────────────────────────────── */}
-        <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Notes</p>
-          {state.noteAdded ? (
-            <p className="text-xs text-green-700 py-2">Note saved ✓</p>
-          ) : (
-            <div className="space-y-2">
-              <Textarea
-                value={state.noteInput}
-                onChange={(e) =>
-                  setExState((prev) => ({
-                    ...prev,
-                    [ex.aweId]: { ...prev[ex.aweId], noteInput: e.target.value },
-                  }))
-                }
-                placeholder="Pain, adaptation, form cue…"
-                rows={3}
-                className="resize-none"
-                style={{ fontSize: "16px" }}
-              />
-              {state.noteInput.trim() && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  disabled={state.noteSaving}
-                  onClick={() => saveNote(ex.aweId, ex.exerciseId)}
+              {!isExpanded && (
+                <button
+                  type="button"
+                  onClick={() => toggleBlock(bi)}
+                  className="w-full text-left text-xs text-muted-foreground px-1 pb-1 truncate touch-manipulation"
                 >
-                  {state.noteSaving ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : null}
-                  Save note
-                </Button>
+                  {block.exIndices.map((exI) => exercises[exI].name).join(" · ")}
+                </button>
               )}
-            </div>
-          )}
-        </div>
+              {isExpanded && block.exIndices.map((exI) => {
+                const ex = exercises[exI];
+                const state = exState[ex.aweId];
+                return (
+                  <Card key={ex.aweId} size="sm">
+                    <CardContent className="space-y-3">
+                      <ExerciseHeader
+                        ex={ex}
+                        isSwapping={swappingAweId === ex.aweId}
+                        swapping={swapping}
+                        onToggleSwap={() =>
+                          setSwappingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))
+                        }
+                        onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                      />
 
-        {/* ── Exercise navigation (block-scoped) ────────────────────── */}
-        <div className="flex gap-3 mt-5">
+                      <div className="space-y-2">
+                        {state.sets.map((entry, idx) => {
+                          const repMax =
+                            ex.prescribedSets[idx]?.repMax ?? ex.prescribedSets[0]?.repMax ?? null;
+                          const prescribedWeight = ex.prescribedSets[idx]?.weight ?? null;
+                          return (
+                            <MobileSetRow
+                              key={idx}
+                              idx={idx}
+                              entry={entry}
+                              repMax={repMax}
+                              prescribedWeight={prescribedWeight}
+                              onChange={(patch) => updateSet(ex.aweId, idx, patch)}
+                              onAdjustWeight={(delta) => adjustWeight(ex.aweId, idx, delta)}
+                              onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
+                              onBlurPersist={() => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => addSet(ex.aweId)}
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add set
+                      </button>
+
+                      <div className="pt-2 border-t">
+                        {state.noteAdded ? (
+                          <p className="text-xs text-green-700">Note saved ✓</p>
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <Input
+                              value={state.noteInput}
+                              onChange={(e) =>
+                                setExState((prev) => ({
+                                  ...prev,
+                                  [ex.aweId]: { ...prev[ex.aweId], noteInput: e.target.value },
+                                }))
+                              }
+                              placeholder="Pain, adaptation, form cue…"
+                              className="h-9"
+                              style={{ fontSize: "16px" }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveNote(ex.aweId, ex.exerciseId);
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 text-xs px-3 shrink-0"
+                              disabled={!state.noteInput.trim() || state.noteSaving}
+                              onClick={() => saveNote(ex.aweId, ex.exerciseId)}
+                            >
+                              {state.noteSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {soapPanel}
+
+      {/* ── Finish session ───────────────────────────────────────── */}
+      <Button
+        className="w-full h-12 text-base mt-4"
+        disabled={completing || !anyCompleted}
+        onClick={handleCompleteSession}
+      >
+        {completing ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            Saving…
+          </>
+        ) : (
+          "Finish session"
+        )}
+      </Button>
+
+      {/* ── Floating rest timer ──────────────────────────────────── */}
+      {lastSetAt && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
+          <Timer className="w-4 h-4 text-muted-foreground" />
+          <span className="font-mono text-lg tabular-nums">{formatRest(restSecs)}</span>
           <button
             type="button"
             onClick={() => {
-              if (posInBlock > 0) {
-                setCurrentExIdx(currentBlock.exIndices[posInBlock - 1]);
-              }
+              setLastSetAt(Date.now());
+              setRestSecs(0);
             }}
-            disabled={posInBlock === 0}
-            className="flex-1 h-12 rounded-xl border flex items-center justify-center gap-1 text-sm font-medium disabled:opacity-30 touch-manipulation active:bg-muted"
+            className="text-muted-foreground touch-manipulation"
           >
-            <ChevronLeft className="w-4 h-4" /> Prev
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
-          {allSessionDone ? (
-            <button
-              type="button"
-              onClick={handleCompleteSession}
-              disabled={completing || !anyCompleted}
-              className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold disabled:opacity-40 touch-manipulation"
-            >
-              {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : "Finish session"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                if (posInBlock < currentBlock.exIndices.length - 1) {
-                  setCurrentExIdx(currentBlock.exIndices[posInBlock + 1]);
-                } else {
-                  // End of block exercises — wrap to next round of this block
-                  setCurrentExIdx(currentBlock.exIndices[0]);
-                  setCurrentSetRound((r) => r + 1);
-                }
-              }}
-              className="flex-1 h-12 rounded-xl border flex items-center justify-center gap-1 text-sm font-medium touch-manipulation active:bg-muted"
-            >
-              Next <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
         </div>
-
-        {/* SOAP notes */}
-        {soapPanel}
-      </div>
-    );
-  })();
+      )}
+    </div>
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DESKTOP LAYOUT  (hidden on < md)
@@ -1599,7 +1030,32 @@ export default function WorkoutLogger({
             <Card>
               <CardHeader className="pb-2 pt-4 px-4">
                 <div className="min-w-0">
-                  <CardTitle className="text-sm font-semibold leading-tight">{ex.name}</CardTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSwappingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))
+                      }
+                      disabled={swapping}
+                      className="text-muted-foreground hover:text-foreground shrink-0 disabled:opacity-50"
+                      title="Did a different exercise?"
+                    >
+                      {swappingAweId === ex.aweId ? (
+                        <X className="w-3.5 h-3.5" />
+                      ) : (
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  {swappingAweId === ex.aweId && (
+                    <div className="mt-1.5">
+                      <ExercisePicker
+                        onSelect={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                        placeholder="Switch to exercise..."
+                      />
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {ex.prescribedSets.length} ×{" "}
                     {ex.prescribedSets[0]
@@ -1732,6 +1188,300 @@ export default function WorkoutLogger({
       {mobileView}
       {desktopView}
     </>
+  );
+}
+
+// ── Exercise header (shared info block for mobile cards) ────────────────────────
+
+function ExerciseHeader({
+  ex,
+  isSwapping,
+  swapping,
+  onToggleSwap,
+  onSwap,
+}: {
+  ex: LoggerExercise;
+  isSwapping: boolean;
+  swapping: boolean;
+  onToggleSwap: () => void;
+  onSwap: (ex: ExerciseOption) => void;
+}) {
+  const lastStr = formatLastSets(ex.lastSets);
+  const hasLastData = ex.lastSets.length > 0;
+  const s = ex.suggestion;
+  const ps0 = ex.prescribedSets[0];
+  const repDesc = ps0
+    ? ps0.unit === "secs"
+      ? `${ps0.repMax}s`
+      : ps0.repMin === ps0.repMax
+        ? `${ps0.repMax}`
+        : `${ps0.repMin}–${ps0.repMax}`
+    : "?";
+
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</h3>
+        <button
+          type="button"
+          onClick={onToggleSwap}
+          disabled={swapping}
+          className="text-muted-foreground hover:text-foreground shrink-0 disabled:opacity-50 touch-manipulation"
+          title="Did a different exercise?"
+        >
+          {isSwapping ? <X className="w-3.5 h-3.5" /> : <ArrowLeftRight className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+      {isSwapping && (
+        <div className="mt-1.5">
+          <ExercisePicker onSelect={onSwap} placeholder="Switch to exercise..." />
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground mt-0.5">
+        {ex.prescribedSets.length} × {repDesc}
+      </p>
+
+      {hasLastData ? (
+        lastStr && <p className="text-xs text-muted-foreground mt-1">{lastStr}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground mt-1 italic">First time — start conservative.</p>
+      )}
+
+      {ex.prevWorkoutSets.length > 0 && (
+        <p className="text-xs mt-1" style={{ color: "var(--blue)" }}>
+          <span className="font-semibold">Prev week:</span> {formatPrevSets(ex.prevWorkoutSets)}
+        </p>
+      )}
+
+      {s.type === "progress" && (
+        <div className="flex items-center gap-1 mt-1">
+          <TrendingUp className="w-3 h-3 text-green-700 shrink-0" />
+          <p className="text-xs text-green-700">{s.reasoning}</p>
+        </div>
+      )}
+      {s.type === "hold" && hasLastData && (
+        <p className="text-xs text-amber-700 mt-1">{s.reasoning}</p>
+      )}
+      {s.type === "deload" && (
+        <div className="flex items-center gap-1 mt-1">
+          <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
+          <p className="text-xs text-red-700">{s.reasoning}</p>
+        </div>
+      )}
+      {s.type === "match_last" && (
+        <p className="text-xs text-muted-foreground mt-1 italic">{s.reasoning}</p>
+      )}
+
+      {ex.lastNote && (
+        <p className="text-xs text-muted-foreground italic mt-1 border-l-2 border-muted pl-2">
+          {ex.lastNote}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Mobile SetRow ─────────────────────────────────────────────────────────────
+
+function MobileSetRow({
+  idx,
+  entry,
+  repMax,
+  prescribedWeight,
+  onChange,
+  onAdjustWeight,
+  onComplete,
+  onBlurPersist,
+}: {
+  idx: number;
+  entry: SetEntry;
+  repMax: number | null;
+  prescribedWeight: number | null;
+  onChange: (patch: Partial<SetEntry>) => void;
+  onAdjustWeight: (delta: number) => void;
+  onComplete: () => void;
+  onBlurPersist: () => void;
+}) {
+  const hitsTopOfRange =
+    !entry.isSeconds &&
+    entry.completed &&
+    repMax != null &&
+    entry.reps !== "" &&
+    parseInt(entry.reps, 10) >= repMax;
+
+  function persistIfCompleted() {
+    if (entry.completed) onBlurPersist();
+  }
+
+  function cycleLoadMode() {
+    if (!entry.isBodyweight && !entry.isBand) {
+      onChange({ isBodyweight: true, isBand: false, weight: "" });
+    } else if (entry.isBodyweight) {
+      onChange({ isBodyweight: false, isBand: true });
+    } else {
+      onChange({ isBodyweight: false, isBand: false });
+    }
+  }
+
+  const bandMeta = BAND_COLORS.find((b) => b.id === entry.bandColor);
+
+  return (
+    <div className={cn("rounded-xl border p-2 space-y-1.5", entry.completed && "bg-muted/30")}>
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground w-4 shrink-0 text-center">{idx + 1}</span>
+
+        {/* Load control */}
+        {entry.isBand ? (
+          <div
+            className="w-[104px] h-11 rounded-lg border-2 flex items-center justify-center gap-1.5 shrink-0"
+            style={{ borderColor: bandMeta?.hex }}
+          >
+            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: bandMeta?.hex }} />
+            <span className="text-xs font-semibold">{bandMeta?.label}</span>
+          </div>
+        ) : entry.isBodyweight ? (
+          <div className="w-[104px] h-11 rounded-lg border bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">
+            Bodyweight
+          </div>
+        ) : (
+          <div className="flex items-center gap-0.5 w-[104px] shrink-0">
+            <button
+              type="button"
+              onClick={() => onAdjustWeight(-2.5)}
+              className="w-7 h-11 rounded-lg border flex items-center justify-center text-base font-light touch-manipulation active:bg-muted shrink-0"
+            >
+              −
+            </button>
+            <Input
+              value={entry.weight}
+              onChange={(e) => onChange({ weight: e.target.value })}
+              onBlur={persistIfCompleted}
+              className="w-12 h-11 text-center text-sm font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+              type="number"
+              inputMode="decimal"
+              step="2.5"
+              style={{ fontSize: "16px" }}
+              placeholder="lb"
+            />
+            <button
+              type="button"
+              onClick={() => onAdjustWeight(2.5)}
+              className="w-7 h-11 rounded-lg border flex items-center justify-center text-base font-light touch-manipulation active:bg-muted shrink-0"
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        {/* Cycle load mode: weight → BW → band → weight */}
+        <button
+          type="button"
+          onClick={cycleLoadMode}
+          title="Switch load type"
+          className="w-6 h-11 rounded-lg border flex items-center justify-center text-sm text-muted-foreground shrink-0 touch-manipulation active:bg-muted"
+        >
+          ⇄
+        </button>
+
+        {/* Reps / Secs */}
+        <Input
+          value={entry.reps}
+          onChange={(e) => onChange({ reps: e.target.value })}
+          onBlur={persistIfCompleted}
+          className="flex-1 min-w-[44px] h-11 text-center text-sm font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+          type="number"
+          inputMode="numeric"
+          style={{ fontSize: "16px" }}
+          placeholder={entry.isSeconds ? "sec" : "reps"}
+        />
+        <button
+          type="button"
+          onClick={() => onChange({ isSeconds: !entry.isSeconds })}
+          className={cn(
+            "w-6 h-11 rounded-lg border flex items-center justify-center text-xs font-semibold shrink-0 touch-manipulation",
+            entry.isSeconds
+              ? "border-blue-400 text-blue-700 bg-blue-50"
+              : "border-border text-muted-foreground"
+          )}
+        >
+          {entry.isSeconds ? "s" : "×"}
+        </button>
+
+        {/* RPE */}
+        <Input
+          value={entry.rpe}
+          onChange={(e) => onChange({ rpe: e.target.value })}
+          onBlur={persistIfCompleted}
+          className="w-10 h-11 text-center text-sm font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none shrink-0"
+          type="number"
+          step="0.5"
+          min="1"
+          max="10"
+          style={{ fontSize: "16px" }}
+          placeholder="–"
+        />
+
+        {/* Complete toggle */}
+        <button
+          type="button"
+          onClick={onComplete}
+          disabled={entry.saving}
+          className={cn(
+            "w-10 h-11 rounded-lg border flex items-center justify-center shrink-0 transition-colors touch-manipulation",
+            entry.completed
+              ? "bg-green-500 border-green-500 text-white"
+              : "border-border text-muted-foreground active:bg-muted"
+          )}
+        >
+          {entry.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Band color swatches */}
+      {entry.isBand && (
+        <div className="flex gap-1.5 pl-5">
+          {BAND_COLORS.map(({ id, label, hex }) => (
+            <button
+              key={id}
+              type="button"
+              title={label}
+              onClick={() => onChange({ bandColor: id })}
+              className={cn(
+                "flex-1 h-8 rounded-lg border-2 transition-all touch-manipulation flex items-center justify-center",
+                entry.bandColor === id ? "border-foreground scale-105" : "border-transparent opacity-70"
+              )}
+              style={{ backgroundColor: hex }}
+            >
+              {entry.bandColor === id && (
+                <Check className="w-3.5 h-3.5 text-white drop-shadow" strokeWidth={3} />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Per-set note */}
+      <div className="pl-5">
+        <Input
+          value={entry.note}
+          onChange={(e) => onChange({ note: e.target.value })}
+          onBlur={persistIfCompleted}
+          placeholder="Set note…"
+          className="h-8 px-2"
+          style={{ fontSize: "16px" }}
+        />
+      </div>
+
+      {prescribedWeight != null && !entry.isBodyweight && !entry.isBand && (
+        <p className="text-xs text-green-700 pl-5">Prescribed: {prescribedWeight} lb</p>
+      )}
+      {hitsTopOfRange && (
+        <p className="text-xs text-green-700 pl-5 flex items-center gap-1">
+          <TrendingUp className="w-3 h-3 shrink-0" />
+          Increase weight next session
+        </p>
+      )}
+    </div>
   );
 }
 

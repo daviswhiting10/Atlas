@@ -236,6 +236,44 @@ export async function completeSession(input: {
   }
 }
 
+// ── swapExercise ───────────────────────────────────────────────────────────────
+//
+// Lets the trainer substitute a different exercise into this slot mid-workout
+// (e.g. the client actually did Bulgarian split squats instead of the prescribed
+// reverse lunge). Prescribed sets/order/section are left untouched — only the
+// exercise identity changes. Any sets already logged for this slot in the
+// current session are re-pointed to the new exercise so history stays consistent.
+
+export async function swapExercise(input: {
+  assignedWorkoutExerciseId: string;
+  exerciseId: string;
+}): Promise<void> {
+  const { workspaceId } = await requireWorkspace();
+
+  const awe = await prisma.assignedWorkoutExercise.findFirst({
+    where: { id: input.assignedWorkoutExerciseId, workspaceId },
+    select: { id: true },
+  });
+  if (!awe) throw new Error("Exercise not found");
+
+  const exercise = await prisma.exercise.findUnique({
+    where: { id: input.exerciseId },
+    select: { id: true },
+  });
+  if (!exercise) throw new Error("Exercise not found");
+
+  await prisma.$transaction([
+    prisma.assignedWorkoutExercise.update({
+      where: { id: input.assignedWorkoutExerciseId },
+      data: { exerciseId: input.exerciseId },
+    }),
+    prisma.setLog.updateMany({
+      where: { assignedWorkoutExerciseId: input.assignedWorkoutExerciseId },
+      data: { exerciseId: input.exerciseId },
+    }),
+  ]);
+}
+
 // ── addExerciseNote ────────────────────────────────────────────────────────────
 //
 // Persists a per-exercise coach observation for a client.
