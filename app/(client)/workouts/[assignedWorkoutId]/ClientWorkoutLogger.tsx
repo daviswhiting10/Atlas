@@ -350,7 +350,7 @@ export default function ClientWorkoutLogger({
             style={{ background: "rgba(43,107,255,0.06)" }}
           >
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold text-white"
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-semibold text-white"
               style={{ background: "var(--blue)" }}
             >
               {(coachName ?? "C").charAt(0).toUpperCase()}
@@ -388,7 +388,7 @@ export default function ClientWorkoutLogger({
                     >
                       {exIdx + 1}
                     </div>
-                    <span className="text-sm font-semibold truncate" style={{ color: "var(--ink)" }}>
+                    <span className="font-display text-base truncate" style={{ color: "var(--ink)" }}>
                       {ex.name}
                     </span>
                   </div>

@@ -867,10 +867,10 @@ export default function WorkoutLogger({
                   onClick={() => toggleBlock(bi)}
                   className="w-full flex items-center gap-2 pt-1 touch-manipulation"
                 >
-                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground min-w-0 truncate">
                     {blockLabel}
                   </span>
-                  <div className="flex-1 h-px bg-border" />
+                  <div className="flex-1 h-px bg-border shrink-0 min-w-[10px]" />
                   {blockDone ? (
                     <Check className="w-3.5 h-3.5 text-[var(--success)] shrink-0" />
                   ) : (
@@ -1321,7 +1321,7 @@ function ExerciseHeader({
           >
             {index}
           </div>
-          <h3 className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</h3>
+          <h3 className="font-display text-sm leading-tight truncate min-w-0">{ex.name}</h3>
         </div>
         <button
           type="button"
