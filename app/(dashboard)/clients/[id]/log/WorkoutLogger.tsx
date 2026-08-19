@@ -923,6 +923,7 @@ export default function WorkoutLogger({
                               entry={entry}
                               repMax={repMax}
                               prescribedWeight={prescribedWeight}
+                              last={ex.lastSets[idx] ?? null}
                               onChange={(patch) => updateSet(ex.aweId, idx, patch)}
                               onAdjustWeight={(delta) => adjustWeight(ex.aweId, idx, delta)}
                               onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
@@ -1389,6 +1390,7 @@ function MobileSetRow({
   entry,
   repMax,
   prescribedWeight,
+  last,
   onChange,
   onAdjustWeight,
   onComplete,
@@ -1398,6 +1400,7 @@ function MobileSetRow({
   entry: SetEntry;
   repMax: number | null;
   prescribedWeight: number | null;
+  last: { weight: number | null; reps: number | null; rpe: number | null; completed: boolean } | null;
   onChange: (patch: Partial<SetEntry>) => void;
   onAdjustWeight: (delta: number) => void;
   onComplete: () => void;
@@ -1425,31 +1428,37 @@ function MobileSetRow({
   }
 
   const bandMeta = BAND_COLORS.find((b) => b.id === entry.bandColor);
+  const loadModeLabel = entry.isBand ? (bandMeta?.label ?? "Band") : entry.isBodyweight ? "Bodyweight" : "Weight";
+  const prevLabel =
+    last && (last.weight != null || last.reps != null)
+      ? `${last.weight != null ? `${last.weight}lb` : "BW"}${last.reps != null ? ` × ${last.reps}` : ""}`
+      : "—";
 
   return (
-    <div className={cn("rounded-xl border p-2 space-y-1.5", entry.completed && "bg-muted/30")}>
-      <div className="flex items-center gap-1">
-        <span className="text-xs text-muted-foreground w-4 shrink-0 text-center">{idx + 1}</span>
+    <div className={cn("rounded-xl border p-2.5 space-y-2", entry.completed && "bg-muted/30")}>
+      {/* Primary row: Set / Prev / Weight / Reps / Check — mirrors the client logger's grid */}
+      <div className="grid grid-cols-[16px_44px_1fr_1fr_36px] gap-1.5 items-center">
+        <span className="text-xs text-muted-foreground text-center">{idx + 1}</span>
+        <span className="text-[11px] text-muted-foreground tabular-nums truncate">{prevLabel}</span>
 
-        {/* Load control */}
         {entry.isBand ? (
           <div
-            className="w-[104px] h-11 rounded-lg border-2 flex items-center justify-center gap-1.5 shrink-0"
+            className="h-11 rounded-lg border-2 flex items-center justify-center gap-1.5 px-1 min-w-0"
             style={{ borderColor: bandMeta?.hex }}
           >
-            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: bandMeta?.hex }} />
-            <span className="text-xs font-semibold">{bandMeta?.label}</span>
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: bandMeta?.hex }} />
+            <span className="text-xs font-semibold truncate">{bandMeta?.label}</span>
           </div>
         ) : entry.isBodyweight ? (
-          <div className="w-[104px] h-11 rounded-lg border bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">
-            Bodyweight
+          <div className="h-11 rounded-lg border bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
+            BW
           </div>
         ) : (
-          <div className="flex items-center gap-0.5 w-[104px] shrink-0">
+          <div className="h-11 rounded-lg border flex items-center min-w-0">
             <button
               type="button"
               onClick={() => onAdjustWeight(-2.5)}
-              className="w-7 h-11 rounded-lg border flex items-center justify-center text-base font-light touch-manipulation active:bg-muted shrink-0"
+              className="w-6 h-full flex items-center justify-center text-sm font-light text-muted-foreground touch-manipulation active:bg-muted shrink-0"
             >
               −
             </button>
@@ -1457,7 +1466,7 @@ function MobileSetRow({
               value={entry.weight}
               onChange={(e) => onChange({ weight: e.target.value })}
               onBlur={persistIfCompleted}
-              className="w-12 h-11 text-center text-sm font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+              className="h-full min-w-0 flex-1 text-center text-sm font-semibold px-0 border-0 rounded-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
               type="number"
               inputMode="decimal"
               step="2.5"
@@ -1467,68 +1476,43 @@ function MobileSetRow({
             <button
               type="button"
               onClick={() => onAdjustWeight(2.5)}
-              className="w-7 h-11 rounded-lg border flex items-center justify-center text-base font-light touch-manipulation active:bg-muted shrink-0"
+              className="w-6 h-full flex items-center justify-center text-sm font-light text-muted-foreground touch-manipulation active:bg-muted shrink-0"
             >
               +
             </button>
           </div>
         )}
 
-        {/* Cycle load mode: weight → BW → band → weight */}
-        <button
-          type="button"
-          onClick={cycleLoadMode}
-          title="Switch load type"
-          className="w-6 h-11 rounded-lg border flex items-center justify-center text-sm text-muted-foreground shrink-0 touch-manipulation active:bg-muted"
-        >
-          ⇄
-        </button>
+        <div className="h-11 rounded-lg border flex items-center min-w-0">
+          <Input
+            value={entry.reps}
+            onChange={(e) => onChange({ reps: e.target.value })}
+            onBlur={persistIfCompleted}
+            className="h-full min-w-0 flex-1 text-center text-sm font-semibold px-0 border-0 rounded-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+            type="number"
+            inputMode="numeric"
+            style={{ fontSize: "16px" }}
+            placeholder={entry.isSeconds ? "sec" : "reps"}
+          />
+          <button
+            type="button"
+            onClick={() => onChange({ isSeconds: !entry.isSeconds })}
+            title={entry.isSeconds ? "Seconds — tap for reps" : "Reps — tap for seconds"}
+            className={cn(
+              "w-6 h-full flex items-center justify-center text-[11px] font-semibold shrink-0 border-l touch-manipulation",
+              entry.isSeconds ? "text-[var(--blue-deep)]" : "text-muted-foreground"
+            )}
+          >
+            {entry.isSeconds ? "s" : "×"}
+          </button>
+        </div>
 
-        {/* Reps / Secs */}
-        <Input
-          value={entry.reps}
-          onChange={(e) => onChange({ reps: e.target.value })}
-          onBlur={persistIfCompleted}
-          className="flex-1 min-w-[44px] h-11 text-center text-sm font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-          type="number"
-          inputMode="numeric"
-          style={{ fontSize: "16px" }}
-          placeholder={entry.isSeconds ? "sec" : "reps"}
-        />
-        <button
-          type="button"
-          onClick={() => onChange({ isSeconds: !entry.isSeconds })}
-          className={cn(
-            "w-6 h-11 rounded-lg border flex items-center justify-center text-xs font-semibold shrink-0 touch-manipulation",
-            entry.isSeconds
-              ? "border-[rgba(43,107,255,0.30)] text-[var(--blue-deep)] bg-[rgba(43,107,255,0.07)]"
-              : "border-border text-muted-foreground"
-          )}
-        >
-          {entry.isSeconds ? "s" : "×"}
-        </button>
-
-        {/* RPE */}
-        <Input
-          value={entry.rpe}
-          onChange={(e) => onChange({ rpe: e.target.value })}
-          onBlur={persistIfCompleted}
-          className="w-10 h-11 text-center text-sm font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none shrink-0"
-          type="number"
-          step="0.5"
-          min="1"
-          max="10"
-          style={{ fontSize: "16px" }}
-          placeholder="–"
-        />
-
-        {/* Complete toggle */}
         <button
           type="button"
           onClick={onComplete}
           disabled={entry.saving}
           className={cn(
-            "w-10 h-11 rounded-lg border flex items-center justify-center shrink-0 transition-colors touch-manipulation",
+            "h-11 rounded-lg border flex items-center justify-center transition-colors touch-manipulation",
             entry.completed
               ? "bg-[var(--success)] border-[var(--success)] text-white"
               : "border-border text-muted-foreground active:bg-muted"
@@ -1538,9 +1522,36 @@ function MobileSetRow({
         </button>
       </div>
 
+      {/* Secondary row: load type + RPE — quieter, smaller than the primary controls */}
+      <div className="flex items-center gap-2 pl-[62px]">
+        <button
+          type="button"
+          onClick={cycleLoadMode}
+          title="Switch load type"
+          className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground touch-manipulation"
+        >
+          <ArrowLeftRight className="w-3 h-3 shrink-0" />
+          {loadModeLabel}
+        </button>
+        <div className="flex-1" />
+        <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">RPE</label>
+        <Input
+          value={entry.rpe}
+          onChange={(e) => onChange({ rpe: e.target.value })}
+          onBlur={persistIfCompleted}
+          className="w-11 h-8 text-center text-xs font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+          type="number"
+          step="0.5"
+          min="1"
+          max="10"
+          style={{ fontSize: "16px" }}
+          placeholder="–"
+        />
+      </div>
+
       {/* Band color swatches */}
       {entry.isBand && (
-        <div className="flex gap-1.5 pl-5">
+        <div className="flex gap-1.5 pl-[62px]">
           {BAND_COLORS.map(({ id, label, hex }) => (
             <button
               key={id}
@@ -1562,7 +1573,7 @@ function MobileSetRow({
       )}
 
       {/* Per-set note */}
-      <div className="pl-5">
+      <div className="pl-[62px]">
         <Input
           value={entry.note}
           onChange={(e) => onChange({ note: e.target.value })}
@@ -1574,10 +1585,10 @@ function MobileSetRow({
       </div>
 
       {prescribedWeight != null && !entry.isBodyweight && !entry.isBand && (
-        <p className="text-xs text-[var(--success)] pl-5">Prescribed: {prescribedWeight} lb</p>
+        <p className="text-xs text-[var(--success)] pl-[62px]">Prescribed: {prescribedWeight} lb</p>
       )}
       {hitsTopOfRange && (
-        <p className="text-xs text-[var(--success)] pl-5 flex items-center gap-1">
+        <p className="text-xs text-[var(--success)] pl-[62px] flex items-center gap-1">
           <TrendingUp className="w-3 h-3 shrink-0" />
           Increase weight next session
         </p>
