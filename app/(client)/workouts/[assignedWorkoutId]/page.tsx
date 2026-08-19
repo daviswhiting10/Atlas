@@ -115,7 +115,6 @@ export default async function ClientWorkoutPage({
       workoutName={assignedWorkout.name}
       assignmentName={assignedWorkout.programAssignment.name}
       weekNum={weekNum}
-      scheduledDate={assignedWorkout.scheduledDate.toISOString()}
       status={assignedWorkout.status}
       coachName={trainer?.name ?? null}
       coachNote={assignedWorkout.notes}

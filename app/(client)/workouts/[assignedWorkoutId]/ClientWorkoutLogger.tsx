@@ -67,7 +67,6 @@ export default function ClientWorkoutLogger({
   workoutName,
   assignmentName,
   weekNum,
-  scheduledDate,
   status,
   coachName,
   coachNote,
@@ -81,7 +80,6 @@ export default function ClientWorkoutLogger({
   workoutName: string;
   assignmentName: string;
   weekNum: number;
-  scheduledDate: string;
   status: "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
   coachName: string | null;
   coachNote: string | null;
