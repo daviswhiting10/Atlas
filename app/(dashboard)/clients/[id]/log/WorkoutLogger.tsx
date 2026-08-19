@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -248,7 +249,18 @@ export default function WorkoutLogger({
   const [structuring, setStructuring] = useState(false);
   const [recording, setRecording] = useState(false);
   const [completing, startComplete] = useTransition();
+  const [finished, setFinished] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // ── Session elapsed timer (display only) ────────────────────────────────────
+  const [sessionStart] = useState(() => Date.now());
+  const [sessionNow, setSessionNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (finished) return;
+    const id = setInterval(() => setSessionNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [finished]);
+  const sessionElapsedSec = Math.floor((sessionNow - sessionStart) / 1000);
 
   // ── Swap exercise (mid-workout substitution) ────────────────────────────────
   const [swappingAweId, setSwappingAweId] = useState<string | null>(null);
@@ -543,7 +555,7 @@ export default function WorkoutLogger({
           structuredNote: structuredNote ?? undefined,
         });
         toast.success("Session complete");
-        router.push(`/clients/${clientId}`);
+        setFinished(true);
       } catch {
         toast.error("Failed to complete session");
       }
@@ -634,7 +646,7 @@ export default function WorkoutLogger({
 
   // ── Shared SOAP panel (used in both layouts) ──────────────────────────────
   const soapPanel = (
-    <div className="mt-4 border rounded-lg overflow-hidden">
+    <div className="mt-4 rounded-[18px] overflow-hidden" style={{ border: "1px solid var(--line)" }}>
       <button
         type="button"
         onClick={() => setSoapOpen((o) => !o)}
@@ -661,8 +673,8 @@ export default function WorkoutLogger({
             </Button>
           </div>
           {recording && (
-            <div className="flex items-center gap-2 text-xs text-red-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <div className="flex items-center gap-2 text-xs text-[var(--destructive)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--destructive)] animate-pulse" />
               Recording…
             </div>
           )}
@@ -715,6 +727,70 @@ export default function WorkoutLogger({
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // SESSION COMPLETE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  if (finished) {
+    let doneSetsAll = 0;
+    let totalVolumeAll = 0;
+    for (const ex of exercises) {
+      for (const entry of exState[ex.aweId].sets) {
+        if (entry.completed) {
+          doneSetsAll++;
+          const w = entry.isBodyweight || entry.isBand ? 0 : parseFloat(entry.weight) || 0;
+          const r = parseInt(entry.reps, 10) || 0;
+          totalVolumeAll += w * r;
+        }
+      }
+    }
+
+    return (
+      <div className="px-6 pt-16 pb-16 max-w-lg mx-auto flex flex-col items-center text-center">
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+          style={{ background: "var(--blue)" }}
+        >
+          <Check className="w-6 h-6 text-white" strokeWidth={3} />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--blue)" }}>
+          Session complete
+        </p>
+        <h2 className="font-display text-2xl mb-1.5" style={{ color: "var(--ink)" }}>
+          {workoutName}
+        </h2>
+        <p className="text-sm mb-8" style={{ color: "var(--ink-mute)" }}>
+          {clientName} · {formatRest(sessionElapsedSec)} elapsed
+        </p>
+
+        <div className="flex mb-9 rounded-[18px] overflow-hidden" style={{ border: "1px solid var(--line)" }}>
+          {[
+            { label: "Sets", value: String(doneSetsAll) },
+            { label: "Lbs lifted", value: totalVolumeAll.toLocaleString() },
+            { label: "Duration", value: formatRest(sessionElapsedSec) },
+          ].map((stat, i) => (
+            <div
+              key={stat.label}
+              className="px-5 py-3.5 text-center"
+              style={i < 2 ? { borderRight: "1px solid var(--line)" } : undefined}
+            >
+              <p className="font-display text-xl tabular-nums" style={{ color: "var(--ink)" }}>
+                {stat.value}
+              </p>
+              <p className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: "var(--ink-mute)" }}>
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
+          Back to {clientName}
+        </Button>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // MOBILE LAYOUT  (hidden on md+) — full scrollable workout view
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -730,11 +806,13 @@ export default function WorkoutLogger({
           <span className="max-w-[100px] truncate">{clientName}</span>
         </Link>
         <div className="flex items-center gap-2">
-          {isResuming && (
-            <span className="text-xs font-semibold" style={{ color: "var(--warn)" }}>
-              Resuming
-            </span>
-          )}
+          {isResuming && <Badge variant="warn">Resuming</Badge>}
+          <div
+            className="text-xs font-semibold tabular-nums px-2.5 py-1 rounded-full"
+            style={{ border: "1px solid var(--line)", color: "var(--ink)" }}
+          >
+            {formatRest(sessionElapsedSec)}
+          </div>
           <Button
             size="sm"
             disabled={completing || !anyCompleted}
@@ -794,7 +872,7 @@ export default function WorkoutLogger({
                   </span>
                   <div className="flex-1 h-px bg-border" />
                   {blockDone ? (
-                    <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                    <Check className="w-3.5 h-3.5 text-[var(--success)] shrink-0" />
                   ) : (
                     <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
                       {doneSets}/{totalSets}
@@ -824,6 +902,7 @@ export default function WorkoutLogger({
                     <CardContent className="space-y-3">
                       <ExerciseHeader
                         ex={ex}
+                        index={exI + 1}
                         isSwapping={swappingAweId === ex.aweId}
                         swapping={swapping}
                         onToggleSwap={() =>
@@ -864,7 +943,7 @@ export default function WorkoutLogger({
 
                       <div className="pt-2 border-t">
                         {state.noteAdded ? (
-                          <p className="text-xs text-green-700">Note saved ✓</p>
+                          <p className="text-xs text-[var(--success)]">Note saved ✓</p>
                         ) : (
                           <div className="flex gap-1.5">
                             <Input
@@ -985,12 +1064,16 @@ export default function WorkoutLogger({
               onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
               className="sr-only"
             />
-            {isResuming && (
-              <span className="font-medium text-sm" style={{ color: "var(--warn)" }}>Resuming</span>
-            )}
+            {isResuming && <Badge variant="warn">Resuming</Badge>}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <div
+            className="text-xs font-semibold tabular-nums px-2.5 py-1 rounded-full"
+            style={{ border: "1px solid var(--line)", color: "var(--ink)" }}
+          >
+            {formatRest(sessionElapsedSec)}
+          </div>
           <Button variant="outline" size="sm" onClick={() => router.push(`/clients/${clientId}`)}>
             <SkipForward className="w-3.5 h-3.5 mr-1.5" />
             Skip
@@ -1031,7 +1114,15 @@ export default function WorkoutLogger({
               <CardHeader className="pb-2 pt-4 px-4">
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                        style={{ background: "var(--blue)" }}
+                      >
+                        {exI + 1}
+                      </div>
+                      <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
+                    </div>
                     <button
                       type="button"
                       onClick={() =>
@@ -1084,17 +1175,17 @@ export default function WorkoutLogger({
 
                 {s.type === "progress" && (
                   <div className="flex items-center gap-1 mt-1">
-                    <TrendingUp className="w-3 h-3 text-green-700 shrink-0" />
-                    <p className="text-xs text-green-700">{s.reasoning}</p>
+                    <TrendingUp className="w-3 h-3 text-[var(--success)] shrink-0" />
+                    <p className="text-xs text-[var(--success)]">{s.reasoning}</p>
                   </div>
                 )}
                 {s.type === "hold" && hasLastData && (
-                  <p className="text-xs text-amber-700 mt-1">{s.reasoning}</p>
+                  <p className="text-xs text-[var(--warn)] mt-1">{s.reasoning}</p>
                 )}
                 {s.type === "deload" && (
                   <div className="flex items-center gap-1 mt-1">
-                    <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
-                    <p className="text-xs text-red-700">{s.reasoning}</p>
+                    <AlertTriangle className="w-3 h-3 text-[var(--destructive)] shrink-0" />
+                    <p className="text-xs text-[var(--destructive)]">{s.reasoning}</p>
                   </div>
                 )}
                 {s.type === "match_last" && (
@@ -1134,7 +1225,7 @@ export default function WorkoutLogger({
 
                 <div className="pt-2 border-t mt-2">
                   {state.noteAdded ? (
-                    <p className="text-xs text-green-700">Note saved ✓</p>
+                    <p className="text-xs text-[var(--success)]">Note saved ✓</p>
                   ) : (
                     <div className="flex gap-1.5">
                       <Input
@@ -1195,12 +1286,14 @@ export default function WorkoutLogger({
 
 function ExerciseHeader({
   ex,
+  index,
   isSwapping,
   swapping,
   onToggleSwap,
   onSwap,
 }: {
   ex: LoggerExercise;
+  index: number;
   isSwapping: boolean;
   swapping: boolean;
   onToggleSwap: () => void;
@@ -1221,7 +1314,15 @@ function ExerciseHeader({
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</h3>
+        <div className="flex items-center gap-2 min-w-0">
+          <div
+            className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+            style={{ background: "var(--blue)" }}
+          >
+            {index}
+          </div>
+          <h3 className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</h3>
+        </div>
         <button
           type="button"
           onClick={onToggleSwap}
@@ -1255,17 +1356,17 @@ function ExerciseHeader({
 
       {s.type === "progress" && (
         <div className="flex items-center gap-1 mt-1">
-          <TrendingUp className="w-3 h-3 text-green-700 shrink-0" />
-          <p className="text-xs text-green-700">{s.reasoning}</p>
+          <TrendingUp className="w-3 h-3 text-[var(--success)] shrink-0" />
+          <p className="text-xs text-[var(--success)]">{s.reasoning}</p>
         </div>
       )}
       {s.type === "hold" && hasLastData && (
-        <p className="text-xs text-amber-700 mt-1">{s.reasoning}</p>
+        <p className="text-xs text-[var(--warn)] mt-1">{s.reasoning}</p>
       )}
       {s.type === "deload" && (
         <div className="flex items-center gap-1 mt-1">
-          <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
-          <p className="text-xs text-red-700">{s.reasoning}</p>
+          <AlertTriangle className="w-3 h-3 text-[var(--destructive)] shrink-0" />
+          <p className="text-xs text-[var(--destructive)]">{s.reasoning}</p>
         </div>
       )}
       {s.type === "match_last" && (
@@ -1400,7 +1501,7 @@ function MobileSetRow({
           className={cn(
             "w-6 h-11 rounded-lg border flex items-center justify-center text-xs font-semibold shrink-0 touch-manipulation",
             entry.isSeconds
-              ? "border-blue-400 text-blue-700 bg-blue-50"
+              ? "border-[rgba(43,107,255,0.30)] text-[var(--blue-deep)] bg-[rgba(43,107,255,0.07)]"
               : "border-border text-muted-foreground"
           )}
         >
@@ -1429,7 +1530,7 @@ function MobileSetRow({
           className={cn(
             "w-10 h-11 rounded-lg border flex items-center justify-center shrink-0 transition-colors touch-manipulation",
             entry.completed
-              ? "bg-green-500 border-green-500 text-white"
+              ? "bg-[var(--success)] border-[var(--success)] text-white"
               : "border-border text-muted-foreground active:bg-muted"
           )}
         >
@@ -1473,10 +1574,10 @@ function MobileSetRow({
       </div>
 
       {prescribedWeight != null && !entry.isBodyweight && !entry.isBand && (
-        <p className="text-xs text-green-700 pl-5">Prescribed: {prescribedWeight} lb</p>
+        <p className="text-xs text-[var(--success)] pl-5">Prescribed: {prescribedWeight} lb</p>
       )}
       {hitsTopOfRange && (
-        <p className="text-xs text-green-700 pl-5 flex items-center gap-1">
+        <p className="text-xs text-[var(--success)] pl-5 flex items-center gap-1">
           <TrendingUp className="w-3 h-3 shrink-0" />
           Increase weight next session
         </p>
@@ -1558,8 +1659,8 @@ function DesktopSetRow({
           }}
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors",
-            entry.isBodyweight ? "border-green-400 text-green-700 bg-green-50" :
-            entry.isBand ? "border-blue-400 text-blue-700 bg-blue-50" :
+            entry.isBodyweight ? "border-[rgba(31,122,77,0.30)] text-[var(--success)] bg-[rgba(31,122,77,0.07)]" :
+            entry.isBand ? "border-[rgba(43,107,255,0.30)] text-[var(--blue-deep)] bg-[rgba(43,107,255,0.07)]" :
             "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >
@@ -1574,7 +1675,7 @@ function DesktopSetRow({
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors font-medium",
             entry.isSeconds
-              ? "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+              ? "border-[rgba(43,107,255,0.30)] text-[var(--blue-deep)] bg-[rgba(43,107,255,0.07)] hover:bg-[rgba(43,107,255,0.12)]"
               : "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >
@@ -1608,8 +1709,8 @@ function DesktopSetRow({
           className={cn(
             "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
             entry.completed
-              ? "bg-green-500 border-green-500 text-white"
-              : "border-border text-muted-foreground hover:border-green-400 hover:text-green-700"
+              ? "bg-[var(--success)] border-[var(--success)] text-white"
+              : "border-border text-muted-foreground hover:border-[rgba(31,122,77,0.30)] hover:text-[var(--success)]"
           )}
         >
           {entry.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
@@ -1627,7 +1728,7 @@ function DesktopSetRow({
       </div>
 
       {hitsTopOfRange && (
-        <p className="text-xs text-green-700 pl-7 flex items-center gap-1">
+        <p className="text-xs text-[var(--success)] pl-7 flex items-center gap-1">
           <TrendingUp className="w-3 h-3 shrink-0" />
           Increase weight next session
         </p>
