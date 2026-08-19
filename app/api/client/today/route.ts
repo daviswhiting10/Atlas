@@ -11,7 +11,7 @@ export const GET = withClient(async (_req, { clientProfileId }) => {
   const workout = await prisma.assignedWorkout.findFirst({
     where: {
       scheduledDate: { gte: today, lt: tomorrow },
-      status: "PLANNED",
+      status: { in: ["PLANNED", "LOGGED"] },
       programAssignment: {
         clientId: clientProfileId,
         status: "ACTIVE",

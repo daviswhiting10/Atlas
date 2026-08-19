@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
-const CLIENT_PATHS = ["/today", "/client"];
+const CLIENT_PATHS = ["/today", "/client", "/plan", "/workouts"];
 const isClientPath = (p: string) => CLIENT_PATHS.some((cp) => p === cp || p.startsWith(cp + "/"));
 const isApiClientPath = (p: string) => p.startsWith("/api/client/");
 

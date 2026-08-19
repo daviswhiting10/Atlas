@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import ClientTabBar from "./ClientTabBar";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -12,7 +13,8 @@ export default async function ClientLayout({ children }: { children: React.React
         <span className="font-semibold text-sm tracking-tight">Atlas</span>
         <span className="text-xs text-muted-foreground">{session.user.name ?? session.user.email}</span>
       </header>
-      <main>{children}</main>
+      <main className="pb-16">{children}</main>
+      <ClientTabBar />
     </div>
   );
 }

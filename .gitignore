@@ -48,3 +48,4 @@ trainer-os.db-wal
 /data/clients/
 .env.local.save
 NOTES.md
+.env*

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Moon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dumbbell, Moon, Check } from "lucide-react";
 
 type SetShape = {
   setNumber: number;
@@ -26,6 +28,7 @@ type TodayWorkout = {
   id: string;
   name: string;
   scheduledDate: string;
+  status: "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
   programAssignment: { name: string };
   exercises: Exercise[];
 } | null;
@@ -76,11 +79,25 @@ export default function TodayPage() {
         <div className="space-y-4">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="font-bold text-lg">{workout.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-lg">{workout.name}</h2>
+                {workout.status === "LOGGED" && (
+                  <Badge variant="outline" className="border-green-300 bg-green-50 text-green-700 text-xs">
+                    <Check className="w-3 h-3 mr-1" />
+                    Logged
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">{workout.programAssignment.name}</p>
             </div>
             <Dumbbell className="w-5 h-5 text-muted-foreground mt-1" />
           </div>
+
+          <Link href={`/workouts/${workout.id}`}>
+            <Button className="w-full h-11">
+              {workout.status === "LOGGED" ? "Review workout" : "Start workout"}
+            </Button>
+          </Link>
 
           {workout.exercises.map((ex) => (
             <Card key={ex.id}>
