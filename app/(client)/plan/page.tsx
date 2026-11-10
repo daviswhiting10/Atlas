@@ -15,7 +15,7 @@ export default async function PlanPage() {
       <div className="surface rise p-8 text-center">
         <h1 className="font-display text-4xl text-ink">No plan yet</h1>
         <p className="mx-auto mt-2 max-w-sm text-[15px] text-ink-soft">Answer four questions and Atlas lays out your next 12 weeks.</p>
-        <Link href="/you" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-blue px-6 text-[15px] font-semibold text-white hover:bg-blue-deep">
+        <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
           Build my plan <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -44,7 +44,7 @@ export default async function PlanPage() {
           )}
         </div>
         {athlete.selfServe && (
-          <Link href="/you" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
+          <Link href="/you?goals=1" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
             <SlidersHorizontal className="h-4 w-4" /> Change goals
           </Link>
         )}
@@ -59,7 +59,7 @@ export default async function PlanPage() {
             <ul className="mt-3 space-y-3">
               {plan.rationale.map((r, i) => (
                 <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-ink-soft">
-                  <span className="tnum mt-0.5 font-mono text-xs text-blue">0{i + 1}</span>
+                  <span className="tnum mt-0.5 font-mono text-xs text-signal">0{i + 1}</span>
                   <span>{r}</span>
                 </li>
               ))}

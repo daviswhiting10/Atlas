@@ -36,7 +36,7 @@ export default function LoginPage() {
           <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
             A sign-in link is on its way to <strong className="font-semibold text-ink">{email}</strong>.
           </p>
-          <button className="mt-5 text-sm font-medium text-blue underline-offset-4 hover:underline" onClick={() => setSent(false)}>
+          <button className="mt-5 text-sm font-medium text-signal underline-offset-4 hover:underline" onClick={() => setSent(false)}>
             Use a different email
           </button>
         </div>
@@ -53,7 +53,7 @@ export default function LoginPage() {
               placeholder="you@example.com"
               required
               autoComplete="email"
-              className="h-[52px] w-full rounded-2xl border border-line bg-white px-4 text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-blue focus:shadow-[0_0_0_3px_rgba(43,107,255,0.14)]"
+              className="h-[52px] w-full rounded-2xl border border-line bg-white px-4 text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:"
             />
             <button
               type="submit"
@@ -76,7 +76,7 @@ export default function LoginPage() {
           <div className="space-y-3">
             <Link
               href="/start"
-              className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-blue text-[15px] font-semibold text-white shadow-[0_12px_24px_-12px_rgba(43,107,255,0.9)] hover:bg-blue-deep"
+              className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85"
             >
               Build my plan <ArrowRight className="h-4 w-4" />
             </Link>

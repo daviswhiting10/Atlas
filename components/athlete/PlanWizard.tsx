@@ -33,11 +33,11 @@ function Choice({
       aria-pressed={selected}
       className={cn(
         "press flex w-full items-center gap-4 rounded-2xl border bg-white p-4 text-left",
-        selected ? "border-blue shadow-[0_0_0_3px_rgba(43,107,255,0.14)]" : "border-line hover:border-ink/20"
+        selected ? "border-signal" : "border-line hover:border-ink/20"
       )}
     >
       {Icon && (
-        <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors", selected ? "bg-blue text-white" : "bg-ink/5 text-ink-soft")}>
+        <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors", selected ? "bg-signal text-white" : "bg-ink/5 text-ink-soft")}>
           <Icon className="h-5 w-5" />
         </span>
       )}
@@ -45,7 +45,7 @@ function Choice({
         <span className="block text-[15px] font-semibold text-ink">{title}</span>
         {blurb && <span className="mt-0.5 block text-[13px] leading-snug text-ink-mute">{blurb}</span>}
       </span>
-      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors", selected ? "border-blue bg-blue text-white" : "border-line")}>
+      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors", selected ? "border-signal bg-signal text-white" : "border-line")}>
         {selected && <Check className="h-3 w-3" strokeWidth={3.5} />}
       </span>
     </button>
@@ -60,7 +60,7 @@ function Pill({ selected, onClick, children }: { selected: boolean; onClick: () 
       aria-pressed={selected}
       className={cn(
         "press tnum h-12 flex-1 rounded-xl border text-[15px] font-semibold",
-        selected ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:border-ink/20"
+        selected ? "border-signal bg-signal text-white" : "border-line bg-white text-ink hover:border-ink/20"
       )}
     >
       {children}
@@ -75,7 +75,7 @@ export function PlanPreview({ prefs, className }: { prefs: Prefs; className?: st
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="eyebrow flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3 text-blue" /> Your plan, live
+            <Sparkles className="h-3 w-3 text-signal" /> Your plan, live
           </p>
           <h3 className="mt-1.5 font-display text-[26px] leading-tight text-ink">{plan.name}</h3>
         </div>
@@ -87,7 +87,7 @@ export function PlanPreview({ prefs, className }: { prefs: Prefs; className?: st
       <div className="mt-4 flex gap-1.5">
         {plan.blocks.map((b, i) => (
           <div key={b.name} className="flex-1">
-            <div className={cn("h-1.5 rounded-full", i === 0 ? "bg-blue" : i === 1 ? "bg-blue/55" : "bg-blue/25")} />
+            <div className={cn("h-1.5 rounded-full", i === 0 ? "bg-signal" : i === 1 ? "bg-signal/55" : "bg-signal/25")} />
             <p className="mt-1.5 text-[11px] font-medium text-ink-soft">{b.name}</p>
             <p className="text-[11px] text-ink-mute">Weeks {i * 4 + 1}–{i * 4 + 4}</p>
           </div>
@@ -215,7 +215,7 @@ export function PlanWizard({
                 placeholder="First name"
                 maxLength={40}
                 autoComplete="given-name"
-                className="h-14 w-full rounded-2xl border border-line bg-white px-4 text-lg text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-blue focus:shadow-[0_0_0_3px_rgba(43,107,255,0.14)]"
+                className="h-14 w-full rounded-2xl border border-line bg-white px-4 text-lg text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:"
               />
             ),
           },
@@ -250,7 +250,7 @@ export function PlanWizard({
         <div>
           <div className="mb-6 flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${steps.length}`}>
             {steps.map((_, i) => (
-              <span key={i} className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i <= step ? "bg-blue" : "bg-ink/10")} />
+              <span key={i} className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i <= step ? "bg-signal" : "bg-ink/10")} />
             ))}
           </div>
 
@@ -275,7 +275,7 @@ export function PlanWizard({
               type="button"
               onClick={() => (last ? submit() : setStep((s) => s + 1))}
               disabled={busy}
-              className="press flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-blue px-6 text-[15px] font-semibold text-white shadow-[0_12px_24px_-12px_rgba(43,107,255,0.9)] hover:bg-blue-deep disabled:opacity-60"
+              className="press flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

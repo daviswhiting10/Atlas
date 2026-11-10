@@ -60,7 +60,7 @@ export function BuildingOverlay({ mode }: { mode: null | "plan" | "demo" }) {
               <span
                 className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-full border transition-colors duration-300",
-                  i < step ? "border-blue bg-blue text-white" : i === step ? "border-blue text-blue" : "border-line text-transparent"
+                  i < step ? "border-signal bg-signal text-white" : i === step ? "border-signal text-signal" : "border-line text-transparent"
                 )}
               >
                 {i < step ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i === step ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}

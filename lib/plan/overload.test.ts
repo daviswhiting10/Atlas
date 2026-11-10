@@ -62,12 +62,27 @@ describe("buildSeries", () => {
     sessionPoint("2026-01-19", [set(105, 7)])!,
   ];
 
-  it("sorts by date and flags records, treating the first session as a baseline", () => {
+  it("sorts by date and flags a record only for a new heaviest weight", () => {
     const series = buildSeries(points);
     expect(series.map((p) => p.date)).toEqual(["2026-01-05", "2026-01-12", "2026-01-19"]);
-    expect(series[0].pr).toEqual({});
-    expect(series[1].pr).toMatchObject({ weight: true, e1rm: true, volume: true });
-    expect(series[2].pr).toEqual({});
+    // First session is the baseline; 105 beats 100; 105 again is not a record.
+    expect(series.map((p) => p.record)).toEqual([false, true, false]);
+  });
+
+  it("does not call more reps at the same weight a record", () => {
+    const series = buildSeries([sessionPoint("2026-01-05", [set(100, 8)])!, sessionPoint("2026-01-12", [set(100, 10)])!]);
+    expect(series[1].record).toBe(false);
+  });
+
+  it("never counts a lighter week as a record, and keeps it marked", () => {
+    const series = buildSeries([sessionPoint("2026-01-05", [set(100, 8)])!, sessionPoint("2026-01-12", [set(110, 5)], true)!]);
+    expect(series[1]).toMatchObject({ deload: true, record: false });
+  });
+
+  it("counts a bodyweight record only when the best set clears another 5-rep step", () => {
+    const days = ["2026-01-05", "2026-01-12", "2026-01-19", "2026-01-26"];
+    const series = buildSeries([8, 9, 10, 11].map((reps, i) => sessionPoint(days[i], [set(null, reps)])!));
+    expect(series.map((p) => p.record)).toEqual([false, false, true, false]);
   });
 
   it("falls back to reps when an exercise has no load to chart", () => {

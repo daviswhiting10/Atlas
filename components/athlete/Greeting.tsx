@@ -14,7 +14,7 @@ export function Greeting({ name }: { name: string }) {
   return (
     <div>
       <p className="eyebrow h-4">{date ?? " "}</p>
-      <h1 className="mt-1.5 font-display text-[38px] leading-[1.05] text-ink sm:text-5xl">
+      <h1 className="font-greeting mt-1.5 text-[38px] leading-[1.05] text-ink sm:text-5xl">
         {part}, {name}
       </h1>
     </div>

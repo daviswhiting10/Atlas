@@ -8,7 +8,7 @@ import { format, parseISO } from "date-fns";
 import { ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Medal, Minus, Plus, Timer, TrendingUp, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
 import { finishWorkout, saveSet } from "@/lib/actions/athlete";
-import { METRICS, formatValue, buildSeries, e1rm, metricFor, sessionPoint } from "@/lib/plan/overload";
+import { METRICS, formatValue, buildSeries, isRecord, metricFor, sessionPoint } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ function Stepper({
     onChange(next);
   };
   return (
-    <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-white transition-colors", dim ? "border-blue/25 bg-blue/[0.04]" : "border-line")}>
+    <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-white transition-colors", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line")}>
       <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press flex h-full w-10 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
         <Minus className="h-4 w-4" />
       </button>
@@ -157,6 +157,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     [apply, data.id]
   );
 
+  const deloadWeek = data.deloadWeek;
   const exercise = data.exercises[index];
   const current = sets[exercise.aweId];
 
@@ -200,13 +201,17 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       return;
     }
 
-    // Personal record? Compare against everything before this set.
-    const score = (w: number | null, r: number | null) => (r == null ? 0 : ex.loaded ? (w ? e1rm(w, r) : 0) : r);
-    const mine = score(s.weight, s.reps);
-    const historyBest = Math.max(0, ...ex.history.map((p) => (ex.loaded ? p.e1rm ?? 0 : p.reps)));
-    const sessionBest = Math.max(0, ...list.filter((x, j) => j !== i && x.done).map((x) => score(x.weight, x.reps)));
-    if (ex.history.length > 0 && mine > historyBest && mine > sessionBest) {
-      const label = ex.loaded ? `${Math.round(mine)} lb est. max` : `${s.reps} ${ex.unit === "secs" ? "sec" : "reps"}`;
+    // Personal record? Same rule as the charts (isRecord): the heaviest weight
+    // yet on a loaded lift, or the next 5-rep step on bodyweight work — judged
+    // against all history and anything already done today.
+    const earlier = list.filter((x, j) => j !== i && x.done);
+    const best = {
+      weight: Math.max(0, ...ex.history.map((p) => p.weight ?? 0), ...earlier.map((x) => x.weight ?? 0)),
+      reps: Math.max(0, ...ex.history.map((p) => p.reps), ...earlier.map((x) => x.reps ?? 0)),
+    };
+    const mine = { weight: ex.loaded ? s.weight : null, reps: s.reps ?? 0 };
+    if (ex.history.length > 0 && !deloadWeek && isRecord(mine, best)) {
+      const label = mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${ex.unit === "secs" ? "sec" : "reps"}`;
       setRecords((r) => ({ ...r, [key]: label }));
       toast.success(`New record on ${ex.name}`, { description: label });
     }
@@ -250,10 +255,10 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
   const today = new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd in the athlete's own timezone
   const { series, metric } = useMemo(() => {
-    const live = sessionPoint(today, current.map((s) => ({ weight: s.weight, reps: s.reps, completed: s.done })));
+    const live = sessionPoint(today, current.map((s) => ({ weight: s.weight, reps: s.reps, completed: s.done })), deloadWeek);
     const series = buildSeries(live ? [...exercise.history, live] : exercise.history);
     return { series, metric: metricFor(data.metric, series.length > 0 ? series : exercise.history) };
-  }, [current, exercise.history, data.metric, today]);
+  }, [current, exercise.history, data.metric, today, deloadWeek]);
   const metricName = !exercise.loaded && (data.metric === "weight" || data.metric === "e1rm") ? "reps" : metric;
   const latest = series.at(-1)?.[metricName];
 
@@ -265,7 +270,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     const recordList = Object.entries(records);
     return (
       <div className="rise mx-auto max-w-xl pt-6 text-center md:pt-12">
-        <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue text-white shadow-[0_16px_32px_-12px_rgba(43,107,255,0.9)]">
+        <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-white">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
         <h1 className="mt-6 font-display text-5xl text-ink">{data.name}, done.</h1>
@@ -304,7 +309,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Link href="/progress" className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue text-base font-semibold text-white hover:bg-blue-deep">
+          <Link href="/progress" className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-ink text-base font-semibold text-white hover:bg-ink/85">
             <TrendingUp className="h-4 w-4" /> See your progress
           </Link>
           <Link href="/today" className="press flex h-14 flex-1 items-center justify-center rounded-2xl border border-line bg-white text-base font-semibold text-ink hover:border-ink/20">
@@ -342,7 +347,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           </button>
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
-          <div className="h-full rounded-full bg-blue transition-[width] duration-500 ease-out" style={{ width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%` }} />
+          <div className="h-full rounded-full bg-signal transition-[width] duration-500 ease-out" style={{ width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%` }} />
         </div>
       </div>
 
@@ -369,7 +374,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 <span
                   className={cn(
                     "tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                    done ? "bg-blue text-white" : active ? "bg-white/15 text-white" : "bg-ink/5 text-ink-mute"
+                    done ? "bg-signal text-white" : active ? "bg-white/15 text-white" : "bg-ink/5 text-ink-mute"
                   )}
                 >
                   {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
@@ -398,19 +403,19 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           </div>
 
           {/* Target */}
-          <div className="rounded-[22px] border border-blue/20 bg-blue/[0.06] p-4 sm:p-5">
+          <div className="surface p-4 sm:p-5">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue text-white">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal text-white">
                 <TrendingUp className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="eyebrow text-blue-deep">Today&apos;s target</p>
+                <p className="eyebrow">Today&apos;s target</p>
                 <p className="tnum mt-0.5 text-xl font-semibold text-ink">{exercise.target.headline}</p>
                 <p className="mt-1 text-sm leading-relaxed text-ink-soft">{exercise.target.reason}</p>
               </div>
             </div>
             {exercise.last && (
-              <p className="tnum mt-3 border-t border-blue/15 pt-3 text-[13px] text-ink-soft">
+              <p className="mt-3 border-t border-line pt-3 text-[13px] text-ink-soft">
                 <span className="font-semibold text-ink">Last time</span> · {format(parseISO(exercise.last.date), "MMM d")} ·{" "}
                 {exercise.last.sets.map((s) => (s.weight != null ? `${s.weight}×${s.reps}` : `${s.reps}`)).join(", ")}
               </p>
@@ -433,7 +438,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 return (
                   <li key={s.setNumber}>
                     <div className="flex items-center gap-2">
-                      <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-blue" : "text-ink-mute")}>{s.setNumber}</span>
+                      <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
                       {exercise.loaded && (
                         <Stepper value={s.weight} step={exercise.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} onChange={(v) => edit(exercise, i, { weight: v })} />
                       )}
@@ -452,7 +457,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                         aria-label={s.done ? `Set ${s.setNumber} done — tap to undo` : `Mark set ${s.setNumber} done`}
                         className={cn(
                           "press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border",
-                          s.done ? "border-blue bg-blue text-white shadow-[0_10px_20px_-10px_rgba(43,107,255,0.9)]" : "border-line bg-white text-ink-mute hover:border-blue hover:text-blue"
+                          s.done ? "border-signal bg-signal text-white" : "border-line bg-white text-ink-mute hover:border-signal hover:text-signal"
                         )}
                       >
                         <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
@@ -484,7 +489,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 type="button"
                 onClick={finish}
                 disabled={finishing || doneCount === 0}
-                className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue text-base font-semibold text-white shadow-[0_14px_28px_-14px_rgba(43,107,255,0.95)] hover:bg-blue-deep disabled:opacity-40"
+                className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-ink text-base font-semibold text-white hover:bg-ink/85 disabled:opacity-40"
               >
                 {finishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <>{data.status === "LOGGED" ? "Save changes" : "Finish workout"} <Check className="h-5 w-5" strokeWidth={3} /></>}
               </button>
@@ -494,7 +499,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 onClick={() => setIndex(index + 1)}
                 className={cn(
                   "press flex h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl px-4 text-base font-semibold",
-                  exerciseDone(exercise) ? "bg-blue text-white shadow-[0_14px_28px_-14px_rgba(43,107,255,0.95)] hover:bg-blue-deep" : "border border-line bg-white text-ink hover:border-ink/20"
+                  exerciseDone(exercise) ? "bg-ink text-white hover:bg-ink/85" : "border border-line bg-white text-ink hover:border-ink/20"
                 )}
               >
                 <span className="truncate">Next: {nextExercise?.name}</span> <ArrowRight className="h-5 w-5 shrink-0" />
@@ -502,23 +507,23 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             )}
           </div>
 
-          {/* Live chart */}
-          <div className="surface p-4 sm:p-5">
+          {/* Live chart: on the page, no card */}
+          <div className="rule pt-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="eyebrow">{METRICS[metricName].label}</p>
+                <h2 className="text-lg text-ink">{METRICS[metricName].label}</h2>
                 <p className="mt-0.5 text-sm text-ink-mute">
-                  {series.length === 0 ? "Your first set starts this chart." : current.some((s) => s.done) ? "Today's point updates as you log." : "Dashed line is today's target."}
+                  {series.length === 0 ? "Your first set starts this chart." : current.some((s) => s.done) ? "Today's session updates as you log." : "Sessions so far. The dashed point is today's target."}
                 </p>
               </div>
               {latest != null && (
-                <p className="tnum shrink-0 font-display text-3xl leading-none text-ink">
+                <p className="shrink-0 text-2xl font-semibold leading-none tracking-tight text-ink">
                   {formatValue(latest, metricName)}
-                  <span className="ml-1 font-body text-sm text-ink-mute">{METRICS[metricName].unit(exercise.loaded)}</span>
+                  <span className="ml-1 text-sm font-normal text-ink-mute">{METRICS[metricName].unit(exercise.loaded)}</span>
                 </p>
               )}
             </div>
-            <div className="mt-2">
+            <div className="mt-3">
               <ProgressChart
                 series={series}
                 metric={metricName}
@@ -535,7 +540,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {rest && (
         <div className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
           <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full bg-night py-2 pl-5 pr-2 text-white shadow-[0_20px_40px_-16px_rgba(11,15,26,0.7)]">
-            <div className="absolute inset-y-0 left-0 bg-blue/35 transition-[width] duration-500 ease-linear" style={{ width: `${Math.max(0, Math.min(100, (restLeft / rest.total) * 100))}%` }} />
+            <div className="absolute inset-y-0 left-0 bg-signal/35 transition-[width] duration-500 ease-linear" style={{ width: `${Math.max(0, Math.min(100, (restLeft / rest.total) * 100))}%` }} />
             <Timer className="relative h-4 w-4 text-white/70" />
             <p className="relative flex-1 text-sm text-white/70">
               Rest <span className="tnum ml-1 text-xl font-semibold text-white">{clock(restLeft)}</span>
@@ -574,7 +579,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                       aria-current={here ? "page" : undefined}
                       className={cn("press flex items-center gap-3 rounded-2xl border bg-white p-3.5", here ? "border-ink" : "border-line hover:border-ink/20")}
                     >
-                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", w.status === "LOGGED" ? "bg-blue text-white" : "bg-ink/5 text-ink-mute")}>
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", w.status === "LOGGED" ? "bg-signal text-white" : "bg-ink/5 text-ink-mute")}>
                         {w.status === "LOGGED" ? <Check className="h-4 w-4" strokeWidth={3} /> : <ArrowRight className="h-4 w-4" />}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -586,7 +591,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 );
               })}
             </ul>
-            <Link href="/plan" className="press mt-3 flex h-12 items-center justify-center rounded-2xl text-sm font-semibold text-blue hover:bg-blue/5">
+            <Link href="/plan" className="press mt-3 flex h-12 items-center justify-center rounded-2xl text-sm font-semibold text-signal hover:bg-signal/5">
               See the full plan
             </Link>
           </div>

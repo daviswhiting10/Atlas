@@ -32,14 +32,11 @@ const POINTS = [
   [20, 178], [70, 166], [120, 158], [170, 150], [220, 131], [270, 122], [320, 98], [370, 84], [420, 62],
 ];
 const LINE = POINTS.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x} ${y}`).join(" ");
-const AREA = `${LINE} L420 210 L20 210 Z`;
 const PRS = [4, 6, 8];
 
 export default function LandingPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-bone">
-      <div aria-hidden="true" className="aura aura-tl opacity-70" />
-      <div aria-hidden="true" className="aura aura-br opacity-60" />
 
       <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
         <Logo />
@@ -58,10 +55,10 @@ export default function LandingPage() {
         <section className="grid items-center gap-12 pb-16 pt-8 sm:pt-14 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-24">
           <div>
             <p className="rise eyebrow inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-1.5 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue" /> Strength training, made obvious
+              <span className="h-1.5 w-1.5 rounded-full bg-signal" /> Strength training, made obvious
             </p>
             <h1 className="rise rise-1 mt-5 font-display text-[46px] leading-[1.02] text-ink sm:text-[68px]">
-              A plan built for your goal. Progress you can <em className="text-blue">see</em>.
+              A plan built for your goal. Progress you can <em className="text-signal">see</em>.
             </h1>
             <p className="rise rise-2 mt-5 max-w-xl text-[17px] leading-relaxed text-ink-soft">
               Atlas writes your 12-week program, tells you what to lift every session, and turns each set you log into a
@@ -70,7 +67,7 @@ export default function LandingPage() {
             <div className="rise rise-3 mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/start"
-                className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-blue px-7 text-base font-semibold text-white shadow-[0_16px_32px_-14px_rgba(43,107,255,0.95)] hover:bg-blue-deep"
+                className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-ink px-7 text-base font-semibold text-white hover:bg-ink/85"
               >
                 Build my plan <ArrowRight className="h-4 w-4" />
               </Link>
@@ -96,21 +93,13 @@ export default function LandingPage() {
                 <span className="tnum rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-[#8EE3B0]">+17% in 8 weeks</span>
               </div>
               <svg viewBox="0 0 440 220" className="mt-4 w-full" aria-hidden="true">
-                <defs>
-                  <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7BA7FF" stopOpacity="0.45" />
-                    <stop offset="100%" stopColor="#7BA7FF" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
                 {[60, 110, 160].map((y) => (
                   <line key={y} x1="20" x2="420" y1={y} y2={y} stroke="rgba(255,255,255,0.08)" />
                 ))}
-                <path d={AREA} fill="url(#hero-area)" className="fade-in" style={{ animationDelay: "1.4s", animationDuration: "900ms" }} />
-                <path d={LINE} pathLength={1} fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="draw" />
+                <path d={LINE} pathLength={1} fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="draw" />
                 {POINTS.map(([x, y], i) => (
                   <g key={x} className="fade-in" style={{ animationDelay: `${500 + i * 220}ms` }}>
-                    {PRS.includes(i) && <circle cx={x} cy={y} r="11" fill="#E0962A" opacity="0.25" />}
-                    <circle cx={x} cy={y} r={PRS.includes(i) ? 5 : 3.5} fill={PRS.includes(i) ? "#E0962A" : "#0B0F1A"} stroke="#fff" strokeWidth="2" />
+                    <circle cx={x} cy={y} r={PRS.includes(i) ? 5 : 3.5} fill={PRS.includes(i) ? "#C98A1B" : "#0B0F1A"} stroke="#fff" strokeWidth="2" />
                   </g>
                 ))}
               </svg>
@@ -127,7 +116,7 @@ export default function LandingPage() {
                 <p className="tnum text-lg font-semibold text-ink">
                   165 lb <span className="text-ink-mute">×</span> 8
                 </p>
-                <span className="rounded-full bg-blue/10 px-2.5 py-1 text-xs font-semibold text-blue-deep">+5 lb</span>
+                <span className="rounded-full bg-signal/10 px-2.5 py-1 text-xs font-semibold text-signal-deep">+5 lb</span>
               </div>
               <p className="mt-1 text-[13px] leading-snug text-ink-mute">You hit 10 reps at 160 last week — the top of your range.</p>
             </div>
@@ -138,7 +127,7 @@ export default function LandingPage() {
         <section className="grid gap-4 pb-16 md:grid-cols-3 lg:pb-24">
           {FEATURES.map(({ icon: Icon, title, body }) => (
             <div key={title} className="surface card-lift p-6">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue/10 text-blue">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal/10 text-signal">
                 <Icon className="h-5 w-5" />
               </span>
               <h2 className="mt-5 font-display text-2xl text-ink">{title}</h2>
@@ -153,7 +142,7 @@ export default function LandingPage() {
           <ol className="mt-8 grid gap-8 md:grid-cols-3">
             {STEPS.map(([title, body], i) => (
               <li key={title} className="border-t border-ink/15 pt-5">
-                <span className="tnum font-mono text-sm text-blue">0{i + 1}</span>
+                <span className="tnum font-mono text-sm text-signal">0{i + 1}</span>
                 <h3 className="mt-2 font-body text-lg font-semibold text-ink">{title}</h3>
                 <p className="mt-1.5 text-[15px] leading-relaxed text-ink-soft">{body}</p>
               </li>

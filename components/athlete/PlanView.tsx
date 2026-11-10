@@ -26,12 +26,12 @@ function WorkoutCard({ w, isNext, open, onToggle }: { w: WorkoutSummary; isNext:
   }
 
   return (
-    <div className={cn("surface overflow-hidden transition-shadow", isNext && "ring-2 ring-blue/30")}>
+    <div className={cn("surface overflow-hidden transition-shadow", isNext && "ring-2 ring-signal/30")}>
       <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3.5 p-4 text-left sm:p-5">
         <span
           className={cn(
             "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
-            logged ? "bg-blue text-white" : isNext ? "bg-blue/10 text-blue" : "bg-ink/5 text-ink-mute"
+            logged ? "bg-signal text-white" : isNext ? "bg-signal/10 text-signal" : "bg-ink/5 text-ink-mute"
           )}
         >
           {logged ? <Check className="h-5 w-5" strokeWidth={3} /> : skipped ? <SkipForward className="h-[18px] w-[18px]" /> : <Dumbbell className="h-[18px] w-[18px]" />}
@@ -39,7 +39,7 @@ function WorkoutCard({ w, isNext, open, onToggle }: { w: WorkoutSummary; isNext:
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className={cn("truncate text-base font-semibold", skipped ? "text-ink-mute line-through" : "text-ink")}>{w.name}</span>
-            {isNext && <span className="shrink-0 rounded-full bg-blue px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Up next</span>}
+            {isNext && <span className="shrink-0 rounded-full bg-signal px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Up next</span>}
           </span>
           <span className="tnum mt-0.5 flex items-center gap-2 text-[13px] text-ink-mute">
             {logged ? "Logged" : skipped ? "Skipped" : `${w.exercises.length} exercises`}
@@ -70,7 +70,7 @@ function WorkoutCard({ w, isNext, open, onToggle }: { w: WorkoutSummary; isNext:
               href={`/workouts/${w.id}`}
               className={cn(
                 "press flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-[15px] font-semibold",
-                logged ? "border border-line bg-white text-ink hover:border-ink/20" : "bg-blue text-white hover:bg-blue-deep"
+                logged ? "border border-line bg-white text-ink hover:border-ink/20" : "bg-ink text-white hover:bg-ink/85"
               )}
             >
               {logged ? "Review workout" : "Start this workout"} <ArrowRight className="h-4 w-4" />
@@ -124,7 +124,7 @@ export function PlanView({ plan }: { plan: PlanOverview }) {
             return (
               <button key={b.name} type="button" onClick={() => setWeek(Math.max(startWeek, Math.min(plan.currentWeek, endWeek)))} className="press flex-1 text-left">
                 <div className="h-2 overflow-hidden rounded-full bg-ink/10">
-                  <div className="h-full rounded-full bg-blue transition-[width] duration-700" style={{ width: `${Math.min(fill, 100)}%` }} />
+                  <div className="h-full rounded-full bg-signal transition-[width] duration-700" style={{ width: `${Math.min(fill, 100)}%` }} />
                 </div>
                 <p className={cn("mt-2 text-sm font-semibold", blockIndex === i ? "text-ink" : "text-ink-mute")}>{b.name}</p>
                 <p className="tnum text-xs text-ink-mute">
@@ -158,9 +158,9 @@ export function PlanView({ plan }: { plan: PlanOverview }) {
               <span className={cn("text-[10px] font-medium uppercase tracking-wide", selected ? "text-white/60" : "text-ink-mute")}>Wk</span>
               <span className="text-lg font-semibold leading-tight">{n}</span>
               {done ? (
-                <span className={cn("absolute bottom-1.5 h-1 w-1 rounded-full", selected ? "bg-white" : "bg-blue")} />
+                <span className={cn("absolute bottom-1.5 h-1 w-1 rounded-full", selected ? "bg-white" : "bg-signal")} />
               ) : n === plan.currentWeek ? (
-                <span className={cn("absolute bottom-1.5 h-1 w-3 rounded-full", selected ? "bg-white" : "bg-blue")} />
+                <span className={cn("absolute bottom-1.5 h-1 w-3 rounded-full", selected ? "bg-white" : "bg-signal")} />
               ) : null}
             </button>
           );
@@ -170,7 +170,7 @@ export function PlanView({ plan }: { plan: PlanOverview }) {
       <div className="mt-5 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-3xl text-ink">
           Week {week}
-          {week === plan.currentWeek && <span className="ml-2 align-middle font-body text-sm font-medium text-blue">current</span>}
+          {week === plan.currentWeek && <span className="ml-2 align-middle font-body text-sm font-medium text-signal">current</span>}
         </h2>
         {block && <p className="truncate text-sm text-ink-mute">{isDeload ? "Lighter week — recover" : block.focus}</p>}
       </div>

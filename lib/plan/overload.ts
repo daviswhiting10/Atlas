@@ -153,12 +153,16 @@ export type SessionPoint = {
   e1rm: number | null;
   volume: number;
   sets: number;
-  /** Which metrics set an all-time best in this session. */
-  pr: Partial<Record<FocusMetric, boolean>>;
+  /** Logged in a lighter (deload) week: expected to dip, and never a record. */
+  deload: boolean;
+  /** This session set a personal record. See `buildSeries` for the rule. */
+  record: boolean;
 };
 
+type RawPoint = Omit<SessionPoint, "record" | "deload"> & { deload?: boolean };
+
 /** Collapse one session's sets for an exercise into a single chart point. */
-export function sessionPoint(date: string, sets: LoggedSet[]): Omit<SessionPoint, "pr"> | null {
+export function sessionPoint(date: string, sets: LoggedSet[], deload = false): RawPoint | null {
   const done = sets.filter((s) => s.completed && s.reps != null && s.reps > 0);
   if (done.length === 0) return null;
 
@@ -186,23 +190,37 @@ export function sessionPoint(date: string, sets: LoggedSet[]): Omit<SessionPoint
     e1rm: best1rm == null ? null : Math.round(best1rm * 10) / 10,
     volume: Math.round(volume),
     sets: done.length,
+    deload,
   };
 }
 
-/** Order points by date and flag every session that set a new best. */
-export function buildSeries(points: Array<Omit<SessionPoint, "pr">>): SessionPoint[] {
+/** Unloaded work counts a record each time the best set clears another step of this size. */
+export const REP_RECORD_STEP = 5;
+
+/**
+ * Has this session beaten everything before it?
+ *
+ * A personal record is deliberately a high bar, so it stays rare:
+ *  - Loaded lifts: the heaviest weight ever used on the exercise.
+ *  - Bodyweight and timed work: the best set clearing another 5-rep step
+ *    (10, 15, 20…). One more rep is progress, but not a record.
+ * The first session is a baseline, and lighter weeks never count.
+ */
+export function isRecord(point: Pick<SessionPoint, "weight" | "reps">, best: { weight: number; reps: number }): boolean {
+  if (point.weight != null) return point.weight > best.weight;
+  return Math.floor(point.reps / REP_RECORD_STEP) > Math.floor(best.reps / REP_RECORD_STEP);
+}
+
+/** Order points by date and flag every session that set a record. */
+export function buildSeries(points: RawPoint[]): SessionPoint[] {
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const best: Record<FocusMetric, number> = { weight: 0, reps: 0, e1rm: 0, volume: 0 };
+  const best = { weight: 0, reps: 0 };
   return sorted.map((p, i) => {
-    const pr: SessionPoint["pr"] = {};
-    for (const m of ["weight", "reps", "e1rm", "volume"] as const) {
-      const v = p[m] ?? 0;
-      if (v > best[m]) {
-        if (i > 0) pr[m] = true; // the first session is a baseline, not a record
-        best[m] = v;
-      }
-    }
-    return { ...p, pr };
+    const deload = p.deload === true;
+    const record = i > 0 && !deload && isRecord(p, best);
+    if (p.weight != null) best.weight = Math.max(best.weight, p.weight);
+    else best.reps = Math.max(best.reps, p.reps);
+    return { ...p, deload, record };
   });
 }
 
@@ -217,8 +235,11 @@ export const METRICS: Record<FocusMetric, { label: string; short: string; unit: 
   weight: { label: "Top weight", short: "Weight", unit: () => "lb" },
   reps: { label: "Best set", short: "Reps", unit: () => "reps" },
   e1rm: { label: "Estimated 1-rep max", short: "Est. 1RM", unit: () => "lb" },
-  volume: { label: "Session volume", short: "Volume", unit: (loaded) => (loaded ? "lb" : "reps") },
+  volume: { label: "Volume per session", short: "Volume", unit: (loaded) => (loaded ? "lb" : "reps") },
 };
+
+/** Volume is a per-session total, so it is drawn as bars; everything else is a trend line. */
+export const chartKind = (metric: FocusMetric): "bars" | "line" => (metric === "volume" ? "bars" : "line");
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 

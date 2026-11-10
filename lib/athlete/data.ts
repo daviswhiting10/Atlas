@@ -229,8 +229,8 @@ export type WeekBucket = { week: string; sessions: number; volume: number };
 export type ProgressData = {
   exercises: ExerciseProgress[];
   weeks: WeekBucket[];
-  totals: { sessions: number; volume: number; sets: number; prs: number; streak: number };
-  recentPRs: Array<{ exercise: string; date: string; metric: FocusMetric; value: number; loaded: boolean }>;
+  totals: { sessions: number; volume: number; sets: number; prs: number; streak: number; since: string | null };
+  recentPRs: Array<{ exercise: string; date: string; value: number; unit: "lb" | "reps" }>;
 };
 
 
@@ -306,7 +306,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   for (const [exerciseId, entry] of Array.from(byExercise.entries())) {
     const sessions = Array.from(entry.sessions.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
     const points = sessions
-      .map((s) => sessionPoint(localDay(s.date, tz), s.sets))
+      .map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload))
       .filter((p): p is NonNullable<typeof p> => p != null);
     if (points.length === 0) continue;
     const series = buildSeries(points);
@@ -317,11 +317,10 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
       : null;
     exercises.push({ exerciseId, name: entry.name, muscles: entry.muscles, loaded, series, target });
 
-    const headline: FocusMetric = loaded ? "e1rm" : "reps";
     for (const p of series) {
-      if (!p.pr[headline]) continue;
+      if (!p.record) continue;
       prCount += 1;
-      recentPRs.push({ exercise: entry.name, date: p.date, metric: headline, value: p[headline] ?? 0, loaded });
+      recentPRs.push({ exercise: entry.name, date: p.date, value: p.weight ?? p.reps, unit: p.weight != null ? "lb" : "reps" });
     }
   }
 
@@ -347,8 +346,15 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   return {
     exercises,
     weeks: weeks.slice(-12),
-    totals: { sessions: sessionDates.size, volume: Math.round(totalVolume), sets: totalSets, prs: prCount, streak },
-    recentPRs: recentPRs.slice(0, 6),
+    totals: {
+      sessions: sessionDates.size,
+      volume: Math.round(totalVolume),
+      sets: totalSets,
+      prs: prCount,
+      streak,
+      since: sessionDates.size > 0 ? localDay(new Date(Math.min(...Array.from(sessionDates.values()).map((d) => d.getTime()))), tz) : null,
+    },
+    recentPRs: recentPRs.slice(0, 12),
   };
 });
 
@@ -389,6 +395,8 @@ export type LoggerData = {
   note: string | null;
   workoutLogId: string | null;
   exercises: LoggerExercise[];
+  /** True in a lighter week of a generated plan: no progression is asked for, and nothing counts as a record. */
+  deloadWeek: boolean;
   /** Other workouts from the same week, for quick switching. */
   siblings: Array<{ id: string; name: string; status: WorkoutSummary["status"]; date: string }>;
   metric: FocusMetric;
@@ -492,7 +500,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     );
     const lastSession = referenceSession(sessions);
     const series = buildSeries(
-      sessions.map((s) => sessionPoint(localDay(s.date, tz), s.sets)).filter((p): p is NonNullable<typeof p> => p != null)
+      sessions.map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload)).filter((p): p is NonNullable<typeof p> => p != null)
     );
     const everLoaded = series.some((p) => p.weight != null);
     const bodyweight = cat ? cat.tool === "bodyweight" : /body ?only|bodyweight|n\/?a/i.test(e.exercise.equipment) && !everLoaded;
@@ -541,6 +549,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     status: workout.status,
     note: workout.notes,
     workoutLogId: workout.workoutLog?.id ?? null,
+    deloadWeek,
     exercises,
     siblings: siblings.map((s) => ({ id: s.id, name: s.name, status: s.status, date: iso(s.scheduledDate) })),
     metric: athlete.metric,

@@ -10,7 +10,8 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db/client";
 import type { Prisma } from "@/app/generated/prisma/client";
-import { CATALOG, CATALOG_BY_SLUG } from "./catalog";
+import { CATALOG } from "./catalog";
+import { simulateDemoHistory } from "./demo";
 import {
   GOALS,
   TOTAL_WEEKS,
@@ -81,6 +82,7 @@ export type CreatedWorkout = {
     id: string;
     exerciseId: string;
     slug: string;
+    role: "main" | "secondary" | "accessory";
     sets: number;
     repMin: number;
     repMax: number;
@@ -168,6 +170,7 @@ export async function createPlanForClient(
           id: aweId,
           exerciseId,
           slug: e.slug,
+          role: e.role,
           sets: e.sets,
           repMin: e.repMin,
           repMax: e.repMax,
@@ -223,26 +226,9 @@ export async function createPlanForClient(
 
 // ── Demo history ────────────────────────────────────────────────────────────
 
-/** Small deterministic PRNG so the demo looks the same every time. */
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const LEVEL_SCALE = { beginner: 0.6, intermediate: 1, advanced: 1.3 } as const;
-/** Which past sessions (by position) the demo athlete missed. */
-const SKIPPED_DEMO_SESSIONS = new Set([9, 22]);
-
 /**
- * Log realistic history for every workout scheduled before `until`.
- * Each lift follows double progression: reps climb through the range, then
- * the weight goes up — the same rule the app coaches the athlete with.
+ * Write the simulated history (lib/plan/demo.ts) for every workout scheduled
+ * before `until`.
  */
 export async function seedDemoHistory(
   {
@@ -258,88 +244,35 @@ export async function seedDemoHistory(
   },
   db: Db = prisma
 ): Promise<void> {
-  const rand = mulberry32(20260519);
-  const state = new Map<string, { weight: number | null; reps: number }>();
-  const scale = LEVEL_SCALE[prefs.experience];
+  const { logs, skipped } = simulateDemoHistory({ prefs, workouts, until });
 
   const logRows: Prisma.WorkoutLogCreateManyInput[] = [];
   const setRows: Prisma.SetLogCreateManyInput[] = [];
-  const loggedIds: string[] = [];
-  const skippedIds: string[] = [];
-
-  const past = workouts.filter((w) => w.scheduledDate.getTime() < until.getTime());
-
-  for (let n = 0; n < past.length; n++) {
-    const w = past[n];
-    // Miss the occasional session so the consistency view looks human.
-    if (SKIPPED_DEMO_SESSIONS.has(n)) {
-      skippedIds.push(w.id);
-      continue;
-    }
-
+  for (const log of logs) {
     const logId = id();
-    const date = new Date(w.scheduledDate.getTime() + (17 + Math.floor(rand() * 3)) * 3_600_000);
-    logRows.push({
-      id: logId,
-      clientId,
-      assignedWorkoutId: w.id,
-      date,
-      durationMin: 46 + Math.floor(rand() * 20),
-      trainerSeen: true,
-    });
-    loggedIds.push(w.id);
-
-    for (const e of w.exercises) {
-      const cat = CATALOG_BY_SLUG[e.slug];
-      const inc = cat?.inc ?? 0;
-      let s = state.get(e.slug);
-      if (!s) {
-        const base = cat?.base ?? null;
-        const start = base == null ? null : Math.max(inc, Math.round((base * scale * 0.88) / (inc || 5)) * (inc || 5));
-        const span = e.repMax - e.repMin;
-        s = { weight: start, reps: e.unit === "secs" ? 30 : e.repMin + Math.floor(span / 2) };
-        state.set(e.slug, s);
-      }
-      // Rep ranges shift between blocks — keep the lift inside today's range.
-      if (e.unit === "reps" && s.weight != null) s.reps = Math.min(Math.max(s.reps, e.repMin), e.repMax);
-
-      const topReps = w.deload ? Math.max(1, s.reps - 1) : s.reps;
-      for (let i = 0; i < e.sets; i++) {
-        const fatigue = e.unit === "secs" ? i * 5 : i >= 2 && rand() < 0.6 ? 1 : 0;
-        setRows.push({
-          workoutLogId: logId,
-          exerciseId: e.exerciseId,
-          assignedWorkoutExerciseId: e.id,
-          setNumber: i + 1,
-          weight: s.weight,
-          reps: Math.max(1, topReps - fatigue),
-          rpe: Math.min(9.5, 7 + Math.round(rand() * 4) / 2),
-          completed: true,
-          createdAt: new Date(date.getTime() + i * 150_000),
-        });
-      }
-
-      if (w.deload) continue; // no progression on a lighter week
-      const stalled = rand() < 0.15;
-      if (e.unit === "secs") {
-        if (!stalled) s.reps = Math.min(s.reps + 5, 120);
-      } else if (s.weight == null || inc <= 0) {
-        if (!stalled) s.reps += 1;
-      } else if (s.reps >= e.repMax) {
-        s.weight += inc;
-        s.reps = Math.max(e.repMin, e.repMax - 2);
-      } else if (!stalled) {
-        s.reps += 1;
-      }
+    logRows.push({ id: logId, clientId, assignedWorkoutId: log.workoutId, date: log.date, durationMin: log.durationMin, trainerSeen: true });
+    for (const s of log.sets) {
+      setRows.push({
+        workoutLogId: logId,
+        exerciseId: s.exerciseId,
+        assignedWorkoutExerciseId: s.aweId,
+        setNumber: s.setNumber,
+        weight: s.weight,
+        reps: s.reps,
+        rpe: s.rpe,
+        completed: true,
+        createdAt: s.at,
+      });
     }
   }
 
   await db.workoutLog.createMany({ data: logRows });
   await db.setLog.createMany({ data: setRows });
+  const loggedIds = logs.map((l) => l.workoutId);
   if (loggedIds.length > 0) {
     await db.assignedWorkout.updateMany({ where: { id: { in: loggedIds } }, data: { status: "LOGGED" } });
   }
-  if (skippedIds.length > 0) {
-    await db.assignedWorkout.updateMany({ where: { id: { in: skippedIds } }, data: { status: "SKIPPED" } });
+  if (skipped.length > 0) {
+    await db.assignedWorkout.updateMany({ where: { id: { in: skipped } }, data: { status: "SKIPPED" } });
   }
 }

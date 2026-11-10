@@ -55,7 +55,7 @@ export function AppNav({ name, isDemo }: { name: string; isDemo: boolean }) {
           </nav>
 
           <div className="flex items-center gap-2">
-            {isDemo && <span className="rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-semibold text-gold">Demo data</span>}
+            {isDemo && <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-medium text-ink-mute">Demo data</span>}
             <Link href="/you" className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" aria-label="Your profile">
               {name.charAt(0).toUpperCase()}
             </Link>
@@ -77,7 +77,7 @@ export function AppNav({ name, isDemo }: { name: string; isDemo: boolean }) {
                   key={href}
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  className={cn("press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium", active ? "text-blue" : "text-ink-mute")}
+                  className={cn("press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium", active ? "text-signal" : "text-ink-mute")}
                 >
                   <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.8} />
                   {label}

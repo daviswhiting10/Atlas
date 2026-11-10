@@ -61,7 +61,7 @@
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 30px 60px -30px rgba(43, 107, 255, 0.30);
+  box-shadow: 0 16px 32px -24px rgba(11, 15, 26, 0.35);
 }
 
 /* ── Mobile: replace hover lifts with active press scale ───────────────── */
@@ -110,7 +110,9 @@
     --blue-soft:  #7BA7FF;            /* glows only              */
     --success:    #1F7A4D;            /* green states            */
     --warn:       #B45309;            /* amber / at-risk states  */
-    --gold:       #E0962A;            /* personal records        */
+    --gold:       #C98A1B;            /* personal records only   */
+    --signal:     #1E6B4E;            /* progress + active state */
+    --signal-deep:#154D38;            /* signal, pressed         */
     --night:      #0B0F1A;            /* dark feature surfaces   */
 
     /* ── Shadcn token remaps ─────────────────────────────────── */
@@ -223,26 +225,22 @@
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Card surface */
+/* Card surface. Used sparingly: most content sits straight on the page. */
 .surface {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: 0 1px 2px rgba(11, 15, 26, 0.04), 0 12px 32px -18px rgba(11, 15, 26, 0.12);
+  border-radius: 14px;
 }
 
-/* Dark feature surface with a soft blue glow */
+/* Dark feature surface: flat ink, no gradient, no glow. */
 .surface-night {
-  position: relative;
-  overflow: hidden;
-  border-radius: 26px;
+  border-radius: 16px;
   color: #fff;
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(43, 107, 255, 0.55) 0%, rgba(43, 107, 255, 0) 55%),
-    radial-gradient(90% 80% at 0% 100%, rgba(123, 167, 255, 0.22) 0%, rgba(123, 167, 255, 0) 60%),
-    var(--night);
-  box-shadow: 0 30px 60px -30px rgba(25, 71, 196, 0.55);
+  background: var(--night);
 }
+
+/* Hairline rule between sections and between stats in a row */
+.rule { border-top: 1px solid var(--line); }
 
 /* Small uppercase label */
 .eyebrow {
@@ -304,3 +302,19 @@
 
 /* Charts: no focus outline on click */
 .recharts-wrapper, .recharts-surface, .recharts-wrapper *:focus { outline: none; }
+
+/* ── Athlete app type system ────────────────────────────────────────────────
+   One grotesque sans for everything, tabular numerals throughout. The serif
+   is kept for a single display moment (the greeting).                      */
+.app-ui { font-variant-numeric: tabular-nums; }
+.app-ui h1, .app-ui h2, .app-ui h3, .app-ui h4,
+.app-ui .font-display {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.app-ui .font-greeting {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}

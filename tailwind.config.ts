@@ -73,6 +73,8 @@ const config: Config = {
         success: "var(--success)",
         warn: "var(--warn)",
         gold: "var(--gold)",
+        signal: "var(--signal)",
+        "signal-deep": "var(--signal-deep)",
         night: "var(--night)",
       },
       borderRadius: {
