@@ -99,8 +99,8 @@
 @layer base {
   :root {
     /* ── Atlas design-system tokens (spec-exact values) ──────── */
-    --bone:       #F7F5F0;            /* page background         */
-    --paper:      #FBFAF7;            /* card / surface          */
+    --bone:       #F5F3EE;            /* page background         */
+    --paper:      #FFFFFF;            /* card / surface          */
     --ink:        #0B0F1A;            /* primary text            */
     --ink-soft:   #3A4255;            /* secondary text          */
     --ink-mute:   #6B7280;            /* tertiary / labels       */
@@ -110,6 +110,8 @@
     --blue-soft:  #7BA7FF;            /* glows only              */
     --success:    #1F7A4D;            /* green states            */
     --warn:       #B45309;            /* amber / at-risk states  */
+    --gold:       #E0962A;            /* personal records        */
+    --night:      #0B0F1A;            /* dark feature surfaces   */
 
     /* ── Shadcn token remaps ─────────────────────────────────── */
     --background:            var(--bone);
@@ -190,18 +192,20 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: var(--font-body), Georgia, serif;
+    font-family: var(--font-body), system-ui, sans-serif;
     padding-top: env(safe-area-inset-top, 0px);
   }
 
   html {
-    font-family: var(--font-body), Georgia, serif;
+    font-family: var(--font-body), system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Display headings default to Instrument Serif */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display), Georgia, serif;
     font-weight: 400;
+    letter-spacing: -0.01em;
   }
 
   /* Prevent iOS zoom on input focus */
@@ -211,3 +215,92 @@
     }
   }
 }
+
+/* ══ Athlete app ═══════════════════════════════════════════════════════════ */
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Card surface */
+.surface {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 1px 2px rgba(11, 15, 26, 0.04), 0 12px 32px -18px rgba(11, 15, 26, 0.12);
+}
+
+/* Dark feature surface with a soft blue glow */
+.surface-night {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(43, 107, 255, 0.55) 0%, rgba(43, 107, 255, 0) 55%),
+    radial-gradient(90% 80% at 0% 100%, rgba(123, 167, 255, 0.22) 0%, rgba(123, 167, 255, 0) 60%),
+    var(--night);
+  box-shadow: 0 30px 60px -30px rgba(25, 71, 196, 0.55);
+}
+
+/* Small uppercase label */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* Press feedback for anything tappable */
+.press { transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1), background-color 160ms, border-color 160ms, box-shadow 160ms, color 160ms, opacity 160ms; }
+.press:active { transform: scale(0.97); }
+
+/* Staggered entrance */
+.rise { animation: rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rise-1 { animation-delay: 60ms; }
+.rise-2 { animation-delay: 120ms; }
+.rise-3 { animation-delay: 180ms; }
+.rise-4 { animation-delay: 240ms; }
+.rise-5 { animation-delay: 300ms; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in { animation: fade-in 260ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Set completed */
+.pop { animation: pop 320ms cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes pop {
+  0%   { transform: scale(0.7); }
+  100% { transform: scale(1); }
+}
+
+/* Line that draws itself — set pathLength="1" on the path */
+.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2.2s cubic-bezier(0.4, 0, 0.2, 1) 300ms forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* Skeleton shimmer */
+.skeleton {
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(11, 15, 26, 0.05) 0%, rgba(11, 15, 26, 0.09) 50%, rgba(11, 15, 26, 0.05) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Sheet sliding up from the bottom */
+.sheet-up { animation: sheet-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes sheet-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Charts: no focus outline on click */
+.recharts-wrapper, .recharts-surface, .recharts-wrapper *:focus { outline: none; }

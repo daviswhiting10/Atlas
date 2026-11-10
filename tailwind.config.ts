@@ -5,15 +5,16 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
       fontFamily: {
-        body: ["var(--font-body)", "Georgia", "serif"],
+        body: ["var(--font-body)", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "Georgia", "serif"],
         heading: ["var(--font-display)", "Georgia", "serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
-        sans: ["var(--font-body)", "Georgia", "serif"],
+        sans: ["var(--font-body)", "system-ui", "sans-serif"],
       },
       colors: {
         background: "var(--background)",
@@ -71,6 +72,8 @@ const config: Config = {
         "blue-soft": "var(--blue-soft)",
         success: "var(--success)",
         warn: "var(--warn)",
+        gold: "var(--gold)",
+        night: "var(--night)",
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -1,171 +1,71 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowRight, SlidersHorizontal } from "lucide-react";
+import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
+import { EQUIPMENT, EXPERIENCE, GOALS } from "@/lib/plan/generator";
+import { PlanView } from "@/components/athlete/PlanView";
 
-type SetShape = { setNumber: number; weight: number | null; unit?: "reps" | "secs"; repMin: number; repMax: number };
-type Exercise = { id: string; prescribedSets: SetShape[]; exercise: { name: string } };
-type Workout = {
-  id: string;
-  name: string;
-  scheduledDate: string;
-  status: "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
-  exercises: Exercise[];
-};
-type Plan = {
-  id: string;
-  name: string;
-  startDate: string;
-  sourceProgram: { name: string };
-  assignedWorkouts: Workout[];
-} | null;
+export const metadata: Metadata = { title: "Plan" };
 
-const STATUS_STYLE: Record<string, string> = {
-  PLANNED: "border-border bg-muted text-muted-foreground",
-  LOGGED: "border-green-300 bg-green-50 text-green-700",
-  SKIPPED: "border-amber-300 bg-amber-50 text-amber-700",
-  RESCHEDULED: "border-blue-300 bg-blue-50 text-blue-700",
-};
-
-function repRange(s: SetShape): string {
-  if (s.unit === "secs") return `${s.repMax}s`;
-  return s.repMin === s.repMax ? String(s.repMax) : `${s.repMin}–${s.repMax}`;
-}
-
-function groupByWeek(workouts: Workout[], startDate: string) {
-  const start = new Date(startDate);
-  const weeks: Record<number, Workout[]> = {};
-  for (const w of workouts) {
-    const diffDays = Math.floor((new Date(w.scheduledDate).getTime() - start.getTime()) / 86400000);
-    const week = Math.floor(diffDays / 7) + 1;
-    (weeks[week] ??= []).push(w);
-  }
-  return weeks;
-}
-
-export default function PlanPage() {
-  const [plan, setPlan] = useState<Plan | undefined>(undefined);
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/client/plan")
-      .then((r) => r.json())
-      .then(setPlan);
-  }, []);
-
-  if (plan === undefined) {
-    return (
-      <div className="p-6 max-w-lg mx-auto">
-        <div className="h-6 w-40 bg-muted rounded animate-pulse mb-4" />
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-14 bg-muted rounded-xl animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+export default async function PlanPage() {
+  const [athlete, plan] = await Promise.all([getAthlete(), getPlanOverview()]);
 
   if (!plan) {
     return (
-      <div className="p-6 max-w-lg mx-auto">
-        <h1 className="text-xl font-bold tracking-tight mb-6">Your plan</h1>
-        <Card className="border-dashed">
-          <CardContent className="py-16 flex flex-col items-center text-center">
-            <ClipboardList className="w-8 h-8 text-muted-foreground mb-3" />
-            <p className="font-semibold">No active program yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Your trainer hasn&apos;t assigned a program. Check back soon.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="surface rise p-8 text-center">
+        <h1 className="font-display text-4xl text-ink">No plan yet</h1>
+        <p className="mx-auto mt-2 max-w-sm text-[15px] text-ink-soft">Answer four questions and Atlas lays out your next 12 weeks.</p>
+        <Link href="/you" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-blue px-6 text-[15px] font-semibold text-white hover:bg-blue-deep">
+          Build my plan <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     );
   }
 
-  const weekGroups = groupByWeek(plan.assignedWorkouts, plan.startDate);
-  const weeks = Object.keys(weekGroups).map(Number).sort((a, b) => a - b);
-  const today = new Date().toISOString().slice(0, 10);
+  const { prefs } = athlete;
+  const chips = athlete.selfServe
+    ? [GOALS[prefs.goal].label, `${prefs.daysPerWeek} days a week`, `${prefs.minutes} min`, EQUIPMENT[prefs.equipment].label, EXPERIENCE[prefs.experience].label]
+    : [];
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold tracking-tight">{plan.name}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{plan.sourceProgram.name}</p>
+    <div>
+      <div className="rise mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow">Your plan · {plan.totalWeeks} weeks</p>
+          <h1 className="mt-1.5 font-display text-[38px] leading-[1.05] text-ink sm:text-5xl">{plan.name}</h1>
+          {chips.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {chips.map((c) => (
+                <span key={c} className="rounded-full border border-line bg-white px-3 py-1 text-[13px] font-medium text-ink-soft">
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {athlete.selfServe && (
+          <Link href="/you" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
+            <SlidersHorizontal className="h-4 w-4" /> Change goals
+          </Link>
+        )}
       </div>
 
-      <div className="space-y-6">
-        {weeks.map((weekNum) => (
-          <div key={weekNum}>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Week {weekNum}
-            </h2>
-            <div className="space-y-2">
-              {weekGroups[weekNum].map((w) => {
-                const isOpen = openId === w.id;
-                const isToday = w.scheduledDate.slice(0, 10) === today;
-                return (
-                  <Card key={w.id} className={cn(isToday && "border-primary/40")}>
-                    <CardContent className="py-3 px-4">
-                      <button
-                        type="button"
-                        onClick={() => setOpenId(isOpen ? null : w.id)}
-                        className="w-full flex items-center gap-3 text-left"
-                      >
-                        {isOpen ? (
-                          <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{w.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(w.scheduledDate).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                            {" · "}
-                            {w.exercises.length} exercise{w.exercises.length !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className={cn("text-xs shrink-0", STATUS_STYLE[w.status])}>
-                          {w.status}
-                        </Badge>
-                      </button>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+        <PlanView plan={plan} />
 
-                      {isOpen && (
-                        <div className="mt-3 pl-7 space-y-2">
-                          {w.exercises.map((ex, i) => (
-                            <div key={ex.id} className="text-sm">
-                              <span className="text-muted-foreground mr-1">{i + 1}.</span>
-                              {ex.exercise.name}
-                              <span className="text-xs text-muted-foreground ml-1.5">
-                                {ex.prescribedSets.length} × {repRange(ex.prescribedSets[0])}
-                              </span>
-                            </div>
-                          ))}
-                          {w.status !== "LOGGED" && (
-                            <Link
-                              href={`/workouts/${w.id}`}
-                              className="inline-block text-xs font-medium text-primary mt-1 hover:underline"
-                            >
-                              Log this workout →
-                            </Link>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+        {plan.rationale.length > 0 && (
+          <aside className="surface rise rise-3 h-fit p-5 sm:p-6 lg:sticky lg:top-24">
+            <p className="eyebrow">Why this plan</p>
+            <ul className="mt-3 space-y-3">
+              {plan.rationale.map((r, i) => (
+                <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-ink-soft">
+                  <span className="tnum mt-0.5 font-mono text-xs text-blue">0{i + 1}</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
       </div>
     </div>
   );

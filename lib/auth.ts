@@ -1,8 +1,10 @@
 import NextAuth from "next-auth"
 import Email from "next-auth/providers/email"
+import Credentials from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
+import { createGuest } from "@/lib/guest"
 
 const baseAdapter = PrismaAdapter(prisma)
 
@@ -24,6 +26,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
   ...authConfig,
   providers: [
+    // Guest sign-in: always creates a brand-new account, never signs into an
+    // existing one — so there is no credential to guess and nothing to hijack.
+    Credentials({
+      id: "guest",
+      name: "Guest",
+      credentials: { payload: {} },
+      async authorize(credentials) {
+        try {
+          const raw = typeof credentials?.payload === "string" ? credentials.payload : "{}"
+          const input = JSON.parse(raw) as { name?: string; prefs?: unknown; demo?: boolean }
+          return await createGuest(input)
+        } catch (err) {
+          console.error("[guest sign-in]", err)
+          return null
+        }
+      },
+    }),
     Email({
       server: process.env.EMAIL_SERVER ?? "smtp://localhost:25",
       from: "Atlas <onboarding@resend.dev>",

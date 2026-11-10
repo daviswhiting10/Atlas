@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Atlas
 
-## Getting Started
+Strength training that adapts to you. Tell Atlas your goal and it writes a 12-week plan, tells you what to lift each
+session, and charts your progress as you log.
 
-First, run the development server:
+**Live:** https://atlas-red-eight.vercel.app — choose **Explore a live demo** to open an account with nine weeks of
+training already logged, or **Build my plan** to start from scratch. Neither needs an email or password.
+
+## What it does
+
+- **Plan generator.** Four questions (goal, experience, schedule, equipment) produce a periodised 12-week program:
+  a split matched to the days available, exercises matched to the equipment, and three 4-week blocks with a lighter
+  week closing each.
+- **Progressive overload.** Every set shows a target worked out from the last session: add a rep until you reach the
+  top of the range, then add weight and start again.
+- **Charts that follow the goal.** Each exercise can be charted by top weight, best set, estimated 1-rep max or
+  session volume. The leading metric depends on the goal — volume for muscle, estimated max for strength, reps for fat
+  loss. Records are marked, and the next target is projected as a dashed point.
+- **Workout logger.** One exercise at a time, steppers for weight and reps, a rest timer, live record detection, and
+  a chart that updates as each set is logged. Any workout in the week can be done in any order.
+- **Coach dashboard.** The original half of the app: client management, a program builder, session logging and
+  AI-assisted intake and programming for a personal trainer. Sign in by email link at `/login`.
+
+## How it's built
+
+| | |
+|---|---|
+| Framework | Next.js 14 (App Router), React 18, TypeScript |
+| Data | Postgres on Neon, Prisma 7 |
+| Auth | Auth.js v5 — email links for coaches, guest accounts for athletes |
+| UI | Tailwind CSS, Recharts |
+| Tests | Vitest |
+| Hosting | Vercel |
+
+The interesting logic is pure TypeScript with no I/O, so it runs in the browser for the live preview and on the server
+when the plan is saved, and is covered by unit tests:
+
+- `lib/plan/generator.ts` — goals in, 12-week plan out. Tested across all 720 combinations of answers.
+- `lib/plan/overload.ts` — next-session targets, per-session chart points and record detection.
+- `lib/plan/catalog.ts` — the curated exercise list and the movement slots that map to it.
+
+Around that:
+
+- `lib/plan/persist.ts` writes a plan (and the demo's history) with batched inserts.
+- `lib/athlete/data.ts` holds the read models for the athlete screens; `lib/actions/athlete.ts` holds the writes.
+  Both take the athlete from the session and never from the request.
+- `lib/guest.ts` creates guest accounts. Each gets its own workspace, so self-serve athletes are isolated from a
+  coach's clients and from each other.
+- `middleware.ts` keeps `/`, `/start` and `/login` public and routes coaches and athletes to their own areas.
+
+## Running locally
 
 ```bash
+npm install
+cp .env.example .env.local   # then fill in the values
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `AUTH_SECRET` | Session signing secret (`npx auth secret`) |
+| `AUTH_URL` | Base URL of the app |
+| `RESEND_API_KEY` | Sends coach sign-in emails (optional locally — the link is printed to the console) |
+| `ANTHROPIC_API_KEY` | Coach-side AI features (optional) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm test        # unit tests
+npm run lint
+npm run build
+```

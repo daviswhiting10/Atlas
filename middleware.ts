@@ -1,47 +1,46 @@
 import NextAuth from "next-auth";
 import authConfig from "./lib/auth.config";
-import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
-const CLIENT_PATHS = ["/today", "/client", "/plan", "/workouts"];
-const isClientPath = (p: string) => CLIENT_PATHS.some((cp) => p === cp || p.startsWith(cp + "/"));
-const isApiClientPath = (p: string) => p.startsWith("/api/client/");
+/** Pages anyone can see without signing in. */
+const PUBLIC_PATHS = ["/", "/start", "/login", "/error"];
+/** The athlete app. Coaches are sent back to their dashboard. */
+const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you"];
 
-export async function middleware(req: NextRequest) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (auth as any)(req);
+const matches = (path: string, list: string[]) =>
+  list.some((p) => path === p || path.startsWith(p + "/"));
 
-    // After base auth check, enforce role-based routing
-    const session = await auth();
-    const role = session?.user?.role ?? "TRAINER";
-    const path = req.nextUrl.pathname;
+export default auth((req) => {
+  const path = req.nextUrl.pathname;
+  const user = req.auth?.user;
+  const isApi = path.startsWith("/api/");
+  const go = (to: string) => NextResponse.redirect(new URL(to, req.url));
 
-    // Authenticated user landing on /login → redirect to their home
-    if (session?.user && path === "/login") {
-      const dest = role === "CLIENT" ? "/today" : "/inbox";
-      return NextResponse.redirect(new URL(dest, req.url));
-    }
-
-    // CLIENT accessing a trainer route → redirect to /today
-    if (role === "CLIENT" && !isClientPath(path) && !isApiClientPath(path)) {
-      return NextResponse.redirect(new URL("/today", req.url));
-    }
-
-    // TRAINER/ADMIN accessing a client-only route → redirect to /inbox
-    if (role !== "CLIENT" && (isClientPath(path) || isApiClientPath(path))) {
-      return NextResponse.redirect(new URL("/inbox", req.url));
-    }
-
-    return response;
-  } catch (err) {
-    console.error("[middleware crash]", err);
-    return undefined;
+  if (!user) {
+    if (matches(path, PUBLIC_PATHS)) return NextResponse.next();
+    if (isApi) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return go("/login");
   }
-}
+
+  const isAthlete = user.role === "CLIENT";
+  const home = isAthlete ? "/today" : "/inbox";
+
+  // Signed-in visitors skip the marketing and sign-in pages.
+  if (path === "/" || path === "/login" || path === "/start") return go(home);
+
+  if (isAthlete) {
+    if (isApi) return path.startsWith("/api/client/") ? NextResponse.next() : NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!matches(path, ATHLETE_PATHS)) return go(home);
+  } else if (matches(path, ATHLETE_PATHS) || path.startsWith("/api/client/")) {
+    return go(home);
+  }
+
+  return NextResponse.next();
+});
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  // Skip Next internals, the auth API, and static files (anything with an extension).
+  matcher: ["/((?!api/auth|_next/static|_next/image|.*\\.[\\w]+$).*)"],
 };

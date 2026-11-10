@@ -31,8 +31,5 @@ export default {
       }
       return session
     },
-    authorized({ auth }) {
-      return !!auth
-    },
   },
 } satisfies NextAuthConfig

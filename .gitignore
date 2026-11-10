@@ -49,3 +49,6 @@ trainer-os.db-wal
 .env.local.save
 NOTES.md
 .env*
+
+# keep the example env file
+!.env.example

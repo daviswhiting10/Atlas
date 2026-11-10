@@ -38,9 +38,9 @@
 ## Required env vars (Vercel)
 ```
 DATABASE_URL=postgresql://...
-AUTH_SECRET=xMg95OE+MjCAK6vTdTaV6vIp/Q1/Di4QctcWg78d99Q=
+AUTH_SECRET=<set in Vercel>
 AUTH_URL=https://atlas-red-eight.vercel.app
-NEXTAUTH_SECRET=xMg95OE+MjCAK6vTdTaV6vIp/Q1/Di4QctcWg78d99Q=
+NEXTAUTH_SECRET=<set in Vercel>
 NEXTAUTH_URL=https://atlas-red-eight.vercel.app
 RESEND_API_KEY=...
 ANTHROPIC_API_KEY=...

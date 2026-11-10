@@ -1,20 +1,12 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import ClientTabBar from "./ClientTabBar";
+import { AppNav } from "@/components/athlete/AppNav";
+import { getAthlete } from "@/lib/athlete/data";
 
-export default async function ClientLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-  if (session.user.role !== "CLIENT") redirect("/inbox");
-
+export default async function AthleteLayout({ children }: { children: React.ReactNode }) {
+  const athlete = await getAthlete();
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border px-6 h-14 flex items-center justify-between">
-        <span className="font-semibold text-sm tracking-tight">Atlas</span>
-        <span className="text-xs text-muted-foreground">{session.user.name ?? session.user.email}</span>
-      </header>
-      <main className="pb-16">{children}</main>
-      <ClientTabBar />
+    <div className="min-h-screen bg-bone">
+      <AppNav name={athlete.firstName} isDemo={athlete.isDemo} />
+      <main className="mx-auto max-w-5xl px-4 pb-28 pt-5 sm:px-8 md:pb-16 md:pt-9">{children}</main>
     </div>
   );
 }
