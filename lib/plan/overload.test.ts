@@ -17,8 +17,12 @@ describe("nextTarget", () => {
     expect(nextTarget({ last: [set(150, 10), set(150, 9)], ...range })).toMatchObject({ kind: "add_weight", weight: 155, reps: 8 });
   });
 
-  it("holds the weight when reps fell short of the range", () => {
-    expect(nextTarget({ last: [set(150, 4)], ...range })).toMatchObject({ kind: "hold", weight: 150, reps: 6 });
+  it("holds the weight when one rep short of the range", () => {
+    expect(nextTarget({ last: [set(150, 5)], ...range })).toMatchObject({ kind: "hold", weight: 150, reps: 6 });
+  });
+
+  it("lowers the weight when two or more reps short of the range", () => {
+    expect(nextTarget({ last: [set(150, 4)], ...range })).toMatchObject({ kind: "reset", weight: 140, reps: 6 });
   });
 
   it("judges by the heaviest weight used, not a lighter back-off set", () => {
@@ -83,5 +87,41 @@ describe("targetValue", () => {
     expect(targetValue(target, "e1rm")).toBeCloseTo(e1rm(155, 8), 1);
     expect(targetValue(target, "volume")).toBeNull();
     expect(targetValue(null, "weight")).toBeNull();
+  });
+});
+
+describe("nextTarget — lighter weeks", () => {
+  it("asks for the same weight and fewer reps, never a progression", () => {
+    const t = nextTarget({ last: [set(225, 10), set(225, 10)], ...range, deload: true });
+    expect(t).toMatchObject({ kind: "deload", weight: 225, reps: 8 });
+  });
+
+  it("backs off timed work by seconds", () => {
+    expect(nextTarget({ last: [set(null, 60)], repMin: 30, repMax: 60, increment: 0, unit: "secs", deload: true })).toMatchObject({
+      kind: "deload",
+      reps: 50,
+    });
+  });
+
+  it("still asks for a baseline when there is no history", () => {
+    expect(nextTarget({ last: [], ...range, deload: true }).kind).toBe("first");
+  });
+});
+
+describe("nextTarget — when the rep range moves up", () => {
+  it("works the load back from the estimated max instead of holding a heavy weight", () => {
+    // Strength plan (3–6) rebuilt as fat loss (8–12): 315 × 4 must not become "315 × 8".
+    const t = nextTarget({ last: [set(315, 4)], repMin: 8, repMax: 12, increment: 5 });
+    expect(t.kind).toBe("reset");
+    expect(t.reps).toBe(8);
+    expect(t.weight).toBeLessThan(315);
+    expect(e1rm(t.weight as number, 8)).toBeLessThanOrEqual(e1rm(315, 4));
+  });
+
+});
+
+describe("nextTarget — load jumps", () => {
+  it("adds the increment exactly, without rounding an odd weight up", () => {
+    expect(nextTarget({ last: [set(22.5, 10)], ...range }).weight).toBe(27.5);
   });
 });

@@ -31,9 +31,11 @@ export default auth((req) => {
   if (path === "/" || path === "/login" || path === "/start") return go(home);
 
   if (isAthlete) {
-    if (isApi) return path.startsWith("/api/client/") ? NextResponse.next() : NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // The athlete app talks to the server through server actions and /api/mcp;
+    // every other API route belongs to the coach dashboard.
+    if (isApi) return path === "/api/mcp" ? NextResponse.next() : NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (!matches(path, ATHLETE_PATHS)) return go(home);
-  } else if (matches(path, ATHLETE_PATHS) || path.startsWith("/api/client/")) {
+  } else if (matches(path, ATHLETE_PATHS)) {
     return go(home);
   }
 
@@ -41,6 +43,8 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Skip Next internals, the auth API, and static files (anything with an extension).
-  matcher: ["/((?!api/auth|_next/static|_next/image|.*\\.[\\w]+$).*)"],
+  // Skip Next internals, the auth API, and a named list of static files.
+  // Deliberately not "anything with a dot": that would let a path like
+  // /clients/a.b slip past the role checks above.
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon\\.ico$|manifest\\.json$|sw\\.js$|swe-worker-[\\w-]+\\.js$|workbox-[\\w-]+\\.js$|icons/).*)"],
 };

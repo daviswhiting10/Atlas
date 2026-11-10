@@ -13,8 +13,15 @@ async function requireWorkspace(): Promise<{ userId: string; workspaceId: string
   const session = await auth();
   const userId = session?.user?.id;
   const workspaceId = session?.user?.workspaceId;
-  if (!userId || !workspaceId) throw new Error("Unauthorized");
+  // Coach-only: athletes log through lib/actions/athlete.ts.
+  if (!userId || !workspaceId || session.user.role === "CLIENT") throw new Error("Unauthorized");
   return { userId, workspaceId };
+}
+
+/** Throws unless the client belongs to the caller's workspace. */
+async function requireClientInWorkspace(clientId: string, workspaceId: string): Promise<void> {
+  const client = await prisma.clientProfile.findFirst({ where: { id: clientId, workspaceId }, select: { id: true } });
+  if (!client) throw new Error("Client not found");
 }
 
 // ── logSet ─────────────────────────────────────────────────────────────────────
@@ -54,7 +61,7 @@ export async function logSet(input: {
   const assignedWorkout = await prisma.assignedWorkout.findFirst({
     where: {
       id: input.assignedWorkoutId,
-      programAssignment: { workspaceId },
+      programAssignment: { workspaceId, clientId: input.clientId },
     },
     select: { id: true, scheduledDate: true },
   });
@@ -62,6 +69,15 @@ export async function logSet(input: {
 
   // ── Find or create WorkoutLog ──────────────────────────────────────────────
   let workoutLogId = input.workoutLogId;
+
+  if (workoutLogId) {
+    // A caller-supplied log id must be this workout's own log.
+    const owned = await prisma.workoutLog.findFirst({
+      where: { id: workoutLogId, assignedWorkoutId: input.assignedWorkoutId },
+      select: { id: true },
+    });
+    if (!owned) throw new Error("Workout log not found");
+  }
 
   if (!workoutLogId) {
     const existing = await prisma.workoutLog.findUnique({
@@ -92,6 +108,11 @@ export async function logSet(input: {
 
   if (input.setLogId) {
     // Update existing set (trainer edited weight/reps after initial save)
+    const ownedSet = await prisma.setLog.findFirst({
+      where: { id: input.setLogId, workoutLogId },
+      select: { id: true },
+    });
+    if (!ownedSet) throw new Error("Set not found");
     await prisma.setLog.update({
       where: { id: input.setLogId },
       data: {
@@ -268,7 +289,7 @@ export async function swapExercise(input: {
       data: { exerciseId: input.exerciseId },
     }),
     prisma.setLog.updateMany({
-      where: { assignedWorkoutExerciseId: input.assignedWorkoutExerciseId },
+      where: { assignedWorkoutExerciseId: awe.id },
       data: { exerciseId: input.exerciseId },
     }),
   ]);
@@ -317,6 +338,9 @@ export async function getLastPerformance(
   clientId: string,
   exerciseId: string
 ): Promise<Array<{ weight: number | null; reps: number | null; rpe: number | null; completed: boolean }>> {
+  const { workspaceId } = await requireWorkspace();
+  await requireClientInWorkspace(clientId, workspaceId);
+
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
 
@@ -375,8 +399,9 @@ export async function getLastExerciseNote(
   clientId: string,
   exerciseId: string
 ): Promise<string | null> {
+  const { workspaceId } = await requireWorkspace();
   const note = await prisma.exerciseCoachNote.findFirst({
-    where: { clientId, exerciseId },
+    where: { clientId, exerciseId, workspaceId },
     orderBy: { createdAt: "desc" },
     select: { note: true },
   });

@@ -52,3 +52,8 @@ NOTES.md
 
 # keep the example env file
 !.env.example
+
+# PWA build output (regenerated on every build)
+/public/sw.js
+/public/swe-worker-*.js
+/public/workbox-*.js

@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,17 @@ const TABS = [
 
 export function AppNav({ name, isDemo }: { name: string; isDemo: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Tell the server which timezone to bucket logged sessions in. On a first
+  // visit the cookie is missing, so set it and re-render once with real dates.
+  useEffect(() => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!tz || document.cookie.split("; ").includes(`tz=${tz}`)) return;
+    document.cookie = `tz=${tz}; path=/; max-age=31536000; samesite=lax`;
+    router.refresh();
+  }, [router]);
+
   const inWorkout = pathname.startsWith("/workouts/");
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 

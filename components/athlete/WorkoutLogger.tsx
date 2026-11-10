@@ -93,6 +93,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     setSetsState(next);
   }, []);
 
+  // Escape closes the workout switcher.
+  useEffect(() => {
+    if (!switching) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSwitching(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [switching]);
+
   // One clock drives the elapsed time and the rest countdown.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 500);
@@ -134,6 +142,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             [aweId]: setsRef.current[aweId].map((x) => (x.setNumber === setNumber ? { ...x, setLogId: res.setLogId } : x)),
           });
         } catch {
+          // A set that never reached the server must not keep looking done.
+          if (!s.setLogId) {
+            apply({
+              ...setsRef.current,
+              [aweId]: setsRef.current[aweId].map((x) => (x.setNumber === setNumber ? { ...x, done: false } : x)),
+            });
+            setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== `${aweId}:${setNumber}`)));
+          }
           toast.error("Couldn't save that set. Check your connection and tap it again.");
         }
       });
@@ -167,6 +183,11 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     const done = !s.done;
     if (done && (s.reps == null || s.reps <= 0)) {
       toast(`Enter your ${ex.unit === "secs" ? "time" : "reps"} first`);
+      return;
+    }
+    // A loaded lift saved without a weight would be charted as bodyweight.
+    if (done && ex.loaded && !s.weight) {
+      toast("Enter the weight first");
       return;
     }
     const next = list.map((x, j) => (j === i ? { ...x, done } : x));
@@ -227,7 +248,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const isLast = index === data.exercises.length - 1;
   const nextExercise = data.exercises[index + 1];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd in the athlete's own timezone
   const { series, metric } = useMemo(() => {
     const live = sessionPoint(today, current.map((s) => ({ weight: s.weight, reps: s.reps, completed: s.done })));
     const series = buildSeries(live ? [...exercise.history, live] : exercise.history);
@@ -532,7 +553,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {/* ── Workout switcher ─────────────────────────────────────────── */}
       {switching && (
         <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={() => setSwitching(false)}>
-          <div className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }} role="dialog" aria-label="Switch workout" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }} role="dialog" aria-modal="true" aria-label="Switch workout" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="eyebrow">Week {data.week}</p>

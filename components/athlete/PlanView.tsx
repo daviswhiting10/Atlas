@@ -6,6 +6,7 @@ import { ArrowRight, Check, ChevronDown, Clock, Dumbbell, Loader2, RotateCcw, Sk
 import { toast } from "sonner";
 import type { PlanOverview, WorkoutSummary } from "@/lib/athlete/data";
 import { setWorkoutSkipped } from "@/lib/actions/athlete";
+import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { cn } from "@/lib/utils";
 
 function WorkoutCard({ w, isNext, open, onToggle }: { w: WorkoutSummary; isNext: boolean; open: boolean; onToggle: () => void }) {
@@ -106,9 +107,9 @@ export function PlanView({ plan }: { plan: PlanOverview }) {
 
   const weeks = Array.from({ length: plan.totalWeeks }, (_, i) => i + 1);
   const shown = plan.workouts.filter((w) => w.week === week);
-  const blockIndex = plan.blocks.length > 0 ? Math.min(Math.floor((week - 1) / 4), plan.blocks.length - 1) : -1;
+  const blockIndex = plan.blocks.length > 0 ? Math.min(Math.floor((week - 1) / BLOCK_WEEKS), plan.blocks.length - 1) : -1;
   const block = blockIndex >= 0 ? plan.blocks[blockIndex] : null;
-  const isDeload = plan.blocks.length > 0 && week % 4 === 0;
+  const isDeload = plan.blocks.length > 0 && week % BLOCK_WEEKS === 0;
 
   return (
     <div className="min-w-0">
@@ -116,17 +117,18 @@ export function PlanView({ plan }: { plan: PlanOverview }) {
       {plan.blocks.length > 0 && (
         <div className="rise rise-1 mb-6 flex gap-2">
           {plan.blocks.map((b, i) => {
-            const startWeek = i * 4 + 1;
-            const state = plan.currentWeek > startWeek + 3 ? "done" : plan.currentWeek >= startWeek ? "now" : "later";
-            const fill = state === "done" ? 100 : state === "now" ? ((plan.currentWeek - startWeek) / 4) * 100 + 12 : 0;
+            const startWeek = i * BLOCK_WEEKS + 1;
+            const endWeek = startWeek + BLOCK_WEEKS - 1;
+            const state = plan.currentWeek > endWeek ? "done" : plan.currentWeek >= startWeek ? "now" : "later";
+            const fill = state === "done" ? 100 : state === "now" ? ((plan.currentWeek - startWeek) / BLOCK_WEEKS) * 100 + 12 : 0;
             return (
-              <button key={b.name} type="button" onClick={() => setWeek(Math.max(startWeek, Math.min(plan.currentWeek, startWeek + 3)))} className="press flex-1 text-left">
+              <button key={b.name} type="button" onClick={() => setWeek(Math.max(startWeek, Math.min(plan.currentWeek, endWeek)))} className="press flex-1 text-left">
                 <div className="h-2 overflow-hidden rounded-full bg-ink/10">
                   <div className="h-full rounded-full bg-blue transition-[width] duration-700" style={{ width: `${Math.min(fill, 100)}%` }} />
                 </div>
                 <p className={cn("mt-2 text-sm font-semibold", blockIndex === i ? "text-ink" : "text-ink-mute")}>{b.name}</p>
                 <p className="tnum text-xs text-ink-mute">
-                  Weeks {startWeek}–{startWeek + 3}
+                  Weeks {startWeek}–{endWeek}
                 </p>
               </button>
             );

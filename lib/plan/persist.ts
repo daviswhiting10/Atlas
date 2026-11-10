@@ -3,7 +3,7 @@
  * Program → Blocks, ProgramAssignment → AssignedWorkouts → exercises.
  *
  * Everything is written with createMany and pre-generated ids so a full
- * 12-week plan (and, for the demo, eight weeks of history) is a handful of
+ * 12-week plan (and, for the demo, nine weeks of history) is a handful of
  * round-trips instead of hundreds.
  */
 
@@ -22,6 +22,9 @@ import {
 } from "./generator";
 
 const id = () => randomUUID().replace(/-/g, "");
+
+/** The shared client, or a transaction handle when the caller wants all-or-nothing writes. */
+type Db = Prisma.TransactionClient;
 
 const PHASE_BY_GOAL = {
   muscle: "HYPERTROPHY",
@@ -89,17 +92,20 @@ export type CreatedWorkout = {
  * Create a plan for a client. Any previous active plan is marked completed —
  * its logged history stays, so charts carry over a rebuild.
  */
-export async function createPlanForClient({
-  workspaceId,
-  clientId,
-  prefs,
-  startDate,
-}: {
-  workspaceId: string;
-  clientId: string;
-  prefs: Prefs;
-  startDate: Date;
-}): Promise<{ assignmentId: string; workouts: CreatedWorkout[] }> {
+export async function createPlanForClient(
+  {
+    workspaceId,
+    clientId,
+    prefs,
+    startDate,
+  }: {
+    workspaceId: string;
+    clientId: string;
+    prefs: Prefs;
+    startDate: Date;
+  },
+  db: Db = prisma
+): Promise<{ assignmentId: string; workouts: CreatedWorkout[] }> {
   const plan = generatePlan(prefs);
   const exerciseIds = await ensureCatalog();
 
@@ -172,12 +178,12 @@ export async function createPlanForClient({
     }
   }
 
-  await prisma.programAssignment.updateMany({
+  await db.programAssignment.updateMany({
     where: { clientId, status: "ACTIVE" },
     data: { status: "COMPLETED" },
   });
 
-  await prisma.program.create({
+  await db.program.create({
     data: {
       id: programId,
       workspaceId,
@@ -198,7 +204,7 @@ export async function createPlanForClient({
     },
   });
 
-  await prisma.programAssignment.create({
+  await db.programAssignment.create({
     data: {
       id: assignmentId,
       workspaceId,
@@ -209,8 +215,8 @@ export async function createPlanForClient({
       status: "ACTIVE",
     },
   });
-  await prisma.assignedWorkout.createMany({ data: workoutRows });
-  await prisma.assignedWorkoutExercise.createMany({ data: exerciseRows });
+  await db.assignedWorkout.createMany({ data: workoutRows });
+  await db.assignedWorkoutExercise.createMany({ data: exerciseRows });
 
   return { assignmentId, workouts };
 }
@@ -230,23 +236,28 @@ function mulberry32(seed: number) {
 }
 
 const LEVEL_SCALE = { beginner: 0.6, intermediate: 1, advanced: 1.3 } as const;
+/** Which past sessions (by position) the demo athlete missed. */
+const SKIPPED_DEMO_SESSIONS = new Set([9, 22]);
 
 /**
  * Log realistic history for every workout scheduled before `until`.
  * Each lift follows double progression: reps climb through the range, then
  * the weight goes up — the same rule the app coaches the athlete with.
  */
-export async function seedDemoHistory({
-  clientId,
-  prefs,
-  workouts,
-  until,
-}: {
-  clientId: string;
-  prefs: Prefs;
-  workouts: CreatedWorkout[];
-  until: Date;
-}): Promise<void> {
+export async function seedDemoHistory(
+  {
+    clientId,
+    prefs,
+    workouts,
+    until,
+  }: {
+    clientId: string;
+    prefs: Prefs;
+    workouts: CreatedWorkout[];
+    until: Date;
+  },
+  db: Db = prisma
+): Promise<void> {
   const rand = mulberry32(20260519);
   const state = new Map<string, { weight: number | null; reps: number }>();
   const scale = LEVEL_SCALE[prefs.experience];
@@ -261,7 +272,7 @@ export async function seedDemoHistory({
   for (let n = 0; n < past.length; n++) {
     const w = past[n];
     // Miss the occasional session so the consistency view looks human.
-    if (n === 9 || n === 22) {
+    if (SKIPPED_DEMO_SESSIONS.has(n)) {
       skippedIds.push(w.id);
       continue;
     }
@@ -323,12 +334,12 @@ export async function seedDemoHistory({
     }
   }
 
-  await prisma.workoutLog.createMany({ data: logRows });
-  await prisma.setLog.createMany({ data: setRows });
+  await db.workoutLog.createMany({ data: logRows });
+  await db.setLog.createMany({ data: setRows });
   if (loggedIds.length > 0) {
-    await prisma.assignedWorkout.updateMany({ where: { id: { in: loggedIds } }, data: { status: "LOGGED" } });
+    await db.assignedWorkout.updateMany({ where: { id: { in: loggedIds } }, data: { status: "LOGGED" } });
   }
   if (skippedIds.length > 0) {
-    await prisma.assignedWorkout.updateMany({ where: { id: { in: skippedIds } }, data: { status: "SKIPPED" } });
+    await db.assignedWorkout.updateMany({ where: { id: { in: skippedIds } }, data: { status: "SKIPPED" } });
   }
 }

@@ -32,11 +32,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       id: "guest",
       name: "Guest",
       credentials: { payload: {} },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         try {
-          const raw = typeof credentials?.payload === "string" ? credentials.payload : "{}"
+          const raw = typeof credentials?.payload === "string" ? credentials.payload.slice(0, 2000) : "{}"
           const input = JSON.parse(raw) as { name?: string; prefs?: unknown; demo?: boolean }
-          return await createGuest(input)
+          const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
+          return await createGuest({ name: input.name, prefs: input.prefs, demo: input.demo === true, ip })
         } catch (err) {
           console.error("[guest sign-in]", err)
           return null
@@ -82,6 +83,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
+    // Email sign-in is for people who already have an account: the coach, and
+    // clients the coach has invited. Without this, any address that completed
+    // a magic link would become a new user with the default (coach) role.
+    async signIn({ user, account }) {
+      if (account?.provider !== "email") return true
+      if (!user.email) return false
+      const existing = await prisma.user.findUnique({ where: { email: user.email }, select: { id: true } })
+      if (existing) return true
+      // Brand-new database: let the first person in so they can bootstrap it.
+      return (await prisma.user.count()) === 0
+    },
     async jwt({ token, user }) {
       // On sign-in user is populated; on subsequent requests only token exists.
       // In both cases, if workspaceId is missing, fetch it from the DB.
@@ -93,24 +105,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           select: { id: true, role: true, workspaceId: true, name: true, email: true },
         })
         if (dbUser) {
-          // If user has no workspace, assign the first one — or create it
+          // First ever sign-in on a fresh DB — bootstrap the workspace. A user
+          // is never attached to a workspace that already exists.
           let workspaceId = dbUser.workspaceId
-          if (!workspaceId) {
-            let primary = await prisma.workspace.findFirst({
+          if (!workspaceId && (await prisma.workspace.count()) === 0) {
+            const created = await prisma.workspace.create({
+              data: { name: dbUser.name ?? dbUser.email ?? "My Workspace" },
               select: { id: true },
-              orderBy: { createdAt: "asc" },
             })
-            if (!primary) {
-              // First ever sign-in on a fresh DB — bootstrap the workspace
-              primary = await prisma.workspace.create({
-                data: { name: dbUser.name ?? dbUser.email ?? "My Workspace" },
-              })
-            }
-            await prisma.user.update({
-              where: { id: dbUser.id },
-              data: { workspaceId: primary.id },
-            })
-            workspaceId = primary.id
+            await prisma.user.update({ where: { id: dbUser.id }, data: { workspaceId: created.id } })
+            workspaceId = created.id
           }
           token.id = dbUser.id
           token.role = dbUser.role

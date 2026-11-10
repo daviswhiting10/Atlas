@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, ChevronRight, Clock, Dumbbell, Flame, Medal, SkipForward, Sparkles } from "lucide-react";
 import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
-import { GOALS } from "@/lib/plan/generator";
+import { BLOCK_WEEKS, GOALS } from "@/lib/plan/generator";
 import { METRICS, formatValue, metricFor } from "@/lib/plan/overload";
 import { Greeting } from "@/components/athlete/Greeting";
 import { ProgressChart } from "@/components/athlete/ProgressChart";
@@ -32,10 +32,16 @@ export default async function TodayPage() {
         <Greeting name={athlete.firstName} />
         <div className="surface mt-7 p-8 text-center">
           <h2 className="font-display text-3xl text-ink">No plan yet</h2>
-          <p className="mx-auto mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it will lay out your next 12 weeks.</p>
-          <Link href="/you" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-blue px-6 text-[15px] font-semibold text-white hover:bg-blue-deep">
-            Build my plan <ArrowRight className="h-4 w-4" />
-          </Link>
+          {athlete.selfServe ? (
+            <>
+              <p className="mx-auto mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it will lay out your next 12 weeks.</p>
+              <Link href="/you" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-blue px-6 text-[15px] font-semibold text-white hover:bg-blue-deep">
+                Build my plan <ArrowRight className="h-4 w-4" />
+              </Link>
+            </>
+          ) : (
+            <p className="mx-auto mt-2 max-w-sm text-[15px] text-ink-soft">Your coach hasn&apos;t assigned a program yet. It will show up here as soon as they do.</p>
+          )}
         </div>
       </div>
     );
@@ -44,7 +50,8 @@ export default async function TodayPage() {
   const next = plan.nextUp;
   const week = plan.workouts.filter((w) => w.week === plan.currentWeek);
   const weekDone = week.filter((w) => w.status === "LOGGED").length;
-  const block = plan.blocks[Math.min(Math.floor((plan.currentWeek - 1) / 4), plan.blocks.length - 1)];
+  const block = plan.blocks[Math.min(Math.floor((plan.currentWeek - 1) / BLOCK_WEEKS), plan.blocks.length - 1)];
+  const lighterWeek = athlete.selfServe && next != null && next.week % BLOCK_WEEKS === 0;
 
   // Lead with the lift the athlete has trained most — or the first one coming up.
   const focus =
@@ -86,7 +93,7 @@ export default async function TodayPage() {
                 <span className="tnum flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
                   <Clock className="h-3.5 w-3.5" /> ~{next.estMinutes} min
                 </span>
-                {next.note && (
+                {lighterWeek && (
                   <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
                     <Sparkles className="h-3.5 w-3.5" /> Lighter week
                   </span>
@@ -104,10 +111,16 @@ export default async function TodayPage() {
       ) : (
         <section className="surface-night rise rise-1 p-8">
           <h2 className="font-display text-5xl">Plan complete.</h2>
-          <p className="mt-3 max-w-md text-white/70">Twelve weeks done. Rebuild your plan to start the next cycle — your history carries over.</p>
-          <Link href="/you" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-white px-6 font-semibold text-ink">
-            Build the next one <ArrowRight className="h-4 w-4" />
-          </Link>
+          {athlete.selfServe ? (
+            <>
+              <p className="mt-3 max-w-md text-white/70">Every week done. Rebuild your plan to start the next cycle — your history carries over.</p>
+              <Link href="/you" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-white px-6 font-semibold text-ink">
+                Build the next one <ArrowRight className="h-4 w-4" />
+              </Link>
+            </>
+          ) : (
+            <p className="mt-3 max-w-md text-white/70">Every workout in this program is done. Your coach will set up what comes next.</p>
+          )}
         </section>
       )}
 

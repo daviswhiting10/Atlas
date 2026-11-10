@@ -4,18 +4,45 @@
  */
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { CATALOG_BY_SLUG, displayName } from "@/lib/plan/catalog";
-import { GOALS, generatePlan, normalizePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
+import { BLOCK_WEEKS, GOALS, generatePlan, normalizePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
 import { buildSeries, nextTarget, sessionPoint, type LoggedSet, type SessionPoint, type Target } from "@/lib/plan/overload";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/guest";
+import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf, weekStreak } from "./sessions";
 
-const DAY_MS = 86_400_000;
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-/** 1-indexed plan week. Rounds to whole days first so DST can't shift a week. */
-const weekOf = (time: number, start: number) => Math.max(1, Math.floor(Math.round((time - start) / DAY_MS) / 7) + 1);
+/** Upper bound on sets per exercise in one workout. */
+export const MAX_SETS = 20;
+
+export const TZ_COOKIE = "tz";
+
+/**
+ * The athlete's timezone, reported by the browser in a cookie. Logged
+ * sessions are instants, so "which day was that?" depends on where the
+ * athlete is — without this an evening session would chart as tomorrow.
+ */
+const getTimeZone = () => safeTimeZone(cookies().get(TZ_COOKIE)?.value);
+
+type Session =
+ { date: Date; deload: boolean; sets: LoggedSet[] };
+
+
+/** Select shape that lets a logged set be traced back to its plan week. */
+const WEEK_SOURCE = {
+  select: { date: true, assignedWorkout: { select: { scheduledDate: true, programAssignment: { select: { startDate: true } } } } },
+} as const;
+
+type WeekSource = { assignedWorkout: { scheduledDate: Date; programAssignment: { startDate: Date } } | null };
+
+/** Generated plans close every block with a lighter week. Coach-written plans have no such rule. */
+function isDeloadSession(log: WeekSource, selfServe: boolean): boolean {
+  if (!selfServe || !log.assignedWorkout) return false;
+  const { scheduledDate, programAssignment } = log.assignedWorkout;
+  return weekOf(scheduledDate.getTime(), programAssignment.startDate.getTime()) % BLOCK_WEEKS === 0;
+}
 
 export type Athlete = {
   userId: string;
@@ -89,7 +116,7 @@ export type PlanOverview = {
   nextUp: WorkoutSummary | null;
   done: number;
   /** The next prescription for each exercise — used to project chart targets. */
-  rx: Record<string, { repMin: number; repMax: number; unit: "reps" | "secs" }>;
+  rx: Record<string, { repMin: number; repMax: number; unit: "reps" | "secs"; deload: boolean }>;
 };
 
 export function repLabel(sets: RawSet[]): string {
@@ -157,7 +184,12 @@ export const getPlanOverview = cache(async (): Promise<PlanOverview | null> => {
       const first = ((e.prescribedSets as RawSet[]) ?? [])[0];
       if (!first) continue;
       const repMin = first.repMin ?? 8;
-      rx[e.exerciseId] = { repMin, repMax: first.repMax ?? repMin, unit: first.unit === "secs" ? "secs" : "reps" };
+      rx[e.exerciseId] = {
+        repMin,
+        repMax: first.repMax ?? repMin,
+        unit: first.unit === "secs" ? "secs" : "reps",
+        deload: athlete.selfServe && weekOf(w.scheduledDate.getTime(), start) % BLOCK_WEEKS === 0,
+      };
     }
   }
 
@@ -201,15 +233,11 @@ export type ProgressData = {
   recentPRs: Array<{ exercise: string; date: string; metric: FocusMetric; value: number; loaded: boolean }>;
 };
 
-function mondayOf(d: Date): string {
-  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
-  return iso(x);
-}
 
 export const getProgress = cache(async (): Promise<ProgressData> => {
   const athlete = await getAthlete();
   const plan = await getPlanOverview();
+  const tz = getTimeZone();
   const sets = await prisma.setLog.findMany({
     where: { workoutLog: { clientId: athlete.clientId }, exerciseId: { not: null } },
     orderBy: { createdAt: "asc" },
@@ -219,7 +247,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
       reps: true,
       completed: true,
       workoutLogId: true,
-      workoutLog: { select: { date: true } },
+      workoutLog: WEEK_SOURCE,
       exercise: { select: { name: true, slug: true, primaryMuscles: true } },
     },
   });
@@ -227,7 +255,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   // exercise → session → sets
   const byExercise = new Map<
     string,
-    { name: string; muscles: string[]; inc: number; sessions: Map<string, { date: Date; sets: LoggedSet[] }> }
+    { name: string; muscles: string[]; inc: number; sessions: Map<string, Session> }
   >();
   const sessionDates = new Map<string, Date>();
   const weekMap = new Map<string, { sessions: Set<string>; volume: number }>();
@@ -250,14 +278,14 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
     }
     let session = entry.sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date, sets: [] };
+      session = { date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [] };
       entry.sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
 
     if (s.completed && s.reps) {
       sessionDates.set(s.workoutLogId, date);
-      const wk = mondayOf(date);
+      const wk = mondayOf(localDay(date, tz));
       let bucket = weekMap.get(wk);
       if (!bucket) {
         bucket = { sessions: new Set(), volume: 0 };
@@ -278,14 +306,14 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   for (const [exerciseId, entry] of Array.from(byExercise.entries())) {
     const sessions = Array.from(entry.sessions.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
     const points = sessions
-      .map((s) => sessionPoint(iso(s.date), s.sets))
+      .map((s) => sessionPoint(localDay(s.date, tz), s.sets))
       .filter((p): p is NonNullable<typeof p> => p != null);
     if (points.length === 0) continue;
     const series = buildSeries(points);
     const loaded = series.some((p) => p.weight != null);
     const rx = plan?.rx[exerciseId];
     const target = rx
-      ? nextTarget({ last: sessions[sessions.length - 1].sets, ...rx, increment: loaded ? entry.inc || 5 : 0 })
+      ? nextTarget({ last: referenceSession(sessions)?.sets ?? [], ...rx, increment: loaded ? entry.inc || 5 : 0 })
       : null;
     exercises.push({ exerciseId, name: entry.name, muscles: entry.muscles, loaded, series, target });
 
@@ -306,7 +334,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   const weeks: WeekBucket[] = [];
   const keys = Array.from(weekMap.keys()).sort();
   if (keys.length > 0) {
-    const end = new Date(mondayOf(new Date()) + "T00:00:00Z").getTime();
+    const end = new Date(mondayOf(localDay(new Date(), tz)) + "T00:00:00Z").getTime();
     for (let t = new Date(keys[0] + "T00:00:00Z").getTime(); t <= end; t += 7 * DAY_MS) {
       const key = iso(new Date(t));
       const b = weekMap.get(key);
@@ -314,13 +342,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
     }
   }
 
-  // Streak: consecutive weeks with a session, ending this week or last.
-  let streak = 0;
-  for (let i = weeks.length - 1; i >= 0; i--) {
-    if (weeks[i].sessions > 0) streak += 1;
-    else if (i === weeks.length - 1) continue; // this week hasn't had its session yet
-    else break;
-  }
+  const streak = weekStreak(weeks);
 
   return {
     exercises,
@@ -374,6 +396,7 @@ export type LoggerData = {
 
 export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerData | null> {
   const athlete = await getAthlete();
+  const tz = getTimeZone();
   const workout = await prisma.assignedWorkout.findFirst({
     where: { id: assignedWorkoutId, programAssignment: { clientId: athlete.clientId } },
     select: {
@@ -427,7 +450,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
         reps: true,
         completed: true,
         workoutLogId: true,
-        workoutLog: { select: { date: true } },
+        workoutLog: WEEK_SOURCE,
       },
     }),
     prisma.assignedWorkout.findMany({
@@ -437,7 +460,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     }),
   ]);
 
-  const sessionsByExercise = new Map<string, Map<string, { date: Date; sets: LoggedSet[] }>>();
+  const sessionsByExercise = new Map<string, Map<string, Session>>();
   for (const s of history) {
     if (!s.exerciseId) continue;
     let sessions = sessionsByExercise.get(s.exerciseId);
@@ -447,13 +470,14 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     }
     let session = sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date: s.workoutLog.date, sets: [] };
+      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [] };
       sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
   }
 
   const logged = workout.workoutLog?.sets ?? [];
+  const deloadWeek = athlete.selfServe && week % BLOCK_WEEKS === 0;
 
   const exercises: LoggerExercise[] = workout.exercises.map((e) => {
     const prescribed = ((e.prescribedSets as RawSet[]) ?? []).length > 0 ? (e.prescribedSets as RawSet[]) : [{}];
@@ -466,18 +490,18 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     const sessions = Array.from(sessionsByExercise.get(e.exerciseId)?.values() ?? []).sort(
       (a, b) => a.date.getTime() - b.date.getTime()
     );
-    const lastSession = sessions.at(-1) ?? null;
+    const lastSession = referenceSession(sessions);
     const series = buildSeries(
-      sessions.map((s) => sessionPoint(iso(s.date), s.sets)).filter((p): p is NonNullable<typeof p> => p != null)
+      sessions.map((s) => sessionPoint(localDay(s.date, tz), s.sets)).filter((p): p is NonNullable<typeof p> => p != null)
     );
     const everLoaded = series.some((p) => p.weight != null);
     const bodyweight = cat ? cat.tool === "bodyweight" : /body ?only|bodyweight|n\/?a/i.test(e.exercise.equipment) && !everLoaded;
     const increment = bodyweight ? 0 : cat?.inc ?? 5;
 
-    const target = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit });
+    const target = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit, deload: deloadWeek });
 
     const mine = logged.filter((s) => s.assignedWorkoutExerciseId === e.id || (!s.assignedWorkoutExerciseId && s.exerciseId === e.exerciseId));
-    const count = Math.max(prescribed.length, mine.reduce((m, s) => Math.max(m, s.setNumber), 0));
+    const count = Math.min(MAX_SETS, Math.max(prescribed.length, mine.reduce((m, s) => Math.max(m, s.setNumber), 0)));
     const sets: LoggerSet[] = Array.from({ length: count }, (_, i) => {
       const saved = mine.find((s) => s.setNumber === i + 1);
       if (saved) {
@@ -501,7 +525,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       target,
       last: lastSession
         ? {
-            date: iso(lastSession.date),
+            date: localDay(lastSession.date, tz),
             sets: lastSession.sets.filter((s) => s.completed).map((s) => ({ weight: s.weight, reps: s.reps })),
           }
         : null,

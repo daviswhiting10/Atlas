@@ -30,7 +30,7 @@ type AuthedHandler<P extends Record<string, string> = Record<string, string>> = 
  *   })
  *
  * Every handler wrapped here is guaranteed to have:
- *   - A valid authenticated session
+ *   - A valid authenticated session with a coach role (TRAINER or ADMIN)
  *   - A workspaceId from the JWT (no extra DB round-trip)
  */
 export function withWorkspace<P extends Record<string, string> = Record<string, string>>(
@@ -46,6 +46,12 @@ export function withWorkspace<P extends Record<string, string> = Record<string, 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Coach routes only. Athletes (role CLIENT) can sign themselves up, so
+    // "signed in" is no longer the same thing as "is the coach".
+    if (session.user.role === "CLIENT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     let workspaceId = session.user.workspaceId;
     if (!workspaceId) {
       // JWT is stale — look up or bootstrap workspace from DB
@@ -55,21 +61,15 @@ export function withWorkspace<P extends Record<string, string> = Record<string, 
       });
       workspaceId = dbUser?.workspaceId ?? undefined;
 
-      if (!workspaceId && dbUser) {
-        let primary = await prisma.workspace.findFirst({
+      // First sign-in on a brand-new database: create the workspace. A user
+      // is never attached to a workspace that already exists.
+      if (!workspaceId && dbUser && (await prisma.workspace.count()) === 0) {
+        const created = await prisma.workspace.create({
+          data: { name: dbUser.name ?? dbUser.email ?? "My Workspace" },
           select: { id: true },
-          orderBy: { createdAt: "asc" },
         });
-        if (!primary) {
-          primary = await prisma.workspace.create({
-            data: { name: dbUser.name ?? dbUser.email ?? "My Workspace" },
-          });
-        }
-        await prisma.user.update({
-          where: { id: dbUser.id },
-          data: { workspaceId: primary.id },
-        });
-        workspaceId = primary.id;
+        await prisma.user.update({ where: { id: dbUser.id }, data: { workspaceId: created.id } });
+        workspaceId = created.id;
       }
     }
     if (!workspaceId) {

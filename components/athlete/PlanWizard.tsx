@@ -266,7 +266,7 @@ export function PlanWizard({
                 type="button"
                 onClick={() => setStep((s) => s - 1)}
                 disabled={busy}
-                className="press flex h-13 h-[52px] items-center gap-2 rounded-2xl border border-line bg-white px-5 text-[15px] font-medium text-ink-soft hover:border-ink/20"
+                className="press flex h-[52px] items-center gap-2 rounded-2xl border border-line bg-white px-5 text-[15px] font-medium text-ink-soft hover:border-ink/20"
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>

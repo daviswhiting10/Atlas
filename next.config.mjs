@@ -10,22 +10,20 @@ const nextConfig = {
 export default withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
-  cacheOnFrontEndNav: true,
+  cacheOnFrontEndNav: false,
   aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
+  // Don't precache the coach's certificate PDFs (4 MB every visitor would
+  // download), and don't keep API responses — they hold signed-in data that
+  // would outlive a sign-out.
+  publicExcludes: ["!credentials/**/*"],
   workboxOptions: {
     disableDevLogs: true,
+    // Static files only. Replaces the plugin's defaults, which also cache
+    // pages and API responses.
     runtimeCaching: [
-      {
-        // API routes — network-first, fall back to cache if offline
-        urlPattern: /\/api\/.*/,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "api-cache",
-          networkTimeoutSeconds: 10,
-          cacheableResponse: { statuses: [0, 200] },
-        },
-      },
+      { urlPattern: /\/_next\/static\/.*/i, handler: "CacheFirst", options: { cacheName: "next-static" } },
+      { urlPattern: /\.(?:png|jpg|jpeg|svg|ico|woff2?)$/i, handler: "StaleWhileRevalidate", options: { cacheName: "static-assets" } },
     ],
   },
 })(nextConfig);

@@ -13,7 +13,7 @@ export type LoggedSet = { weight: number | null; reps: number | null; completed:
 export type Target = {
   weight: number | null;
   reps: number;
-  kind: "first" | "add_weight" | "add_reps" | "hold";
+  kind: "first" | "add_weight" | "add_reps" | "hold" | "reset" | "deload";
   headline: string;
   reason: string;
 };
@@ -26,14 +26,21 @@ export function nextTarget({
   repMax,
   increment,
   unit = "reps",
+  deload = false,
 }: {
-  /** Sets from the most recent session of this exercise. Empty = never done. */
+  /**
+   * Sets from the reference session: the most recent one that counts.
+   * Callers should skip lighter-week sessions so a deliberate back-off never
+   * becomes the bar to beat. Empty = never done.
+   */
   last: LoggedSet[];
   repMin: number;
   repMax: number;
   /** Load jump in lb. 0 = bodyweight / unloaded. */
   increment: number;
   unit?: "reps" | "secs";
+  /** True when today falls in a lighter (deload) week. */
+  deload?: boolean;
 }): Target {
   const u = unit === "secs" ? "sec" : "reps";
   const done = last.filter((s) => s.completed && s.reps != null && s.reps > 0);
@@ -58,6 +65,19 @@ export function nextTarget({
   const atTop = topWeight == null ? done : done.filter((s) => s.weight === topWeight);
   const bestReps = Math.max(...atTop.map((s) => s.reps as number));
 
+  // Lighter week: same load, stop short. No progression is asked for.
+  if (deload) {
+    const back = unit === "secs" ? 10 : 2;
+    const reps = Math.max(unit === "secs" ? 10 : 1, bestReps - back);
+    return {
+      weight: topWeight,
+      reps,
+      kind: "deload",
+      headline: topWeight == null ? `Easy ${reps} ${u}` : `${topWeight} lb × ${reps}, easy`,
+      reason: `Lighter week. ${topWeight == null ? "Stop" : "Keep the weight and stop"} ${back} ${u} short of last time (${bestReps}) so you recover for the next block.`,
+    };
+  }
+
   // Unloaded or timed work: progress by reps / seconds only.
   if (topWeight == null || increment <= 0) {
     const step = unit === "secs" ? 5 : 1;
@@ -72,7 +92,7 @@ export function nextTarget({
   }
 
   if (bestReps >= repMax) {
-    const weight = round(topWeight + increment, increment);
+    const weight = Math.round((topWeight + increment) * 100) / 100;
     const reps = Math.max(repMin, repMax - 2);
     return {
       weight,
@@ -84,6 +104,22 @@ export function nextTarget({
   }
 
   if (bestReps < repMin) {
+    // Well short of the range — usually because the range itself moved up
+    // (a rebuilt plan, a new block). Asking for the old weight at far more
+    // reps would be unsafe, so work the load back from the estimated max.
+    if (repMin - bestReps >= 2) {
+      const est = e1rm(topWeight, bestReps);
+      const weight = Math.max(increment, round(Math.floor(est / (1 + repMin / 30) / increment) * increment, increment));
+      if (weight < topWeight) {
+        return {
+          weight,
+          reps: repMin,
+          kind: "reset",
+          headline: `Drop to ${weight} lb`,
+          reason: `Your range is now ${repMin}–${repMax} reps. Last time was ${topWeight} lb × ${bestReps}, so about ${weight} lb should get you ${repMin}.`,
+        };
+      }
+    }
     return {
       weight: topWeight,
       reps: repMin,

@@ -17,7 +17,7 @@ export function SignOutButton({ isGuest }: { isGuest: boolean }) {
     return (
       <div className="rounded-2xl border border-line bg-white p-4">
         <p className="text-[15px] font-semibold text-ink">Leave this guest account?</p>
-        <p className="mt-1 text-sm leading-relaxed text-ink-soft">Guest accounts live in this browser only. Once you sign out you can&apos;t get back into this one.</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-soft">Guest accounts have no email or password, so this browser is the only way in. Once you sign out you can&apos;t get back to this one.</p>
         <div className="mt-4 flex gap-2">
           <button type="button" onClick={() => setConfirming(false)} className="press h-11 flex-1 rounded-xl border border-line bg-white text-sm font-semibold text-ink hover:border-ink/20">
             Stay

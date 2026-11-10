@@ -8,6 +8,9 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.role === "CLIENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const url = new URL(req.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
@@ -16,6 +19,9 @@ export async function GET(req: Request) {
 
   const exercises = await prisma.exercise.findMany({
     where: {
+      // "atlas-" entries belong to the plan generator's own catalog; hiding
+      // them keeps the coach's picker free of near-duplicates.
+      NOT: { slug: { startsWith: "atlas-" } },
       ...(q && { name: { contains: q, mode: "insensitive" } }),
       ...(pattern && { movementPattern: pattern as never }),
       ...(equipment && { equipment }),
@@ -39,6 +45,9 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role === "CLIENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();

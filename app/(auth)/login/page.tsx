@@ -11,12 +11,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await signIn("email", { email, redirect: false, callbackUrl: "/inbox" });
-    setSent(true);
+    setFailed(false);
+    const res = await signIn("email", { email, redirect: false, callbackUrl: "/inbox" });
+    // Unknown addresses are refused server-side; say so rather than promise an email.
+    if (res?.error) setFailed(true);
+    else setSent(true);
     setLoading(false);
   }
 
@@ -49,7 +53,7 @@ export default function LoginPage() {
               placeholder="you@example.com"
               required
               autoComplete="email"
-              className="h-13 h-[52px] w-full rounded-2xl border border-line bg-white px-4 text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-blue focus:shadow-[0_0_0_3px_rgba(43,107,255,0.14)]"
+              className="h-[52px] w-full rounded-2xl border border-line bg-white px-4 text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-blue focus:shadow-[0_0_0_3px_rgba(43,107,255,0.14)]"
             />
             <button
               type="submit"
@@ -58,6 +62,11 @@ export default function LoginPage() {
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Email me a sign-in link"}
             </button>
+            {failed && (
+              <p role="alert" className="text-sm leading-relaxed text-destructive">
+                We couldn&apos;t send a link to that address. Email sign-in is for coaches and invited clients — to try Atlas yourself, use one of the options below.
+              </p>
+            )}
           </form>
 
           <div className="my-8 flex items-center gap-3 text-xs text-ink-mute">

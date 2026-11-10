@@ -1,50 +1,31 @@
-# Atlas — Project State
-
-## Current phase: Phase 3 — Operations (in progress)
+# Atlas — project state
 
 ## What's live
-- **Prod**: https://atlas-red-eight.vercel.app
-- **DB**: Neon PostgreSQL (ep-nameless-field-apekq1z7, us-east-1)
-- Deployed: 2026-05-09
 
-## What's been built
-- Full Prisma schema: Postgres, multi-tenant, all Phase 1–4 models
-- Auth.js v5 with email magic links + Resend (`onboarding@resend.dev`)
-- `withWorkspace` HOF — all API routes structurally scoped
-- UsageLog wired on every `callAI` call (fire-and-forget)
-- Methodology loader reads from DB (`MethodologyDocument` table)
-- Exercise library: 80 hand-curated exercises
-- Seed: Workspace + User (davis@atlasapp.co) + TrainerProfile + exercises
-- Edge-safe middleware: `lib/auth.config.ts` has zero Node.js imports
-- JWT callback fetches `workspaceId`/`role` from DB; uses `token.sub` fallback
-- All client-side fetches guarded against non-array API responses
-- Dropdowns: replaced Base UI Select with Radix UI Select (standard shadcn)
+- Production: https://atlas-red-eight.vercel.app (Vercel, deploys from `main`)
+- Database: Postgres on Neon
+- Two sides, one codebase and one database:
+  - **Athlete app** (`/`, `/start`, `/today`, `/plan`, `/progress`, `/you`, `/workouts/[id]`) — self-serve, guest
+    accounts, generated plans, progress charts.
+  - **Coach dashboard** (`/inbox`, `/clients`, `/programs`, …) — client management, program builder, session logging,
+    AI-assisted intake and programming. Email-link sign-in.
 
-## Bugs fixed this session
-- ✅ Inbox redirect to login — `token.sub` fallback + inbox redirects to `/` not `/login`
-- ✅ `e.filter is not a function` — all 6 pages guarded with `Array.isArray` check
-- ✅ Dropdowns non-functional — replaced Base UI with Radix UI Select
-- ✅ Resend not delivering — `from` changed to `onboarding@resend.dev`
-- ✅ Debug console.log removed from layout
-- ✅ `authorized()` restored to `!!auth`
+## How access is decided
 
-## Phase 3 — Operations (remaining)
-- [ ] Smoke test: every nav item loads, no console errors, API calls return correct shapes
-- [ ] Voice input in session notes (browser SpeechRecognition — test in Chrome)
-- [ ] Outreach history view (/outreach/history)
-- [ ] Session list per client (currently write-only)
-- [ ] Fill in /methodology/*.md files (run `npm run seed:methodology` after)
+- `middleware.ts` routes by role: `CLIENT` to the athlete app, `TRAINER`/`ADMIN` to the dashboard.
+- Role is checked again behind the middleware: `withWorkspace` (API routes), the dashboard layout, and the coach
+  server actions all refuse `CLIENT`.
+- Email sign-in only works for an address that already has an account (the coach, or a client the coach invited).
+- Guest accounts are created through the `guest` credentials provider and each get their own workspace.
 
-## Required env vars (Vercel)
-```
-DATABASE_URL=postgresql://...
-AUTH_SECRET=<set in Vercel>
-AUTH_URL=https://atlas-red-eight.vercel.app
-NEXTAUTH_SECRET=<set in Vercel>
-NEXTAUTH_URL=https://atlas-red-eight.vercel.app
-RESEND_API_KEY=...
-ANTHROPIC_API_KEY=...
-SEED_TRAINER_EMAIL=davis@atlasapp.co
-SEED_TRAINER_NAME=Davis Whiting
-SEED_WORKSPACE_ID=ws_atlas_primary
-```
+## Required environment variables
+
+See `.env.example`. Values live in Vercel; none are committed.
+
+## Known gaps
+
+- Guest accounts are never cleaned up. A scheduled job to delete idle ones is the next piece of housekeeping.
+- The per-visitor sign-up limit is held in memory per server instance. A platform rate limit should replace it.
+- Coach-written programs show in the athlete app with their first set's rep range only; per-set weights and RPE are
+  not surfaced there yet.
+- Accessibility: charts have no text alternative, and the tab-style pickers don't support arrow keys.
