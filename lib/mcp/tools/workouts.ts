@@ -6,13 +6,20 @@ import { ALL_ROLES } from "../auth";
 import { invalid, notFound } from "../context";
 import { findVisibleExercise, loadSetRows } from "../data";
 import { groupByExercise, summarizeSession } from "../derive";
-import { ClientIdArg, Id, IsoDate, LoggedSetInput, TimeZoneArg } from "../schemas";
+import {
+  ClientIdArg,
+  Id,
+  IsoDate,
+  LoggedSetInput,
+  TimeZoneArg,
+} from "../schemas";
 import { clientTool } from "../tool";
 
 export const getWorkoutHistory = clientTool({
   name: "get_workout_history",
   title: "Workout history",
-  description: "Recent logged workouts for a client, newest first, with every set.",
+  description:
+    "Recent logged workouts for a client, newest first, with every set.",
   permission: "read",
   roles: ALL_ROLES,
   input: z.object({
@@ -27,7 +34,9 @@ export const getWorkoutHistory = clientTool({
       where: {
         clientId: client.id,
         client: { workspaceId: client.workspaceId },
-        ...(args.before && { date: { lt: new Date(args.before + "T00:00:00Z") } }),
+        ...(args.before && {
+          date: { lt: new Date(args.before + "T00:00:00Z") },
+        }),
       },
       orderBy: { date: "desc" },
       take: args.limit,
@@ -38,7 +47,16 @@ export const getWorkoutHistory = clientTool({
         assignedWorkout: { select: { name: true, status: true } },
         sets: {
           orderBy: { setNumber: "asc" },
-          select: { exerciseId: true, setNumber: true, weight: true, bandColor: true, reps: true, rpe: true, completed: true, exercise: { select: { name: true, slug: true } } },
+          select: {
+            exerciseId: true,
+            setNumber: true,
+            weight: true,
+            bandColor: true,
+            reps: true,
+            rpe: true,
+            completed: true,
+            exercise: { select: { name: true, slug: true } },
+          },
         },
       },
     });
@@ -46,16 +64,30 @@ export const getWorkoutHistory = clientTool({
     return {
       client: client.fullName,
       workouts: logs.map((log) => {
-        const exercises = new Map<string, { exerciseId: string; exercise: string; sets: unknown[] }>();
+        const exercises = new Map<
+          string,
+          { exerciseId: string; exercise: string; sets: unknown[] }
+        >();
         let volumeLb = 0;
         for (const s of log.sets) {
           if (!s.exerciseId || !s.exercise) continue;
           let e = exercises.get(s.exerciseId);
           if (!e) {
-            e = { exerciseId: s.exerciseId, exercise: displayName(s.exercise.slug, s.exercise.name), sets: [] };
+            e = {
+              exerciseId: s.exerciseId,
+              exercise: displayName(s.exercise.slug, s.exercise.name),
+              sets: [],
+            };
             exercises.set(s.exerciseId, e);
           }
-          e.sets.push({ set: s.setNumber, weightLb: s.weight, band: s.bandColor, reps: s.reps, rpe: s.rpe, completed: s.completed });
+          e.sets.push({
+            set: s.setNumber,
+            weightLb: s.weight,
+            band: s.bandColor,
+            reps: s.reps,
+            rpe: s.rpe,
+            completed: s.completed,
+          });
           if (s.completed && s.weight && s.reps) volumeLb += s.weight * s.reps;
         }
         return {
@@ -75,29 +107,54 @@ export const getWorkoutHistory = clientTool({
 export const getExerciseHistory = clientTool({
   name: "get_exercise_history",
   title: "Exercise history",
-  description: "Every logged session of one exercise for a client: sets, top weight, estimated 1-rep max and volume per session.",
+  description:
+    "Every logged session of one exercise for a client: sets, top weight, estimated 1-rep max and volume per session.",
   permission: "read",
   roles: ALL_ROLES,
   input: z.object({
     clientId: ClientIdArg,
     exerciseId: Id,
-    limit: z.number().int().min(1).max(100).default(20).describe("Most recent sessions to return."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe("Most recent sessions to return."),
     timezone: TimeZoneArg,
   }),
   async handler({ client }, args) {
-    const exercise = await findVisibleExercise(args.exerciseId, client.workspaceId);
+    const exercise = await findVisibleExercise(
+      args.exerciseId,
+      client.workspaceId,
+    );
     if (!exercise) throw notFound();
     const rows = await loadSetRows(client, { exerciseIds: [exercise.id] });
     const history = groupByExercise(rows, safeTimeZone(args.timezone))[0];
     const sessions = (history?.sessions ?? []).slice(-args.limit);
     return {
       client: client.fullName,
-      exercise: { id: exercise.id, name: exercise.name, movementPattern: exercise.movementPattern, equipment: exercise.equipment },
-      sessions: sessions.map((s) => ({
-        ...summarizeSession(s),
-        lighterWeek: s.deload,
-        setDetail: s.sets.map((x) => ({ set: x.setNumber, weightLb: x.weight, band: x.bandColor, reps: x.reps, rpe: x.rpe, completed: x.completed })),
-      })),
+      exercise: {
+        id: exercise.id,
+        name: exercise.name,
+        movementPattern: exercise.movementPattern,
+        equipment: exercise.equipment,
+      },
+      sessions: sessions.map((s) => {
+        const { deload, ...summary } = summarizeSession(s);
+        return {
+          ...summary,
+          lighterWeek: deload,
+          setDetail: s.sets.map((x) => ({
+            set: x.setNumber,
+            weightLb: x.weight,
+            band: x.bandColor,
+            reps: x.reps,
+            rpe: x.rpe,
+            completed: x.completed,
+          })),
+        };
+      }),
     };
   },
 });
@@ -113,51 +170,105 @@ export const logWorkout = clientTool({
     clientId: ClientIdArg,
     assignedWorkoutId: Id,
     sets: z.array(LoggedSetInput).min(1).max(100),
-    complete: z.boolean().default(false).describe("Mark the workout as finished."),
+    complete: z
+      .boolean()
+      .default(false)
+      .describe("Mark the workout as finished."),
     durationMin: z.number().int().min(1).max(600).optional().catch(undefined),
   }),
   async handler({ client, caller }, args) {
     // Scope check before any write: the workout must belong to this client in this workspace.
     const workout = await prisma.assignedWorkout.findFirst({
-      where: { id: args.assignedWorkoutId, workspaceId: client.workspaceId, programAssignment: { clientId: client.id } },
-      select: { id: true, name: true, scheduledDate: true, exercises: { select: { id: true, exerciseId: true } } },
+      where: {
+        id: args.assignedWorkoutId,
+        workspaceId: client.workspaceId,
+        programAssignment: { clientId: client.id },
+      },
+      select: {
+        id: true,
+        name: true,
+        scheduledDate: true,
+        exercises: { select: { id: true, exerciseId: true } },
+      },
     });
     if (!workout) throw notFound();
 
-    const aweByExercise = new Map(workout.exercises.map((e) => [e.exerciseId, e.id]));
+    const aweByExercise = new Map(
+      workout.exercises.map((e) => [e.exerciseId, e.id]),
+    );
     for (const s of args.sets) {
-      if (!aweByExercise.has(s.exerciseId)) throw invalid(`Exercise ${s.exerciseId} is not part of this workout.`);
+      if (!aweByExercise.has(s.exerciseId))
+        throw invalid(`Exercise ${s.exerciseId} is not part of this workout.`);
     }
 
     const loggedBy = caller.role === "CLIENT" ? "CLIENT" : "TRAINER";
 
-    const result = await prisma.$transaction(async (tx) => {
-      const log =
-        (await tx.workoutLog.findUnique({ where: { assignedWorkoutId: workout.id }, select: { id: true } })) ??
-        (await tx.workoutLog.create({
-          // A client logs "now"; a coach logging after the fact files it on the scheduled day, as the dashboard does.
-          data: { clientId: client.id, assignedWorkoutId: workout.id, date: loggedBy === "CLIENT" ? new Date() : workout.scheduledDate },
-          select: { id: true },
-        }));
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const log =
+          (await tx.workoutLog.findUnique({
+            where: { assignedWorkoutId: workout.id },
+            select: { id: true },
+          })) ??
+          (await tx.workoutLog.create({
+            // A client logs "now"; a coach logging after the fact files it on the scheduled day, as the dashboard does.
+            data: {
+              clientId: client.id,
+              assignedWorkoutId: workout.id,
+              date: loggedBy === "CLIENT" ? new Date() : workout.scheduledDate,
+            },
+            select: { id: true },
+          }));
 
-      for (const s of args.sets) {
-        const aweId = aweByExercise.get(s.exerciseId) as string;
-        const data = { weight: s.weight ?? null, reps: s.reps, rpe: s.rpe ?? null, completed: true };
-        const existing = await tx.setLog.findFirst({
-          where: { workoutLogId: log.id, assignedWorkoutExerciseId: aweId, setNumber: s.setNumber },
-          select: { id: true },
-        });
-        if (existing) await tx.setLog.update({ where: { id: existing.id }, data });
-        else await tx.setLog.create({ data: { ...data, workoutLogId: log.id, exerciseId: s.exerciseId, assignedWorkoutExerciseId: aweId, setNumber: s.setNumber } });
-      }
+        for (const s of args.sets) {
+          const aweId = aweByExercise.get(s.exerciseId) as string;
+          const data = {
+            weight: s.weight ?? null,
+            reps: s.reps,
+            rpe: s.rpe ?? null,
+            completed: true,
+          };
+          const existing = await tx.setLog.findFirst({
+            where: {
+              workoutLogId: log.id,
+              assignedWorkoutExerciseId: aweId,
+              setNumber: s.setNumber,
+            },
+            select: { id: true },
+          });
+          if (existing)
+            await tx.setLog.update({ where: { id: existing.id }, data });
+          else
+            await tx.setLog.create({
+              data: {
+                ...data,
+                workoutLogId: log.id,
+                exerciseId: s.exerciseId,
+                assignedWorkoutExerciseId: aweId,
+                setNumber: s.setNumber,
+              },
+            });
+        }
 
-      if (args.complete) {
-        await tx.assignedWorkout.update({ where: { id: workout.id }, data: { status: "LOGGED", loggedBy } });
-        if (args.durationMin) await tx.workoutLog.update({ where: { id: log.id }, data: { durationMin: args.durationMin } });
-        await tx.clientProfile.update({ where: { id: client.id }, data: { lastContactAt: new Date() } });
-      }
-      return { workoutLogId: log.id };
-    }, { timeout: 20_000, maxWait: 10_000 });
+        if (args.complete) {
+          await tx.assignedWorkout.update({
+            where: { id: workout.id },
+            data: { status: "LOGGED", loggedBy },
+          });
+          if (args.durationMin)
+            await tx.workoutLog.update({
+              where: { id: log.id },
+              data: { durationMin: args.durationMin },
+            });
+          await tx.clientProfile.update({
+            where: { id: client.id },
+            data: { lastContactAt: new Date() },
+          });
+        }
+        return { workoutLogId: log.id };
+      },
+      { timeout: 20_000, maxWait: 10_000 },
+    );
 
     return {
       workoutLogId: result.workoutLogId,
