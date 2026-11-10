@@ -235,8 +235,16 @@ export const METRICS: Record<FocusMetric, { label: string; short: string; unit: 
   weight: { label: "Top weight", short: "Weight", unit: () => "lb" },
   reps: { label: "Best set", short: "Reps", unit: () => "reps" },
   e1rm: { label: "Estimated 1-rep max", short: "Est. 1RM", unit: () => "lb" },
-  volume: { label: "Volume per session", short: "Volume", unit: (loaded) => (loaded ? "lb" : "reps") },
+  // Volume is weight × reps summed over every set, so it runs into the
+  // thousands. The unit says "total" so it is never read as a weight on the bar.
+  volume: { label: "Session volume (weight × reps, all sets)", short: "Volume", unit: (loaded) => (loaded ? "lb total" : "reps total") },
 };
+
+/** Unit for a charted value. Timed holds (a plank) are measured in seconds, not reps. */
+export function unitFor(metric: FocusMetric, loaded: boolean, timed = false): string {
+  const unit = METRICS[metric].unit(loaded);
+  return timed ? unit.replace("reps", "sec") : unit;
+}
 
 /** Volume is a per-session total, so it is drawn as bars; everything else is a trend line. */
 export const chartKind = (metric: FocusMetric): "bars" | "line" => (metric === "volume" ? "bars" : "line");

@@ -40,8 +40,8 @@ export const GOALS: Record<
   muscle: {
     label: "Build muscle",
     blurb: "Moderate reps, plenty of volume, steady load increases.",
-    metric: "volume",
-    metricWhy: "Muscle grows when total work goes up, so your charts lead with volume.",
+    metric: "weight",
+    metricWhy: "Your charts lead with the weight on the bar. Session volume — the total across all sets — is one tap away.",
     primaryGoal: "hypertrophy",
   },
   strength: {

@@ -219,6 +219,8 @@ export type ExerciseProgress = {
   name: string;
   muscles: string[];
   loaded: boolean;
+  /** Measured in seconds rather than reps (planks, carries). */
+  timed: boolean;
   series: SessionPoint[];
   /** What to aim for next session, when the exercise is still in the plan. */
   target: Target | null;
@@ -255,7 +257,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   // exercise → session → sets
   const byExercise = new Map<
     string,
-    { name: string; muscles: string[]; inc: number; sessions: Map<string, Session> }
+    { name: string; muscles: string[]; inc: number; timed: boolean; sessions: Map<string, Session> }
   >();
   const sessionDates = new Map<string, Date>();
   const weekMap = new Map<string, { sessions: Set<string>; volume: number }>();
@@ -272,6 +274,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
         name: displayName(s.exercise.slug, s.exercise.name),
         muscles: cat?.muscles ?? ((s.exercise.primaryMuscles as string[] | null) ?? []),
         inc: cat ? (cat.tool === "bodyweight" ? 0 : cat.inc) : 5,
+        timed: cat?.unit === "secs",
         sessions: new Map(),
       };
       byExercise.set(s.exerciseId, entry);
@@ -315,7 +318,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
     const target = rx
       ? nextTarget({ last: referenceSession(sessions)?.sets ?? [], ...rx, increment: loaded ? entry.inc || 5 : 0 })
       : null;
-    exercises.push({ exerciseId, name: entry.name, muscles: entry.muscles, loaded, series, target });
+    exercises.push({ exerciseId, name: entry.name, muscles: entry.muscles, loaded, timed: entry.timed, series, target });
 
     for (const p of series) {
       if (!p.record) continue;

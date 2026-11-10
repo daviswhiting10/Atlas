@@ -4,7 +4,7 @@ import { memo, useCallback, useMemo } from "react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { format, parseISO } from "date-fns";
 import type { FocusMetric } from "@/lib/plan/generator";
-import { METRICS, chartKind, formatValue, targetValue, type SessionPoint, type Target } from "@/lib/plan/overload";
+import { chartKind, formatValue, targetValue, unitFor, type SessionPoint, type Target } from "@/lib/plan/overload";
 
 type Row = {
   key: string;
@@ -73,11 +73,11 @@ function GhostDot(props: { cx?: number; cy?: number; payload?: Row }) {
 }
 
 /** One legend for every chart in the app, so the marks always mean the same thing. */
-export function ChartLegend({ deload, target }: { deload: boolean; target: boolean }) {
+export function ChartLegend({ deload, target, loaded = true }: { deload: boolean; target: boolean; loaded?: boolean }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-ink-mute">
       <li className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full bg-gold" /> Personal record (heaviest weight yet)
+        <span className="h-2 w-2 rounded-full bg-gold" /> Personal record ({loaded ? "heaviest weight yet" : "best set yet"})
       </li>
       {deload && (
         <li className="flex items-center gap-1.5">
@@ -119,6 +119,7 @@ export const ProgressChart = memo(function ProgressChart({
   height = 260,
   chartKey,
   legend = true,
+  timed = false,
 }: {
   series: SessionPoint[];
   metric: FocusMetric;
@@ -128,8 +129,10 @@ export const ProgressChart = memo(function ProgressChart({
   /** Change this to replay the draw-in animation (e.g. when switching exercise). */
   chartKey?: string;
   legend?: boolean;
+  /** The exercise is measured in seconds rather than reps. */
+  timed?: boolean;
 }) {
-  const unit = METRICS[metric].unit(loaded);
+  const unit = unitFor(metric, loaded, timed);
   const bars = chartKind(metric) === "bars";
 
   const { rows, domain, ticks, hasGhost } = useMemo(() => {
@@ -239,7 +242,7 @@ export const ProgressChart = memo(function ProgressChart({
       </div>
       {legend && (
         <div className="mt-3">
-          <ChartLegend deload={series.some((p) => p.deload)} target={hasGhost} />
+          <ChartLegend deload={series.some((p) => p.deload)} target={hasGhost} loaded={loaded} />
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeries, e1rm, metricFor, nextTarget, sessionPoint, targetValue } from "./overload";
+import { buildSeries, e1rm, metricFor, nextTarget, sessionPoint, targetValue, unitFor } from "./overload";
 
 const set = (weight: number | null, reps: number, completed = true) => ({ weight, reps, completed });
 const range = { repMin: 6, repMax: 10, increment: 5 };
@@ -138,5 +138,19 @@ describe("nextTarget — when the rep range moves up", () => {
 describe("nextTarget — load jumps", () => {
   it("adds the increment exactly, without rounding an odd weight up", () => {
     expect(nextTarget({ last: [set(22.5, 10)], ...range }).weight).toBe(27.5);
+  });
+});
+
+describe("unitFor", () => {
+  it("labels volume as a total so it is never read as a weight on the bar", () => {
+    expect(unitFor("weight", true)).toBe("lb");
+    expect(unitFor("volume", true)).toBe("lb total");
+    expect(unitFor("volume", false)).toBe("reps total");
+  });
+
+  it("measures timed holds in seconds", () => {
+    expect(unitFor("reps", false, true)).toBe("sec");
+    expect(unitFor("volume", false, true)).toBe("sec total");
+    expect(unitFor("weight", true, true)).toBe("lb");
   });
 });

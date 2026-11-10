@@ -8,11 +8,14 @@ import { format, parseISO } from "date-fns";
 import { ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Medal, Minus, Plus, Timer, TrendingUp, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
 import { finishWorkout, saveSet } from "@/lib/actions/athlete";
-import { METRICS, formatValue, buildSeries, isRecord, metricFor, sessionPoint } from "@/lib/plan/overload";
+import { METRICS, formatValue, buildSeries, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
 
 type SetMap = Record<string, LoggerSet[]>;
+
+/** Heaviest load the logger accepts. Above any real lift, low enough to catch a typo like 1450 for 145. */
+const MAX_WEIGHT_LB = 1000;
 
 const clock = (totalSeconds: number) => {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -38,7 +41,7 @@ function Stepper({
 }) {
   const bump = (dir: 1 | -1) => {
     const next = value == null ? (dir === 1 ? step : 0) : Math.max(0, Math.round((value + dir * step) * 100) / 100);
-    onChange(next);
+    onChange(unit === "lb" ? Math.min(next, MAX_WEIGHT_LB) : next);
   };
   return (
     <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-white transition-colors", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line")}>
@@ -50,11 +53,12 @@ function Stepper({
           type="number"
           inputMode="decimal"
           min={0}
+          max={unit === "lb" ? MAX_WEIGHT_LB : undefined}
           step={step}
           value={value ?? ""}
           placeholder="–"
           aria-label={label}
-          onChange={(e) => onChange(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
+          onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
           onFocus={(e) => e.target.select()}
           className="tnum w-full bg-transparent text-center text-lg font-semibold leading-none text-ink outline-none [appearance:textfield] placeholder:text-ink-mute/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
@@ -279,7 +283,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         <div className="mt-8 grid grid-cols-3 gap-3">
           {[
             [String(doneCount), "sets"],
-            [volume >= 10000 ? `${(volume / 1000).toFixed(1)}k` : volume.toLocaleString(), "lb moved"],
+            [volume >= 10000 ? `${(volume / 1000).toFixed(1)}k` : volume.toLocaleString(), "lb volume, all sets"],
             [String(summary.minutes), "minutes"],
           ].map(([value, label]) => (
             <div key={label} className="surface p-4">
@@ -519,7 +523,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
               {latest != null && (
                 <p className="shrink-0 text-2xl font-semibold leading-none tracking-tight text-ink">
                   {formatValue(latest, metricName)}
-                  <span className="ml-1 text-sm font-normal text-ink-mute">{METRICS[metricName].unit(exercise.loaded)}</span>
+                  <span className="ml-1 text-sm font-normal text-ink-mute">{unitFor(metricName, exercise.loaded, exercise.unit === "secs")}</span>
                 </p>
               )}
             </div>
@@ -528,6 +532,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 series={series}
                 metric={metricName}
                 loaded={exercise.loaded}
+                timed={exercise.unit === "secs"}
                 target={current.some((s) => s.done) ? null : exercise.target}
                 height={190}
               />

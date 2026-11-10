@@ -7,7 +7,7 @@ import { format, parseISO } from "date-fns";
 import { ArrowRight, TrendingUp } from "lucide-react";
 import type { ProgressData } from "@/lib/athlete/data";
 import type { FocusMetric } from "@/lib/plan/generator";
-import { METRICS, formatValue, metricFor } from "@/lib/plan/overload";
+import { METRICS, formatValue, metricFor, unitFor } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { StatRow } from "./StatRow";
 import { cn } from "@/lib/utils";
@@ -72,7 +72,7 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
     );
   }
 
-  const unit = METRICS[metric].unit(exercise.loaded);
+  const unit = unitFor(metric, exercise.loaded, exercise.timed);
   const selectedIndex = data.exercises.findIndex((e) => e.exerciseId === exercise.exerciseId);
   // Keep the selected exercise visible even when it lives under "More".
   const visible = showAll ? data.exercises : data.exercises.filter((_, i) => i < PILLS_SHOWN || i === selectedIndex);
@@ -84,7 +84,7 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
         className="rise rise-1"
         stats={[
           { label: "Workouts", value: String(data.totals.sessions) },
-          { label: "Total volume", value: compact(data.totals.volume), unit: "lb" },
+          { label: "Sets", value: data.totals.sets.toLocaleString() },
           { label: "Records", value: String(data.totals.prs) },
           { label: "Streak", value: String(data.totals.streak), unit: data.totals.streak === 1 ? "week" : "weeks" },
         ]}
@@ -196,6 +196,7 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
             series={exercise.series}
             metric={metric}
             loaded={exercise.loaded}
+            timed={exercise.timed}
             target={exercise.target}
             height={300}
             chartKey={`${exercise.exerciseId}-${metric}`}
@@ -220,7 +221,7 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
         {/* ── All lifts, week by week ────────────────────────────────── */}
         <section className="rise rise-3 min-w-0">
           <h2 className="text-xl text-ink">Weekly volume, all lifts</h2>
-          <p className="mt-0.5 text-sm text-ink-mute">Total pounds moved each week. Dots are sessions.</p>
+          <p className="mt-0.5 text-sm text-ink-mute">Weight × reps, added up across every set that week. Dots are sessions.</p>
           <div className="mt-4 h-44">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.weeks} margin={{ top: 4, right: 0, left: -8, bottom: 0 }} barCategoryGap="28%">

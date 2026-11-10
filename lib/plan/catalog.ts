@@ -29,7 +29,11 @@ export type CatalogExercise = {
   tool: Tool;
   region: BodyRegion;
   muscles: string[];
-  /** Typical working weight (lb) for an intermediate lifter. null = bodyweight. */
+  /**
+   * Typical working weight (lb) for an intermediate lifter, as it would be
+   * logged: the bar's total for barbells and machines, one hand for
+   * dumbbells. null = bodyweight.
+   */
   base: number | null;
   /** Smallest sensible load jump in lb. */
   inc: number;
@@ -81,7 +85,7 @@ export const CATALOG: CatalogExercise[] = [
   ex("standing-military-press", "Overhead Press", "VERTICAL_PUSH", "barbell", "upper", ["shoulders", "triceps"], 95, 5),
   ex("dumbbell-shoulder-press", "Dumbbell Shoulder Press", "VERTICAL_PUSH", "dumbbell", "upper", ["shoulders", "triceps"], 40, 5),
   ex("atlas-pike-push-up", "Pike Push-Up", "VERTICAL_PUSH", "bodyweight", "upper", ["shoulders", "triceps"], null, 0),
-  ex("side-lateral-raise", "Lateral Raise", "VERTICAL_PUSH", "dumbbell", "upper", ["shoulders"], 15, 2.5),
+  ex("side-lateral-raise", "Lateral Raise", "VERTICAL_PUSH", "dumbbell", "upper", ["shoulders"], 15, 5),
   ex("atlas-triceps-pushdown", "Triceps Pushdown", "VERTICAL_PUSH", "cable", "upper", ["triceps"], 50, 5),
   ex("atlas-overhead-triceps-extension", "Overhead Triceps Extension", "VERTICAL_PUSH", "dumbbell", "upper", ["triceps"], 35, 5),
   // ── Horizontal pull ──────────────────────────────────────────────────────
@@ -91,13 +95,13 @@ export const CATALOG: CatalogExercise[] = [
   ex("dumbbell-incline-row", "Chest-Supported Row", "HORIZONTAL_PULL", "dumbbell", "upper", ["back", "rear delts"], 40, 5),
   ex("inverted-row", "Inverted Row", "HORIZONTAL_PULL", "bodyweight", "upper", ["back", "biceps"], null, 0),
   ex("face-pull", "Face Pull", "HORIZONTAL_PULL", "cable", "upper", ["rear delts", "upper back"], 40, 5),
-  ex("seated-bent-over-rear-delt-raise", "Rear Delt Raise", "HORIZONTAL_PULL", "dumbbell", "upper", ["rear delts"], 12.5, 2.5),
+  ex("seated-bent-over-rear-delt-raise", "Rear Delt Raise", "HORIZONTAL_PULL", "dumbbell", "upper", ["rear delts"], 15, 5),
   // ── Vertical pull ────────────────────────────────────────────────────────
   ex("wide-grip-lat-pulldown", "Lat Pulldown", "VERTICAL_PULL", "cable", "upper", ["lats", "biceps"], 120, 10),
   ex("pullups", "Pull-Up", "VERTICAL_PULL", "bodyweight", "upper", ["lats", "biceps"], null, 0),
   ex("chin-up", "Chin-Up", "VERTICAL_PULL", "bodyweight", "upper", ["lats", "biceps"], null, 0),
   ex("bent-arm-dumbbell-pullover", "Dumbbell Pullover", "VERTICAL_PULL", "dumbbell", "upper", ["lats", "chest"], 35, 5),
-  ex("atlas-dumbbell-curl", "Dumbbell Curl", "VERTICAL_PULL", "dumbbell", "upper", ["biceps"], 25, 2.5),
+  ex("atlas-dumbbell-curl", "Dumbbell Curl", "VERTICAL_PULL", "dumbbell", "upper", ["biceps"], 25, 5),
   // ── Lower accessories ────────────────────────────────────────────────────
   ex("atlas-standing-calf-raise", "Standing Calf Raise", "LOCOMOTION", "machine", "lower", ["calves"], 135, 10),
   ex("atlas-dumbbell-calf-raise", "Dumbbell Calf Raise", "LOCOMOTION", "dumbbell", "lower", ["calves"], 40, 5),

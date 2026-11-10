@@ -98,3 +98,61 @@ describe("simulateDemoHistory", () => {
     });
   });
 });
+
+describe("demo weights are believable", () => {
+  /** Plausible working-weight ranges (lb) for an intermediate lifter, as logged. */
+  const RANGES: Record<string, [number, number]> = {
+    "barbell-bench-press-medium-grip": [100, 300],
+    "barbell-squat": [135, 365],
+    "barbell-deadlift": [135, 405],
+    "standing-military-press": [65, 165],
+    "bent-over-barbell-row": [95, 225],
+    "romanian-deadlift": [95, 275],
+    "barbell-hip-thrust": [135, 365],
+    "atlas-leg-press": [180, 500],
+    "wide-grip-lat-pulldown": [80, 200],
+    "seated-cable-rows": [80, 200],
+    "incline-dumbbell-press": [25, 90],
+    "dumbbell-lunges": [15, 70],
+    "atlas-dumbbell-curl": [15, 50],
+    "side-lateral-raise": [10, 35],
+    "atlas-triceps-pushdown": [30, 100],
+    "face-pull": [20, 80],
+    "atlas-leg-curl": [50, 150],
+    "atlas-leg-extension": [60, 180],
+    "atlas-standing-calf-raise": [90, 300],
+  };
+
+  const demo = seriesByExercise(DEMO);
+
+  it("covers every loaded exercise in the demo plan", () => {
+    const loaded = Array.from(demo.series).filter(([, s]) => s.some((p) => p.weight != null)).map(([slug]) => slug);
+    expect(loaded.filter((slug) => !RANGES[slug])).toEqual([]);
+  });
+
+  it.each(Object.entries(RANGES))("%s stays within a realistic range", (slug, [min, max]) => {
+    const series = demo.series.get(slug);
+    if (!series) return; // not in this split
+    for (const p of series) {
+      expect(p.weight, `${slug} on ${p.date}`).toBeGreaterThanOrEqual(min);
+      expect(p.weight, `${slug} on ${p.date}`).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it("uses weights that exist in a gym: whole 5 lb steps", () => {
+    demo.series.forEach((series, slug) => {
+      for (const p of series) if (p.weight != null) expect(p.weight % 5, `${slug} at ${p.weight}`).toBe(0);
+    });
+  });
+
+  it("keeps reps inside a believable band", () => {
+    for (const log of demo.logs) {
+      for (const s of log.sets) {
+        if (s.weight != null) {
+          expect(s.reps).toBeGreaterThanOrEqual(3);
+          expect(s.reps).toBeLessThanOrEqual(15);
+        }
+      }
+    }
+  });
+});

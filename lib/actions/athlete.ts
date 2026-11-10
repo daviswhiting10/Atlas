@@ -75,7 +75,7 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
   if (!log || log.clientId !== clientId) throw new Error("Workout not found");
 
   const data = {
-    weight: clean(input.weight, 2000),
+    weight: clean(input.weight, 1000),
     reps: clean(input.reps, 1000) == null ? null : Math.round(clean(input.reps, 1000) as number),
     completed: input.done,
   };

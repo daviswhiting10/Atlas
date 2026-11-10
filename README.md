@@ -14,8 +14,8 @@ training already logged, or **Build my plan** to start from scratch. Neither nee
 - **Progressive overload.** Every set shows a target worked out from the last session: add a rep until you reach the
   top of the range, then add weight and start again.
 - **Charts that follow the goal.** Each exercise can be charted by top weight, best set, estimated 1-rep max or
-  session volume. The leading metric depends on the goal — volume for muscle, estimated max for strength, reps for fat
-  loss. Records are marked, and the next target is projected as a dashed point.
+  session volume. The leading metric depends on the goal — weight on the bar for muscle and general fitness,
+  estimated max for strength, reps for fat loss. Records are marked, and the next target is projected as a dashed point.
 - **Workout logger.** One exercise at a time, steppers for weight and reps, a rest timer, live record detection, and
   a chart that updates as each set is logged. Any workout in the week can be done in any order.
 - **Coach dashboard.** The original half of the app: client management, a program builder, session logging and

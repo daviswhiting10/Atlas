@@ -4,7 +4,7 @@ import { format, parseISO } from "date-fns";
 import { ArrowRight, Check, ChevronRight, Dumbbell, SkipForward } from "lucide-react";
 import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
-import { METRICS, formatValue, metricFor } from "@/lib/plan/overload";
+import { METRICS, formatValue, metricFor, unitFor } from "@/lib/plan/overload";
 import { Greeting } from "@/components/athlete/Greeting";
 import { ProgressChart } from "@/components/athlete/ProgressChart";
 import { StatRow } from "@/components/athlete/StatRow";
@@ -167,7 +167,7 @@ export default async function TodayPage() {
               <div className="shrink-0 text-right">
                 <p className="text-2xl font-semibold leading-none tracking-tight text-ink">
                   {formatValue(latestValue, metric)}
-                  <span className="ml-1 text-sm font-normal text-ink-mute">{METRICS[metric].unit(focus?.loaded ?? true)}</span>
+                  <span className="ml-1 text-sm font-normal text-ink-mute">{unitFor(metric, focus?.loaded ?? true, focus?.timed)}</span>
                 </p>
                 <p className="mt-1.5 text-[13px] text-ink-mute">
                   {format(parseISO(latest.date), "MMM d")} session
@@ -185,7 +185,7 @@ export default async function TodayPage() {
             )}
           </div>
           <div className="mt-4">
-            <ProgressChart series={focus?.series ?? []} metric={metric} loaded={focus?.loaded ?? true} target={focus?.target} height={250} />
+            <ProgressChart series={focus?.series ?? []} metric={metric} loaded={focus?.loaded ?? true} timed={focus?.timed} target={focus?.target} height={250} />
           </div>
           <Link href="/progress" className="press mt-4 inline-flex items-center gap-1 text-sm font-semibold text-ink hover:text-ink-soft">
             All progress <ArrowRight className="h-3.5 w-3.5" />
