@@ -41,6 +41,9 @@ export default function LandingPage() {
       <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
         <Logo />
         <nav className="flex items-center gap-1.5 sm:gap-3">
+          <Link href="/agents" className="press hidden rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink sm:block">
+            For AI assistants
+          </Link>
           <Link href="/login" className="press rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink">
             Coach sign in
           </Link>
@@ -166,7 +169,12 @@ export default function LandingPage() {
 
       <footer className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 border-t border-line px-5 py-8 text-sm text-ink-mute sm:flex-row sm:items-center sm:px-8">
         <Logo />
-        <p>Next.js · Postgres · Prisma · Auth.js — plan engine and overload logic are pure, unit-tested TypeScript.</p>
+        <p>
+          Next.js · Postgres · Prisma · Auth.js — plan engine and overload logic are pure, unit-tested TypeScript.{" "}
+          <Link href="/agents" className="font-medium text-ink-soft underline-offset-4 hover:underline">
+            For AI assistants →
+          </Link>
+        </p>
       </footer>
     </div>
   );
