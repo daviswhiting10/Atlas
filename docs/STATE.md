@@ -18,6 +18,13 @@
 - Email sign-in only works for an address that already has an account (the coach, or a client the coach invited).
 - Guest accounts are created through the `guest` credentials provider and each get their own workspace.
 
+## MCP server
+
+- Tools, resources and both transports are implemented (`lib/mcp/`, `app/api/mcp/route.ts`).
+- Phase 1 auth only: the HTTP endpoint uses the web session. Remote OAuth 2.1 is not built.
+- `AuditLog` is a new table (migration `20261110170000_mcp_audit_log`). Until it is applied, audit writes fail and
+  are logged to stderr; the tools themselves still work.
+
 ## Required environment variables
 
 See `.env.example`. Values live in Vercel; none are committed.

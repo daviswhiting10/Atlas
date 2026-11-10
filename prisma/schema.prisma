@@ -30,6 +30,7 @@ model Workspace {
   programAssignments ProgramAssignment[]
   measurements       Measurement[]
   milestones         Milestone[]
+  auditLogs          AuditLog[]
 }
 
 // ─────────────────────────────────────────────
@@ -675,4 +676,29 @@ model UsageLog {
   userId       String?
   user         User?     @relation(fields: [userId], references: [id])
   createdAt    DateTime  @default(now())
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG (MCP access trail)
+// ─────────────────────────────────────────────
+// One row per MCP tool or resource call — reads, writes and rejected calls.
+// Arguments are stored only as a hash: training and health data in raw
+// arguments does not belong in a second table.
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  actorUserId String
+  actorRole   Role
+  transport   String    // "http" | "stdio"
+  tool        String
+  clientId    String?   // target ClientProfile, when applicable
+  argsHash    String    // sha256 of normalised arguments; never raw arguments
+  outcome     String    // "ok" | "validation_error" | "forbidden" | "not_found" | "rate_limited" | "error"
+  latencyMs   Int?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([clientId, createdAt])
 }

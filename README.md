@@ -21,6 +21,56 @@ training already logged, or **Build my plan** to start from scratch. Neither nee
 - **Coach dashboard.** The original half of the app: client management, a program builder, session logging and
   AI-assisted intake and programming for a personal trainer. Sign in by email link at `/login`.
 
+## MCP server
+
+Atlas also speaks the [Model Context Protocol](https://modelcontextprotocol.io), so an AI assistant can read a
+client's training data and log workouts through the same models and rules the web app uses.
+
+- **15 tools**: workout and exercise history, progress analysis, personal records, training volume, plateau
+  detection, the active program and program details, exercise search, a fitness profile, deterministic training
+  recommendations, workout logging, and (coaches only) program generation, save and update.
+- **4 read-only resources** under `atlas://clients/{clientId}/…` for summary, active program, exercise history and
+  progress.
+- **Two transports**: STDIO for an assistant on your own machine, and Streamable HTTP at `/api/mcp`.
+
+### Authorization
+
+The caller is resolved once per session and bound into every handler; no tool accepts a workspace or user id.
+
+| Caller | May act on |
+|---|---|
+| Coach (`TRAINER`, `ADMIN`) | Any client in their own workspace. `clientId` is required. |
+| Athlete (`CLIENT`) | Their own profile only. `clientId` can be omitted. |
+
+- A role that may not use a tool at all gets **403** (an athlete calling `save_program`).
+- Reaching for a client outside your scope gets **404**, never 403, so the response does not confirm the record
+  exists.
+- Every call — including refused ones — writes one `AuditLog` row with the actor, tool, target client, outcome and a
+  hash of the arguments. Raw arguments are never stored.
+
+The role and scope matrix for all 15 tools is asserted in `lib/mcp/auth.test.ts`.
+
+### Run it locally
+
+```bash
+ATLAS_MCP_AS=demo npm run mcp                    # a demo athlete with nine weeks of history
+ATLAS_MCP_USER_EMAIL=coach@example.com npm run mcp   # an existing account; its role and workspace apply
+```
+
+The repo's `.mcp.json` registers the demo mode with Claude Code and other clients that read that file. The STDIO
+runner is local-trust only and must not be exposed on a network.
+
+Over HTTP, `/api/mcp` authenticates with the same signed-in session as the rest of the app, which covers same-origin
+use. Remote assistants need OAuth 2.1; that is the next phase and is deliberately not faked with ad-hoc tokens.
+
+### Layout
+
+- `lib/mcp/tool.ts` — one pipeline for every call: role gate → validation → client scoping → handler → audit.
+- `lib/mcp/auth.ts` — the authorization rules, pure and unit-tested.
+- `lib/mcp/tools/` — the tool handlers. `lib/mcp/derive.ts` — records, volume and recommendations as pure functions.
+- `lib/progress/plateau.ts` — plateau detection.
+- `app/api/mcp/route.ts` and `lib/mcp/stdio.ts` — the two transports.
+
 ## How it's built
 
 | | |
@@ -67,6 +117,7 @@ npm run dev
 
 ```bash
 npm test        # unit tests
+npm run mcp     # local MCP server (see above)
 npm run lint
 npm run build
 ```
