@@ -1,5 +1,21 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * The colours are CSS variables (so light and dark can swap them), and
+ * Tailwind can't apply an opacity modifier like `bg-ink/10` to a bare
+ * `var(--ink)`: those classes silently render transparent. Mixing each
+ * colour with transparent at <alpha-value> makes every modifier work.
+ */
+type Colors = { [key: string]: string | Colors };
+function withAlpha(colors: Colors): Colors {
+  return Object.fromEntries(
+    Object.entries(colors).map(([k, v]) => [
+      k,
+      typeof v === "string" ? (v.startsWith("var(") ? `color-mix(in srgb, ${v} calc(<alpha-value> * 100%), transparent)` : v) : withAlpha(v),
+    ])
+  );
+}
+
 const config: Config = {
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -16,7 +32,7 @@ const config: Config = {
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
         sans: ["var(--font-body)", "system-ui", "sans-serif"],
       },
-      colors: {
+      colors: withAlpha({
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {
@@ -76,7 +92,7 @@ const config: Config = {
         signal: "var(--signal)",
         "signal-deep": "var(--signal-deep)",
         night: "var(--night)",
-      },
+      }),
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
