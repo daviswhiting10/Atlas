@@ -15,7 +15,12 @@ import type { Prisma } from "@/app/generated/prisma/client";
 import { CATALOG_BY_SLUG } from "./catalog";
 import { ensureCatalog } from "./persist";
 
-export type PlanScope = { clientId: string; workspaceId: string };
+/**
+ * Whose plan, and which one. Without an assignmentId the edit applies to the
+ * client's live plan only. A coach editing a draft passes its id explicitly,
+ * so the athlete's live plan can never be changed by mistake.
+ */
+export type PlanScope = { clientId: string; workspaceId: string; assignmentId?: string };
 
 export class PlanEditError extends Error {
   constructor(
@@ -32,8 +37,12 @@ const invalid = (message: string) => new PlanEditError("invalid", message);
 export const LIMITS = { workoutsPerWeek: 14, exercisesPerWorkout: 12, sets: 10, reps: 100, seconds: 600, weight: 1000, note: 2000, name: 60 } as const;
 
 const DAY_MS = 86_400_000;
-/** A plan that can still be edited: live, or a coach's draft that hasn't been assigned yet. */
-const EDITABLE: Prisma.ProgramAssignmentWhereInput["status"] = { in: ["ACTIVE", "PAUSED"] };
+/** The plan an edit may touch: the named one (live or a coach's draft), or else the live plan. */
+const planWhere = (scope: PlanScope): Prisma.ProgramAssignmentWhereInput => ({
+  clientId: scope.clientId,
+  workspaceId: scope.workspaceId,
+  ...(scope.assignmentId ? { id: scope.assignmentId, status: { in: ["ACTIVE", "PAUSED"] } } : { status: "ACTIVE" }),
+});
 
 type SetShape = { setNumber: number; weight: number | null; unit?: "reps" | "secs"; repMin: number; repMax: number; rpe: number | null; restSeconds: number | null };
 
@@ -49,7 +58,7 @@ const cleanText = (text: unknown, max: number): string | null => {
 /** The workout, if it belongs to this client's editable plan. */
 async function ownWorkout(scope: PlanScope, workoutId: string) {
   const w = await prisma.assignedWorkout.findFirst({
-    where: { id: workoutId, workspaceId: scope.workspaceId, programAssignment: { clientId: scope.clientId, workspaceId: scope.workspaceId, status: EDITABLE } },
+    where: { id: workoutId, workspaceId: scope.workspaceId, programAssignment: planWhere(scope) },
     select: { id: true, name: true, order: true, scheduledDate: true, status: true, programAssignmentId: true, _count: { select: { exercises: true } } },
   });
   if (!w) throw notFound();
@@ -59,7 +68,7 @@ async function ownWorkout(scope: PlanScope, workoutId: string) {
 /** The exercise row, if it sits inside one of this client's editable workouts. */
 async function ownExercise(scope: PlanScope, aweId: string) {
   const e = await prisma.assignedWorkoutExercise.findFirst({
-    where: { id: aweId, workspaceId: scope.workspaceId, assignedWorkout: { programAssignment: { clientId: scope.clientId, workspaceId: scope.workspaceId, status: EDITABLE } } },
+    where: { id: aweId, workspaceId: scope.workspaceId, assignedWorkout: { programAssignment: planWhere(scope) } },
     select: { id: true, exerciseId: true, assignedWorkoutId: true, prescribedSets: true, order: true },
   });
   if (!e) throw notFound("That exercise");
@@ -112,7 +121,7 @@ export async function addWorkout(scope: PlanScope, input: { week: number; name: 
   if (!name) throw invalid("Give the workout a name.");
 
   const plan = await prisma.programAssignment.findFirst({
-    where: { clientId: scope.clientId, workspaceId: scope.workspaceId, status: EDITABLE },
+    where: planWhere(scope),
     orderBy: { createdAt: "desc" },
     select: { id: true, startDate: true, assignedWorkouts: { select: { id: true, order: true, scheduledDate: true } } },
   });
@@ -267,7 +276,7 @@ export async function setWorkoutNote(scope: PlanScope, workoutId: string, text: 
 
 export async function setPlanNote(scope: PlanScope, text: string | null): Promise<void> {
   const { count } = await prisma.programAssignment.updateMany({
-    where: { clientId: scope.clientId, workspaceId: scope.workspaceId, status: "ACTIVE" },
+    where: planWhere(scope),
     data: { notes: cleanText(text, LIMITS.note) },
   });
   if (count === 0) throw notFound("An active plan");

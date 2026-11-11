@@ -1,775 +1,127 @@
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Save, Loader2, Trash2, RotateCcw, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { SetsTable, type SetDraft } from "@/app/(dashboard)/programs/_components/SetsTable";
-import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
+import { notFound, redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/client";
+import { loadPlanOverview } from "@/lib/plan/overview";
+import { EQUIPMENT, EXPERIENCE, GOALS, resolvePrefs } from "@/lib/plan/generator";
+import { CONDITIONS } from "@/lib/plan/goal";
+import {
+  coachAddExercise,
+  coachAddWorkout,
+  coachRemoveExercise,
+  coachRemoveWorkout,
+  coachSetPlanNote,
+  coachSetTargets,
+  coachSetWorkoutNote,
+  coachSwapExercise,
+} from "@/lib/actions/coach-plan";
+import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
+import { AssignPanel } from "@/components/coach/AssignPanel";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export const metadata: Metadata = { title: "Plan" };
 
-type SetShape = {
-  setNumber: number;
-  weight: number | null;
-  repMin: number;
-  repMax: number;
-  rpe: number | null;
-  restSeconds: number | null;
-  notes: string;
-};
+/**
+ * The coach's view of a client's plan is the athlete's Plan view: the same
+ * weeks, the same workouts, the same targets, the same editing controls —
+ * plus assigning a draft.
+ */
+export default async function ClientPlanPage({ params }: { params: { id: string; assignmentId: string } }) {
+  const session = await auth();
+  const workspaceId = session?.user?.workspaceId;
+  if (!workspaceId) redirect("/login");
 
-type AssignedExercise = {
-  id: string;
-  exerciseId: string;
-  order: number;
-  section: string | null;
-  prescribedSets: SetShape[];
-  notes: string | null;
-  exercise: { id: string; name: string; movementPattern?: string; equipment?: string };
-};
-
-type AssignedWorkout = {
-  id: string;
-  name: string;
-  scheduledDate: string;
-  loggedBy: "TRAINER" | "CLIENT";
-  status: "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
-  order: number;
-  notes: string | null;
-  exercises: AssignedExercise[];
-};
-
-type Assignment = {
-  id: string;
-  name: string;
-  startDate: string;
-  status: string;
-  client: { id: string; fullName: string };
-  sourceProgram: { id: string; name: string };
-  assignedWorkouts: AssignedWorkout[];
-};
-
-// ─── Local state for workout editing ─────────────────────────────────────────
-
-type ExerciseDraft = {
-  _key: string;
-  id?: string;
-  exerciseId: string;
-  exerciseName: string;
-  section: string | null;
-  order: number;
-  prescribedSets: SetDraft[];
-  notes: string;
-};
-
-let _k = 0;
-function k() { return `k${++_k}`; }
-
-function toDraft(ex: AssignedExercise): ExerciseDraft {
-  return {
-    _key: k(),
-    id: ex.id,
-    exerciseId: ex.exerciseId,
-    exerciseName: ex.exercise.name,
-    section: ex.section ?? null,
-    order: ex.order,
-    prescribedSets: ex.prescribedSets.map((s) => ({ isBodyweight: false, ...s })),
-    notes: ex.notes ?? "",
-  };
-}
-
-// ─── Section grouping ─────────────────────────────────────────────────────────
-
-// Standard section order — matches ProgramBuilder's DEFAULT_SECTIONS.
-// Trainer-renamed sections fall through to the "any additional named" bucket.
-const SECTION_ORDER = ["Warmup", "Main A", "Main B", "Burner"];
-
-/** Human-readable label for a section key. Handles both ProgramBuilder
- *  ("Warmup", "Main A") and any custom names the trainer may have entered. */
-function formatSectionLabel(section: string | null): string {
-  if (!section) return "General";
-  return section; // ProgramBuilder already stores display-ready names
-}
-
-type SectionGroup = { section: string | null; label: string; exs: ExerciseDraft[] };
-
-function getSectionGroups(exercises: ExerciseDraft[]): SectionGroup[] {
-  const map = new Map<string | null, ExerciseDraft[]>();
-  for (const ex of exercises) {
-    const key = ex.section;
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(ex);
-  }
-
-  const result: SectionGroup[] = [];
-
-  // Standard order first
-  for (const sectionKey of SECTION_ORDER) {
-    if (map.has(sectionKey)) {
-      result.push({ section: sectionKey, label: formatSectionLabel(sectionKey), exs: map.get(sectionKey)! });
-      map.delete(sectionKey);
-    }
-  }
-
-  // Any additional named sections (custom trainer names, or legacy lowercase values)
-  Array.from(map.entries()).forEach(([key, exs]) => {
-    if (key !== null) {
-      result.push({ section: key, label: formatSectionLabel(key), exs });
-    }
+  const client = await prisma.clientProfile.findFirst({
+    where: { id: params.id, workspaceId, deletedAt: null },
+    select: { id: true, fullName: true, programAssignments: { where: { status: "ACTIVE" }, select: { id: true } } },
   });
+  if (!client) notFound();
 
-  // Unsectioned exercises last
-  if (map.has(null)) {
-    result.push({ section: null, label: "General", exs: map.get(null)! });
-  }
+  const plan = await loadPlanOverview({ clientId: client.id, workspaceId, assignmentId: params.assignmentId });
+  if (!plan) notFound();
 
-  return result;
-}
+  // Each action is bound to this client and this plan on the server, so the
+  // browser can only ever edit the plan it was shown.
+  const actions: PlanActions = {
+    addWorkout: coachAddWorkout.bind(null, client.id, plan.id),
+    removeWorkout: coachRemoveWorkout.bind(null, client.id, plan.id),
+    addExercise: coachAddExercise.bind(null, client.id, plan.id),
+    removeExercise: coachRemoveExercise.bind(null, client.id, plan.id),
+    swapExercise: coachSwapExercise.bind(null, client.id, plan.id),
+    setTargets: coachSetTargets.bind(null, client.id, plan.id),
+    setWorkoutNote: coachSetWorkoutNote.bind(null, client.id, plan.id),
+    setPlanNote: coachSetPlanNote.bind(null, client.id, plan.id),
+  };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const STATUS_COLORS: Record<string, string> = {
-  PLANNED: "border border-[var(--line)] bg-[var(--muted)] text-[var(--ink-soft)]",
-  LOGGED: "border border-green-300 bg-green-50 text-green-700",
-  SKIPPED: "border border-amber-300 bg-amber-50 text-amber-700",
-  RESCHEDULED: "border border-blue-300 bg-blue-50 text-blue-700",
-};
-
-function groupByWeek(workouts: AssignedWorkout[], startDate: string) {
-  const start = new Date(startDate);
-  const weeks: Record<number, AssignedWorkout[]> = {};
-  for (const w of workouts) {
-    const d = new Date(w.scheduledDate);
-    const diffDays = Math.floor((d.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const week = Math.floor(diffDays / 7) + 1;
-    if (!weeks[week]) weeks[week] = [];
-    weeks[week].push(w);
-  }
-  return weeks;
-}
-
-// ─── Workout editor (inline) ──────────────────────────────────────────────────
-
-type SectionMeta = { key: string; name: string };
-
-function initSectionMetas(drafts: ExerciseDraft[]): SectionMeta[] {
-  return getSectionGroups(drafts)
-    .filter((g) => g.section !== null)
-    .map((g) => ({ key: k(), name: g.section! }));
-}
-
-function WorkoutEditor({
-  workout,
-  workspaceAssignmentId,
-  onSaved,
-}: {
-  workout: AssignedWorkout;
-  workspaceAssignmentId: string;
-  onSaved: (updated: AssignedWorkout) => void;
-}) {
-  const [exercises, setExercises] = useState<ExerciseDraft[]>(
-    workout.exercises.map(toDraft)
-  );
-  const [sections, setSections] = useState<SectionMeta[]>(() =>
-    initSectionMetas(workout.exercises.map(toDraft))
-  );
-  const [loggedBy, setLoggedBy] = useState<"TRAINER" | "CLIENT">(workout.loggedBy);
-  const [scheduledDate, setScheduledDate] = useState(
-    workout.scheduledDate.split("T")[0]
-  );
-  const [saving, setSaving] = useState(false);
-
-  const updateEx = useCallback(
-    (eKey: string, fn: (e: ExerciseDraft) => ExerciseDraft) =>
-      setExercises((prev) => prev.map((e) => (e._key === eKey ? fn(e) : e))),
-    []
-  );
-
-  function addExerciseToSection(ex: ExerciseOption, section: string | null) {
-    setExercises((prev) => [
-      ...prev,
-      {
-        _key: k(),
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        section,
-        order: prev.length + 1, // will be recomputed on save
-        prescribedSets: [
-          { setNumber: 1, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
-          { setNumber: 2, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
-          { setNumber: 3, weight: null, isBodyweight: false, repMin: 8, repMax: 12, rpe: null, restSeconds: null, notes: "" },
-        ],
-        notes: "",
-      },
-    ]);
-  }
-
-  function removeExercise(eKey: string) {
-    setExercises((prev) => prev.filter((e) => e._key !== eKey));
-  }
-
-  function addBlock() {
-    setSections((prev) => [...prev, { key: k(), name: `Block ${prev.length + 1}` }]);
-  }
-
-  function renameSection(sKey: string, newName: string) {
-    const meta = sections.find((s) => s.key === sKey);
-    if (!meta || meta.name === newName) return;
-    const oldName = meta.name;
-    setSections((prev) => prev.map((s) => (s.key === sKey ? { ...s, name: newName } : s)));
-    setExercises((prev) =>
-      prev.map((e) => (e.section === oldName ? { ...e, section: newName } : e))
-    );
-  }
-
-  function moveExercise(exKey: string, direction: "up" | "down") {
-    setExercises((prev) => {
-      const ex = prev.find((e) => e._key === exKey);
-      if (!ex) return prev;
-
-      // Move within the same section only
-      const sectionExs = prev.filter((e) => e.section === ex.section);
-      const posInSection = sectionExs.findIndex((e) => e._key === exKey);
-      if (direction === "up" && posInSection === 0) return prev;
-      if (direction === "down" && posInSection === sectionExs.length - 1) return prev;
-
-      const swapWith =
-        direction === "up"
-          ? sectionExs[posInSection - 1]
-          : sectionExs[posInSection + 1];
-
-      const next = [...prev];
-      const idxA = next.findIndex((e) => e._key === exKey);
-      const idxB = next.findIndex((e) => e._key === swapWith._key);
-      [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
-      return next;
-    });
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      // Flatten in section display order, then unsectioned/orphaned last
-      const knownSectionNames = new Set(sections.map((s) => s.name));
-      const flatInOrder = [
-        ...sections.flatMap((sec) => exercises.filter((e) => e.section === sec.name)),
-        ...exercises.filter((e) => e.section === null || !knownSectionNames.has(e.section!)),
-      ];
-      const exercisesWithOrder = flatInOrder.map((e, i) => ({ ...e, order: i + 1 }));
-
-      const res = await fetch(
-        `/api/assignments/${workspaceAssignmentId}/workouts/${workout.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            loggedBy,
-            scheduledDate,
-            exercises: exercisesWithOrder.map((e) => ({
-              id: e.id,
-              exerciseId: e.exerciseId,
-              order: e.order,
-              section: e.section ?? null,
-              prescribedSets: e.prescribedSets,
-              notes: e.notes || null,
-            })),
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const msg =
-          typeof err?.error === "string"
-            ? err.error
-            : err?.error?.formErrors?.[0] ?? "Save failed";
-        toast.error(msg);
-        return;
-      }
-
-      const updated = await res.json();
-      toast.success("Workout saved");
-
-      // Re-init drafts from saved data to pick up generated IDs and confirmed orders
-      if (Array.isArray(updated?.exercises)) {
-        const updatedDrafts = (updated.exercises as AssignedExercise[]).map(toDraft);
-        setExercises(updatedDrafts);
-        setSections(initSectionMetas(updatedDrafts));
-      }
-      onSaved(updated);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const hasAnySection = sections.length > 0 || exercises.some((e) => e.section !== null);
-  const knownSectionNames = new Set(sections.map((s) => s.name));
-  const generalExs = exercises.filter((e) => e.section === null || !knownSectionNames.has(e.section!));
+  const firstName = client.fullName.split(" ")[0];
+  const draft = plan.status === "PAUSED";
+  const live = plan.status === "ACTIVE";
+  const prefs = plan.prefs ? resolvePrefs(plan.prefs) : null;
+  const chips = prefs
+    ? [
+        GOALS[prefs.goal].label,
+        `${prefs.daysPerWeek} day${prefs.daysPerWeek === 1 ? "" : "s"} a week`,
+        `${prefs.minutes} min`,
+        EQUIPMENT[prefs.equipment].label,
+        EXPERIENCE[prefs.experience].label,
+        ...prefs.conditions.map((c) => CONDITIONS[c].label),
+      ]
+    : [];
+  const status = draft ? "Draft plan" : live ? `Live plan · what ${firstName} sees` : plan.status === "COMPLETED" ? "Past plan" : "Plan";
 
   return (
-    <div className="mt-3 space-y-3">
-      {/* Date + logged-by row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Date:</span>
-          <input
-            type="date"
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            className="text-xs h-7 rounded-md border border-input px-2 bg-background"
-          />
-        </div>
-        <span className="text-xs text-muted-foreground">Logged by:</span>
-        <button
-          type="button"
-          onClick={() => setLoggedBy(loggedBy === "TRAINER" ? "CLIENT" : "TRAINER")}
-          className={cn(
-            "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
-            loggedBy === "TRAINER"
-              ? "bg-[var(--blue)] text-white border-[var(--blue)]"
-              : "border-[var(--line)] text-[var(--ink-soft)] bg-[var(--muted)]"
-          )}
-        >
-          {loggedBy === "TRAINER" ? "In-person (I log)" : "At-home (client logs)"}
-        </button>
-      </div>
-
-      {/* Exercises grouped by section */}
-      {hasAnySection ? (
-        <div className="space-y-4">
-          {sections.map((sec) => {
-            const secExs = exercises.filter((e) => e.section === sec.name);
-            return (
-              <div key={sec.key}>
-                {/* Section header with editable name */}
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    value={sec.name}
-                    onChange={(e) => renameSection(sec.key, e.target.value)}
-                    className="font-body text-xs font-medium uppercase tracking-widest bg-transparent border-0 outline-none focus:underline min-w-0 w-auto"
-                    style={{ color: "var(--blue)" }}
-                  />
-                  <div className="flex-1 h-px" style={{ background: "var(--line)" }} />
-                  <span className="text-xs text-muted-foreground">{secExs.length} ex</span>
-                </div>
-
-                {/* Exercises in this section */}
-                <div className="space-y-2 ml-1">
-                  {secExs.map((ex, exIdx) => (
-                    <div key={ex._key} className="border rounded p-3 bg-background">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <div className="flex flex-col shrink-0">
-                            <button
-                              type="button"
-                              disabled={exIdx === 0}
-                              onClick={() => moveExercise(ex._key, "up")}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                              title="Move up"
-                            >
-                              <ChevronUp className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={exIdx === secExs.length - 1}
-                              onClick={() => moveExercise(ex._key, "down")}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                              title="Move down"
-                            >
-                              <ChevronDown className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <span className="text-sm font-medium truncate">
-                            {exIdx + 1}. {ex.exerciseName}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeExercise(ex._key)}
-                          className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <SetsTable
-                        sets={ex.prescribedSets}
-                        onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Per-section add */}
-                <div className="mt-2 ml-1">
-                  <ExercisePicker
-                    onSelect={(ex) => addExerciseToSection(ex, sec.name)}
-                    placeholder={`+ Add to ${sec.name}...`}
-                  />
-                </div>
-              </div>
-            );
-          })}
-
-          {/* General group for unsectioned / orphaned exercises */}
-          {generalExs.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="font-body text-xs font-medium uppercase tracking-widest" style={{ color: "var(--blue)" }}>
-                  General
-                </span>
-                <div className="flex-1 h-px" style={{ background: "var(--line)" }} />
-                <span className="text-xs text-muted-foreground">{generalExs.length} ex</span>
-              </div>
-              <div className="space-y-2 ml-1">
-                {generalExs.map((ex, exIdx) => (
-                  <div key={ex._key} className="border rounded p-3 bg-background">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="flex flex-col shrink-0">
-                          <button
-                            type="button"
-                            disabled={exIdx === 0}
-                            onClick={() => moveExercise(ex._key, "up")}
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                          >
-                            <ChevronUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={exIdx === generalExs.length - 1}
-                            onClick={() => moveExercise(ex._key, "down")}
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                          >
-                            <ChevronDown className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <span className="text-sm font-medium truncate">{exIdx + 1}. {ex.exerciseName}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeExercise(ex._key)}
-                        className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <SetsTable
-                      sets={ex.prescribedSets}
-                      onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Add block */}
-          <button
-            type="button"
-            onClick={addBlock}
-            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground border border-dashed rounded-md py-2 hover:text-foreground hover:border-foreground/40 transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            Add block
-          </button>
-        </div>
-      ) : (
-        /* Flat list for workouts with no sections */
-        <div className="space-y-2">
-          {exercises.map((ex, idx) => (
-            <div key={ex._key} className="border rounded p-3 bg-background">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="flex flex-col shrink-0">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => moveExercise(ex._key, "up")}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                    >
-                      <ChevronUp className="w-3 h-3" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === exercises.length - 1}
-                      onClick={() => moveExercise(ex._key, "down")}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
-                    >
-                      <ChevronDown className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <span className="text-sm font-medium truncate">{idx + 1}. {ex.exerciseName}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeExercise(ex._key)}
-                  className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <SetsTable
-                sets={ex.prescribedSets}
-                onChange={(sets) => updateEx(ex._key, (e) => ({ ...e, prescribedSets: sets }))}
-              />
-            </div>
-          ))}
-          <ExercisePicker onSelect={(ex) => addExerciseToSection(ex, null)} placeholder="+ Add exercise..." />
-          <button
-            type="button"
-            onClick={addBlock}
-            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground border border-dashed rounded-md py-2 hover:text-foreground hover:border-foreground/40 transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            Add block
-          </button>
-        </div>
-      )}
-
-      <Button size="sm" onClick={save} disabled={saving} className="w-full mt-2">
-        {saving ? (
-          <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving...</>
-        ) : (
-          <><Save className="w-3.5 h-3.5 mr-1.5" />Save workout</>
-        )}
-      </Button>
-    </div>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
-
-export default function AssignedProgramPage() {
-  const { id: clientId, assignmentId } = useParams<{ id: string; assignmentId: string }>();
-  const router = useRouter();
-  const [assignment, setAssignment] = useState<Assignment | null>(null);
-  const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    fetch(`/api/assignments/${assignmentId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && data.id) setAssignment(data);
-      })
-      .finally(() => setLoading(false));
-  }, [assignmentId]);
-
-  function handleWorkoutSaved(updated: AssignedWorkout) {
-    setAssignment((prev) =>
-      prev
-        ? {
-            ...prev,
-            assignedWorkouts: prev.assignedWorkouts.map((w) =>
-              w.id === updated.id ? { ...w, ...updated } : w
-            ),
-          }
-        : prev
-    );
-  }
-
-  async function deleteAssignment() {
-    if (!confirm("Remove this program from the client? All scheduled workouts and logged data will be permanently deleted.")) return;
-    setDeleting(true);
-    const res = await fetch(`/api/assignments/${assignmentId}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("Failed to remove program");
-      setDeleting(false);
-      return;
-    }
-    toast.success("Program removed");
-    router.push(`/clients/${clientId}`);
-  }
-
-  async function resetSession(workoutId: string) {
-    if (!confirm("Reset this session to Planned? The logged data will be deleted.")) return;
-    const res = await fetch(`/api/assignments/${assignmentId}/workouts/${workoutId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "PLANNED" }),
-    });
-    if (!res.ok) { toast.error("Failed to reset session"); return; }
-    const updated = await res.json();
-    handleWorkoutSaved(updated);
-    toast.success("Session reset to Planned");
-  }
-
-  if (loading) {
-    return (
-      <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-4xl">
-        <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-16 bg-muted rounded animate-pulse" />)}
-        </div>
-      </div>
-    );
-  }
-
-  if (!assignment) {
-    return (
-      <div className="px-5 pt-5 md:px-8 md:pt-8">
-        <p className="text-muted-foreground">Assignment not found.</p>
-        <Link href={`/clients/${clientId}`} className={cn(buttonVariants({ variant: "link" }), "p-0 mt-2 block")}>
-          Back to client
-        </Link>
-      </div>
-    );
-  }
-
-  const weekGroups = groupByWeek(assignment.assignedWorkouts, assignment.startDate);
-  const weeks = Object.keys(weekGroups).map(Number).sort((a, b) => a - b);
-
-  return (
-    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-4xl">
-      <Link
-        href={`/clients/${clientId}`}
-        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}
-      >
-        <ArrowLeft className="w-4 h-4 mr-1" />
-        {assignment.client.fullName}
+    <div>
+      <Link href={`/clients/${client.id}`} className="press -ml-1 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-ink-soft hover:text-ink">
+        <ArrowLeft className="h-4 w-4" /> {client.fullName}
       </Link>
 
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)", color: "var(--ink)" }}
-          >
-            {assignment.name}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Started {new Date(assignment.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-            {" · "}
-            <Link href={`/programs/${assignment.sourceProgram.id}`} className="hover:underline">
-              {assignment.sourceProgram.name}
-            </Link>
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge
-            variant="outline"
-            className={assignment.status === "ACTIVE" ? "border-green-200 text-green-700" : ""}
-          >
-            {assignment.status}
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={deleteAssignment}
-            disabled={deleting}
-            className="h-8 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            title="Remove program from client"
-          >
-            {deleting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
+      <div className="rise mb-7 mt-3">
+        <p className="eyebrow">
+          {status} · {plan.totalWeeks} weeks
+        </p>
+        <h1 className="mt-1.5 text-[34px] leading-[1.08] text-ink sm:text-[42px]">{plan.name}</h1>
+        {plan.goalText && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-soft">“{plan.goalText}”</p>}
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <span key={c} className="rounded-full border border-line bg-white px-3 py-1 text-[13px] font-medium text-ink-soft">
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+        {!plan.generated && (
+          <p className="mt-3 max-w-2xl text-[13px] text-ink-mute">Built from a library program. It edits the same way; phases and lighter weeks apply to generated plans.</p>
+        )}
       </div>
 
-      {/* Week-by-week workout list */}
-      {weeks.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-muted-foreground text-sm">
-            No workouts scheduled.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {weeks.map((weekNum) => (
-            <div key={weekNum}>
-              <h2 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                Week {weekNum}
-              </h2>
-              <div className="space-y-2">
-                {weekGroups[weekNum].map((workout) => {
-                  const isOpen = openWorkoutId === workout.id;
-                  return (
-                    <Card
-                      key={workout.id}
-                      className={cn("transition-colors", isOpen && "border-primary/40")}
-                    >
-                      <CardContent className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            className="flex-1 flex items-center gap-3 text-left min-w-0"
-                            onClick={() =>
-                              setOpenWorkoutId(isOpen ? null : workout.id)
-                            }
-                          >
-                            {isOpen ? (
-                              <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
-                            )}
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{workout.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(workout.scheduledDate).toLocaleDateString("en-US", {
-                                  weekday: "short", month: "short", day: "numeric",
-                                })}
-                                {" · "}
-                                {workout.exercises.length} exercise{workout.exercises.length !== 1 ? "s" : ""}
-                              </p>
-                            </div>
-                          </button>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={cn(
-                                "text-xs px-2 py-0.5 rounded-full font-medium",
-                                workout.loggedBy === "TRAINER"
-                                  ? "bg-[rgba(43,107,255,0.08)] text-[var(--blue)]"
-                                  : "bg-[var(--muted)] text-[var(--ink-soft)]"
-                              )}
-                            >
-                              {workout.loggedBy === "TRAINER" ? "In-person" : "At-home"}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className={cn("text-xs", STATUS_COLORS[workout.status])}
-                            >
-                              {workout.status}
-                            </Badge>
-                            {workout.status === "LOGGED" && (
-                              <button
-                                type="button"
-                                title="Reset to Planned"
-                                onClick={(e) => { e.stopPropagation(); resetSession(workout.id); }}
-                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
+        <PlanView
+          plan={plan}
+          actions={actions}
+          workoutBase={live ? `/clients/${client.id}/log?workoutId=` : undefined}
+          startLabel="Log this workout"
+          noteLabel={`Plan notes · ${firstName} sees these`}
+        />
 
-                        {isOpen && (
-                          <WorkoutEditor
-                            workout={workout}
-                            workspaceAssignmentId={assignmentId}
-                            onSaved={handleWorkoutSaved}
-                          />
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+        <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          {draft && <AssignPanel clientId={client.id} clientName={client.fullName} assignmentId={plan.id} startDate={plan.startDate} hasLivePlan={client.programAssignments.length > 0} />}
+          {plan.rationale.length > 0 && (
+            <div>
+              <p className="eyebrow">Why this plan</p>
+              <ul className="rule mt-3 divide-y divide-line">
+                {plan.rationale.map((r, i) => (
+                  <li key={i} className="flex gap-3 py-3 text-[14px] leading-relaxed text-ink-soft">
+                    <span className="mt-0.5 font-mono text-xs text-ink-mute">{String(i + 1).padStart(2, "0")}</span>
+                    <span>{r}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          ))}
-        </div>
-      )}
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

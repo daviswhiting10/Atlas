@@ -7,7 +7,50 @@ import { ArrowLeft, ImageUp, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const IMPORT_STORAGE_KEY = "atlas-program-import";
+/** What the import route returns: days of sections of exercises. */
+type ImportedProgram = {
+  name: string;
+  description: string;
+  durationWeeks: number;
+  goals: string[];
+  conditions: string[];
+  days: Array<{
+    name: string;
+    dayOfWeek: number;
+    order: number;
+    sections: Array<{ name: string; exercises: Array<{ exerciseId: string; order: number; notes: string; prescribedSets: Array<Record<string, unknown>> }> }>;
+  }>;
+};
+
+/** One block that repeats for the program's length; each day becomes a workout, sections flattened in order. */
+function toProgramBody(p: ImportedProgram) {
+  return {
+    name: p.name || "Imported program",
+    description: p.description || null,
+    goalTags: { goals: p.goals ?? [], conditions: p.conditions ?? [] },
+    blocks: [
+      {
+        name: "Block 1",
+        order: 1,
+        weeks: Math.max(1, Math.round(p.durationWeeks || 1)),
+        workouts: p.days.map((d, i) => ({
+          name: d.name,
+          dayOfWeek: Math.min(7, Math.max(1, d.dayOfWeek)),
+          order: i + 1,
+          exercises: d.sections
+            .flatMap((section) => section.exercises.map((e) => ({ ...e, section: section.name })))
+            .map((e, j) => ({
+              exerciseId: e.exerciseId,
+              order: j + 1,
+              notes: e.notes || null,
+              section: e.section,
+              prescribedSets: e.prescribedSets.map((set, k) => ({ ...set, setNumber: k + 1 })),
+            })),
+        })),
+      },
+    ],
+  };
+}
 const ALLOWED = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 type ImageEntry = { file: File; previewUrl: string };
@@ -97,9 +140,18 @@ export default function ProgramImportPage() {
         throw new Error(data.error ?? `Server error ${res.status}`);
       }
 
-      const { program } = await res.json();
-      localStorage.setItem(IMPORT_STORAGE_KEY, JSON.stringify(program));
-      router.push("/programs/new");
+      const { program } = (await res.json()) as { program: ImportedProgram };
+
+      // Save it to the library as written. From there it can be used for a
+      // client as a draft, or its goals can seed a generated plan.
+      const save = await fetch("/api/programs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toProgramBody(program)),
+      });
+      if (!save.ok) throw new Error("The program was read, but couldn't be saved. Try again.");
+      const saved = (await save.json()) as { id: string };
+      router.push(`/programs/${saved.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
@@ -113,7 +165,7 @@ export default function ProgramImportPage() {
 
   return (
     <div
-      className="max-w-2xl mx-auto px-5 pt-7 md:px-8 md:pt-8 space-y-5"
+      className="max-w-2xl space-y-5"
       onPaste={handlePaste}
     >
       {/* Back */}
@@ -152,14 +204,14 @@ export default function ProgramImportPage() {
           "relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed cursor-pointer transition-colors px-6 text-center select-none",
           hasImages ? "py-6" : "py-16",
           dragging
-            ? "border-blue-400 bg-blue-50/40 dark:bg-blue-950/20"
+            ? "border-signal/50 bg-signal/10/40 dark:bg-signal/20/20"
             : "border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/30",
           loading && "pointer-events-none opacity-60"
         )}
       >
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ background: "rgba(43,107,255,0.08)" }}
+          style={{ background: "rgba(30,107,78,0.08)" }}
         >
           {hasImages ? (
             <Plus className="w-5 h-5" style={{ color: "var(--blue)" }} />

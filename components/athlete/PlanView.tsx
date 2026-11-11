@@ -82,6 +82,7 @@ function WorkoutCard({
   onToggle,
   actions,
   workoutHref,
+  startLabel,
 }: {
   w: WorkoutSummary;
   isNext: boolean;
@@ -89,6 +90,7 @@ function WorkoutCard({
   onToggle: () => void;
   actions: PlanActions;
   workoutHref?: (workoutId: string) => string;
+  startLabel: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -251,7 +253,7 @@ function WorkoutCard({
                   logged ? "border border-line bg-white text-ink hover:border-ink/20" : "bg-ink text-white hover:bg-ink/85"
                 )}
               >
-                {logged ? "Review workout" : "Start this workout"} <ArrowRight className="h-4 w-4" />
+                {logged ? "Review workout" : startLabel} <ArrowRight className="h-4 w-4" />
               </Link>
             )}
             {!logged && actions.setSkipped && (
@@ -366,12 +368,19 @@ export function PlanView({
   plan,
   actions,
   workoutBase,
+  startLabel = "Start this workout",
   noteLabel = "Plan notes",
 }: {
   plan: PlanOverview;
   actions: PlanActions;
-  /** Path prefix for "Start this workout" (the workout id is appended). Left out where logging doesn't apply, such as a coach's draft. */
+  /**
+   * Where "Start this workout" goes: a path the workout id is appended to
+   * ("/workouts"), or one with a query parameter it fills ("/clients/x/log?workoutId=").
+   * Left out where logging doesn't apply, such as a coach's draft.
+   */
   workoutBase?: string;
+  /** Label for the start button: the athlete starts a workout, a coach logs one. */
+  startLabel?: string;
   noteLabel?: string;
 }) {
   const [week, setWeek] = useState(plan.currentWeek);
@@ -457,7 +466,7 @@ export function PlanView({
 
       <div key={week} className="fade-in mt-3 space-y-3">
         {shown.map((w) => (
-          <WorkoutCard key={w.id} w={w} isNext={w.id === plan.nextUp?.id} open={openId === w.id} onToggle={() => setOpenId(openId === w.id ? null : w.id)} actions={actions} workoutHref={workoutBase ? (id) => `${workoutBase}/${id}` : undefined} />
+          <WorkoutCard key={w.id} w={w} isNext={w.id === plan.nextUp?.id} open={openId === w.id} onToggle={() => setOpenId(openId === w.id ? null : w.id)} actions={actions} startLabel={startLabel} workoutHref={workoutBase ? (id) => (workoutBase.endsWith("=") ? `${workoutBase}${id}` : `${workoutBase}/${id}`) : undefined} />
         ))}
         {shown.length === 0 && <p className="py-4 text-center text-[15px] text-ink-mute">Nothing scheduled this week yet.</p>}
         <AddWorkout week={week} workouts={shown} actions={actions} />

@@ -1,334 +1,164 @@
-"use client";
-
-import { useEffect, useState, useTransition } from "react";
-import { useContentFade } from "@/hooks/use-content-fade";
-import { useRouter } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Dumbbell, Copy, UserPlus, Trash2, Sparkles, ImageUp } from "lucide-react";
-import { toast } from "sonner";
+import { redirect } from "next/navigation";
+import { ArrowRight, ImageUp, Lightbulb, Plus } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/client";
+import { StatRow } from "@/components/athlete/StatRow";
+import { cn } from "@/lib/utils";
 
-type Program = {
-  id: string;
-  name: string;
-  description: string | null;
-  durationWeeks: number;
-  isDraft: boolean;
-  goalTags: { goals: string[]; conditions: string[] } | null;
-  updatedAt: string;
-  _count: { assignments: number; blocks: number };
-  blocks: { _count: { workouts: number } }[];
-};
+export const metadata: Metadata = { title: "Programs" };
 
-const GOAL_OPTIONS = [
-  "Weight Loss",
-  "Hypertrophy",
-  "Strength",
-  "Endurance",
-  "Athletic Performance",
-  "General Fitness",
-  "Corrective",
-];
+const DAY_MS = 86_400_000;
 
-const CONDITION_OPTIONS = [
-  "Lower Back Safe",
-  "Knee Pain",
-  "Shoulder Restrictions",
-  "Post-Rehab",
-  "Beginner",
-  "No Equipment",
-];
+/**
+ * Programs: the plans clients are on (and drafts waiting to be assigned),
+ * then the library of programs written by hand. Every plan opens in the
+ * same editor the athlete's Plan screen uses.
+ */
+export default async function ProgramsPage() {
+  const session = await auth();
+  const workspaceId = session?.user?.workspaceId;
+  if (!workspaceId) redirect("/login");
 
-// Goal tag inline styles — outlined, token-based
-const GOAL_TAG_STYLE: Record<string, { border: string; bg: string; color: string }> = {
-  "Weight Loss":          { border: "rgba(31,122,77,0.30)",  bg: "rgba(31,122,77,0.07)",   color: "var(--success)" },
-  "Hypertrophy":          { border: "rgba(43,107,255,0.30)", bg: "rgba(43,107,255,0.07)",  color: "var(--blue)" },
-  "Strength":             { border: "rgba(109,40,217,0.25)", bg: "rgba(109,40,217,0.06)",  color: "#6D28D9" },
-  "Endurance":            { border: "rgba(6,182,212,0.30)",  bg: "rgba(6,182,212,0.07)",   color: "#0891B2" },
-  "Athletic Performance": { border: "rgba(43,107,255,0.30)", bg: "rgba(43,107,255,0.07)",  color: "var(--blue)" },
-  "General Fitness":      { border: "var(--line)",           bg: "rgba(11,15,26,0.04)",    color: "var(--ink-soft)" },
-  "Corrective":           { border: "rgba(180,83,9,0.30)",   bg: "rgba(180,83,9,0.07)",    color: "var(--warn)" },
-};
+  const [plans, library] = await Promise.all([
+    prisma.programAssignment.findMany({
+      where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] }, client: { deletedAt: null } },
+      orderBy: [{ status: "desc" }, { updatedAt: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        startDate: true,
+        client: { select: { id: true, fullName: true } },
+        assignedWorkouts: { select: { status: true, scheduledDate: true } },
+      },
+    }),
+    prisma.program.findMany({
+      where: { workspaceId, deletedAt: null, isTemplate: true },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, name: true, description: true, durationWeeks: true, goalTags: true, _count: { select: { assignments: true } }, blocks: { select: { _count: { select: { workouts: true } } } } },
+    }),
+  ]);
 
-export default function ProgramsPage() {
-  const router = useRouter();
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [loading, setLoading] = useState(true);
-  const phase = useContentFade(loading);
-  const [goalFilter, setGoalFilter] = useState<string | null>(null);
-  const [condFilter, setCondFilter] = useState<string | null>(null);
-  const [duplicating, startDuplicate] = useTransition();
+  const drafts = plans.filter((p) => p.status === "PAUSED");
+  const live = plans.filter((p) => p.status === "ACTIVE");
 
-  useEffect(() => {
-    fetch("/api/programs")
-      .then((r) => r.json())
-      .then((data) => setPrograms(Array.isArray(data) ? data : []))
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function deleteProgram(e: React.MouseEvent, id: string, name: string) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    const res = await fetch(`/api/programs/${id}`, { method: "DELETE" });
-    if (!res.ok) { toast.error("Delete failed"); return; }
-    setPrograms((prev) => prev.filter((p) => p.id !== id));
-    toast.success(`"${name}" deleted`);
-  }
-
-  async function duplicate(e: React.MouseEvent, id: string, name: string) {
-    e.preventDefault();
-    e.stopPropagation();
-    startDuplicate(async () => {
-      const res = await fetch(`/api/programs/${id}/duplicate`, { method: "POST" });
-      if (!res.ok) { toast.error("Duplicate failed"); return; }
-      const copy = await res.json();
-      toast.success(`"${name}" duplicated`);
-      router.push(`/programs/${copy.id}`);
-    });
-  }
-
-  const filtered = programs.filter((p) => {
-    const goals = p.goalTags?.goals ?? [];
-    const conds = p.goalTags?.conditions ?? [];
-    if (goalFilter && !goals.includes(goalFilter)) return false;
-    if (condFilter && !conds.includes(condFilter)) return false;
-    return true;
-  });
+  const progressOf = (p: (typeof plans)[number]) => {
+    const total = p.assignedWorkouts.length;
+    const done = p.assignedWorkouts.filter((w) => w.status === "LOGGED").length;
+    const weeks = p.assignedWorkouts.reduce((m, w) => Math.max(m, Math.floor(Math.round((w.scheduledDate.getTime() - p.startDate.getTime()) / DAY_MS) / 7) + 1), 1);
+    return { total, done, weeks };
+  };
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-10">
+      <div className="rise flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
-          >
-            Programs
-          </h1>
-          <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>
-            {programs.length} template{programs.length !== 1 ? "s" : ""}
-            {filtered.length !== programs.length && ` · ${filtered.length} shown`}
+          <h1 className="text-4xl leading-none text-ink">Programs</h1>
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-soft">
+            Generate a plan for a client, edit it the way they&apos;ll see it, then assign it.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/programs/idea" className={buttonVariants({ variant: "outline" })}>
-            <Sparkles className="w-4 h-4 mr-1.5" style={{ color: "var(--blue)" }} />
-            AI Idea
-          </Link>
-          <Link href="/programs/import" className={buttonVariants({ variant: "outline" })}>
-            <ImageUp className="w-4 h-4 mr-1.5" style={{ color: "var(--blue)" }} />
-            Import
-          </Link>
-          <Link href="/programs/new" className={buttonVariants()}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Program
-          </Link>
-        </div>
+        <Link href="/programs/new" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 sm:self-auto">
+          <Plus className="h-4 w-4" /> New plan
+        </Link>
       </div>
 
-      {/* Filters */}
-      {programs.length > 0 && (
-        <div className="space-y-2 mb-5">
-          <div className="flex flex-wrap gap-1.5">
-            <span className="text-xs text-muted-foreground self-center mr-1">Goal:</span>
-            {GOAL_OPTIONS.map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGoalFilter(goalFilter === g ? null : g)}
-                className="px-2.5 py-0.5 rounded-full font-body text-xs border transition-all"
-                style={
-                  goalFilter === g
-                    ? {
-                        background: "var(--blue)",
-                        color: "#fff",
-                        borderColor: "var(--blue)",
-                      }
-                    : {
-                        borderColor: "var(--line)",
-                        color: "var(--ink-soft)",
-                      }
-                }
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <span className="text-xs text-muted-foreground self-center mr-1">Modifier:</span>
-            {CONDITION_OPTIONS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCondFilter(condFilter === c ? null : c)}
-                className="px-2.5 py-0.5 rounded-full font-body text-xs border transition-all"
-                style={
-                  condFilter === c
-                    ? {
-                        background: "var(--warn)",
-                        color: "#fff",
-                        borderColor: "var(--warn)",
-                      }
-                    : {
-                        borderColor: "var(--line)",
-                        color: "var(--ink-soft)",
-                      }
-                }
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <StatRow
+        className="rise rise-1"
+        stats={[
+          { label: "Live plans", value: String(live.length) },
+          { label: "Drafts", value: String(drafts.length), hint: drafts.length > 0 ? "waiting to be assigned" : undefined },
+          { label: "Library", value: String(library.length), hint: "hand-built programs" },
+        ]}
+      />
 
-      <div className="relative">
-        {phase !== "done" && (
-          <div
-            className={"space-y-2" + (phase === "fading" ? " absolute inset-0 pointer-events-none opacity-0" : "")}
-            aria-hidden={phase === "fading"}
-          >
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
-            ))}
-          </div>
+      {/* ── Client plans ─────────────────────────────────────────────── */}
+      <section className="rise rise-2">
+        <h2 className="text-xl text-ink">Client plans</h2>
+        {plans.length === 0 ? (
+          <p className="rule mt-3 pt-4 text-[15px] text-ink-soft">No client is on a plan yet. Start with “New plan”.</p>
+        ) : (
+          <ul className="rule mt-3 divide-y divide-line">
+            {[...drafts, ...live].map((p) => {
+              const { total, done, weeks } = progressOf(p);
+              return (
+                <li key={p.id}>
+                  <Link href={`/clients/${p.client.id}/programs/${p.id}`} className="press group flex items-center gap-4 py-3.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">{p.client.fullName.charAt(0)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-[15px] font-semibold text-ink">{p.client.fullName}</span>
+                        {p.status === "PAUSED" && <span className="shrink-0 rounded-full border border-line bg-white px-2 py-0.5 text-[11px] font-medium text-ink-soft">Draft</span>}
+                      </span>
+                      <span className="block truncate text-[13px] text-ink-mute">
+                        {p.name} · {weeks} weeks
+                      </span>
+                    </span>
+                    <span className="hidden w-40 shrink-0 sm:block">
+                      <span className="block h-1 overflow-hidden rounded-full bg-ink/10">
+                        <span className={cn("block h-full rounded-full", p.status === "PAUSED" ? "bg-ink/20" : "bg-signal")} style={{ width: `${total ? Math.round((done / total) * 100) : 0}%` }} />
+                      </span>
+                      <span className="mt-1 block text-right text-xs text-ink-mute">{p.status === "PAUSED" ? "Not assigned" : `${done} of ${total} logged`}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-ink-mute transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
-        {phase !== "loading" && (
-        <div className={phase === "fading" ? "animate-in fade-in-0 duration-200 ease-out" : undefined}>
-        {programs.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 flex flex-col items-center text-center">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-5"
-              style={{ background: "rgba(43,107,255,0.08)" }}
-            >
-              <Dumbbell className="w-7 h-7" style={{ color: "var(--blue)" }} />
-            </div>
-            <h3 className="font-display text-xl mb-1" style={{ color: "var(--ink)" }}>No programs yet</h3>
-            <p className="font-body text-sm mb-5 max-w-xs" style={{ color: "var(--ink-mute)" }}>
-              Build a periodized program template, then assign it to clients.
-            </p>
-            <Link href="/programs/new" className={buttonVariants()}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Build First Program
+      </section>
+
+      {/* ── Library ──────────────────────────────────────────────────── */}
+      <section className="rise rise-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <h2 className="text-xl text-ink">Library</h2>
+            <p className="mt-0.5 text-sm text-ink-mute">Programs written by hand. Use one as written for a client, or generate a plan from its goals.</p>
+          </div>
+          <div className="flex gap-1">
+            <Link href="/programs/import" className="press flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
+              <ImageUp className="h-4 w-4" /> Import from photos
             </Link>
-          </CardContent>
-        </Card>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">
-          No programs match these filters.{" "}
-          <button
-            className="underline"
-            onClick={() => { setGoalFilter(null); setCondFilter(null); }}
-          >
-            Clear
-          </button>
+            <Link href="/programs/idea" className="press flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
+              <Lightbulb className="h-4 w-4" /> Program idea
+            </Link>
+          </div>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => {
-            const totalWorkouts = p.blocks.reduce((s, b) => s + b._count.workouts, 0);
-            const goals = p.goalTags?.goals ?? [];
-            const conditions = p.goalTags?.conditions ?? [];
-            return (
-              <Link key={p.id} href={`/programs/${p.id}`}>
-                <Card lift className="cursor-pointer group card-lift">
-                  <CardContent className="py-3.5 px-4 sm:px-5">
-
-                    {/* ── Row 1: name + badges ── */}
-                    <div className="flex items-start justify-between gap-2 mb-0.5">
-                      <div className="flex items-start gap-2 min-w-0 flex-1">
-                        <p className="font-body text-sm font-medium leading-snug min-w-0" style={{ color: "var(--ink)" }}>{p.name}</p>
-                        {p.isDraft && (
-                          <Badge variant="secondary" className="h-4 px-1.5 shrink-0 mt-px">
-                            Draft
-                          </Badge>
-                        )}
-                      </div>
-                      {/* Actions — always visible on mobile, hover-only on desktop */}
-                      <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
-                        <button
-                          type="button"
-                          onClick={(e) => duplicate(e, p.id, p.name)}
-                          disabled={duplicating}
-                          title="Duplicate"
-                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground touch-manipulation"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                        <Link
-                          href={`/programs/${p.id}/assign`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground touch-manipulation"
-                          title="Assign to client"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" />
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={(e) => deleteProgram(e, p.id, p.name)}
-                          title="Delete"
-                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive touch-manipulation"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* ── Row 2: stats + assigned ── */}
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground">
-                        {p.durationWeeks}wk · {p._count.blocks} block{p._count.blocks !== 1 ? "s" : ""} · {totalWorkouts} workout{totalWorkouts !== 1 ? "s" : ""}
-                      </p>
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {p._count.assignments} assigned
-                      </Badge>
-                    </div>
-
-                    {/* ── Row 3: goal / condition tags ── */}
-                    {(goals.length > 0 || conditions.length > 0) && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {goals.map((g) => {
-                          const s = GOAL_TAG_STYLE[g] ?? GOAL_TAG_STYLE["General Fitness"];
-                          return (
-                            <span
-                              key={g}
-                              className="inline-flex items-center px-1.5 py-0 rounded font-body text-[10px] border font-medium"
-                              style={{ background: s.bg, color: s.color, borderColor: s.border }}
-                            >
-                              {g}
-                            </span>
-                          );
-                        })}
-                        {conditions.map((c) => (
-                          <span
-                            key={c}
-                            className="inline-flex items-center px-1.5 py-0 rounded font-body text-[10px] border font-medium"
-                            style={{
-                              background: "rgba(180,83,9,0.07)",
-                              color: "var(--warn)",
-                              borderColor: "rgba(180,83,9,0.30)",
-                            }}
-                          >
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-        </div>
+        {library.length === 0 ? (
+          <p className="rule mt-3 pt-4 text-[15px] text-ink-soft">No library programs.</p>
+        ) : (
+          <ul className="rule mt-3 divide-y divide-line">
+            {library.map((p) => {
+              const tags = (p.goalTags as { goals?: string[]; conditions?: string[] } | null) ?? {};
+              const perWeek = p.blocks[0]?._count.workouts ?? 0;
+              return (
+                <li key={p.id}>
+                  <Link href={`/programs/${p.id}`} className="press group flex items-center gap-4 py-3.5">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-ink">{p.name}</span>
+                      <span className="block truncate text-[13px] text-ink-mute">
+                        {p.durationWeeks} week{p.durationWeeks === 1 ? "" : "s"} · {perWeek} workout{perWeek === 1 ? "" : "s"} a week
+                        {p._count.assignments > 0 ? ` · used for ${p._count.assignments} client${p._count.assignments === 1 ? "" : "s"}` : ""}
+                      </span>
+                    </span>
+                    <span className="hidden flex-wrap justify-end gap-1 md:flex">
+                      {[...(tags.goals ?? []), ...(tags.conditions ?? [])].slice(0, 3).map((t) => (
+                        <span key={t} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs font-medium text-ink-soft">
+                          {t}
+                        </span>
+                      ))}
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-ink-mute transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

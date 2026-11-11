@@ -42,10 +42,21 @@ export type Prefs = {
   conditions?: Condition[];
   /** Areas to emphasise, set explicitly on top of anything the goal text mentions. */
   emphasis?: Area[];
+  /** Add a conditioning finisher to each session, set explicitly (the goal text can also ask for it). */
+  conditioning?: boolean;
+  /**
+   * Which 4-week phases the plan runs, in order. Defaults to all three
+   * (12 weeks). A coach sets the length of a plan by choosing phases.
+   */
+  phases?: Phase[];
 };
 
+export type Phase = "foundation" | "build" | "peak";
+export const PHASES: readonly Phase[] = ["foundation", "build", "peak"];
+export const PHASE_LABEL: Record<Phase, string> = { foundation: "Foundation", build: "Build", peak: "Peak" };
+
 /** Prefs after the goal text has been read: what the generator actually builds from. */
-export type ResolvedPrefs = Prefs & { conditions: Condition[]; emphasis: Area[]; conditioning: boolean; understood: string[] };
+export type ResolvedPrefs = Prefs & { conditions: Condition[]; emphasis: Area[]; conditioning: boolean; phases: Phase[]; understood: string[] };
 
 const unique = <T,>(xs: T[]) => Array.from(new Set(xs));
 
@@ -60,7 +71,8 @@ export function resolvePrefs(input: Prefs): ResolvedPrefs {
     goal: read.goal ?? prefs.goal,
     conditions,
     emphasis,
-    conditioning: read.conditioning,
+    conditioning: read.conditioning || prefs.conditioning === true,
+    phases: prefs.phases && prefs.phases.length > 0 ? prefs.phases : [...PHASES],
     understood: read.understood,
   };
 }
@@ -151,7 +163,7 @@ export type PlannedDay = {
   exercises: PlannedExercise[];
 };
 
-export type PlanBlock = { name: string; weeks: number; focus: string };
+export type PlanBlock = { name: string; weeks: number; focus: string; phase: Phase };
 
 export type Plan = {
   name: string;
@@ -421,7 +433,7 @@ function estimateMinutes(day: PlannedDay): number {
   return Math.round(seconds / 60 / 5) * 5;
 }
 
-const BLOCKS: Record<Goal, PlanBlock[]> = {
+const BLOCKS: Record<Goal, Array<Omit<PlanBlock, "phase">>> = {
   muscle: [
     { name: "Foundation", weeks: 4, focus: "Groove the lifts and find your working weights." },
     { name: "Build", weeks: 4, focus: "An extra set on your main lifts — more total work." },
@@ -467,7 +479,7 @@ export function generatePlan(input: Prefs): Plan {
     ...(prefs.emphasis.length > 0 ? [`Extra work for ${prefs.emphasis.map((a) => AREAS[a]).join(" and ")}: one more set on every lift that trains ${prefs.emphasis.length > 1 ? "them" : "it"}, and more of those lifts on the days that suit.`] : []),
     ...prefs.conditions.map((c) => `${CONDITIONS[c].label}: ${CONDITIONS[c].blurb}`),
     `Progression is double: add reps until you reach the top of the range, then add weight and start again.`,
-    `Three 4-week blocks. The last week of each is lighter — stop every set a couple of reps early — so you recover before the next step up.`,
+    `${prefs.phases.length === 1 ? "One 4-week block" : `${["", "One", "Two", "Three"][prefs.phases.length]} 4-week blocks`} (${prefs.phases.map((p) => PHASE_LABEL[p]).join(", ")}). The last week of each is lighter — stop every set a couple of reps early — so you recover before the next step up.`,
     g.metricWhy,
   ];
 
@@ -475,7 +487,7 @@ export function generatePlan(input: Prefs): Plan {
     name: [g.label, split.label, ...(prefs.emphasis.length > 0 ? [`${prefs.emphasis.map((a) => AREAS[a]).join(" + ")} focus`] : [])].join(" · "),
     split: split.label,
     prefs,
-    blocks: BLOCKS[prefs.goal],
+    blocks: prefs.phases.map((phase) => ({ ...BLOCKS[prefs.goal][PHASES.indexOf(phase)], phase })),
     days,
     rationale,
     estMinutes,
@@ -484,24 +496,29 @@ export function generatePlan(input: Prefs): Plan {
 
 // ── Week variants (periodisation) ───────────────────────────────────────────
 
-export type WeekInfo = { week: number; block: number; blockName: string; deload: boolean };
+export type WeekInfo = { week: number; block: number; blockName: string; phase: Phase; deload: boolean };
+
+/** Length of the plan in weeks: four per phase. */
+export const planWeeks = (plan: Plan) => plan.blocks.length * BLOCK_WEEKS;
 
 export function weekInfo(plan: Plan, week: number): WeekInfo {
   const block = Math.min(Math.floor((week - 1) / BLOCK_WEEKS), plan.blocks.length - 1);
-  return { week, block, blockName: plan.blocks[block].name, deload: week % BLOCK_WEEKS === 0 };
+  return { week, block, blockName: plan.blocks[block].name, phase: plan.blocks[block].phase, deload: week % BLOCK_WEEKS === 0 };
 }
 
 /** The exact prescription for a given week (1-indexed) of the plan. */
 export function weekVariant(plan: Plan, week: number): PlannedDay[] {
-  const { block } = weekInfo(plan, week);
+  // Periodisation follows the phase, not the position: a plan that starts at
+  // Build gets Build's extra set from week one.
+  const { phase } = weekInfo(plan, week);
   return plan.days.map((day) => ({
     ...day,
     exercises: day.exercises.map((e) => {
       let { sets, repMin, repMax } = e;
       if (e.unit === "reps" && e.role === "main") {
-        if (block >= 1) sets = Math.min(sets + 1, 5);
-        // Only strength plans trade reps for load in the final block — and never after rehab.
-        if (block >= 2 && plan.prefs.goal === "strength" && !plan.prefs.conditions.includes("post_rehab")) {
+        if (phase !== "foundation") sets = Math.min(sets + 1, 5);
+        // Only strength plans trade reps for load in the Peak phase — and never after rehab.
+        if (phase === "peak" && plan.prefs.goal === "strength" && !plan.prefs.conditions.includes("post_rehab")) {
           const drop = Math.min(2, repMin - 2);
           repMin -= Math.max(drop, 0);
           repMax -= Math.max(drop, 0);
@@ -539,6 +556,9 @@ export function normalizePrefs(input: unknown): Prefs {
   const goalText = typeof p.goalText === "string" ? p.goalText.replace(/\s+/g, " ").trim().slice(0, GOAL_TEXT_MAX) : "";
   const conditions = Array.isArray(p.conditions) ? unique(p.conditions.filter((c): c is Condition => isOneOf(c, CONDITION_KEYS))) : [];
   const emphasis = Array.isArray(p.emphasis) ? unique(p.emphasis.filter((a): a is Area => isOneOf(a, AREA_KEYS))) : [];
+  // Phases keep their natural order whatever order they arrive in.
+  const askedPhases: unknown[] = Array.isArray(p.phases) ? p.phases : [];
+  const phases = PHASES.filter((ph) => askedPhases.includes(ph));
   return {
     goal: isOneOf(p.goal, ["muscle", "strength", "fat_loss", "general"] as const) ? p.goal : DEFAULT_PREFS.goal,
     experience: isOneOf(p.experience, ["beginner", "intermediate", "advanced"] as const) ? p.experience : DEFAULT_PREFS.experience,
@@ -549,5 +569,44 @@ export function normalizePrefs(input: unknown): Prefs {
     ...(goalText && { goalText }),
     ...(conditions.length > 0 && { conditions }),
     ...(emphasis.length > 0 && { emphasis }),
+    ...(p.conditioning === true && { conditioning: true }),
+    ...(phases.length > 0 && phases.length < PHASES.length && { phases }),
   };
+}
+
+/**
+ * The coach's goal and condition tags (the pills in the program editor, and
+ * the tags stored on hand-built programs) expressed as generator inputs.
+ */
+export const COACH_GOALS: Record<string, { goal: Goal; conditioning?: boolean; conditions?: Condition[] }> = {
+  "Weight Loss": { goal: "fat_loss" },
+  Hypertrophy: { goal: "muscle" },
+  Strength: { goal: "strength" },
+  Endurance: { goal: "general", conditioning: true },
+  "Athletic Performance": { goal: "strength", conditioning: true },
+  "General Fitness": { goal: "general" },
+  Corrective: { goal: "general", conditions: ["post_rehab"] },
+};
+
+export const COACH_MODIFIERS: Record<string, Partial<Pick<Prefs, "experience" | "equipment">> & { condition?: Condition }> = {
+  "Lower Back Safe": { condition: "lower_back" },
+  "Knee Pain": { condition: "knee" },
+  "Shoulder Restrictions": { condition: "shoulder" },
+  "Post-Rehab": { condition: "post_rehab" },
+  Beginner: { experience: "beginner" },
+  "No Equipment": { equipment: "bodyweight" },
+};
+
+/** Fold coach goal pills and modifier pills into generator preferences. The first goal pill decides the goal. */
+export function prefsFromCoachTags(base: Prefs, tags: { goals?: string[]; conditions?: string[] }): Prefs {
+  const goals = (tags.goals ?? []).map((g) => COACH_GOALS[g]).filter(Boolean);
+  const mods = (tags.conditions ?? []).map((c) => COACH_MODIFIERS[c]).filter(Boolean);
+  const conditions = unique([...(base.conditions ?? []), ...goals.flatMap((g) => g.conditions ?? []), ...mods.flatMap((m) => (m.condition ? [m.condition] : []))]);
+  return normalizePrefs({
+    ...base,
+    ...(goals[0] && { goal: goals[0].goal }),
+    ...(goals.some((g) => g.conditioning) && { conditioning: true }),
+    ...Object.assign({}, ...mods.map((m) => ({ ...(m.experience && { experience: m.experience }), ...(m.equipment && { equipment: m.equipment }) }))),
+    conditions,
+  });
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, SlidersHorizontal } from "lucide-react";
 import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
 import { EQUIPMENT, EXPERIENCE, GOALS, resolvePrefs } from "@/lib/plan/generator";
+import { CONDITIONS } from "@/lib/plan/goal";
 import {
   planAddExercise,
   planAddWorkout,
@@ -54,7 +55,14 @@ export default async function PlanPage() {
 
   const prefs = plan.prefs ? resolvePrefs(plan.prefs) : null;
   const chips = prefs
-    ? [GOALS[prefs.goal].label, `${prefs.daysPerWeek} day${prefs.daysPerWeek === 1 ? "" : "s"} a week`, `${prefs.minutes} min`, EQUIPMENT[prefs.equipment].label, EXPERIENCE[prefs.experience].label]
+    ? [
+        GOALS[prefs.goal].label,
+        `${prefs.daysPerWeek} day${prefs.daysPerWeek === 1 ? "" : "s"} a week`,
+        `${prefs.minutes} min`,
+        EQUIPMENT[prefs.equipment].label,
+        EXPERIENCE[prefs.experience].label,
+        ...prefs.conditions.map((c) => CONDITIONS[c].label),
+      ]
     : [];
 
   return (

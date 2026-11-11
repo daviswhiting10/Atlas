@@ -14,8 +14,8 @@ import { CATALOG } from "./catalog";
 import { simulateDemoHistory } from "./demo";
 import {
   GOALS,
-  TOTAL_WEEKS,
   generatePlan,
+  planWeeks,
   toPrescribedSets,
   weekInfo,
   weekVariant,
@@ -125,7 +125,7 @@ export async function createPlanForClient(
   const exerciseRows: Prisma.AssignedWorkoutExerciseCreateManyInput[] = [];
   let order = 1;
 
-  for (let week = 1; week <= TOTAL_WEEKS; week++) {
+  for (let week = 1; week <= planWeeks(plan); week++) {
     const info = weekInfo(plan, week);
     const days = weekVariant(plan, week);
     for (let d = 0; d < days.length; d++) {
@@ -184,7 +184,8 @@ export async function createPlanForClient(
     }
   }
 
-  // A new live plan replaces the old one. A draft leaves the live plan alone.
+  // A new live plan replaces the old one. A draft (status PAUSED until a
+  // coach assigns it) leaves the live plan alone.
   if (!draft) {
     await db.programAssignment.updateMany({
       where: { clientId, status: "ACTIVE" },
@@ -201,15 +202,16 @@ export async function createPlanForClient(
       // The preferences travel with the program, so any screen can rebuild
       // the plan's phases and reasoning without knowing who generated it.
       goalTags: { goals: [GOALS[plan.prefs.goal].primaryGoal], conditions: plan.prefs.conditions, prefs },
-      durationWeeks: TOTAL_WEEKS,
+      durationWeeks: planWeeks(plan),
       isTemplate: false,
+      isDraft: draft,
       blocks: {
         create: plan.blocks.map((b, i) => ({
           workspaceId,
           name: b.name,
           order: i + 1,
           weeks: b.weeks,
-          phase: PHASE_BY_GOAL[prefs.goal],
+          phase: PHASE_BY_GOAL[plan.prefs.goal],
         })),
       },
     },

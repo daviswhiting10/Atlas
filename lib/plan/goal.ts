@@ -70,7 +70,7 @@ const CONDITION_RULES: Rule<Condition>[] = [
   { value: "lower_back", pattern: near("(lower back|low back|back|spine|disc|sciatica)") },
   { value: "knee", pattern: near("(knees?|acl|mcl|meniscus|patella\\w*)") },
   { value: "shoulder", pattern: near("(shoulders?|rotator cuff|labrum)") },
-  { value: "post_rehab", pattern: /\b(post[- ]?rehab|rehab\w*|physio\w*|physical therapy|after surgery|post[- ]?op|coming back from|returning from|recovering from)\b/i },
+  { value: "post_rehab", pattern: /\b(post[- ]?rehab|rehab\w*|physio\w*|physical therapy|surgery|surgical|post[- ]?op|coming back from|returning from|recovering from|get(ting)? back into)\b/i },
 ];
 
 const CONDITIONING = /\b(endurance|stamina|cardio|conditioning|work capacity|gas tank|hike|hiking|run(ning|ner)?|5k|10k|marathon|sport|season|soccer|basketball|football|hockey|tennis|keep up with)\b/i;

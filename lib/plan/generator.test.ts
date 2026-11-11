@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG_BY_SLUG, SLOTS } from "./catalog";
-import { DEFAULT_PREFS, TOTAL_WEEKS, generatePlan, normalizePrefs, resolvePrefs, weekInfo, weekVariant, type Prefs } from "./generator";
+import { DEFAULT_PREFS, TOTAL_WEEKS, generatePlan, normalizePrefs, prefsFromCoachTags, resolvePrefs, weekInfo, weekVariant, type Prefs } from "./generator";
 import { interpretGoal } from "./goal";
 
 const GOALS = ["muscle", "strength", "fat_loss", "general"] as const;
@@ -188,6 +188,10 @@ describe("interpretGoal", () => {
     expect(r.conditions).toEqual(expect.arrayContaining(["shoulder", "post_rehab"]));
   });
 
+  it("reads surgery and a return to training as post-rehab", () => {
+    expect(interpretGoal("get back into lifting after shoulder surgery").conditions).toEqual(expect.arrayContaining(["shoulder", "post_rehab"]));
+  });
+
   it("notices a wish for stamina", () => {
     expect(interpretGoal("get fit for soccer season").conditioning).toBe(true);
     expect(interpretGoal("bench 225").conditioning).toBe(false);
@@ -313,5 +317,51 @@ describe("experience changes the tools, not just the volume", () => {
     const a = first("advanced").days[0].exercises[0];
     expect(b.repMin).toBeGreaterThan(i.repMin);
     expect(a.sets).toBeGreaterThan(i.sets);
+  });
+});
+
+describe("phases set the length of a plan", () => {
+  it("runs all three phases by default", () => {
+    const plan = generatePlan(DEFAULT_PREFS);
+    expect(plan.blocks.map((b) => b.phase)).toEqual(["foundation", "build", "peak"]);
+  });
+
+  it("can run fewer phases, in their natural order", () => {
+    const plan = generatePlan({ ...DEFAULT_PREFS, phases: ["peak", "build"] });
+    expect(plan.blocks.map((b) => b.name)).toEqual(["Build", "Peak"]);
+    expect(normalizePrefs({ phases: ["peak", "nonsense", "build"] }).phases).toEqual(["build", "peak"]);
+    expect(normalizePrefs({ phases: ["foundation", "build", "peak"] }).phases).toBeUndefined(); // the default is not stored
+  });
+
+  it("periodises by phase, not by position: a Build-first plan gets Build's extra set in week one", () => {
+    const full = generatePlan({ ...DEFAULT_PREFS });
+    const buildFirst = generatePlan({ ...DEFAULT_PREFS, phases: ["build", "peak"] });
+    expect(weekVariant(buildFirst, 1)[0].exercises[0].sets).toBe(weekVariant(full, 5)[0].exercises[0].sets);
+  });
+});
+
+describe("the coach's goal and condition pills feed the generator", () => {
+  it("maps goal pills to a goal", () => {
+    expect(prefsFromCoachTags(DEFAULT_PREFS, { goals: ["Strength"] }).goal).toBe("strength");
+    expect(prefsFromCoachTags(DEFAULT_PREFS, { goals: ["Weight Loss", "Strength"] }).goal).toBe("fat_loss"); // first pill decides
+    expect(prefsFromCoachTags(DEFAULT_PREFS, { goals: ["Endurance"] })).toMatchObject({ goal: "general", conditioning: true });
+    expect(prefsFromCoachTags(DEFAULT_PREFS, { goals: ["Corrective"] }).conditions).toEqual(["post_rehab"]);
+  });
+
+  it("maps modifier pills to conditions, experience and equipment", () => {
+    const p = prefsFromCoachTags(DEFAULT_PREFS, { conditions: ["Lower Back Safe", "Knee Pain", "Beginner", "No Equipment", "Made up"] });
+    expect(p).toMatchObject({ conditions: ["lower_back", "knee"], experience: "beginner", equipment: "bodyweight" });
+  });
+
+  it("changes the exercises chosen", () => {
+    const plain = generatePlan({ ...DEFAULT_PREFS }).days.flatMap((d) => d.exercises.map((e) => e.slug));
+    const safe = generatePlan(prefsFromCoachTags(DEFAULT_PREFS, { conditions: ["Lower Back Safe"] })).days.flatMap((d) => d.exercises.map((e) => e.slug));
+    expect(plain).toContain("barbell-deadlift");
+    expect(safe).not.toContain("barbell-deadlift");
+  });
+
+  it("adds a conditioning finisher when asked", () => {
+    const slugs = generatePlan({ ...DEFAULT_PREFS, conditioning: true }).days.flatMap((d) => d.exercises.map((e) => e.slug));
+    expect(slugs).toContain("farmer-s-walk");
   });
 });
