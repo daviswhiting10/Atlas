@@ -13,6 +13,7 @@ type Row = {
   value: number | null;
   proj: number | null;
   record: boolean;
+  best: boolean;
   deload: boolean;
   ghost: boolean;
 };
@@ -43,16 +44,18 @@ function ChartTooltip({
         {formatValue(v, metric)} <span className="font-normal text-ink-mute">{unit}</span>
       </p>
       {row.record && <p className="text-[11px] font-medium text-gold">Personal record</p>}
+      {row.best && <p className="text-[11px] font-medium text-signal">Best estimated 1RM yet</p>}
       {row.deload && <p className="text-[11px] text-ink-mute">Deload week — lighter on purpose</p>}
     </div>
   );
 }
 
-/** A dot on every data point: gold for a record, hollow grey for a deload week. */
+/** A dot on every data point: gold for a record, a ringed dot for a new best est. 1RM, grey for a deload week. */
 function Dot(props: { cx?: number; cy?: number; payload?: Row }) {
   const { cx, cy, payload } = props;
   if (cx == null || cy == null || !payload || payload.value == null) return null;
   if (payload.record) return <circle cx={cx} cy={cy} r={4} fill="var(--gold)" stroke="var(--bone)" strokeWidth={1.5} />;
+  if (payload.best) return <circle cx={cx} cy={cy} r={3.5} fill="var(--bone)" stroke="var(--signal)" strokeWidth={2} />;
   if (payload.deload) {
     return (
       <g>
@@ -73,12 +76,17 @@ function GhostDot(props: { cx?: number; cy?: number; payload?: Row }) {
 }
 
 /** One legend for every chart in the app, so the marks always mean the same thing. */
-export function ChartLegend({ deload, target, loaded = true }: { deload: boolean; target: boolean; loaded?: boolean }) {
+export function ChartLegend({ deload, target, best = false, loaded = true }: { deload: boolean; target: boolean; best?: boolean; loaded?: boolean }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-ink-mute">
       <li className="flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full bg-gold" /> Personal record ({loaded ? "heaviest weight yet" : "best set yet"})
       </li>
+      {best && (
+        <li className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full border-2 border-signal" /> Best est. 1RM yet (more reps or a stronger set)
+        </li>
+      )}
       {deload && (
         <li className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full" style={{ background: DELOAD }} /> Deload week (lighter on purpose)
@@ -143,6 +151,7 @@ export const ProgressChart = memo(function ProgressChart({
       value: p[metric] ?? null,
       proj: null,
       record: p.record,
+      best: p.best,
       deload: p.deload,
       ghost: false,
     }));
@@ -152,7 +161,7 @@ export const ProgressChart = memo(function ProgressChart({
     const hasGhost = ghost != null && rows.length > 0 && rows[lastReal].value != null;
     if (hasGhost) {
       rows[lastReal].proj = rows[lastReal].value;
-      rows.push({ key: "next", label: "Next", date: null, value: null, proj: ghost, record: false, deload: false, ghost: true });
+      rows.push({ key: "next", label: "Next", date: null, value: null, proj: ghost, record: false, best: false, deload: false, ghost: true });
     }
     const values = rows.flatMap((r) => [r.value, r.proj]).filter((v): v is number => v != null);
     return { rows, hasGhost, ...axis(values.length > 0 ? values : [0], bars) };
@@ -242,7 +251,7 @@ export const ProgressChart = memo(function ProgressChart({
       </div>
       {legend && (
         <div className="mt-3">
-          <ChartLegend deload={series.some((p) => p.deload)} target={hasGhost} loaded={loaded} />
+          <ChartLegend deload={series.some((p) => p.deload)} target={hasGhost} best={series.some((p) => p.best)} loaded={loaded} />
         </div>
       )}
     </div>

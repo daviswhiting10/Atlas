@@ -3,10 +3,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowRight, Check, MessageSquare, Plus, UserPlus } from "lucide-react";
+import { ArrowRight, Check, MessageSquare, Plus, TrendingDown, UserPlus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { ROSTER } from "@/lib/db/roster";
+import { rosterStalls } from "@/lib/coach/stalls";
+import { TZ_COOKIE, safeTimeZone } from "@/lib/athlete/data";
+import { cookies } from "next/headers";
 import { getClients, runRetentionHeuristic } from "@/lib/db/clients";
 import { Greeting } from "@/components/athlete/Greeting";
 import { StatRow } from "@/components/athlete/StatRow";
@@ -37,7 +40,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
   weekStart.setHours(0, 0, 0, 0);
   weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
 
-  const [clients, logged, livePlans, drafts] = await Promise.all([
+  const [clients, logged, livePlans, drafts, stalls] = await Promise.all([
     getClients(workspaceId),
     prisma.workoutLog.findMany({
       where: { client: { workspaceId, deletedAt: null, ...ROSTER }, date: { gte: weekStart } },
@@ -53,6 +56,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
     }),
     prisma.programAssignment.count({ where: { workspaceId, status: "ACTIVE", client: { deletedAt: null, ...ROSTER } } }),
     prisma.programAssignment.count({ where: { workspaceId, status: "PAUSED", client: { deletedAt: null, ...ROSTER } } }),
+    rosterStalls(workspaceId, safeTimeZone(cookies().get(TZ_COOKIE)?.value)),
   ]);
 
   const active = clients.filter((c) => c.status === "ACTIVE");
@@ -62,7 +66,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
   const followUps = prospects.filter((c) => (c as any).reachOutDate != null);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const attention = atRisk.length + followUps.length;
+  const attention = atRisk.length + followUps.length + stalls.length;
 
   return (
     <div className="space-y-10">
@@ -72,7 +76,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
           { label: "Clients", value: String(clients.length), hint: `${active.length} active` },
           { label: "Live plans", value: String(livePlans), hint: drafts > 0 ? `${drafts} draft${drafts === 1 ? "" : "s"} to assign` : "all assigned" },
           { label: "Logged this week", value: String(logged.length), hint: logged.length > 0 ? `last on ${format(logged[0].date, "EEE")}` : "no sessions yet" },
-          { label: "Need attention", value: String(attention), hint: attention > 0 ? `${atRisk.length} at risk · ${followUps.length} follow-up${followUps.length === 1 ? "" : "s"}` : "nothing waiting" },
+          { label: "Need attention", value: String(attention), hint: attention > 0 ? [stalls.length > 0 && `${stalls.length} stalled`, atRisk.length > 0 && `${atRisk.length} at risk`, followUps.length > 0 && `${followUps.length} follow-up${followUps.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ") : "nothing waiting" },
         ]}
       />
 
@@ -80,6 +84,20 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
         <section className="rise rise-2">
           <h2 className="text-xl text-ink">Needs attention</h2>
           <ul className="rule mt-3 divide-y divide-line">
+            {stalls.map((c) => (
+              <li key={`stall-${c.clientId}`} className="flex items-center gap-3 py-3">
+                <TrendingDown className="h-4 w-4 shrink-0 text-warn" />
+                <Link href={`/clients/${c.clientId}`} className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold text-ink">{c.name}</span>
+                  <span className="block truncate text-[13px] text-ink-mute">
+                    Stalled: {c.lifts.join(", ")} · no gain in the last 3 sessions
+                  </span>
+                </Link>
+                <Link href={`/clients/${c.clientId}`} className="press flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:border-ink/25">
+                  See charts
+                </Link>
+              </li>
+            ))}
             {atRisk.map((c) => (
               <li key={c.id} className="flex items-center gap-3 py-3">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-warn" />

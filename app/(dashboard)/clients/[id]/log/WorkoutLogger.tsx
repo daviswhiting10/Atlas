@@ -213,7 +213,7 @@ type WorkoutOption = {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export type ExerciseTrend = { series: SessionPoint[]; loaded: boolean; timed: boolean; target: Target | null };
+export type ExerciseTrend = { series: SessionPoint[]; loaded: boolean; timed: boolean; target: Target | null; stalled: boolean };
 
 /** The exercise's trend across past sessions, the same chart the client sees. Collapsible. */
 function TrendChart({ trend }: { trend: ExerciseTrend | undefined }) {
@@ -223,6 +223,9 @@ function TrendChart({ trend }: { trend: ExerciseTrend | undefined }) {
   const sessions = trend.series.length;
   return (
     <div className="mt-2">
+      {trend.stalled && (
+        <p className="mb-1 text-xs font-medium text-warn">Stalled: no gain in the last 3 sessions. Worth changing something today.</p>
+      )}
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink">
         <TrendingUp className="h-3 w-3" />
         {open ? "Hide trend" : "Show trend"} · {sessions} session{sessions === 1 ? "" : "s"}

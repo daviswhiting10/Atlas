@@ -88,6 +88,8 @@ export function ProgressView({
   const selectedIndex = data.exercises.findIndex((e) => e.exerciseId === exercise.exerciseId);
   // Keep the selected exercise visible even when it lives under "More".
   const visible = showAll ? data.exercises : data.exercises.filter((_, i) => i < PILLS_SHOWN || i === selectedIndex);
+  const stalled = new Map(data.stalled.map((s) => [s.exerciseId, s]));
+  const stall = stalled.get(exercise.exerciseId);
   const hidden = data.exercises.length - visible.length;
 
   return (
@@ -106,6 +108,28 @@ export function ProgressView({
 
       {/* ── One exercise ─────────────────────────────────────────────── */}
       <section className="rise rise-2">
+        {data.stalled.length > 0 && (
+          <div className="mb-5 rounded-xl border border-warn/25 bg-warn/[0.06] px-4 py-3">
+            <p className="text-[14px] leading-relaxed text-ink">
+              <span className="font-semibold text-warn">
+                {data.stalled.length === 1 ? "1 lift has" : `${data.stalled.length} lifts have`} stalled.
+              </span>{" "}
+              No gain in weight, estimated 1RM or reps across the last {data.stalled[0].sessions} sessions:
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {data.stalled.map((s) => (
+                <button
+                  key={s.exerciseId}
+                  type="button"
+                  onClick={() => setExerciseId(s.exerciseId)}
+                  className="press rounded-full border border-warn/30 bg-white px-3 py-1 text-[13px] font-medium text-ink hover:border-warn/60"
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Wraps onto as many rows as it needs: a name is never cut mid-word. */}
         <div className="flex flex-wrap gap-2" role="group" aria-label="Exercise">
           {visible.map((e) => {
@@ -121,6 +145,7 @@ export function ProgressView({
                   active ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:border-ink/25 hover:text-ink"
                 )}
               >
+                {stalled.has(e.exerciseId) && <span className="mr-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-warn" aria-label="Stalled" />}
                 {e.name}
               </button>
             );
@@ -144,6 +169,11 @@ export function ProgressView({
               {METRICS[metric].label}
               {metric === goalMetric ? " · the number your goal is measured by" : ""}
             </p>
+            {stall && (
+              <p className="mt-1.5 text-sm font-medium text-warn">
+                Stalled: no gain in the last {stall.sessions} sessions, since {day(stall.since)}.
+              </p>
+            )}
           </div>
           <div className="flex self-start rounded-lg border border-line bg-white p-0.5 sm:self-auto" role="radiogroup" aria-label="Metric">
             {ORDER.map((m) => {

@@ -10,7 +10,7 @@ import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
 import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveSet } from "@/lib/actions/athlete";
 import { ExercisePicker } from "./ExercisePicker";
 import { TargetEditor } from "./TargetEditor";
-import { METRICS, formatValue, buildSeries, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
+import { METRICS, formatValue, buildSeries, e1rm, isE1rmBest, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +86,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [records, setRecords] = useState<Record<string, string>>({});
+  /** Exercises that already got a "new best" toast this session: once is enough. */
+  const bestToasted = useRef(new Set<string>());
   const [switching, setSwitching] = useState(false);
   const [summary, setSummary] = useState<null | { minutes: number }>(null);
   const [finishing, startFinish] = useTransition();
@@ -283,6 +285,18 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       const label = mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${ex.unit === "secs" ? "sec" : "reps"}`;
       setRecords((r) => ({ ...r, [key]: label }));
       toast.success(`New record on ${ex.name}`, { description: label });
+    } else if (ex.history.length > 0 && !deloadWeek && mine.weight != null && mine.reps > 0) {
+      // Not heavier, but stronger: more reps at a weight beats the best estimated max.
+      const bestE1rm = Math.max(
+        0,
+        ...ex.history.filter((p) => !p.deload).map((p) => p.e1rm ?? 0),
+        ...earlier.filter((x) => x.weight != null && (x.reps ?? 0) > 0).map((x) => e1rm(x.weight as number, x.reps as number))
+      );
+      const est = Math.round(e1rm(mine.weight, mine.reps) * 10) / 10;
+      if (isE1rmBest({ e1rm: est }, bestE1rm) && !bestToasted.current.has(ex.aweId)) {
+        bestToasted.current.add(ex.aweId);
+        toast(`New best on ${ex.name}`, { description: `${mine.weight} lb × ${mine.reps} · est. 1RM ${Math.round(est)} lb, your highest yet` });
+      }
     }
 
     const everythingDone = data.exercises.every((e) => (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));

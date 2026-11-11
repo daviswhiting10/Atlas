@@ -293,8 +293,9 @@ export default async function LogPage({
 
   // Each exercise's history, from the same read model as the Progress charts.
   const progress = await loadClientProgress(clientId, workspaceId);
+  const stalledIds = new Set((progress?.data.stalled ?? []).map((s) => s.exerciseId));
   const trends: Record<string, ExerciseTrend> = Object.fromEntries(
-    (progress?.data.exercises ?? []).map((e) => [e.exerciseId, { series: e.series, loaded: e.loaded, timed: e.timed, target: e.target }])
+    (progress?.data.exercises ?? []).map((e) => [e.exerciseId, { series: e.series, loaded: e.loaded, timed: e.timed, target: e.target, stalled: stalledIds.has(e.exerciseId) }])
   );
 
   return (

@@ -74,6 +74,40 @@ describe("buildSeries", () => {
     expect(series[1].record).toBe(false);
   });
 
+  it("credits more reps at the same weight as a new best est. 1RM, not a record", () => {
+    // The dumbbell press case: 60 × 8, then 60 × 10 (stronger), then 65 × 7 (heavier: a record).
+    const series = buildSeries([
+      sessionPoint("2026-01-05", [set(60, 8)])!,
+      sessionPoint("2026-01-12", [set(60, 10)])!,
+      sessionPoint("2026-01-19", [set(65, 7)])!,
+    ]);
+    expect(series.map((p) => [p.record, p.best])).toEqual([
+      [false, false],
+      [false, true],
+      [true, false],
+    ]);
+  });
+
+  it("doesn't call a heavier set for fewer reps a best when the estimate didn't rise", () => {
+    // 60 × 10 ≈ 80 est. 1RM; 62.5 × 8 ≈ 79.2: heavier, so a record, but not stronger.
+    const series = buildSeries([sessionPoint("2026-01-05", [set(60, 10)])!, sessionPoint("2026-01-12", [set(62.5, 8)])!, sessionPoint("2026-01-19", [set(62.5, 8)])!]);
+    expect(series.map((p) => [p.record, p.best])).toEqual([
+      [false, false],
+      [true, false],
+      [false, false],
+    ]);
+  });
+
+  it("never credits a lighter week, and a lighter week never sets the bar", () => {
+    const series = buildSeries([
+      sessionPoint("2026-01-05", [set(100, 8)])!,
+      sessionPoint("2026-01-12", [set(100, 10)], true)!,
+      sessionPoint("2026-01-19", [set(100, 9)])!,
+    ]);
+    expect(series[1]).toMatchObject({ deload: true, best: false });
+    expect(series[2].best).toBe(true);
+  });
+
   it("never counts a lighter week as a record, and keeps it marked", () => {
     const series = buildSeries([sessionPoint("2026-01-05", [set(100, 8)])!, sessionPoint("2026-01-12", [set(110, 5)], true)!]);
     expect(series[1]).toMatchObject({ deload: true, record: false });

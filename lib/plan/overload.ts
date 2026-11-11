@@ -157,9 +157,15 @@ export type SessionPoint = {
   deload: boolean;
   /** This session set a personal record. See `buildSeries` for the rule. */
   record: boolean;
+  /**
+   * A new best estimated 1-rep max that isn't a weight record: more reps at a
+   * weight, or a heavier set for nearly as many. Rep progress gets credit
+   * without making the (rare, gold) record ordinary.
+   */
+  best: boolean;
 };
 
-type RawPoint = Omit<SessionPoint, "record" | "deload"> & { deload?: boolean };
+type RawPoint = Omit<SessionPoint, "record" | "best" | "deload"> & { deload?: boolean };
 
 /** Collapse one session's sets for an exercise into a single chart point. */
 export function sessionPoint(date: string, sets: LoggedSet[], deload = false): RawPoint | null {
@@ -211,16 +217,25 @@ export function isRecord(point: Pick<SessionPoint, "weight" | "reps">, best: { w
   return Math.floor(point.reps / REP_RECORD_STEP) > Math.floor(best.reps / REP_RECORD_STEP);
 }
 
-/** Order points by date and flag every session that set a record. */
+/** A new best estimated 1-rep max on a loaded lift (see `SessionPoint.best`). */
+export function isE1rmBest(point: Pick<SessionPoint, "e1rm">, bestE1rm: number): boolean {
+  return point.e1rm != null && point.e1rm > bestE1rm;
+}
+
+/** Order points by date and flag every session that set a record or a new best est. 1RM. */
 export function buildSeries(points: RawPoint[]): SessionPoint[] {
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const best = { weight: 0, reps: 0 };
+  const best = { weight: 0, reps: 0, e1rm: 0 };
   return sorted.map((p, i) => {
     const deload = p.deload === true;
-    const record = i > 0 && !deload && isRecord(p, best);
+    const counts = i > 0 && !deload;
+    const record = counts && isRecord(p, best);
+    const newBest = counts && !record && isE1rmBest(p, best.e1rm);
     if (p.weight != null) best.weight = Math.max(best.weight, p.weight);
     else best.reps = Math.max(best.reps, p.reps);
-    return { ...p, deload, record };
+    // A lighter week can't set the bar either: it's below the best by design anyway.
+    if (!deload && p.e1rm != null) best.e1rm = Math.max(best.e1rm, p.e1rm);
+    return { ...p, deload, record, best: newBest };
   });
 }
 

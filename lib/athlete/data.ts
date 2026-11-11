@@ -13,6 +13,7 @@ import { GOALS, normalizePrefs, resolvePrefs, type FocusMetric, type Prefs } fro
 import { buildSeries, nextTarget, sessionPoint, type LoggedSet, type SessionPoint, type Target } from "@/lib/plan/overload";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/guest";
 import { athleteIdentity } from "./identity";
+import { PLATEAU_SESSIONS, detectPlateau } from "@/lib/progress/plateau";
 import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/lighter";
 import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
@@ -130,7 +131,11 @@ export type ProgressData = {
   weeks: WeekBucket[];
   totals: { sessions: number; volume: number; sets: number; prs: number; streak: number; since: string | null };
   recentPRs: Array<{ exercise: string; date: string; value: number; unit: "lb" | "reps" }>;
+  /** Lifts with no gain (weight, est. 1RM or reps) across their last three counted sessions. */
+  stalled: StalledLift[];
 };
+
+export type StalledLift = { exerciseId: string; name: string; /** First of the stalled sessions. */ since: string; sessions: number };
 
 
 /** The signed-in athlete's progress. The read model itself is shared with the coach side. */
@@ -253,6 +258,19 @@ export async function loadProgress({
   exercises.sort((a, b) => peak(b) - peak(a) || b.series.length - a.series.length || a.name.localeCompare(b.name));
   recentPRs.sort((a, b) => b.date.localeCompare(a.date));
 
+  const today = localDay(new Date(), tz);
+  const stalled: StalledLift[] = exercises.flatMap((e) => {
+    const verdict = detectPlateau(
+      e.series.map((p) => ({ date: p.date, topWeight: p.weight, bestE1RM: p.e1rm, repsAtTop: p.reps, deload: p.deload })),
+      today
+    );
+    if (verdict.plateaued !== true) return [];
+    const counted = e.series.filter((p) => !p.deload && p.weight != null);
+    const recent = counted.slice(-PLATEAU_SESSIONS);
+    return [{ exerciseId: e.exerciseId, name: e.name, since: recent[0].date, sessions: recent.length }];
+  });
+  stalled.sort((a, b) => a.name.localeCompare(b.name));
+
   // Fill empty weeks between the first and the current one so gaps show honestly.
   const weeks: WeekBucket[] = [];
   const keys = Array.from(weekMap.keys()).sort();
@@ -279,6 +297,7 @@ export async function loadProgress({
       since: sessionDates.size > 0 ? localDay(new Date(Math.min(...Array.from(sessionDates.values()).map((d) => d.getTime()))), tz) : null,
     },
     recentPRs: recentPRs.slice(0, 12),
+    stalled,
   };
 }
 
