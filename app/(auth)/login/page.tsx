@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Loader2, Play } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
-import { CredentialFields, inputClass, signInWithPassword } from "@/components/athlete/account";
+import { CredentialFields, GoogleButton, inputClass, signInWithPassword } from "@/components/athlete/account";
 
 const primary =
   "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60";
@@ -64,8 +64,10 @@ export default function LoginPage() {
           <h1 className="font-display text-4xl text-ink">Welcome back</h1>
           <p className="mt-2 text-[15px] text-ink-soft">Sign in to pick up where you left off.</p>
 
+          <GoogleButton callbackUrl="/" className="mt-7" />
+
           {mode === "password" ? (
-            <form onSubmit={signInPassword} className="mt-7 space-y-3">
+            <form onSubmit={signInPassword} className="mt-3 space-y-3">
               <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} newPassword={false} />
               {error && (
                 <p role="alert" className="text-sm leading-relaxed text-destructive">
@@ -77,7 +79,7 @@ export default function LoginPage() {
               </button>
             </form>
           ) : (
-            <form onSubmit={sendLink} className="mt-7 space-y-3">
+            <form onSubmit={sendLink} className="mt-3 space-y-3">
               <label className="block">
                 <span className="sr-only">Email</span>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required autoComplete="email" className={inputClass} />

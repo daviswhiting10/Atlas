@@ -10,7 +10,7 @@ import type { Equipment } from "@/lib/plan/catalog";
 import { rebuildPlan } from "@/lib/actions/athlete";
 import { createAccount } from "@/lib/actions/account";
 import { BuildingOverlay, useGuestSignIn } from "./guest";
-import { CredentialFields, inputClass, signInWithPassword } from "./account";
+import { CredentialFields, GoogleButton, PENDING_PLAN_KEY, inputClass, signInWithPassword } from "./account";
 import { cn } from "@/lib/utils";
 
 const GOAL_ICONS: Record<Goal, typeof Dumbbell> = { muscle: Dumbbell, strength: Trophy, fat_loss: Flame, general: HeartPulse };
@@ -275,6 +275,16 @@ export function PlanWizard({
                     {accountError}
                   </p>
                 )}
+                <GoogleButton
+                  callbackUrl="/today"
+                  label="Or continue with Google"
+                  beforeRedirect={() => {
+                    // Built from these answers as soon as they land on Today.
+                    try {
+                      localStorage.setItem(PENDING_PLAN_KEY, JSON.stringify({ prefs, at: Date.now() }));
+                    } catch {}
+                  }}
+                />
               </form>
             ),
           },

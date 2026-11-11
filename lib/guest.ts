@@ -118,3 +118,25 @@ export async function createAthlete(input: {
     { timeout: 30_000, maxWait: 10_000 }
   );
 }
+
+/**
+ * Someone signing in with Google for the first time, with no Atlas account
+ * yet: a self-serve athlete in their own workspace, like an email sign-up.
+ * No plan yet; they build one from Today (or it's built from the plan
+ * wizard answers they gave before signing in).
+ */
+export async function createOAuthAthlete(input: { email: string; name?: string | null; image?: string | null; emailVerified?: Date | null }) {
+  const email = input.email.trim().toLowerCase();
+  const name = (input.name ?? "").trim().slice(0, 40) || email.split("@")[0].slice(0, 40) || "Athlete";
+  const meta: AthleteMeta = { prefs: normalizePrefs(undefined), demo: false };
+  return prisma.$transaction(async (tx) => {
+    const workspace = await tx.workspace.create({ data: { name: `${name} — personal` }, select: { id: true } });
+    const user = await tx.user.create({
+      data: { email, name, image: input.image ?? null, emailVerified: input.emailVerified ?? new Date(), role: "CLIENT", workspaceId: workspace.id },
+    });
+    await tx.clientProfile.create({
+      data: { workspaceId: workspace.id, userId: user.id, fullName: name, email, status: "ACTIVE", goalTargets: { athlete: meta } },
+    });
+    return user;
+  });
+}

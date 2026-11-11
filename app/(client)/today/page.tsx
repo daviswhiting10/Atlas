@@ -5,6 +5,7 @@ import { ArrowRight, Check, ChevronRight, Dumbbell, SkipForward } from "lucide-r
 import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { Greeting } from "@/components/athlete/Greeting";
+import { PendingPlan } from "@/components/athlete/PendingPlan";
 import { ProgressChart } from "@/components/athlete/ProgressChart";
 import { OverallChart } from "@/components/athlete/OverallChart";
 import { overallProgress } from "@/lib/progress/overall";
@@ -19,6 +20,7 @@ export default async function TodayPage() {
   if (!plan) {
     return (
       <div className="rise">
+        {athlete.selfServe && <PendingPlan />}
         <Greeting name={athlete.firstName} />
         <div className="surface mt-7 p-8">
           <h2 className="text-2xl text-ink">No plan yet</h2>

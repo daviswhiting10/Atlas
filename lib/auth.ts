@@ -1,10 +1,11 @@
 import NextAuth from "next-auth"
 import Email from "next-auth/providers/email"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
-import { createGuest } from "@/lib/guest"
+import { createGuest, createOAuthAthlete } from "@/lib/guest"
 import { Email as EmailAddress, rateLimiter, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
 
 const baseAdapter = PrismaAdapter(prisma)
@@ -12,8 +13,22 @@ const baseAdapter = PrismaAdapter(prisma)
 // Override createVerificationToken to clear stale tokens for the same email
 // before inserting a new one. This ensures only the latest magic link is valid,
 // preventing "link already used" errors from old emails in the inbox.
+/** Google sign-in is on once its credentials are configured (AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET). */
+export const GOOGLE_ENABLED = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
+
 const adapter = {
   ...baseAdapter,
+  /**
+   * Only a first-time Google sign-in creates a user here: email links are
+   * refused for unknown addresses, and passwords, guests and the demo make
+   * their own accounts. A new Google user is an athlete in their own
+   * workspace, never a coach. (A brand-new, empty database still lets its
+   * first person in as the coach who sets it up.)
+   */
+  async createUser(user: { email: string; name?: string | null; image?: string | null; emailVerified: Date | null }) {
+    if ((await prisma.user.count()) === 0) return baseAdapter.createUser!(user as never)
+    return createOAuthAthlete(user)
+  },
   async createVerificationToken(verificationToken: { identifier: string; token: string; expires: Date }) {
     await prisma.verificationToken.deleteMany({
       where: { identifier: verificationToken.identifier },
@@ -29,9 +44,14 @@ const perIp = rateLimiter(30, 15 * 60_000)
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter,
-  session: { strategy: "jwt" },
+  // Signed in for 90 days, renewed as the app is used: regular users don't sign in again.
+  session: { strategy: "jwt", maxAge: 90 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
   ...authConfig,
   providers: [
+    // Google: an existing account with the same (Google-verified) email is
+    // linked rather than duplicated, so a coach or invited client signs
+    // straight into their own account.
+    ...(GOOGLE_ENABLED ? [Google({ allowDangerousEmailAccountLinking: true })] : []),
     // Guest sign-in: always creates a brand-new account, never signs into an
     // existing one — so there is no credential to guess and nothing to hijack.
     // Email + password. Wrong address and wrong password look the same from

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { saveGuestAccount, setAccountPassword } from "@/lib/actions/account";
 import { PASSWORD_MIN } from "@/lib/password-rules";
@@ -197,5 +197,58 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
         </form>
       )}
     </section>
+  );
+}
+
+/** Where the plan wizard parks its answers while the athlete signs in with Google. */
+export const PENDING_PLAN_KEY = "atlas-pending-plan";
+
+/**
+ * "Continue with Google", shown only when Google sign-in is configured on the
+ * server. `beforeRedirect` runs first (the wizard uses it to keep the answers).
+ */
+export function GoogleButton({ callbackUrl, label = "Continue with Google", beforeRedirect, className }: { callbackUrl: string; label?: string; beforeRedirect?: () => void; className?: string }) {
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/auth/providers")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((p: Record<string, unknown>) => live && setEnabled(Boolean(p?.google)))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!enabled) return null;
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        beforeRedirect?.();
+        const { signIn } = await import("next-auth/react");
+        await signIn("google", { callbackUrl });
+      }}
+      className={cn(
+        "press flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl border border-line bg-white text-[15px] font-semibold text-ink hover:border-ink/25 disabled:opacity-60",
+        className
+      )}
+    >
+      {busy ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+          <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.45H12v4.63h6.46a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.56-5.17 3.56-8.8z" />
+          <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3.01c-1.07.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.95H1.28v3.11A12 12 0 0 0 12 24z" />
+          <path fill="#FBBC05" d="M5.29 14.28A7.2 7.2 0 0 1 4.91 12c0-.79.14-1.56.38-2.28V6.61H1.28A12 12 0 0 0 0 12c0 1.94.46 3.77 1.28 5.39l4.01-3.11z" />
+          <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.61 4.59 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.28 6.61l4.01 3.11C6.23 6.88 8.88 4.77 12 4.77z" />
+        </svg>
+      )}
+      {label}
+    </button>
   );
 }
