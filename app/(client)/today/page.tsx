@@ -6,6 +6,8 @@ import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { Greeting } from "@/components/athlete/Greeting";
 import { PendingPlan } from "@/components/athlete/PendingPlan";
+import { OwnProgramPicker } from "@/components/athlete/OwnProgramPicker";
+import { libraryForPicker } from "@/lib/programs/library";
 import { ProgressChart } from "@/components/athlete/ProgressChart";
 import { OverallChart } from "@/components/athlete/OverallChart";
 import { overallProgress } from "@/lib/progress/overall";
@@ -18,13 +20,30 @@ export default async function TodayPage() {
   const [athlete, plan, progress] = await Promise.all([getAthlete(), getPlanOverview(), getProgress()]);
 
   if (!plan) {
+    // A coach's own training can run a program from their library.
+    const library = athlete.isCoach ? await libraryForPicker(athlete.workspaceId) : [];
     return (
       <div className="rise">
         {athlete.selfServe && <PendingPlan />}
         <Greeting name={athlete.firstName} />
         <div className="surface mt-7 p-8">
           <h2 className="text-2xl text-ink">No plan yet</h2>
-          {athlete.selfServe ? (
+          {athlete.isCoach ? (
+            <div className="mt-5 grid gap-8 md:grid-cols-2">
+              <div>
+                <p className="text-[15px] font-semibold text-ink">Use one of my programs</p>
+                <p className="mt-1 text-[14px] text-ink-soft">Run a program from your library, exactly as written.</p>
+                <OwnProgramPicker programs={library} className="mt-4" />
+              </div>
+              <div>
+                <p className="text-[15px] font-semibold text-ink">Or let Atlas build one</p>
+                <p className="mt-1 text-[14px] text-ink-soft">Tell it your goal and it lays out the next 12 weeks.</p>
+                <Link href="/you?goals=1" className="press mt-4 inline-flex h-12 items-center gap-2 rounded-xl border border-line bg-white px-6 text-[15px] font-semibold text-ink hover:border-ink/25">
+                  Build my plan <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          ) : athlete.selfServe ? (
             <>
               <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it will lay out your next 12 weeks.</p>
               <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">

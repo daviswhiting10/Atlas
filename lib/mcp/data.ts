@@ -130,7 +130,7 @@ export async function loadActiveAssignment(client: ScopedClient) {
       goalText: true,
       notes: true,
       lighterWeeks: true,
-      sourceProgram: { select: { goalTags: true } },
+      sourceProgram: { select: { goalTags: true, isTemplate: true } },
       assignedWorkouts: {
         orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
         select: {

@@ -6,6 +6,8 @@ import { EQUIPMENT, EXPERIENCE, GOALS } from "@/lib/plan/generator";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
 import { StatRow } from "@/components/athlete/StatRow";
 import { PasswordPanel, SaveAccountPanel } from "@/components/athlete/account";
+import { OwnProgramPicker } from "@/components/athlete/OwnProgramPicker";
+import { libraryForPicker } from "@/lib/programs/library";
 import { prisma } from "@/lib/db/client";
 
 export const metadata: Metadata = { title: "You" };
@@ -42,9 +44,17 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
         </Link>
       )}
       {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-8" />}
+      {athlete.isCoach && (
+        <section className="mt-8 rounded-2xl border border-line bg-white p-5">
+          <p className="text-[17px] font-semibold text-ink">My programs</p>
+          <p className="mt-1 text-[14px] text-ink-soft">Train on a program from your library, exactly as written.</p>
+          <OwnProgramPicker programs={await libraryForPicker(athlete.workspaceId)} hasPlan={plan != null} className="mt-4" />
+        </section>
+      )}
       {account && !athlete.isCoach && <PasswordPanel className="mt-8" email={account.email} hasPassword={account.passwordHash != null} />}
 
-      {athlete.selfServe && (
+      {/* The generator's settings describe a generated plan, not a program someone wrote. */}
+      {athlete.selfServe && (plan?.generated ?? true) && (
         <StatRow
           className="mt-8"
           size="sm"
@@ -58,7 +68,7 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
       )}
 
       <StatRow
-        className={athlete.selfServe ? "border-t-0" : "mt-8"}
+        className={athlete.selfServe && (plan?.generated ?? true) ? "border-t-0" : "mt-8"}
         stats={[
           { label: "Workouts", value: String(progress.totals.sessions) },
           { label: "Sets", value: progress.totals.sets.toLocaleString() },

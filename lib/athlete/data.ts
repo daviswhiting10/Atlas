@@ -81,7 +81,9 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
 
   const meta = (profile.goalTargets as { athlete?: { prefs?: unknown; demo?: boolean } } | null)?.athlete;
   const prefs = normalizePrefs(meta?.prefs);
-  const name = profile.fullName || session.user.name || "Athlete";
+  // My training goes by the coach's own name, read fresh so a change in Settings shows at once.
+  const coachName = isCoach ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } }))?.name?.trim() : null;
+  const name = isCoach ? coachName || (profile.fullName !== "Me" ? profile.fullName : "") || "Coach" : profile.fullName || session.user.name || "Athlete";
   return {
     userId: session.user.id,
     clientId,

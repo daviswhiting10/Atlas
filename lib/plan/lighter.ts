@@ -15,14 +15,15 @@ import { weekOf } from "@/lib/athlete/sessions";
 export type LighterSource = {
   startDate: Date;
   lighterWeeks: boolean | null;
-  sourceProgram: { goalTags: unknown };
+  /** isTemplate: a library program, written by a coach. Never treated as generated. */
+  sourceProgram: { goalTags: unknown; isTemplate?: boolean };
 };
 
 /** Prisma select for everything the rule needs from a plan. */
 export const LIGHTER_SELECT = {
   startDate: true,
   lighterWeeks: true,
-  sourceProgram: { select: { goalTags: true } },
+  sourceProgram: { select: { goalTags: true, isTemplate: true } },
 } as const;
 
 /** True when the program was generated (its generator preferences are stored with it). */
@@ -36,7 +37,8 @@ export function isGenerated(goalTags: unknown): boolean {
  * from before the generator's preferences were stored with the program.
  */
 export function lighterWeeksOn(plan: Pick<LighterSource, "lighterWeeks" | "sourceProgram">, selfServe = false): boolean {
-  return plan.lighterWeeks ?? (selfServe || isGenerated(plan.sourceProgram.goalTags));
+  // A library program is hand-built even when an athlete runs it themselves.
+  return plan.lighterWeeks ?? (isGenerated(plan.sourceProgram.goalTags) || (selfServe && !plan.sourceProgram.isTemplate));
 }
 
 /** Whether a workout scheduled on `date` falls in one of the plan's lighter weeks. */

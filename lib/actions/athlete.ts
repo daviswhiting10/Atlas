@@ -7,6 +7,7 @@ import { athleteIdentity } from "@/lib/athlete/identity";
 import { prisma } from "@/lib/db/client";
 import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
+import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS } from "@/lib/athlete/data";
 import {
@@ -267,4 +268,34 @@ export async function planSetLighterWeeks(on: boolean) {
 
 export async function planSetNote(text: string) {
   return edit((scope) => setPlanNote(scope, z.string().max(LIMITS.note * 2).parse(text)));
+}
+
+/**
+ * My training: start one of the coach's own library programs as their plan,
+ * exactly as written. Only the coach's own profile can do this: a client's
+ * plan comes from their coach.
+ */
+export async function startMyProgram(raw: { programId: string; startDate: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  const identity = await athleteIdentity(session?.user);
+  if (!identity?.isCoach) return { ok: false, error: "Only a coach can use their library for their own training." };
+  const input = z.object({ programId: z.string().min(1).max(64), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).safeParse(raw);
+  if (!input.success) return { ok: false, error: "Choose a program and a start date." };
+
+  const program = await prisma.program.findFirst({ where: { id: input.data.programId, workspaceId: identity.workspaceId, deletedAt: null }, select: { id: true } });
+  if (!program) return { ok: false, error: "That program isn't in your library." };
+
+  try {
+    const assignment = await assignProgram(identity.workspaceId, program.id, identity.clientId, new Date(`${input.data.startDate}T00:00:00`));
+    // It's the plan now; an earlier one is finished (its history stays).
+    await prisma.programAssignment.updateMany({
+      where: { clientId: identity.clientId, workspaceId: identity.workspaceId, status: "ACTIVE", NOT: { id: assignment.id } },
+      data: { status: "COMPLETED" },
+    });
+  } catch (err) {
+    console.error("[my program]", err);
+    return { ok: false, error: "Couldn't start that program. Please try again." };
+  }
+  refresh();
+  return { ok: true };
 }

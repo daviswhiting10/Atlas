@@ -116,7 +116,7 @@ export async function loadPlanOverview({
       goalText: true,
       notes: true,
       lighterWeeks: true,
-      sourceProgram: { select: { goalTags: true } },
+      sourceProgram: { select: { goalTags: true, isTemplate: true } },
       assignedWorkouts: {
         orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
         select: {
@@ -135,12 +135,13 @@ export async function loadPlanOverview({
   });
   if (!assignment) return null;
 
-  const prefs = storedPrefs(assignment.sourceProgram.goalTags) ?? fallbackPrefs;
+  // The fallback is for an athlete's own older generated plans; a library program is never generated.
+  const prefs = storedPrefs(assignment.sourceProgram.goalTags) ?? (assignment.sourceProgram.isTemplate ? null : fallbackPrefs);
   const generated = prefs != null;
   const plan = prefs ? generatePlan(prefs) : null;
   const start = assignment.startDate.getTime();
   // An athlete's own plan from before prefs were stored with it still counts as generated.
-  const selfServe = fallbackPrefs != null;
+  const selfServe = fallbackPrefs != null && !assignment.sourceProgram.isTemplate;
   const lighterWeeks = lighterWeeksOn(assignment, selfServe);
   const isDeload = (date: Date) => isLighterWeek(date, assignment, selfServe);
 

@@ -4,8 +4,9 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Activity, Copy, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { draftFromTemplate } from "@/lib/actions/coach-plan";
+import { startMyProgram } from "@/lib/actions/athlete";
 
 type Client = { id: string; fullName: string };
 
@@ -23,6 +24,15 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
       const res = await draftFromTemplate({ programId, clientId, startDate: date });
       if (!res.ok) return void toast.error(res.error);
       router.push(`/clients/${clientId}/programs/${res.assignmentId}`);
+    });
+  }
+
+  function useForMe() {
+    start(async () => {
+      const res = await startMyProgram({ programId, startDate: date });
+      if (!res.ok) return void toast.error(res.error);
+      toast.success("It's your plan now");
+      router.push("/today");
     });
   }
 
@@ -63,6 +73,14 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
           {pending && <Loader2 className="h-4 w-4 animate-spin" />} Create draft
         </button>
       </div>
+
+      <button type="button" onClick={useForMe} disabled={pending} className="press flex w-full items-start gap-3 rounded-[14px] border border-line bg-white p-4 text-left hover:border-ink/25 disabled:opacity-60">
+        <Activity className="mt-0.5 h-4 w-4 shrink-0 text-signal" />
+        <span>
+          <span className="block text-[15px] font-semibold text-ink">Use for my training</span>
+          <span className="mt-0.5 block text-[13px] leading-relaxed text-ink-mute">Run it yourself in My training, as written, starting on the date above.</span>
+        </span>
+      </button>
 
       <Link href={`/programs/new?from=${programId}`} className="press flex items-start gap-3 rounded-[14px] border border-line bg-white p-4 hover:border-ink/25">
         <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-signal" />

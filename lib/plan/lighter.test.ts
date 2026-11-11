@@ -22,6 +22,10 @@ describe("lighter weeks", () => {
     expect(lighterWeeksOn({ lighterWeeks: null, sourceProgram: handBuilt }, true)).toBe(true);
   });
 
+  it("never treats a library program as generated, even on a self-built profile", () => {
+    expect(lighterWeeksOn({ lighterWeeks: null, sourceProgram: { ...handBuilt, isTemplate: true } }, true)).toBe(false);
+  });
+
   it("lets the switch override the default either way", () => {
     expect(lighterWeeksOn({ lighterWeeks: true, sourceProgram: handBuilt })).toBe(true);
     expect(lighterWeeksOn({ lighterWeeks: false, sourceProgram: generated })).toBe(false);
