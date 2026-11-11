@@ -15,7 +15,6 @@ const ITEMS = [
   { href: "/programs", label: "Programs", icon: Dumbbell },
   { href: "/sessions", label: "Sessions", icon: ClipboardList },
   { href: "/outreach", label: "Outreach" },
-  { href: "/pricing", label: "Pricing" },
 ] as const;
 
 /** Phones get the four most-used sections as tabs; the rest sit behind "More". */
