@@ -19,11 +19,12 @@ const GENERATIONS_PER_WORKSPACE_PER_HOUR = 10;
 export const getActiveProgram = clientTool({
   name: "get_active_program",
   title: "Active program",
-  description: "The client's current plan: where they are in it, the next workout with its prescription, and this week's workouts.",
+  description:
+    "The client's current plan: where they are in it, the next workout, and every workout in one week (this week by default) with its exercises and targets. Returns the ids the plan-editing tools take: assignedWorkoutId for a workout, planExerciseId for an exercise in it.",
   permission: "read",
   roles: ALL_ROLES,
-  input: z.object({ clientId: ClientIdArg }),
-  async handler({ client }) {
+  input: z.object({ clientId: ClientIdArg, week: z.number().int().min(1).max(52).optional().describe("Which week to list. Defaults to the current week.") }),
+  async handler({ client }, args) {
     const assignment = await loadActiveAssignment(client);
     if (!assignment) return { client: client.fullName, program: null };
 
@@ -37,7 +38,15 @@ export const getActiveProgram = clientTool({
       note: w.notes,
       exercises: w.exercises.map((e) => {
         const rx = describePrescription(e.prescribedSets);
-        return { exerciseId: e.exerciseId, exercise: displayName(e.exercise.slug, e.exercise.name), sets: rx.sets, reps: rx.reps };
+        const weight = (Array.isArray(e.prescribedSets) ? (e.prescribedSets[0] as { weight?: number | null } | undefined)?.weight : null) ?? null;
+        return {
+          planExerciseId: e.id,
+          exerciseId: e.exerciseId,
+          exercise: displayName(e.exercise.slug, e.exercise.name),
+          sets: rx.sets,
+          reps: rx.reps,
+          targetWeightLb: weight,
+        };
       }),
     }));
     const next = workouts.find((w) => w.status === "PLANNED") ?? null;
@@ -50,13 +59,16 @@ export const getActiveProgram = clientTool({
         assignmentId: assignment.id,
         programId: assignment.sourceProgramId,
         name: assignment.name,
+        goal: assignment.goalText,
+        note: assignment.notes,
         startDate: iso(assignment.startDate),
         totalWeeks,
         currentWeek,
         workoutsLogged: workouts.filter((w) => w.status === "LOGGED").length,
         workoutsTotal: workouts.length,
         nextWorkout: next,
-        thisWeek: workouts.filter((w) => w.week === currentWeek).map(({ exercises, ...w }) => ({ ...w, exerciseCount: exercises.length })),
+        week: args.week ?? currentWeek,
+        workouts: workouts.filter((w) => w.week === (args.week ?? currentWeek)),
       },
     };
   },

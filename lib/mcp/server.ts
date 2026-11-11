@@ -16,6 +16,7 @@ import { analyzeProgress, detectPlateaus, getPersonalRecords, getTrainingVolume 
 import { generateProgram, getActiveProgram, getProgramDetails, saveProgram, updateProgram } from "./tools/programs";
 import { searchExercises } from "./tools/exercises";
 import { getTrainingRecommendations, getUserFitnessProfile } from "./tools/coaching";
+import { addPlanExercise, addPlanWorkout, removePlanExercise, removePlanWorkout, setPlanExerciseTargets, setPlanNotes, swapPlanExercise } from "./tools/plan";
 
 export const TOOLS: ToolDef[] = [
   getWorkoutHistory,
@@ -33,6 +34,13 @@ export const TOOLS: ToolDef[] = [
   getTrainingRecommendations,
   getUserFitnessProfile,
   logWorkout,
+  addPlanWorkout,
+  removePlanWorkout,
+  addPlanExercise,
+  removePlanExercise,
+  swapPlanExercise,
+  setPlanExerciseTargets,
+  setPlanNotes,
 ];
 
 /** Writes the audit row. A failed write is reported, never thrown: an audit outage must not take the tools down. */
@@ -81,8 +89,8 @@ export function createMcpServer(caller: McpCaller, deps: ToolDeps): McpServer {
     {
       instructions:
         caller.role === "CLIENT"
-          ? "Atlas training data for one athlete. Every tool acts on the signed-in athlete's own data; clientId can be omitted. Weights are in pounds."
-          : "Atlas coaching data for one workspace. Pass clientId to say which client a tool acts on. Weights are in pounds. generate_program returns a proposal and saves nothing.",
+          ? "Atlas training data for one athlete. Every tool acts on the signed-in athlete's own data; clientId can be omitted. You can read the plan and progress, log workouts, and edit the plan itself: add or remove workouts and exercises, swap an exercise, change targets, and write notes on the plan or a workout. Call get_active_program first for the assignedWorkoutId and planExerciseId values those edits take. Edits never delete logged history. Weights are in pounds."
+          : "Atlas coaching data for one workspace. Pass clientId to say which client a tool acts on. You can read any client's plan and progress, log workouts, and edit a client's plan (add_plan_workout, add_plan_exercise, swap_plan_exercise, set_plan_exercise_targets, set_plan_note and the remove tools); get_active_program returns the ids those take. save_program and update_program work on the coach's program library, not on a client's plan. generate_program returns a proposal and saves nothing. Weights are in pounds.",
     }
   );
 

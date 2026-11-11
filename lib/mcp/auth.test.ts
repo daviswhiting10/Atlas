@@ -32,6 +32,14 @@ const EXPECTED: Record<string, { roles: McpRole[]; permission: string; scope: "c
   get_training_recommendations: { roles: EVERYONE, permission: "read", scope: "client" },
   get_user_fitness_profile: { roles: EVERYONE, permission: "read", scope: "client" },
   log_workout: { roles: EVERYONE, permission: "write", scope: "client" },
+  // Plan editing: an athlete edits their own plan, a coach any client's in their workspace.
+  add_plan_workout: { roles: EVERYONE, permission: "write", scope: "client" },
+  remove_plan_workout: { roles: EVERYONE, permission: "write", scope: "client" },
+  add_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
+  remove_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
+  swap_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
+  set_plan_exercise_targets: { roles: EVERYONE, permission: "write", scope: "client" },
+  set_plan_note: { roles: EVERYONE, permission: "write", scope: "client" },
 };
 
 /** Otherwise-valid arguments for tools that require more than a client, so each case fails for the reason under test. */
@@ -39,6 +47,13 @@ const VALID: Record<string, Record<string, unknown>> = {
   get_exercise_history: { exerciseId: "ex_1" },
   log_workout: { assignedWorkoutId: "aw_1", sets: [{ exerciseId: "ex_1", setNumber: 1, weight: 100, reps: 8 }] },
   generate_program: { goal: "hypertrophy", durationWeeks: 8, sessionsPerWeek: 3, sessionLength: 60, equipment: "full gym" },
+  add_plan_workout: { week: 3, name: "Extra" },
+  remove_plan_workout: { assignedWorkoutId: "aw_1" },
+  add_plan_exercise: { assignedWorkoutId: "aw_1", slug: "plank" },
+  remove_plan_exercise: { planExerciseId: "awe_1" },
+  swap_plan_exercise: { planExerciseId: "awe_1", slug: "plank" },
+  set_plan_exercise_targets: { planExerciseId: "awe_1", sets: 4 },
+  set_plan_note: { text: "Felt strong" },
 };
 const argsFor = (tool: { name: string }, extra: Record<string, unknown> = {}) => ({ ...VALID[tool.name], ...extra });
 
@@ -60,7 +75,7 @@ const caller = (role: McpRole, clientProfileId: string | null = null, workspaceI
 const deps: ToolDeps = { transport: "http", audit: async () => {}, lookupClient: lookup };
 
 describe("tool inventory", () => {
-  it("exposes exactly the fifteen planned tools", () => {
+  it("exposes exactly the planned tools", () => {
     expect(TOOLS.map((t) => t.name).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 
@@ -91,7 +106,7 @@ describe("role gate (403)", () => {
     expect(lookup).not.toHaveBeenCalled();
   });
 
-  it("refuses an athlete on all three program-authoring tools", () => {
+  it("refuses an athlete only on the coach's program-library tools", () => {
     const refused = TOOLS.filter((t) => !t.roles.includes("CLIENT")).map((t) => t.name).sort();
     expect(refused).toEqual(["generate_program", "save_program", "update_program"]);
   });
@@ -160,5 +175,34 @@ describe("resolveClientScope", () => {
       resolveClientScope(caller("CLIENT", "alice"), "zed", lookup),
     ];
     for (const attempt of attempts) await expect(attempt).rejects.toMatchObject({ outcome: "not_found", message: "Not found." });
+  });
+});
+
+describe("plan editing", () => {
+  const editTools = TOOLS.filter((t) => t.name.includes("plan_") && t.permission === "write");
+
+  it("is open to an athlete for their own plan", () => {
+    expect(editTools.map((t) => t.name).sort()).toEqual(
+      ["add_plan_exercise", "add_plan_workout", "remove_plan_exercise", "remove_plan_workout", "set_plan_exercise_targets", "set_plan_note", "swap_plan_exercise"].sort()
+    );
+    for (const t of editTools) expect(t.roles, t.name).toContain("CLIENT");
+  });
+
+  it.each(editTools.map((t) => [t.name, t] as const))("%s: an athlete reaching for another client's plan gets 404, never 403", async (_n, tool) => {
+    for (const other of ["bob", "zed"]) {
+      const result = await executeTool(tool, caller("CLIENT", "alice"), argsFor(tool, { clientId: other }), deps);
+      expect(result).toEqual({ outcome: "not_found", message: "Not found." });
+    }
+  });
+
+  it.each(editTools.map((t) => [t.name, t] as const))("%s: a coach reaching into another workspace gets 404", async (_n, tool) => {
+    expect(await executeTool(tool, caller("TRAINER"), argsFor(tool, { clientId: "zed" }), deps)).toEqual({ outcome: "not_found", message: "Not found." });
+  });
+
+  it("writes an audit row for every edit, including refused ones", async () => {
+    const rows: string[] = [];
+    const audited: ToolDeps = { ...deps, audit: async (e) => void rows.push(`${e.tool}:${e.outcome}`) };
+    for (const tool of editTools) await executeTool(tool, caller("CLIENT", "alice"), argsFor(tool, { clientId: "bob" }), audited);
+    expect(rows).toEqual(editTools.map((t) => `${t.name}:not_found`));
   });
 });

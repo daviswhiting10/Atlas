@@ -129,6 +129,8 @@ export async function loadActiveAssignment(client: ScopedClient) {
       name: true,
       startDate: true,
       sourceProgramId: true,
+      goalText: true,
+      notes: true,
       assignedWorkouts: {
         orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
         select: {
@@ -139,7 +141,7 @@ export async function loadActiveAssignment(client: ScopedClient) {
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
-            select: { exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true } } },
+            select: { id: true, exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true } } },
           },
         },
       },
