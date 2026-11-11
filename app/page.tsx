@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ChartNoAxesCombined, ListChecks, Play, Target } from "lucide-react";
+import { ArrowRight, ChartNoAxesCombined, ListChecks, Play, Sparkles, Target } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
 
@@ -81,6 +81,12 @@ export default function LandingPage() {
             <p className="rise rise-4 mt-4 text-sm text-ink-mute">
               Your plan is ready in under a minute. The demo needs no account and opens with nine weeks already logged.
             </p>
+            <Link
+              href="/agents#demo"
+              className="rise rise-4 press mt-5 inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:border-ink/25"
+            >
+              <Sparkles className="h-4 w-4 text-signal" /> Watch an AI assistant use Atlas <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
 
           {/* Hero visual */}

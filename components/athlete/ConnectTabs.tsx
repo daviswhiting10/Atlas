@@ -24,7 +24,7 @@ export function ConnectTabs({ options }: { options: ConnectOption[] }) {
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-line" role="tablist" aria-label="Client">
+      <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Client">
         {options.map((o, i) => (
           <button
             key={o.label}

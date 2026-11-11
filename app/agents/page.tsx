@@ -1,24 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { Play } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { ConnectTabs, type ConnectOption } from "@/components/athlete/ConnectTabs";
+import { AgentDemo } from "@/components/agents/AgentDemo";
 import { TOOLS } from "@/lib/mcp/server";
 
 export const metadata: Metadata = {
   title: "For AI assistants",
   description: "Atlas speaks the Model Context Protocol: an AI assistant can read a training plan, analyse progress and log workouts, scoped to exactly one athlete.",
 };
-
-/** Condensed from a real session against the local server, run as the demo athlete. */
-const SESSION: Array<{ call: string; args?: string; result: string; tone?: "ok" | "refused" }> = [
-  { call: "get_active_program", result: "Build muscle · Upper / Lower — week 10 of 12 · next: Upper A", tone: "ok" },
-  { call: "detect_plateaus", result: "1 stalled: Leg Extension, 3 sessions flat · confidence high", tone: "ok" },
-  { call: "get_training_recommendations", result: "Overhead Press → hold 100 lb · RPE 9.0 was above 8", tone: "ok" },
-  { call: "log_workout", args: '{ sets: [{ bench, 1, 150 lb × 9 }, …] }', result: "2 sets written · Upper A · in progress", tone: "ok" },
-  { call: "save_program", args: "{ program: … }", result: "403 forbidden · not available to your role", tone: "refused" },
-  { call: "get_workout_history", args: '{ clientId: "someone-else" }', result: "404 not found", tone: "refused" },
-];
 
 const GUARANTEES = [
   {
@@ -84,48 +75,34 @@ export default function AgentsPage() {
 
       <main>
         {/* ── Hero ─────────────────────────────────────────────────────── */}
-        <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-8 sm:px-8 sm:pt-14 lg:grid-cols-[1fr_1.05fr] lg:gap-14">
+        <section className="mx-auto max-w-4xl px-5 pb-12 pt-8 text-center sm:px-8 sm:pt-14">
           <div className="rise">
             <p className="eyebrow">/agents · Atlas for AI assistants</p>
-            <h1 className="mt-4 text-[44px] leading-[1.02] text-ink sm:text-[60px]">Your assistant can read your training. And log it.</h1>
+            <h1 className="mx-auto mt-4 max-w-3xl text-[44px] leading-[1.02] text-ink sm:text-[60px]">Your assistant can read your training. And log it.</h1>
             <p className="mt-5 text-lg font-semibold text-ink">It works on your plan. It stays inside your data.</p>
-            <p className="mt-3 max-w-xl text-[16px] leading-relaxed text-ink-soft">
+            <p className="mx-auto mt-3 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               Atlas is also a Model Context Protocol server. An assistant connects once and can see the plan, analyse progress, spot a stalled lift and log
               the session, through the same rules the app itself uses.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <a href="#connect" className="press flex h-12 items-center justify-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
-                Connect an assistant <ArrowRight className="h-4 w-4" />
+            <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+              <a href="#demo" className="press flex h-12 items-center justify-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
+                <Play className="h-4 w-4 fill-current" /> Watch the demo
               </a>
               <a href="#tools" className="press flex h-12 items-center justify-center rounded-xl border border-line bg-white px-6 text-[15px] font-semibold text-ink hover:border-ink/25">
                 See the {TOOLS.length} tools
               </a>
             </div>
           </div>
+        </section>
 
-          {/* Recorded session */}
-          <div className="rise rise-1 overflow-hidden rounded-2xl bg-night">
-            <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-              <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-              <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-              <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-              <span className="ml-2 font-mono text-[11px] text-white/40">assistant session · demo athlete · condensed</span>
-            </div>
-            <ol className="space-y-3.5 p-5 font-mono text-[12.5px] leading-relaxed sm:p-6 sm:text-[13px]">
-              {SESSION.map((s) => (
-                <li key={s.call + (s.args ?? "")}>
-                  <p className="text-white/90">
-                    <span className="text-white/35">❯ </span>
-                    {s.call}
-                    {s.args && <span className="text-white/45"> {s.args}</span>}
-                  </p>
-                  <p className={s.tone === "refused" ? "pl-4 text-[#E3B05F]" : "pl-4 text-[#8FD3B0]"}>
-                    {s.tone === "refused" ? "✕ " : "✓ "}
-                    <span className="text-white/60">{s.result}</span>
-                  </p>
-                </li>
-              ))}
-            </ol>
+        {/* ── Demo ─────────────────────────────────────────────────────── */}
+        <section id="demo" className="mx-auto max-w-6xl scroll-mt-6 px-5 pb-16 sm:px-8">
+          <div className="rise rise-1 mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <h2 className="text-3xl text-ink">See it in action.</h2>
+            <p className="text-[15px] text-ink-soft">One athlete, one assistant, fourteen steps. Press play.</p>
+          </div>
+          <div className="rise rise-1">
+            <AgentDemo />
           </div>
         </section>
 

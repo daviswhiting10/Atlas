@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { EQUIPMENT, EXPERIENCE, GOALS } from "@/lib/plan/generator";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
@@ -30,6 +32,15 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
       </header>
 
       {/* A demo account is sample data; a guest's own plan is worth keeping. */}
+      {athlete.isDemo && (
+        <Link href="/agents#demo" className="press mt-6 flex items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4 hover:border-ink/20">
+          <span className="min-w-0">
+            <span className="block text-[15px] font-semibold text-ink">Watch an AI assistant use this data</span>
+            <span className="block text-[13px] text-ink-mute">How Claude reads Alex&apos;s plan, spots stalls and logs a workout, safely.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-ink-soft" />
+        </Link>
+      )}
       {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-8" />}
       {account && !athlete.isCoach && <PasswordPanel className="mt-8" email={account.email} hasPassword={account.passwordHash != null} />}
 
