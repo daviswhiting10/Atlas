@@ -55,7 +55,7 @@ async function main() {
     update: { workspaceId: workspace.id, role: "TRAINER" },
     create: {
       email,
-      name: process.env.SEED_TRAINER_NAME ?? "Davis Whiting",
+      name: process.env.SEED_TRAINER_NAME ?? "Coach",
       role: "TRAINER",
       workspaceId: workspace.id,
     },
@@ -68,8 +68,8 @@ async function main() {
     update: {},
     create: {
       userId: user.id,
-      bio: "NASM CPT, NASM CNC. Life Time Fitness, Columbia MD.",
-      certifications: ["NASM CPT", "NASM CNC"],
+      bio: null,
+      certifications: [],
     },
   });
   console.log("TrainerProfile: ok");

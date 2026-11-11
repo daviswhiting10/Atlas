@@ -6,6 +6,7 @@ export type OutreachInput = {
   purpose: string;
   channel: string;
   trainerVoice?: string | null;
+  trainerName?: string | null;
   methodology?: string;
 };
 
@@ -29,10 +30,14 @@ export function buildOutreachPrompt(input: OutreachInput) {
 
   const voiceSection = input.trainerVoice
     ? `## Trainer Voice\n${input.trainerVoice}`
-    : `## Trainer Voice\nDavis Whiting — NASM CPT. Direct, evidence-based, no fluff. Sharp but warm. Not a Planet Fitness coach.`;
+    : `## Trainer Voice\nDirect, evidence-based, no fluff. Sharp but warm.`;
+  const trainer = input.trainerName ? `${input.trainerName}, a personal trainer` : "a personal trainer";
+  const signOff = input.trainerName
+    ? `Sign off with the trainer's first name (${input.trainerName.split(" ")[0]}).`
+    : "Don't sign off with a name.";
 
   return {
-    system: `You are writing an outreach message for Davis Whiting, a personal trainer.
+    system: `You are writing an outreach message for ${trainer}.
 
 ${voiceSection}
 
@@ -43,6 +48,7 @@ ${methodology ? `## Methodology Context\n${methodology}` : ""}
 - Channel-appropriate length: Email = 3-5 sentences. SMS = 1-2 sentences. DM = conversational, brief.
 - Personalize using everything you know about this client.
 - One clear call to action max.
+- ${signOff} Never invent a phone number, gym, or location.
 - Never be sycophantic. Never be pushy.
 - Output ONLY the message text. No subject line unless it's an email (then include "Subject: " on line 1).`,
     user: `Write a ${input.channel} message for this client.

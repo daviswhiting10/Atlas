@@ -47,7 +47,7 @@ const COLUMNS = [
 const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
   ig: "Instagram",
-  life_time_floor: "Life Time Floor",
+  life_time_floor: "Gym floor", // key kept for existing leads
   cold_list: "Cold List",
   other: "Other",
 };
@@ -139,7 +139,7 @@ export default function LeadsPage() {
                   <SelectContent>
                     <SelectItem value="referral">Referral</SelectItem>
                     <SelectItem value="ig">Instagram</SelectItem>
-                    <SelectItem value="life_time_floor">Life Time Floor</SelectItem>
+                    <SelectItem value="life_time_floor">Gym floor</SelectItem>
                     <SelectItem value="cold_list">Cold List</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>

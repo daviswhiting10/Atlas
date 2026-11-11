@@ -8,6 +8,7 @@ export type ProgramInput = {
   equipment: string;
   notes?: string;
   trainerVoice?: string | null;
+  trainerName?: string | null;
   methodology?: string;
 };
 
@@ -16,10 +17,10 @@ export function buildProgramPrompt(input: ProgramInput) {
 
   const voiceSection = input.trainerVoice
     ? `## Trainer Voice & Philosophy\n${input.trainerVoice}`
-    : `## Trainer Voice\nDavis Whiting — NASM CPT. Evidence-based, periodized, no fluff. Programs have a purpose every session.`;
+    : `## Trainer Voice\nEvidence-based, periodized, no fluff. Programs have a purpose every session.`;
 
   return {
-    system: `You are Atlas, programming assistant for Davis Whiting (NASM CPT, NASM CNC).
+    system: `You are Atlas, programming assistant for ${input.trainerName ? `${input.trainerName}, a personal trainer` : "a personal trainer"}.
 
 ${voiceSection}
 

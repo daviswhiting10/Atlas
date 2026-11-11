@@ -161,12 +161,11 @@ export const generateProgram = clientTool({
 
     const [full, trainer, methodology] = await Promise.all([
       getClient(client.id, caller.workspaceId),
-      getTrainer(caller.workspaceId),
+      getTrainer(caller.workspaceId, caller.userId),
       loadMethodology(caller.workspaceId, "program"),
     ]);
     if (!full) throw notFound();
 
-    const voice = trainer?.voiceProfile;
     const { system, user } = buildProgramPrompt({
       clientName: full.fullName,
       clientSummary: full.intakeForms?.[0]?.aiSummary ?? null,
@@ -176,7 +175,8 @@ export const generateProgram = clientTool({
       sessionLength: args.sessionLength,
       equipment: args.equipment,
       notes: args.notes,
-      trainerVoice: typeof voice === "string" ? voice : voice ? JSON.stringify(voice) : null,
+      trainerVoice: trainer?.voice ?? null,
+      trainerName: trainer?.name ?? null,
       methodology,
     });
 

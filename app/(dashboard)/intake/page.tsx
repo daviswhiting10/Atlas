@@ -521,7 +521,7 @@ export default function IntakePage() {
 
           <div className="space-y-2">
             <Label>
-              Why did you join LT and what are your most important health &amp; fitness goals?
+              What brought you here, and what are your most important health &amp; fitness goals?
             </Label>
             <div className="space-y-2 pl-1">
               <div className="flex items-start gap-2">

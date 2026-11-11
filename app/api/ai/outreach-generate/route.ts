@@ -23,7 +23,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
 
   const [client, trainer, methodology] = await Promise.all([
     getClient(parsed.data.clientId, workspaceId),
-    getTrainer(workspaceId),
+    getTrainer(workspaceId, userId),
     loadMethodology(workspaceId, "outreach"),
   ]);
 
@@ -31,13 +31,6 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
 
-  const voiceProfile = trainer?.voiceProfile;
-  const trainerVoice =
-    typeof voiceProfile === "string"
-      ? voiceProfile
-      : voiceProfile
-        ? JSON.stringify(voiceProfile)
-        : null;
 
   const { system, user } = buildOutreachPrompt({
     clientName: client.fullName,
@@ -46,7 +39,8 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     recentContext: parsed.data.context,
     purpose: parsed.data.purpose,
     channel: parsed.data.channel,
-    trainerVoice,
+    trainerVoice: trainer?.voice ?? null,
+    trainerName: trainer?.name ?? null,
     methodology,
   });
 

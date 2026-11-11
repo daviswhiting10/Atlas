@@ -37,54 +37,47 @@ const PURPOSES = [
   { value: "goal-review", label: "Goal Review" },
 ];
 
+// Starting points. Each coach edits them and saves their own version as the default.
 const TEMPLATES = [
   {
     id: "reactivation",
-    label: "Reactivation Email",
+    label: "Welcome-back email",
     channel: "Email",
-    body: `Hi ______!
+    body: `Hi [Name],
 
-My name is Davis Whiting and I'm a Personal Trainer here at Life Time - Columbia. We are happy to see that you've come back and to make your experience even better, I'm offering you a 1h complimentary Goal Setting Session available to use during your first month of reactivation! During that session, we can talk about your health and fitness goals and I will help you make a plan to achieve them!
+It's [your name], a personal trainer at [your gym]. Great to see you back! To help you hit the ground running, I'd like to offer you a complimentary goal-setting session this month. We'll talk through your health and fitness goals and put together a plan to reach them.
 
-Let me know what day & time works best for you so we can get started!
+What day and time work best for you?
 
-You can reply to this email or text at 513-828-8682.
+You can reply to this email or text me at [your phone].
 
-Hope to hear from you soon!
-
-In Health,
-Davis Whiting`,
+Talk soon,
+[your name]`,
   },
   {
     id: "birthday",
-    label: "Birthday Email",
+    label: "Birthday email",
     channel: "Email",
-    body: `Hello ______,
+    body: `Hi [Name],
 
-My name is Davis Whiting and I'm a Personal Trainer here at Life Time - Columbia.
+Happy birthday! I hope it's a great one.
 
-I hope all is well with you.
+As a birthday gift, I'd like to offer you a complimentary training session. We can work on whatever you'd like: a new routine, technique on a lift you've been curious about, or a plan for your next goal.
 
-First and foremost, HAPPY BIRTHDAY!!! I hope your special day is awesome!
+What day and time work best for you?
 
-To make it even better, as a birthday gift, I'm giving you a 1h complimentary Dynamic Personal Training Experience available to use on your account! During that session, you can inquire as to how to set up your workouts for success each time you come in.
+You can reply to this email or text me at [your phone].
 
-Let me know what day & time works best for you so we can get started!
-
-You can reply to this email or text at 513-828-8682.
-
-Hope to hear from you soon!
-
-In Health,
-Davis Whiting`,
+Talk soon,
+[your name]`,
   },
   {
     id: "appointment_confirm",
-    label: "Appointment Confirmation",
+    label: "Appointment confirmation",
     channel: "Text — send 12–24 hrs before",
-    body: `Hi _____! It's Davis from Life Time. This text is to confirm you for your 1-1 Goal Setting Session with me tomorrow at _____ AM/PM.
+    body: `Hi [Name], it's [your name]. Just confirming your session with me tomorrow at [time].
 
-Please confirm by 5PM today to avoid late cancellation.`,
+Please reply to confirm by [time] today so I can hold your spot.`,
   },
 ];
 

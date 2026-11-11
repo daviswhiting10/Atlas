@@ -1,10 +1,20 @@
 import { prisma } from "./client";
 
-export async function getTrainer(workspaceId: string) {
-  return prisma.trainerProfile.findFirst({
-    where: { user: { workspaceId, role: "TRAINER" } },
-    include: { user: { select: { name: true, email: true } } },
+/**
+ * The coach's profile: the voice the AI writes in and the name it signs with.
+ * Always the signed-in coach's own; a workspace can have more than one.
+ */
+export async function getTrainer(workspaceId: string, userId: string) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, workspaceId },
+    select: { name: true, email: true, trainerProfile: { select: { voiceProfile: true } } },
   });
+  if (!user) return null;
+  const voice = user.trainerProfile?.voiceProfile;
+  return {
+    name: user.name?.trim() || null,
+    voice: typeof voice === "string" ? voice.trim() || null : voice ? JSON.stringify(voice) : null,
+  };
 }
 
 export async function updateTrainer(

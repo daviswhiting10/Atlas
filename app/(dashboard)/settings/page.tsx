@@ -1,233 +1,115 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Save, Loader2, BookOpen, Zap } from "lucide-react";
 
-const DEFAULT_VOICE = `Davis Whiting — NASM CPT, NASM CNC, former D1 lacrosse captain. Training at Life Time Fitness, Columbia MD.
+type Profile = { name: string; email: string; voiceProfile: string };
 
-Voice: Evidence-based, direct, no fluff. Slight intellectual edge — I read the research and I apply it. Not a Planet Fitness coach. I say what I mean and I expect clients to do the work.
+const VOICE_PLACEHOLDER = `How you coach and how you talk to clients. For example:
 
-What I say:
-- "Here's why this works..." (brief, evidence-backed rationale)
-- "The goal this block is X. Here's how we get there."
-- Short sentences. No corporate wellness speak.
-- I call out when someone is sandbagging or playing it safe.
+Direct and evidence-based. Short sentences, no filler.
+I explain the why behind a block in a line or two.
+I give credit when it's earned and honest feedback when it isn't.
+I don't say "You've got this!" or use jargon clients won't know.`;
 
-What I don't say:
-- "Amazing!" after every set
-- "You've got this!" filler
-- Vague encouragement without substance
-- Jargon the client doesn't understand
-
-Client relationship style:
-- I'm direct but I'm in their corner. I care about results and I hold people accountable.
-- I adjust based on what I observe — not just what they report.
-- I give credit when it's earned and honest feedback when it isn't.
-
-Training philosophy:
-- Train Like It Matters. Every session has a purpose.
-- Evidence-based programming: periodization, progressive overload, specificity.
-- Corrective work isn't optional for clients with dysfunction — it's part of the program.
-- I don't believe in programs that look good on paper but don't transfer to the gym floor.`;
+const field =
+  "mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-mute/70 focus:border-ink/40 disabled:bg-ink/5 disabled:text-ink-mute";
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({
-    name: "Davis Whiting",
-    email: "davis@atlas.app",
-    voiceProfile: DEFAULT_VOICE,
-  });
+  const [saved, setSaved] = useState<Profile | null>(null);
+  const [form, setForm] = useState<Profile>({ name: "", email: "", voiceProfile: "" });
   const [saving, setSaving] = useState(false);
-  const [pingResult, setPingResult] = useState<string | null>(null);
-  const [pinging, setPinging] = useState(false);
 
   useEffect(() => {
     fetch("/api/trainer")
-      .then((r) => r.json())
-      .then((trainer) => {
-        if (trainer) {
-          setForm((prev) => ({
-            name: trainer.name ?? prev.name,
-            email: trainer.email ?? prev.email,
-            voiceProfile: trainer.voiceProfile ?? DEFAULT_VOICE,
-          }));
-        }
-      });
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p: Profile | null) => {
+        if (!p) return;
+        setSaved(p);
+        setForm(p);
+      })
+      .catch(() => toast.error("Couldn't load your profile"));
   }, []);
+
+  const dirty = saved != null && (form.name.trim() !== saved.name || form.voiceProfile.trim() !== saved.voiceProfile.trim());
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.name.trim()) {
+      toast.error("Add your name");
+      return;
+    }
     setSaving(true);
     const res = await fetch("/api/trainer", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voiceProfile: form.voiceProfile }),
+      body: JSON.stringify({ name: form.name.trim(), voiceProfile: form.voiceProfile }),
     });
     setSaving(false);
-    if (res.ok) toast.success("Settings saved");
-    else toast.error("Failed to save");
-  }
-
-  async function ping() {
-    setPinging(true);
-    setPingResult(null);
-    try {
-      const res = await fetch("/api/ai/ping");
-      const data = await res.json();
-      setPingResult(JSON.stringify(data, null, 2));
-      toast.success("AI connection confirmed");
-    } catch {
-      setPingResult("Error — check your ANTHROPIC_API_KEY in .env.local");
-      toast.error("AI ping failed");
-    } finally {
-      setPinging(false);
+    if (!res.ok) {
+      toast.error("Couldn't save. Please try again.");
+      return;
     }
+    const p: Profile = await res.json();
+    setSaved(p);
+    setForm(p);
+    toast.success("Saved");
   }
 
   return (
     <div className="max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-4xl leading-none text-ink">
-          Settings
-        </h1>
+      <div className="rise mb-8">
+        <h1 className="text-4xl leading-none text-ink">Settings</h1>
         <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-          Your trainer profile and voice — injected into every AI generation.
+          Your name signs the messages Atlas drafts, and your voice shapes how it writes them.
         </p>
       </div>
 
-      <form onSubmit={save} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Name</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <form onSubmit={save} className="rise rise-1 space-y-8">
+        <section>
+          <p className="eyebrow">Profile</p>
+          <div className="rule mt-3 grid gap-4 pt-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-ink">Name</span>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} placeholder="Your name" className={field} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-ink">Email</span>
+              <input value={form.email} disabled className={field} />
+              <span className="mt-1 block text-xs text-ink-mute">The address you sign in with.</span>
+            </label>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              Voice Profile
-              <Badge variant="outline" className="text-xs font-normal">
-                Injected into every AI prompt
-              </Badge>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Describe your training style, what you say and don&apos;t say, and how you relate to clients.
-              The more specific, the better the AI output.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
+        <section>
+          <p className="eyebrow">Coaching voice</p>
+          <div className="rule mt-3 pt-4">
+            <p className="text-[14px] leading-relaxed text-ink-soft">
+              Used when Atlas drafts outreach and programs for you. The more specific, the more it sounds like you. Leave it empty for a neutral, direct voice.
+            </p>
+            <textarea
               value={form.voiceProfile}
               onChange={(e) => setForm({ ...form, voiceProfile: e.target.value })}
-              rows={18}
-              className="font-mono text-xs leading-relaxed resize-none"
+              rows={12}
+              maxLength={8000}
+              placeholder={VOICE_PLACEHOLDER}
+              className={`${field} resize-y leading-relaxed`}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-1.5" />
-                Save Settings
-              </>
-            )}
-          </Button>
+          <button
+            type="submit"
+            disabled={saving || !dirty}
+            className="press flex h-11 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
       </form>
-
-      {/* AI connection test */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Zap className="w-4 h-4 text-primary" />
-            AI Connection
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Test your Anthropic API key. Add it to <code className="font-mono bg-muted px-1 rounded">.env.local</code> if missing.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={ping} disabled={pinging} size="sm">
-            {pinging ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                Pinging...
-              </>
-            ) : (
-              "Test AI Connection"
-            )}
-          </Button>
-          {pingResult && (
-            <pre className="mt-3 text-xs font-mono bg-muted rounded p-3 overflow-auto max-h-48">
-              {pingResult}
-            </pre>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Methodology info */}
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-primary" />
-            Methodology Files
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Fill in <code className="font-mono bg-muted px-1 rounded">/methodology/*.md</code> files to give Atlas your training framework.
-            These are loaded into every AI prompt automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            {[
-              "00-voice-and-philosophy.md",
-              "01-program-design-framework.md",
-              "02-periodization.md",
-              "03-corrective-exercise.md",
-              "04-nutrition.md",
-              "05-population-templates.md",
-              "06-scope-of-practice.md",
-            ].map((f) => (
-              <div key={f} className="flex items-center gap-2 text-xs">
-                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
-                <code className="font-mono text-muted-foreground">{f}</code>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

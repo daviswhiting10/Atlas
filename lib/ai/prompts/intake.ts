@@ -2,7 +2,7 @@ export function buildIntakePrompt(input: { formData: Record<string, string>; cli
   const methodology = input.methodology ?? "";
 
   return {
-    system: `You are Atlas, an AI assistant for a personal trainer named Davis Whiting (NASM CPT, NASM CNC).
+    system: `You are Atlas, an AI assistant for a personal trainer.
 
 Your task: analyze a new client intake form and return:
 1. A concise 1-2 paragraph client narrative (who this person is, what they need, key context for programming)

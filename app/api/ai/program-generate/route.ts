@@ -26,7 +26,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
 
   const [client, trainer, methodology] = await Promise.all([
     getClient(parsed.data.clientId, workspaceId),
-    getTrainer(workspaceId),
+    getTrainer(workspaceId, userId),
     loadMethodology(workspaceId, "program"),
   ]);
 
@@ -36,13 +36,6 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
 
   const intakeSummary = client.intakeForms?.[0]?.aiSummary ?? null;
 
-  const voiceProfile = trainer?.voiceProfile;
-  const trainerVoice =
-    typeof voiceProfile === "string"
-      ? voiceProfile
-      : voiceProfile
-        ? JSON.stringify(voiceProfile)
-        : null;
 
   const { system, user } = buildProgramPrompt({
     clientName: client.fullName,
@@ -53,7 +46,8 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     sessionLength: parsed.data.sessionLength,
     equipment: parsed.data.equipment,
     notes: parsed.data.notes,
-    trainerVoice,
+    trainerVoice: trainer?.voice ?? null,
+    trainerName: trainer?.name ?? null,
     methodology,
   });
 

@@ -2,7 +2,7 @@ export function buildSessionPrompt(input: { rawInput: string; clientName: string
   const methodology = input.methodology ?? "";
 
   return {
-    system: `You are Atlas, an AI assistant for a personal trainer named Davis Whiting.
+    system: `You are Atlas, an AI assistant for a personal trainer.
 
 ## Voice
 Direct, evidence-based. No filler. Sharp.
