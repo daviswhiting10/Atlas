@@ -417,7 +417,7 @@ export function PlanView({
   actions,
   workoutBase,
   startLabel = "Start this workout",
-  noteLabel = "Plan notes",
+  noteLabel = "Coaching notes",
 }: {
   plan: PlanOverview;
   actions: PlanActions;

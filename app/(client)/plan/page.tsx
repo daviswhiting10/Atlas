@@ -91,22 +91,8 @@ export default async function PlanPage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
+      <div className="max-w-3xl">
         <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" />
-
-        {plan.rationale.length > 0 && (
-          <aside className="rise rise-3 h-fit lg:sticky lg:top-24">
-            <p className="eyebrow">Why this plan</p>
-            <ul className="rule mt-3 divide-y divide-line">
-              {plan.rationale.map((r, i) => (
-                <li key={i} className="flex gap-3 py-3 text-[14px] leading-relaxed text-ink-soft">
-                  <span className="mt-0.5 font-mono text-xs text-ink-mute">{String(i + 1).padStart(2, "0")}</span>
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
       </div>
     </div>
   );

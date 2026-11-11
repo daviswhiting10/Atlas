@@ -4,9 +4,10 @@ import { format, parseISO } from "date-fns";
 import { ArrowRight, Check, ChevronRight, Dumbbell, SkipForward } from "lucide-react";
 import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
-import { METRICS, formatValue, metricFor, unitFor } from "@/lib/plan/overload";
 import { Greeting } from "@/components/athlete/Greeting";
 import { ProgressChart } from "@/components/athlete/ProgressChart";
+import { OverallChart } from "@/components/athlete/OverallChart";
+import { overallProgress } from "@/lib/progress/overall";
 import { StatRow } from "@/components/athlete/StatRow";
 import { cn } from "@/lib/utils";
 
@@ -43,17 +44,8 @@ export default async function TodayPage() {
   const block = plan.blocks[Math.min(Math.floor((plan.currentWeek - 1) / BLOCK_WEEKS), plan.blocks.length - 1)];
   const lighterWeek = plan.lighterWeeks && next != null && next.week % BLOCK_WEEKS === 0;
 
-  // Lead with the lift coming up first today, if it has history; otherwise the biggest lift.
-  const focus =
-    progress.exercises.find((e) => next?.exercises[0]?.name === e.name && e.series.length > 1) ?? progress.exercises[0] ?? null;
-  const metric = focus ? metricFor(athlete.metric, focus.series) : athlete.metric;
-  // Compare like with like: a deload session is low on purpose.
-  const counted = focus?.series.filter((p) => !p.deload) ?? [];
-  const first = counted[0];
-  const latest = counted[counted.length - 1];
-  const latestValue = latest?.[metric] ?? null;
-  const firstValue = first?.[metric] ?? null;
-  const change = latest && first && latest !== first && latestValue != null && firstValue ? Math.round(((latestValue - firstValue) / firstValue) * 100) : null;
+  // At a glance: every lift at once, against its own start.
+  const overall = overallProgress(progress.exercises);
 
   // State-aware helper under the week list.
   const weekLine =
@@ -166,36 +158,27 @@ export default async function TodayPage() {
           <p className="rule pt-3 text-[13px] text-ink-mute">{weekLine}</p>
         </section>
 
-        {/* ── Focus chart: sits on the page, no card ─────────────────── */}
+        {/* ── Overall progress: sits on the page, no card ─────────────── */}
         <section className="rise rise-3 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="truncate text-xl text-ink">{focus?.name ?? "Nothing logged yet"}</h2>
-              <p className="mt-0.5 text-sm text-ink-mute">{focus ? METRICS[metric].label : "Your chart starts with your first set."}</p>
+              <h2 className="truncate text-xl text-ink">{overall.change != null ? "Overall progress" : "Nothing logged yet"}</h2>
+              <p className="mt-0.5 text-sm text-ink-mute">
+                {overall.change != null ? `Across ${overall.lifts} exercise${overall.lifts === 1 ? "" : "s"}, against where each started` : "Your chart starts after an exercise is logged twice."}
+              </p>
             </div>
-            {latest && latestValue != null && (
+            {overall.change != null && overall.since && (
               <div className="shrink-0 text-right">
-                <p className="text-2xl font-semibold leading-none tracking-tight text-ink">
-                  {formatValue(latestValue, metric)}
-                  <span className="ml-1 text-sm font-normal text-ink-mute">{unitFor(metric, focus?.loaded ?? true, focus?.timed)}</span>
+                <p className={cn("text-2xl font-semibold leading-none tracking-tight", overall.change > 0 ? "text-signal" : "text-ink")}>
+                  {overall.change > 0 ? "+" : ""}
+                  {overall.change}%
                 </p>
-                <p className="mt-1.5 text-[13px] text-ink-mute">
-                  {format(parseISO(latest.date), "MMM d")} session
-                  {change != null && change !== 0 && first && (
-                    <>
-                      {" · "}
-                      <span className={cn("font-medium", change > 0 ? "text-signal" : "text-ink-soft")}>
-                        {change > 0 ? "+" : ""}
-                        {change}% since {format(parseISO(first.date), "MMM d")}
-                      </span>
-                    </>
-                  )}
-                </p>
+                <p className="mt-1.5 text-[13px] text-ink-mute">since {format(parseISO(overall.since), "MMM d")}</p>
               </div>
             )}
           </div>
           <div className="mt-4">
-            <ProgressChart series={focus?.series ?? []} metric={metric} loaded={focus?.loaded ?? true} timed={focus?.timed} target={focus?.target} height={250} />
+            {overall.points.length > 0 ? <OverallChart points={overall.points} height={250} /> : <ProgressChart series={[]} metric={athlete.metric} loaded height={250} legend={false} />}
           </div>
           <Link href="/progress" className="press mt-4 inline-flex items-center gap-1 text-sm font-semibold text-ink hover:text-ink-soft">
             All progress <ArrowRight className="h-3.5 w-3.5" />
