@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { ROSTER } from "@/lib/db/roster";
 import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
 
 export const metadata: Metadata = { title: "New plan" };
@@ -14,7 +15,7 @@ export default async function NewPlanPage({ searchParams }: { searchParams: { cl
   if (!workspaceId) redirect("/login");
 
   const [clients, template] = await Promise.all([
-    prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null }, orderBy: { fullName: "asc" }, select: { id: true, fullName: true, primaryGoal: true } }),
+    prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null, ...ROSTER }, orderBy: { fullName: "asc" }, select: { id: true, fullName: true, primaryGoal: true } }),
     searchParams.from ? prisma.program.findFirst({ where: { id: searchParams.from, workspaceId, deletedAt: null }, select: { name: true, goalTags: true } }) : null,
   ]);
   const tags = (template?.goalTags as { goals?: string[]; conditions?: string[] } | null) ?? null;

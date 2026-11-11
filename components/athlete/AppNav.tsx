@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChartLine, House, UserRound, Users } from "lucide-react";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,8 @@ const TABS = [
   { href: "/you", label: "You", icon: UserRound },
 ];
 
-export function AppNav({ name, isDemo }: { name: string; isDemo: boolean }) {
+/** `isCoach`: a coach in My training gets a way back to their clients. */
+export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo: boolean; isCoach?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -56,6 +57,11 @@ export function AppNav({ name, isDemo }: { name: string; isDemo: boolean }) {
 
           <div className="flex items-center gap-2">
             {isDemo && <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-medium text-ink-mute">Demo data</span>}
+            {isCoach && (
+              <Link href="/inbox" className="press hidden h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-sm font-medium text-ink-soft hover:border-ink/20 hover:text-ink md:flex">
+                <ArrowLeft className="h-4 w-4" /> Coaching
+              </Link>
+            )}
             <Link href="/you" className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" aria-label="Your profile">
               {name.charAt(0).toUpperCase()}
             </Link>
@@ -84,6 +90,12 @@ export function AppNav({ name, isDemo }: { name: string; isDemo: boolean }) {
                 </Link>
               );
             })}
+            {isCoach && (
+              <Link href="/inbox" className="press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium text-ink-mute">
+                <Users className="h-[22px] w-[22px]" strokeWidth={1.8} />
+                Coaching
+              </Link>
+            )}
           </div>
         </nav>
       )}

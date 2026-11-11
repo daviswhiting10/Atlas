@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Dumbbell, Inbox, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
+import { Activity, Dumbbell, Inbox, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { cn } from "@/lib/utils";
 
@@ -13,12 +13,15 @@ const ITEMS = [
   { href: "/clients", label: "Roster", icon: Users },
   { href: "/intake", label: "Intake" },
   { href: "/programs", label: "Programs", icon: Dumbbell },
-  { href: "/sessions", label: "Sessions", icon: ClipboardList },
+  { href: "/sessions", label: "Sessions" },
   { href: "/outreach", label: "Outreach" },
 ] as const;
 
-/** Phones get the four most-used sections as tabs; the rest sit behind "More". */
-const TABS = ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Inbox }>;
+/** The coach's own training: the athlete app on their own profile. */
+const MY_TRAINING = { href: "/today", label: "My training", icon: Activity };
+
+/** Phones get the most-used sections as tabs; the rest sit behind "More". */
+const TABS = [...(ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Inbox }>), MY_TRAINING];
 const MORE: Array<{ href: string; label: string }> = [...ITEMS.filter((i) => !("icon" in i)), { href: "/settings", label: "Settings" }];
 
 export function CoachNav({ name }: { name: string }) {
@@ -58,6 +61,12 @@ export function CoachNav({ name }: { name: string }) {
           </nav>
 
           <div className="flex shrink-0 items-center gap-1">
+            <Link
+              href={MY_TRAINING.href}
+              className="press mr-1 hidden h-9 items-center gap-1.5 rounded-full bg-signal px-3.5 text-sm font-semibold text-white hover:bg-signal/90 md:flex"
+            >
+              <Activity className="h-4 w-4" /> My training
+            </Link>
             <Link
               href="/settings"
               aria-label="Settings"

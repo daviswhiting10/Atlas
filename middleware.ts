@@ -6,7 +6,7 @@ const { auth } = NextAuth(authConfig);
 
 /** Pages anyone can see without signing in. */
 const PUBLIC_PATHS = ["/", "/start", "/login", "/error"];
-/** The athlete app. Coaches are sent back to their dashboard. */
+/** The athlete app. Coaches use it too, for their own training ("My training"). */
 const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you"];
 
 const matches = (path: string, list: string[]) =>
@@ -35,8 +35,6 @@ export default auth((req) => {
     // every other API route belongs to the coach dashboard.
     if (isApi) return path === "/api/mcp" ? NextResponse.next() : NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (!matches(path, ATHLETE_PATHS)) return go(home);
-  } else if (matches(path, ATHLETE_PATHS)) {
-    return go(home);
   }
 
   return NextResponse.next();

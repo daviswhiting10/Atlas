@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { ArrowRight, Check, MessageSquare, Plus, UserPlus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { ROSTER } from "@/lib/db/roster";
 import { getClients, runRetentionHeuristic } from "@/lib/db/clients";
 import { Greeting } from "@/components/athlete/Greeting";
 import { StatRow } from "@/components/athlete/StatRow";
@@ -39,7 +40,7 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
   const [clients, logged, livePlans, drafts] = await Promise.all([
     getClients(workspaceId),
     prisma.workoutLog.findMany({
-      where: { client: { workspaceId, deletedAt: null }, date: { gte: weekStart } },
+      where: { client: { workspaceId, deletedAt: null, ...ROSTER }, date: { gte: weekStart } },
       orderBy: { date: "desc" },
       take: 12,
       select: {
@@ -50,8 +51,8 @@ async function InboxContent({ workspaceId }: { workspaceId: string }) {
         _count: { select: { sets: { where: { completed: true } } } },
       },
     }),
-    prisma.programAssignment.count({ where: { workspaceId, status: "ACTIVE", client: { deletedAt: null } } }),
-    prisma.programAssignment.count({ where: { workspaceId, status: "PAUSED", client: { deletedAt: null } } }),
+    prisma.programAssignment.count({ where: { workspaceId, status: "ACTIVE", client: { deletedAt: null, ...ROSTER } } }),
+    prisma.programAssignment.count({ where: { workspaceId, status: "PAUSED", client: { deletedAt: null, ...ROSTER } } }),
   ]);
 
   const active = clients.filter((c) => c.status === "ACTIVE");
@@ -174,7 +175,7 @@ export default async function InboxPage() {
   if (!workspaceId) redirect("/login");
   const firstName = (session.user.name || "Coach").split(" ")[0];
 
-  const clients = await prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null }, select: { id: true, fullName: true, primaryGoal: true, status: true } });
+  const clients = await prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null, ...ROSTER }, select: { id: true, fullName: true, primaryGoal: true, status: true } });
 
   return (
     <div className="space-y-8">

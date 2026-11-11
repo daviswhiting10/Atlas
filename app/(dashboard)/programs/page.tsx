@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, ImageUp, Lightbulb, Plus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { ROSTER } from "@/lib/db/roster";
 import { StatRow } from "@/components/athlete/StatRow";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ export default async function ProgramsPage() {
 
   const [plans, library] = await Promise.all([
     prisma.programAssignment.findMany({
-      where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] }, client: { deletedAt: null } },
+      where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] }, client: { deletedAt: null, ...ROSTER } },
       orderBy: [{ status: "desc" }, { updatedAt: "desc" }],
       select: {
         id: true,

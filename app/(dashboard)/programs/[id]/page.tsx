@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { ROSTER } from "@/lib/db/roster";
 import { getProgram } from "@/lib/db/programs";
 import { displayName } from "@/lib/plan/catalog";
 import { repLabel } from "@/lib/plan/overview";
@@ -21,7 +22,7 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
 
   const [program, clients, assigned] = await Promise.all([
     getProgram(params.id, workspaceId),
-    prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null }, orderBy: { fullName: "asc" }, select: { id: true, fullName: true } }),
+    prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null, ...ROSTER }, orderBy: { fullName: "asc" }, select: { id: true, fullName: true } }),
     prisma.programAssignment.count({ where: { sourceProgramId: params.id, workspaceId } }),
   ]);
   if (!program) notFound();

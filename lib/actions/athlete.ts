@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { athleteIdentity } from "@/lib/athlete/identity";
 import { prisma } from "@/lib/db/client";
 import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
@@ -27,10 +28,10 @@ import {
 // and re-checks ownership of the row it touches.
 async function requireAthlete() {
   const session = await auth();
-  const clientId = session?.user?.clientProfileId;
-  const workspaceId = session?.user?.workspaceId;
-  if (session?.user?.role !== "CLIENT" || !clientId || !workspaceId) throw new Error("Unauthorized");
-  return { clientId, workspaceId };
+  // A client's own profile, or a coach's My training.
+  const identity = await athleteIdentity(session?.user);
+  if (!identity) throw new Error("Unauthorized");
+  return { clientId: identity.clientId, workspaceId: identity.workspaceId };
 }
 
 const clean = (n: number | null, max: number) =>

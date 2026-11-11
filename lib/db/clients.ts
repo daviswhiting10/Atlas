@@ -1,8 +1,9 @@
 import { prisma } from "./client";
+import { ROSTER } from "./roster";
 
 export async function getClients(workspaceId: string) {
   return prisma.clientProfile.findMany({
-    where: { workspaceId, deletedAt: null },
+    where: { workspaceId, deletedAt: null, ...ROSTER },
     orderBy: { updatedAt: "desc" },
     include: {
       _count: { select: { sessionNotes: true, programAssignments: true } },
@@ -98,6 +99,7 @@ export async function runRetentionHeuristic(workspaceId: string): Promise<void> 
       workspaceId,
       deletedAt: null,
       status: "ACTIVE",
+      AND: [ROSTER],
       OR: [
         { lastContactAt: { lt: cutoff } },
         { lastContactAt: null, createdAt: { lt: cutoff } },

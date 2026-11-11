@@ -12,6 +12,7 @@ import { CATALOG_BY_SLUG, displayName } from "@/lib/plan/catalog";
 import { GOALS, normalizePrefs, resolvePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
 import { buildSeries, nextTarget, sessionPoint, type LoggedSet, type SessionPoint, type Target } from "@/lib/plan/overload";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/guest";
+import { athleteIdentity } from "./identity";
 import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/lighter";
 import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
@@ -59,15 +60,16 @@ export type Athlete = {
   isGuest: boolean;
   /** True when the plan came from the generator rather than a coach. */
   selfServe: boolean;
+  /** A coach in My training: their own profile, opened from the coach side. */
+  isCoach: boolean;
 };
 
 export const getAthlete = cache(async (): Promise<Athlete> => {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  if (session.user.role !== "CLIENT") redirect("/inbox");
-  const clientId = session.user.clientProfileId;
-  const workspaceId = session.user.workspaceId;
-  if (!clientId || !workspaceId) redirect("/login");
+  const identity = await athleteIdentity(session.user);
+  if (!identity) redirect("/login");
+  const { clientId, workspaceId, isCoach } = identity;
 
   const profile = await prisma.clientProfile.findUnique({
     where: { id: clientId },
@@ -89,6 +91,7 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
     isDemo: meta?.demo === true,
     isGuest: (session.user.email ?? "").endsWith(`@${GUEST_EMAIL_DOMAIN}`),
     selfServe: meta != null,
+    isCoach,
   };
 });
 
