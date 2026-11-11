@@ -91,7 +91,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
+    <div className="max-w-2xl">
       <div className="mb-6">
         <h1
           className="font-display leading-[1.04] tracking-[-0.01em]"

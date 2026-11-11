@@ -1671,7 +1671,7 @@ function DesktopSetRow({
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors",
             entry.isBodyweight ? "border-[rgba(31,122,77,0.30)] text-[var(--success)] bg-[rgba(31,122,77,0.07)]" :
-            entry.isBand ? "border-[rgba(43,107,255,0.30)] text-[var(--blue-deep)] bg-[rgba(43,107,255,0.07)]" :
+            entry.isBand ? "border-[rgba(30,107,78,0.30)] text-[var(--blue-deep)] bg-[rgba(30,107,78,0.07)]" :
             "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >
@@ -1686,7 +1686,7 @@ function DesktopSetRow({
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors font-medium",
             entry.isSeconds
-              ? "border-[rgba(43,107,255,0.30)] text-[var(--blue-deep)] bg-[rgba(43,107,255,0.07)] hover:bg-[rgba(43,107,255,0.12)]"
+              ? "border-[rgba(30,107,78,0.30)] text-[var(--blue-deep)] bg-[rgba(30,107,78,0.07)] hover:bg-[rgba(30,107,78,0.12)]"
               : "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >

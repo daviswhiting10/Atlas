@@ -100,7 +100,7 @@ export default function LeadsPage() {
   }, {});
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8">
+    <div className="">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1

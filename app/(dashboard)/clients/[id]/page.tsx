@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { StatRow } from "@/components/athlete/StatRow";
 import {
   ArrowLeft,
   Dumbbell,
@@ -27,8 +28,6 @@ import {
   UserCheck,
   ChevronDown,
   CalendarDays,
-  TrendingDown,
-  Activity,
   MoreHorizontal,
   BarChart2,
 } from "lucide-react";
@@ -86,18 +85,18 @@ const GOAL_LABELS: Record<string, string> = {
 };
 
 const GOAL_AVATAR_BG: Record<string, string> = {
-  weight_loss: "bg-green-50 text-green-700",
-  hypertrophy: "bg-blue-50 text-blue-700",
-  pain_mgmt: "bg-amber-50 text-amber-700",
-  performance: "bg-[rgba(43,107,255,0.07)] text-[var(--blue)]",
+  weight_loss: "bg-signal/10 text-signal",
+  hypertrophy: "bg-signal/10 text-signal-deep",
+  pain_mgmt: "bg-warn/10 text-warn",
+  performance: "bg-[rgba(30,107,78,0.07)] text-[var(--blue)]",
   general: "bg-muted text-muted-foreground",
 };
 
 const STATUS_CONFIG = {
   PROSPECT: { label: "Prospect", className: "border border-[var(--line)] text-[var(--ink-soft)] bg-[var(--muted)]" },
-  ACTIVE: { label: "Active", className: "border border-green-300 text-green-700 bg-green-50" },
-  AT_RISK: { label: "At Risk", className: "border border-amber-300 text-amber-700 bg-amber-50" },
-  CHURNED: { label: "Churned", className: "border border-red-300 text-red-700 bg-red-50" },
+  ACTIVE: { label: "Active", className: "border border-signal/30 text-signal bg-signal/10" },
+  AT_RISK: { label: "At Risk", className: "border border-warn/30 text-warn bg-warn/10" },
+  CHURNED: { label: "Churned", className: "border border-destructive/30 text-destructive bg-destructive/10" },
 };
 
 function getInitials(name: string) {
@@ -214,7 +213,7 @@ export default function ClientDetailPage() {
 
   if (phase === "loading") {
     return (
-      <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl space-y-4">
+      <div className="space-y-4">
         <div className="h-8 w-32 bg-muted rounded animate-pulse" />
         <div className="h-24 bg-muted rounded-xl animate-pulse" />
         <div className="h-16 bg-muted rounded-lg animate-pulse" />
@@ -226,7 +225,7 @@ export default function ClientDetailPage() {
 
   if (!client) {
     return (
-      <div className="px-5 pt-7 md:px-8 md:pt-8">
+      <div className="">
         <p className="text-muted-foreground">Client not found.</p>
         <Link href="/clients" className={cn(buttonVariants({ variant: "link" }), "p-0 mt-2 block")}>
           Back to clients
@@ -249,7 +248,7 @@ export default function ClientDetailPage() {
   const lastSession = client.workoutLogs[0] ?? null;
 
   return (
-    <div className={cn("px-5 pt-5 md:px-8 md:pt-8 md:max-w-5xl pb-12", phase === "fading" && "animate-in fade-in-0 duration-200 ease-out")}>
+    <div className={cn("pb-12", phase === "fading" && "animate-in fade-in-0 duration-200 ease-out")}>
       {/* Back */}
       <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-3 -ml-2")}>
         <ArrowLeft className="w-4 h-4 mr-1" />
@@ -260,12 +259,12 @@ export default function ClientDetailPage() {
       <div className="flex items-start justify-between mb-4 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {/* Avatar */}
-          <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-base md:text-lg font-bold shrink-0", avatarBg)}>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-base font-semibold text-white md:h-14 md:w-14 md:text-lg">
             {getInitials(client.fullName)}
           </div>
           {/* Name + meta */}
           <div className="min-w-0">
-            <h1 className="font-display leading-[1.04] tracking-[-0.01em] truncate" style={{ fontSize: "clamp(1.5rem, 3vw, 2.25rem)", color: "var(--ink)" }}>{client.fullName}</h1>
+            <h1 className="truncate text-[30px] leading-[1.08] text-ink sm:text-[38px]">{client.fullName}</h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -334,9 +333,9 @@ export default function ClientDetailPage() {
 
       {/* Retention flag banner */}
       {client.retentionFlag && (
-        <div className="mb-4 px-4 py-2.5 rounded-lg border border-amber-200 bg-amber-50 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-          <p className="text-sm text-amber-800">{client.retentionFlag}</p>
+        <div className="mb-4 px-4 py-2.5 rounded-lg border border-warn/30 bg-warn/10 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-warn mt-0.5 shrink-0" />
+          <p className="text-sm text-warn">{client.retentionFlag}</p>
         </div>
       )}
 
@@ -373,33 +372,16 @@ export default function ClientDetailPage() {
         </div>
       )}
 
-      {/* ── KPI strip — scrollable on mobile, grid on desktop ────────────── */}
-      <div className="flex gap-3 overflow-x-auto pb-1 mb-5 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible md:pb-0 lg:grid-cols-5">
-        <KpiTile
-          icon={<TrendingDown className="w-4 h-4" />}
-          label="Current weight"
-          value="—"
-          sub="No measurements"
-        />
-        <KpiTile
-          icon={<Activity className="w-4 h-4" />}
-          label="Adherence"
-          value="—"
-          sub="No workout logs"
-        />
-        <KpiTile
-          icon={<CalendarDays className="w-4 h-4" />}
-          label="Sessions this week"
-          value={sessionsThisWeek > 0 ? String(sessionsThisWeek) : "0"}
-          sub={sessionsThisWeek === 1 ? "session logged" : "sessions logged"}
-        />
-        <KpiTile
-          icon={<CalendarDays className="w-4 h-4" />}
-          label="Last session"
-          value={lastSession ? relativeTime(lastSession.date) : "—"}
-          sub={lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None yet"}
-        />
-      </div>
+      {/* ── Headline numbers: the athlete app's stat row ───────────────── */}
+      <StatRow
+        className="mb-6"
+        stats={[
+          { label: "Plan", value: activeProgram ? String(activeProgram._count.assignedWorkouts) : "—", unit: activeProgram ? "workouts" : undefined, hint: activeProgram ? activeProgram.name : "No live plan" },
+          { label: "Sessions", value: String(client.workoutLogs.length), hint: "logged in total" },
+          { label: "This week", value: String(sessionsThisWeek), hint: sessionsThisWeek === 1 ? "session" : "sessions" },
+          { label: "Last session", value: lastSession ? relativeTime(lastSession.date) : "—", hint: lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "None yet" },
+        ]}
+      />
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
       <Tabs defaultValue="overview">
@@ -477,10 +459,10 @@ export default function ClientDetailPage() {
                       <Dumbbell className="w-7 h-7 text-muted-foreground mx-auto mb-2" />
                       <p className="text-sm font-medium">No program assigned</p>
                       <p className="text-xs text-muted-foreground mt-1 mb-3">
-                        Pick a template from the library to get started.
+                        Generate one, or start from a library program.
                       </p>
-                      <Link href="/programs" className={buttonVariants({ size: "sm" })}>
-                        Assign Program
+                      <Link href={`/programs/new?client=${client.id}`} className={buttonVariants({ size: "sm" })}>
+                        New plan
                       </Link>
                     </div>
                   )}
@@ -556,24 +538,24 @@ export default function ClientDetailPage() {
 
               {/* Red flags / intake CTA */}
               {redFlags && redFlags.length > 0 ? (
-                <Card className="border-red-200">
+                <Card className="border-destructive/30">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-red-700 flex items-center gap-1.5">
+                    <CardTitle className="text-sm font-semibold text-destructive flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5" />
                       Red Flags
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0 space-y-2">
                     {redFlags.map((flag, i) => (
-                      <div key={i} className="p-2.5 bg-red-50 rounded border border-red-100">
+                      <div key={i} className="p-2.5 bg-destructive/10 rounded border border-destructive/30">
                         <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs font-medium text-red-800">{flag.issue}</span>
+                          <span className="text-xs font-medium text-destructive">{flag.issue}</span>
                           <Badge
                             variant="outline"
                             className={cn(
                               "text-[10px] h-4 px-1",
-                              flag.severity === "high" ? "border-red-300 text-red-700" :
-                              flag.severity === "medium" ? "border-amber-300 text-amber-700" :
+                              flag.severity === "high" ? "border-destructive/30 text-destructive" :
+                              flag.severity === "medium" ? "border-warn/30 text-warn" :
                               "border-[var(--line)] text-[var(--ink-soft)]"
                             )}
                           >
@@ -661,9 +643,9 @@ export default function ClientDetailPage() {
             <p className="text-sm text-muted-foreground">
               {client.programAssignments.length} assignment{client.programAssignments.length !== 1 ? "s" : ""}
             </p>
-            <Link href="/programs" className={cn(buttonVariants({ size: "sm" }))}>
+            <Link href={`/programs/new?client=${client.id}`} className={cn(buttonVariants({ size: "sm" }))}>
               <Dumbbell className="w-3 h-3 mr-1.5" />
-              Assign Program
+              New plan
             </Link>
           </div>
           {client.programAssignments.length === 0 ? (
@@ -695,10 +677,11 @@ export default function ClientDetailPage() {
                         variant="outline"
                         className={cn(
                           "text-xs capitalize",
-                          a.status === "ACTIVE" && "border-green-200 text-green-700"
+                          a.status === "ACTIVE" && "border-signal/30 text-signal",
+                          a.status === "PAUSED" && "border-line text-ink-soft"
                         )}
                       >
-                        {a.status.toLowerCase()}
+                        {a.status === "PAUSED" ? "draft" : a.status.toLowerCase()}
                       </Badge>
                     </CardContent>
                   </Card>
@@ -813,25 +796,3 @@ export default function ClientDetailPage() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function KpiTile({
-  icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-card px-4 py-3 space-y-1 snap-start shrink-0 min-w-[140px] md:min-w-0">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <span className="w-4 h-4">{icon}</span>
-        <span className="text-xs">{label}</span>
-      </div>
-      <p className="text-xl font-semibold tracking-tight">{value}</p>
-      <p className="text-xs text-muted-foreground">{sub}</p>
-    </div>
-  );
-}

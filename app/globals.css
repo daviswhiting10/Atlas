@@ -20,7 +20,7 @@
 
 /* ── Aura blobs ────────────────────────────────────────────────────────────
    Two large blurred circles behind all content. Fixed, z-index -1.
-   Spec: TL 900×900 rgba(43,107,255,0.22) blur 80px, 22s anim
+   Spec: TL 900×900 rgba(30,107,78,0.22) blur 80px, 22s anim
          BR 1100×1100 rgba(123,167,255,0.20) blur 80px, 28s anim       */
 .aura {
   position: fixed;
@@ -35,7 +35,7 @@
   height: 900px;
   top: -300px;
   left: -200px;
-  background: rgba(43, 107, 255, 0.22);
+  background: rgba(30, 107, 78, 0.22);
   animation: aura-tl 22s ease-in-out infinite alternate;
 }
 .aura-br {
@@ -105,9 +105,9 @@
     --ink-soft:   #3A4255;            /* secondary text          */
     --ink-mute:   #6B7280;            /* tertiary / labels       */
     --line:       rgba(11,15,26,0.08);/* borders                 */
-    --blue:       #2B6BFF;            /* single accent           */
-    --blue-deep:  #1947C4;            /* accent hover / pressed  */
-    --blue-soft:  #7BA7FF;            /* glows only              */
+    --blue:       #1E6B4E;            /* legacy name for --signal */
+    --blue-deep:  #154D38;            /* legacy name for --signal-deep */
+    --blue-soft:  #8DBBA6;            /* soft signal tint        */
     --success:    #1F7A4D;            /* green states            */
     --warn:       #B45309;            /* amber / at-risk states  */
     --gold:       #C98A1B;            /* personal records only   */
@@ -124,11 +124,11 @@
     --popover-foreground:    var(--ink);
     --primary:               var(--blue);
     --primary-foreground:    #FFFFFF;
-    --secondary:             rgba(43,107,255,0.07);
+    --secondary:             rgba(30,107,78,0.07);
     --secondary-foreground:  var(--blue-deep);
     --muted:                 rgba(11,15,26,0.04);
     --muted-foreground:      var(--ink-mute);
-    --accent:                rgba(43,107,255,0.07);
+    --accent:                rgba(30,107,78,0.07);
     --accent-foreground:     var(--blue-deep);
     --destructive:           #C8341A;
     --destructive-foreground:#FFFFFF;
@@ -155,9 +155,9 @@
     --ink-soft:   #A0A8BC;
     --ink-mute:   #5A6278;
     --line:       rgba(238,240,245,0.08);
-    --blue:       #4A82FF;
-    --blue-deep:  #2B6BFF;
-    --blue-soft:  #7BA7FF;
+    --blue:       #3E9A72;
+    --blue-deep:  #1E6B4E;
+    --blue-soft:  #8DBBA6;
     --success:    #26A461;
     --warn:       #D17A2C;
 
@@ -169,12 +169,12 @@
     --popover-foreground:    var(--ink);
     --primary:               var(--blue);
     --primary-foreground:    #FFFFFF;
-    --secondary:             rgba(74,130,255,0.10);
-    --secondary-foreground:  #93C5FD;
+    --secondary:             rgba(30,107,78,0.10);
+    --secondary-foreground:  #8DBBA6;
     --muted:                 rgba(238,240,245,0.05);
     --muted-foreground:      var(--ink-mute);
-    --accent:                rgba(74,130,255,0.10);
-    --accent-foreground:     #93C5FD;
+    --accent:                rgba(30,107,78,0.10);
+    --accent-foreground:     #8DBBA6;
     --destructive:           #E05A40;
     --destructive-foreground:#FFFFFF;
     --border:                var(--line);

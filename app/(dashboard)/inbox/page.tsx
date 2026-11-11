@@ -1,372 +1,199 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
-import { getClients, runRetentionHeuristic } from "@/lib/db/clients";
-import { auth } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/status-badge";
-import { AlertTriangle, CalendarClock, ClipboardList, MessageSquare, Users } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
+import { format } from "date-fns";
+import { ArrowRight, Check, MessageSquare, Plus, UserPlus } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/client";
+import { getClients, runRetentionHeuristic } from "@/lib/db/clients";
+import { Greeting } from "@/components/athlete/Greeting";
+import { StatRow } from "@/components/athlete/StatRow";
+import { StatusBadge } from "@/components/status-badge";
 import { LogSessionCard } from "./_components/LogSessionCard";
 import { ProspectFollowUpButton } from "./_components/ProspectFollowUpButton";
-import { FadeIn } from "@/components/fade-in";
 
-// ── Skeleton ───────────────────────────────────────────────────────────────────
-// Mirrors the visual structure of the data section so nothing jumps on load.
+export const metadata: Metadata = { title: "Inbox" };
 
-function InboxSkeleton() {
+type Status = "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
+
+function Skeleton() {
   return (
-    <div>
-      {/* Stat strip */}
-      <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4 md:gap-4 md:mb-10">
-        {[0, 1, 2, 3].map((i) => (
-          <Card key={i}>
-            <CardContent className="pt-4 pb-3">
-              <div className="h-14 w-12 rounded-lg bg-muted animate-pulse mb-1" />
-              <div className="h-3 w-16 rounded bg-muted animate-pulse" />
-            </CardContent>
-          </Card>
-        ))}
+    <div className="fade-in space-y-8" aria-busy="true" aria-label="Loading">
+      <div className="skeleton h-24 w-full" />
+      <div className="grid gap-10 lg:grid-cols-2">
+        <div className="skeleton h-72" />
+        <div className="skeleton h-72" />
       </div>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-        {[0, 1, 2].map((i) => (
-          <Card key={i}>
-            <CardContent className="py-4 px-4 min-h-[72px] sm:min-h-[120px]">
-              <div className="flex items-center gap-3 sm:flex-col sm:items-start sm:pt-1 sm:gap-2">
-                <div className="w-9 h-9 rounded-[10px] bg-muted animate-pulse shrink-0" />
-                <div className="space-y-1.5">
-                  <div className="h-3 w-20 rounded bg-muted animate-pulse" />
-                  <div className="h-2.5 w-28 rounded bg-muted animate-pulse" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Client list */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="h-4 w-24 rounded bg-muted animate-pulse" />
-        </CardHeader>
-        <CardContent className="p-0 md:px-4 md:pb-4">
-          <div className="divide-y divide-[var(--line)] md:divide-y-0 md:space-y-0.5">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-3 px-4 md:px-2 py-3 md:py-2">
-                <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />
-                <div className="flex-1 space-y-1.5 min-w-0">
-                  <div className="h-3 w-32 rounded bg-muted animate-pulse" />
-                  <div className="h-2.5 w-20 rounded bg-muted animate-pulse" />
-                </div>
-                <div className="h-7 w-12 rounded-md bg-muted animate-pulse" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
 
-// ── Data component ─────────────────────────────────────────────────────────────
-// Async server component — this is the only part that waits on the database.
-// Wrapped in <Suspense> by the page shell so the heading renders immediately.
-
 async function InboxContent({ workspaceId }: { workspaceId: string }) {
-  // Write-then-read: heuristic must finish before getClients sees updated statuses.
+  // Write-then-read: the heuristic must finish before getClients sees updated statuses.
   await runRetentionHeuristic(workspaceId);
-  const clients = await getClients(workspaceId);
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
 
-  const activeClients = clients.filter((c) => c.status === "ACTIVE");
-  const atRiskClients  = clients.filter((c) => c.status === "AT_RISK");
-  const prospects      = clients.filter((c) => c.status === "PROSPECT");
+  const [clients, logged, livePlans, drafts] = await Promise.all([
+    getClients(workspaceId),
+    prisma.workoutLog.findMany({
+      where: { client: { workspaceId, deletedAt: null }, date: { gte: weekStart } },
+      orderBy: { date: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        date: true,
+        client: { select: { id: true, fullName: true } },
+        assignedWorkout: { select: { name: true } },
+        _count: { select: { sets: { where: { completed: true } } } },
+      },
+    }),
+    prisma.programAssignment.count({ where: { workspaceId, status: "ACTIVE", client: { deletedAt: null } } }),
+    prisma.programAssignment.count({ where: { workspaceId, status: "PAUSED", client: { deletedAt: null } } }),
+  ]);
 
+  const active = clients.filter((c) => c.status === "ACTIVE");
+  const atRisk = clients.filter((c) => c.status === "AT_RISK");
+  const prospects = clients.filter((c) => c.status === "PROSPECT");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const followUps = clients.filter((c) => c.status === "PROSPECT" && (c as any).reachOutDate != null);
+  const followUps = prospects.filter((c) => (c as any).reachOutDate != null);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const attention = atRisk.length + followUps.length;
 
   return (
-    <FadeIn>
-      {/* ── Stat strip ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4 md:gap-4 md:mb-10">
-        {[
-          { value: clients.length,       label: "Total Clients", color: "var(--ink)" },
-          { value: activeClients.length,  label: "Active",        color: "var(--success)" },
-          { value: atRiskClients.length,  label: "At Risk",       color: "var(--warn)" },
-          { value: prospects.length,      label: "Prospects",     color: "var(--blue)" },
-        ].map(({ value, label, color }) => (
-          <Card key={label} lift>
-            <CardContent className="pt-4 pb-3">
-              <div
-                className="font-display italic leading-none"
-                style={{ fontSize: "clamp(3.5rem, 6vw, 5rem)", color }}
-              >
-                {value}
-              </div>
-              <div className="font-body text-xs mt-1" style={{ color: "var(--ink-mute)" }}>
-                {label}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <div className="space-y-10">
+      <StatRow
+        className="rise rise-1"
+        stats={[
+          { label: "Clients", value: String(clients.length), hint: `${active.length} active` },
+          { label: "Live plans", value: String(livePlans), hint: drafts > 0 ? `${drafts} draft${drafts === 1 ? "" : "s"} to assign` : "all assigned" },
+          { label: "Logged this week", value: String(logged.length), hint: logged.length > 0 ? `last on ${format(logged[0].date, "EEE")}` : "no sessions yet" },
+          { label: "Need attention", value: String(attention), hint: attention > 0 ? `${atRisk.length} at risk · ${followUps.length} follow-up${followUps.length === 1 ? "" : "s"}` : "nothing waiting" },
+        ]}
+      />
 
-      {/* ── At-risk alerts ────────────────────────────────────────────── */}
-      {atRiskClients.length > 0 && (
-        <div
-          className="mb-6 rounded-[18px] p-4"
-          style={{
-            border: "1px solid rgba(180,83,9,0.25)",
-            background: "rgba(180,83,9,0.05)",
-          }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: "var(--warn)" }} />
-            <p className="font-body text-sm font-medium" style={{ color: "var(--warn)" }}>
-              {atRiskClients.length} client{atRiskClients.length > 1 ? "s" : ""} need attention
-            </p>
-          </div>
-          <div className="space-y-2">
-            {atRiskClients.map((client) => (
-              <div
-                key={client.id}
-                className="flex items-center justify-between py-2 px-3 rounded-xl"
-                style={{ background: "var(--paper)", border: "1px solid var(--line)" }}
-              >
-                <div>
-                  <Link
-                    href={`/clients/${client.id}`}
-                    className="font-body text-sm font-medium hover:underline"
-                    style={{ color: "var(--ink)" }}
-                  >
-                    {client.fullName}
-                  </Link>
-                  {client.retentionFlag && (
-                    <p className="font-body text-xs mt-0.5" style={{ color: "var(--ink-mute)" }}>
-                      {client.retentionFlag}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {client.retentionScore != null && (
-                    <span
-                      className="hidden md:inline font-body text-xs"
-                      style={{ color: "var(--ink-mute)" }}
-                    >
-                      Score: {client.retentionScore}
-                    </span>
-                  )}
-                  <Link
-                    href={`/outreach?clientId=${client.id}`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                  >
-                    <MessageSquare className="w-3 h-3 md:mr-1" />
-                    <span className="hidden md:inline">Reach out</span>
-                  </Link>
-                </div>
-              </div>
+      {attention > 0 && (
+        <section className="rise rise-2">
+          <h2 className="text-xl text-ink">Needs attention</h2>
+          <ul className="rule mt-3 divide-y divide-line">
+            {atRisk.map((c) => (
+              <li key={c.id} className="flex items-center gap-3 py-3">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-warn" />
+                <Link href={`/clients/${c.id}`} className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold text-ink">{c.fullName}</span>
+                  <span className="block truncate text-[13px] text-ink-mute">{c.retentionFlag ?? "At risk of dropping off"}</span>
+                </Link>
+                <Link href={`/outreach?clientId=${c.id}`} className="press flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:border-ink/25">
+                  <MessageSquare className="h-3.5 w-3.5" /> Reach out
+                </Link>
+              </li>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Prospect follow-up reminders ─────────────────────────────── */}
-      {followUps.length > 0 && (
-        <div
-          className="mb-6 rounded-[18px] p-4"
-          style={{
-            border: "1px solid rgba(43,107,255,0.2)",
-            background: "rgba(43,107,255,0.04)",
-          }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <CalendarClock className="w-4 h-4 shrink-0" style={{ color: "var(--blue)" }} />
-            <p className="font-body text-sm font-medium" style={{ color: "var(--blue)" }}>
-              {followUps.length} prospect follow-up{followUps.length > 1 ? "s" : ""} scheduled
-            </p>
-          </div>
-          <div className="space-y-2">
-            {followUps.map((client) => {
+            {followUps.map((c) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const rod: Date = (client as any).reachOutDate as Date;
-              const due = new Date(rod.toISOString().slice(0, 10) + "T12:00:00");
-              const isPast = due < today;
-              const label = isPast
-                ? "Overdue"
-                : due.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              const due = new Date(((c as any).reachOutDate as Date).toISOString().slice(0, 10) + "T12:00:00");
+              const overdue = due < today;
               return (
-                <div
-                  key={client.id}
-                  className="flex items-center justify-between py-2 px-3 rounded-xl"
-                  style={{ background: "var(--paper)", border: "1px solid var(--line)" }}
-                >
-                  <div>
-                    <Link
-                      href={`/clients/${client.id}`}
-                      className="font-body text-sm font-medium hover:underline"
-                      style={{ color: "var(--ink)" }}
-                    >
-                      {client.fullName}
-                    </Link>
-                    <p className="font-body text-xs mt-0.5" style={{ color: isPast ? "var(--warn)" : "var(--ink-mute)" }}>
-                      Follow up: {label}
-                    </p>
-                  </div>
-                  <ProspectFollowUpButton clientId={client.id} />
-                </div>
+                <li key={c.id} className="flex items-center gap-3 py-3">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-ink/30" />
+                  <Link href={`/clients/${c.id}`} className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold text-ink">{c.fullName}</span>
+                    <span className={overdue ? "block text-[13px] text-warn" : "block text-[13px] text-ink-mute"}>Prospect · follow up {overdue ? "overdue" : `on ${format(due, "MMM d")}`}</span>
+                  </Link>
+                  <ProspectFollowUpButton clientId={c.id} />
+                </li>
               );
             })}
-          </div>
-        </div>
+          </ul>
+        </section>
       )}
 
-      {/* ── Quick actions ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-        <Link href="/clients">
-          <Card lift className="cursor-pointer">
-            <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
-              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: "rgba(43,107,255,0.08)" }}>
-                <Users className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
-              </div>
-              <div>
-                <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>Add Client</p>
-                <p className="font-body text-xs" style={{ color: "var(--ink-mute)" }}>New intake or import</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <LogSessionCard clients={clients.map((c) => ({ id: c.id, fullName: c.fullName, primaryGoal: c.primaryGoal ?? null, status: c.status }))} />
-
-        <Link href="/outreach">
-          <Card lift className="cursor-pointer">
-            <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
-              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: "rgba(43,107,255,0.08)" }}>
-                <MessageSquare className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
-              </div>
-              <div>
-                <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>Outreach</p>
-                <p className="font-body text-xs" style={{ color: "var(--ink-mute)" }}>Generate messages</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      {/* ── Client list ───────────────────────────────────────────────── */}
-      {clients.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="font-display text-sm">
-              <span className="md:hidden">Start Session</span>
-              <span className="hidden md:inline">All Clients</span>
-            </CardTitle>
-            <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
-              View all
+      <div className="grid gap-x-12 gap-y-10 lg:grid-cols-2">
+        <section className="rise rise-3 min-w-0">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-xl text-ink">Clients</h2>
+            <Link href="/clients" className="press text-sm font-semibold text-ink hover:text-ink-soft">
+              Roster <ArrowRight className="inline h-3.5 w-3.5" />
             </Link>
-          </CardHeader>
-          <CardContent className="p-0 md:px-4 md:pb-4">
-            <div className="divide-y divide-[var(--line)] md:divide-y-0 md:space-y-0.5">
-              {clients.slice(0, 8).map((client) => (
-                <div
-                  key={client.id}
-                  className="flex items-center gap-3 px-4 md:px-2 py-3 md:py-2 md:rounded-xl md:hover:bg-[rgba(11,15,26,0.03)] transition-colors"
-                >
-                  <Link href={`/clients/${client.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center font-body text-xs font-medium shrink-0"
-                      style={{ background: "rgba(43,107,255,0.08)", color: "var(--blue)" }}
-                    >
-                      {client.fullName.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-body text-sm font-medium truncate" style={{ color: "var(--ink)" }}>
-                        {client.fullName}
-                      </p>
-                      {client.primaryGoal && (
-                        <p className="font-body text-xs truncate" style={{ color: "var(--ink-mute)" }}>
-                          {client.primaryGoal.replace(/_/g, " ")}
-                        </p>
-                      )}
-                    </div>
+          </div>
+          {clients.length === 0 ? (
+            <p className="rule mt-3 pt-4 text-[15px] text-ink-soft">No clients yet. Add one from the roster or start with an intake.</p>
+          ) : (
+            <ul className="rule mt-3 divide-y divide-line">
+              {clients.slice(0, 8).map((c) => (
+                <li key={c.id}>
+                  <Link href={`/clients/${c.id}`} className="press group flex items-center gap-3 py-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">{c.fullName.charAt(0)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-ink">{c.fullName}</span>
+                      {c.primaryGoal && <span className="block truncate text-[13px] text-ink-mute">{c.primaryGoal.replace(/_/g, " ")}</span>}
+                    </span>
+                    <StatusBadge status={c.status as Status} />
                   </Link>
-                  <Link
-                    href={`/clients/${client.id}/log`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "md:hidden shrink-0 gap-1.5")}
-                  >
-                    <ClipboardList className="w-3.5 h-3.5" />
-                    Log
-                  </Link>
-                  <div className="hidden md:block shrink-0">
-                    <StatusBadge status={client.status as "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED"} />
-                  </div>
-                </div>
+                </li>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="py-16 flex flex-col items-center text-center">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-5"
-              style={{ background: "rgba(43,107,255,0.08)" }}
-            >
-              <Users className="w-7 h-7" style={{ color: "var(--blue)" }} />
-            </div>
-            <h3 className="font-display text-xl mb-1" style={{ color: "var(--ink)" }}>No clients yet</h3>
-            <p className="font-body text-sm mb-5 max-w-xs" style={{ color: "var(--ink-mute)" }}>
-              Add your first client to get started. Atlas will help you track, program, and retain them.
-            </p>
-            <Link href="/clients" className={buttonVariants()}>Add first client</Link>
-          </CardContent>
-        </Card>
-      )}
-    </FadeIn>
+            </ul>
+          )}
+        </section>
+
+        <section className="rise rise-4 min-w-0">
+          <h2 className="text-xl text-ink">Logged this week</h2>
+          {logged.length === 0 ? (
+            <p className="rule mt-3 pt-4 text-[15px] text-ink-soft">Nothing logged since Monday. Sessions your clients log, and ones you log for them, show up here.</p>
+          ) : (
+            <ul className="rule mt-3 divide-y divide-line">
+              {logged.map((l) => (
+                <li key={l.id}>
+                  <Link href={`/clients/${l.client.id}/sessions/${l.id}`} className="press group flex items-center gap-3 py-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-white">
+                      <Check className="h-4 w-4" strokeWidth={3} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-ink">{l.client.fullName}</span>
+                      <span className="block truncate text-[13px] text-ink-mute">
+                        {l.assignedWorkout?.name ?? "Ad-hoc session"} · {l._count.sets} sets
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[13px] text-ink-mute">{format(l.date, "EEE")}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
-
-// ── Page shell ─────────────────────────────────────────────────────────────────
-// Only awaits auth() (fast cookie/JWT read — Auth.js caches per request).
-// The heading renders immediately; InboxContent streams in behind the skeleton.
 
 export default async function InboxPage() {
   const session = await auth();
   const workspaceId = session?.user?.workspaceId;
+  if (!workspaceId) redirect("/login");
+  const firstName = (session.user.name || "Coach").split(" ")[0];
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const clients = await prisma.clientProfile.findMany({ where: { workspaceId, deletedAt: null }, select: { id: true, fullName: true, primaryGoal: true, status: true } });
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
-      {/* Renders immediately — no data dependency */}
-      <div className="mb-6 md:mb-10">
-        <h1
-          className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--ink)" }}
-        >
-          {greeting},&nbsp;<em>Davis.</em>
-        </h1>
-        <p className="font-body text-sm mt-1.5" style={{ color: "var(--ink-mute)" }}>
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
+    <div className="space-y-8">
+      <div className="rise flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <Greeting name={firstName} />
+        <div className="flex flex-wrap gap-2">
+          <LogSessionCard clients={clients} />
+          <Link href="/programs/new" className="press flex h-10 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/25">
+            <Plus className="h-4 w-4" /> New plan
+          </Link>
+          <Link href="/clients" className="press flex h-10 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85">
+            <UserPlus className="h-4 w-4" /> Add client
+          </Link>
+        </div>
       </div>
 
-      {/* Skeleton swapped for real content once InboxContent resolves */}
-      {workspaceId ? (
-        <Suspense fallback={<InboxSkeleton />}>
-          <InboxContent workspaceId={workspaceId} />
-        </Suspense>
-      ) : (
-        <InboxSkeleton />
-      )}
+      <Suspense fallback={<Skeleton />}>
+        <InboxContent workspaceId={workspaceId} />
+      </Suspense>
     </div>
   );
 }

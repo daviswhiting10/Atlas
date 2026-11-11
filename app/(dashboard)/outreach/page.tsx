@@ -168,7 +168,7 @@ function TemplateCard({ template }: { template: (typeof TEMPLATES)[0] }) {
         <p className="text-xs text-muted-foreground mt-2">
           Fill in the blanks (______), then copy.
           {savedDefault !== template.body && (
-            <span className="ml-2 text-blue-600">Custom default saved.</span>
+            <span className="ml-2 text-signal">Custom default saved.</span>
           )}
         </p>
       </CardContent>
@@ -248,7 +248,7 @@ export default function OutreachPage() {
   }
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-3xl">
+    <div className="max-w-3xl">
       <div className="mb-6">
         <h1 className="font-display leading-[1.04] tracking-[-0.01em]" style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}>Outreach</h1>
         <p className="text-muted-foreground text-sm mt-0.5">

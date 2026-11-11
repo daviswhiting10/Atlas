@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TrendingUp, Search } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -36,31 +35,18 @@ export function LogSessionCard({ clients }: { clients: Client[] }) {
 
   return (
     <>
-      <button type="button" className="text-left w-full" onClick={() => setOpen(true)}>
-        <Card lift className="cursor-pointer">
-          <CardContent className="py-4 px-4 flex items-center gap-3 sm:flex-col sm:items-start sm:pt-5 sm:gap-2 min-h-[72px] sm:min-h-[120px]">
-            <div
-              className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
-              style={{ background: "rgba(43,107,255,0.08)" }}
-            >
-              <TrendingUp className="w-[18px] h-[18px]" style={{ color: "var(--blue)" }} />
-            </div>
-            <div>
-              <p className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>
-                Log Session
-              </p>
-              <p className="font-body text-xs" style={{ color: "var(--ink-mute)" }}>
-                Pick a client to log
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="press flex h-10 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/25"
+      >
+        <TrendingUp className="h-4 w-4" /> Log a session
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">Log a session</DialogTitle>
+            <DialogTitle className="text-xl">Log a session</DialogTitle>
           </DialogHeader>
 
           {/* Search */}
@@ -89,7 +75,7 @@ export function LogSessionCard({ clients }: { clients: Client[] }) {
                 >
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center font-body text-xs font-medium shrink-0"
-                    style={{ background: "rgba(43,107,255,0.08)", color: "var(--blue)" }}
+                    style={{ background: "var(--ink)", color: "#fff" }}
                   >
                     {c.fullName.charAt(0)}
                   </div>

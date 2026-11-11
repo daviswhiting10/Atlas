@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 // All badges are outlined — no filled defaults.
-// Blue-soft (#7BA7FF) is for glows only — badge bg uses rgba(--blue, 0.07).
+// Badges use a tint of the signal colour, never a saturated fill.
 const badgeVariants = cva(
   "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 font-body text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-[var(--blue)]/40 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
@@ -12,7 +12,7 @@ const badgeVariants = cva(
       variant: {
         // Blue outlined — primary/brand state
         default:
-          "border-[rgba(43,107,255,0.30)] bg-[rgba(43,107,255,0.07)] text-[var(--blue-deep)]",
+          "border-[rgba(30,107,78,0.30)] bg-[rgba(30,107,78,0.07)] text-[var(--blue-deep)]",
         // Ink outlined — neutral/secondary
         secondary:
           "border-[var(--line)] bg-transparent text-[var(--ink-soft)]",

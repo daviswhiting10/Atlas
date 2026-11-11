@@ -8,7 +8,7 @@ const CREDENTIALS = [
 
 export default function PricingPage() {
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-4xl">
+    <div className="max-w-4xl">
       <div className="mb-6 md:mb-8">
         <h1
           className="font-display leading-[1.04] tracking-[-0.01em]"

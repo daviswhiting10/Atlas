@@ -136,7 +136,7 @@ function YesNoField({
         </button>
       </div>
       {value === "yes" && warning && (
-        <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+        <p className="text-xs text-warn font-medium flex items-center gap-1">
           <AlertTriangle className="w-3 h-3" />
           {warning}
         </p>
@@ -322,9 +322,9 @@ export default function IntakePage() {
     ].filter((s) => s.fields.length > 0);
 
     return (
-      <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
+      <div className="max-w-2xl">
         <div className="flex items-center gap-2 mb-6">
-          <CheckCircle className="w-5 h-5 text-green-700" />
+          <CheckCircle className="w-5 h-5 text-signal" />
           <h1
             className="font-display leading-[1.04] tracking-[-0.01em]"
             style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)", color: "var(--ink)" }}
@@ -376,7 +376,7 @@ export default function IntakePage() {
 
   // ── Main form ──────────────────────────────────────────────────────────────
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-2xl">
+    <div className="max-w-2xl">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>

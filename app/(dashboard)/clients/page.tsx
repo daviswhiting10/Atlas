@@ -94,7 +94,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="px-5 pt-7 md:px-8 md:pt-8 md:max-w-5xl">
+    <div className="">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1

@@ -12,9 +12,9 @@ const config: Record<
   },
   ACTIVE: {
     label: "Active",
-    border: "rgba(31,122,77,0.30)",
-    bg: "rgba(31,122,77,0.07)",
-    color: "var(--success)",
+    border: "var(--line)",
+    bg: "var(--paper)",
+    color: "var(--signal)",
   },
   AT_RISK: {
     label: "At Risk",
@@ -34,7 +34,7 @@ export function StatusBadge({ status }: { status: ClientStatus }) {
   const cfg = config[status] ?? config.PROSPECT;
   return (
     <span
-      className="inline-flex items-center rounded-full border px-2 py-0.5 font-body text-xs font-medium"
+      className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium"
       style={{
         borderColor: cfg.border,
         background: cfg.bg,
@@ -54,8 +54,8 @@ const leadConfig: Record<
 > = {
   NEW: {
     label: "New",
-    border: "rgba(43,107,255,0.30)",
-    bg: "rgba(43,107,255,0.07)",
+    border: "rgba(30,107,78,0.30)",
+    bg: "rgba(30,107,78,0.07)",
     color: "var(--blue)",
   },
   CONTACTED: {
@@ -94,7 +94,7 @@ export function LeadStatusBadge({ status }: { status: string }) {
   const cfg = leadConfig[status as LeadStatus] ?? leadConfig.NEW;
   return (
     <span
-      className="inline-flex items-center rounded-full border px-2 py-0.5 font-body text-xs font-medium"
+      className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium"
       style={{
         borderColor: cfg.border,
         background: cfg.bg,

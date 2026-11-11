@@ -209,7 +209,7 @@ function SlotPickerDialog({
                                   <span
                                     className="text-xs font-medium px-2 py-0.5 rounded-full"
                                     style={{
-                                      background: "rgba(43,107,255,0.1)",
+                                      background: "rgba(30,107,78,0.1)",
                                       color: "var(--blue)",
                                     }}
                                   >

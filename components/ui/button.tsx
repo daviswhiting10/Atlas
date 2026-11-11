@@ -7,12 +7,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // Primary action is ink, as in the athlete app; the signal colour marks progress and state.
         default:
-          "bg-[var(--blue)] text-white hover:bg-[var(--blue-deep)]",
+          "bg-[var(--ink)] text-white hover:bg-[color-mix(in_srgb,var(--ink)_85%,white)]",
         outline:
           "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-[rgba(11,15,26,0.04)]",
         secondary:
-          "bg-[rgba(43,107,255,0.07)] text-[var(--blue-deep)] hover:bg-[rgba(43,107,255,0.12)]",
+          "bg-[rgba(30,107,78,0.07)] text-[var(--blue-deep)] hover:bg-[rgba(30,107,78,0.12)]",
         ghost:
           "hover:bg-[rgba(11,15,26,0.04)] text-[var(--ink-soft)] hover:text-[var(--ink)]",
         destructive:
@@ -22,7 +23,7 @@ const buttonVariants = cva(
       },
       size: {
         default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+          "h-9 gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-9 gap-1.5 px-3",

@@ -133,7 +133,7 @@ export default function NewMeasurementPage() {
   }
 
   return (
-    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-xl">
+    <div className="max-w-xl">
       <Link
         href={`/clients/${clientId}/progress/body`}
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4 -ml-2")}
@@ -160,7 +160,7 @@ export default function NewMeasurementPage() {
           className={cn(
             "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
             inbodyMode
-              ? "bg-[rgba(43,107,255,0.08)] text-[var(--blue)] border-[rgba(43,107,255,0.30)]"
+              ? "bg-[rgba(30,107,78,0.08)] text-[var(--blue)] border-[rgba(30,107,78,0.30)]"
               : "border-[var(--line)] text-[var(--ink-mute)] hover:border-[var(--ink-soft)]"
           )}
         >
