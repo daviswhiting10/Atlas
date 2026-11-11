@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
-import { Plus, Search, Upload, Users } from "lucide-react";
+import { Plus, Search, Trash2, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Client = {
@@ -35,7 +35,7 @@ type Client = {
   primaryGoal: string | null;
   retentionScore: number | null;
   updatedAt: string;
-  _count: { sessionNotes: number; programAssignments: number };
+  _count: { sessionNotes: number; programAssignments: number; workoutLogs?: number };
 };
 
 const GOAL_LABELS: Record<string, string> = {
@@ -78,6 +78,22 @@ export default function ClientsPage() {
     const matchesStatus = filterStatus === "all" || c.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(client: Client) {
+    setDeleting(client.id);
+    const res = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
+    setDeleting(null);
+    setConfirming(null);
+    if (!res.ok) {
+      toast.error("Couldn't delete that client. Please try again.");
+      return;
+    }
+    setClients((prev) => prev.filter((c) => c.id !== client.id));
+    toast.success(`${client.fullName} removed from your roster`);
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -244,11 +260,27 @@ export default function ClientsPage() {
             ) : (
               <Card>
                 <div className="divide-y divide-border">
-                  {filtered.map((client) => (
+                  {filtered.map((client) =>
+                    confirming === client.id ? (
+                      <div key={client.id} className="flex flex-col gap-3 bg-destructive/[0.04] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-ink">Delete {client.fullName}?</p>
+                          <p className="text-xs text-muted-foreground">They leave your roster and lose access to the app. Their logged history is kept.</p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setConfirming(null)} disabled={deleting === client.id}>
+                            Cancel
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDelete(client)} disabled={deleting === client.id}>
+                            {deleting === client.id ? "Deleting…" : "Delete"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                    <div key={client.id} className="group flex items-center hover:bg-muted/40 transition-colors">
                     <Link
-                      key={client.id}
                       href={`/clients/${client.id}`}
-                      className="flex items-center justify-between px-5 py-4 min-h-[60px] hover:bg-muted/40 active:bg-muted/60 transition-colors"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 pl-5 pr-2 min-h-[60px] active:bg-muted/60"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
@@ -265,7 +297,7 @@ export default function ClientsPage() {
                       <div className="flex items-center gap-4">
                         <div className="text-right hidden sm:block">
                           <p className="text-xs text-muted-foreground">
-                            {client._count.sessionNotes} sessions · {client._count.programAssignments} programs
+                            {client._count.workoutLogs ?? 0} workout{(client._count.workoutLogs ?? 0) === 1 ? "" : "s"} logged
                           </p>
                           {client.retentionScore != null && (
                             <p className="text-xs font-mono text-muted-foreground">
@@ -276,7 +308,18 @@ export default function ClientsPage() {
                         <StatusBadge status={client.status} />
                       </div>
                     </Link>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(client.id)}
+                      aria-label={`Delete ${client.fullName}`}
+                      title="Delete client"
+                      className="press mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    </div>
+                    )
+                  )}
                 </div>
               </Card>
             )}

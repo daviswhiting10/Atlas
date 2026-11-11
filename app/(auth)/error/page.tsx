@@ -14,6 +14,7 @@ const MESSAGES: Record<string, string> = {
   EmailSignin: "The sign-in link could not be sent. Check your email address and try again.",
   CredentialsSignin: "Invalid credentials.",
   SessionRequired: "Please sign in to continue.",
+  NoAccess: "This account no longer has access. If you train with a coach, ask them for a new invite.",
   Default: "The sign-in link is no longer valid — it may have already been used or expired.",
 };
 
@@ -24,14 +25,27 @@ function ErrorContent() {
 
   return (
     <div className="w-full max-w-sm text-center space-y-4 px-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Sign-in failed</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{error === "NoAccess" ? "No access" : "Sign-in failed"}</h1>
       <p className="text-sm text-muted-foreground">{message}</p>
+      {error === "NoAccess" ? (
+        <button
+          type="button"
+          onClick={async () => {
+            const { signOut } = await import("next-auth/react");
+            await signOut({ callbackUrl: `${window.location.origin}/login` });
+          }}
+          className="inline-block w-full rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          Sign out
+        </button>
+      ) : (
       <Link
         href="/login"
         className="inline-block w-full rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
       >
         Request a new link
       </Link>
+      )}
     </div>
   );
 }

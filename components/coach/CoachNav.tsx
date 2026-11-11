@@ -3,25 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Dumbbell, Inbox, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
+import { Activity, ClipboardPen, Dumbbell, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { cn } from "@/lib/utils";
 
-/** Same order as the old sidebar groups: Today, Clients, Training, Outreach, Business. */
+/** Logging comes first: it's what the coach opens the app to do. */
 const ITEMS = [
-  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/log", label: "Log session", icon: ClipboardPen },
   { href: "/clients", label: "Roster", icon: Users },
-  { href: "/intake", label: "Intake" },
   { href: "/programs", label: "Programs", icon: Dumbbell },
-  { href: "/sessions", label: "Sessions" },
-  { href: "/outreach", label: "Outreach" },
+  { href: "/intake", label: "Intake" },
 ] as const;
 
 /** The coach's own training: the athlete app on their own profile. */
 const MY_TRAINING = { href: "/today", label: "My training", icon: Activity };
 
 /** Phones get the most-used sections as tabs; the rest sit behind "More". */
-const TABS = [...(ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Inbox }>), MY_TRAINING];
+const TABS = [...(ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Users }>), MY_TRAINING];
 const MORE: Array<{ href: string; label: string }> = [...ITEMS.filter((i) => !("icon" in i)), { href: "/settings", label: "Settings" }];
 
 export function CoachNav({ name }: { name: string }) {
@@ -40,7 +38,7 @@ export function CoachNav({ name }: { name: string }) {
     <>
       <header className="sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 sm:px-8 md:h-16">
-          <Link href="/inbox" aria-label="Atlas home" className="shrink-0">
+          <Link href="/log" aria-label="Atlas home" className="shrink-0">
             <Logo />
           </Link>
 

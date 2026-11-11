@@ -18,12 +18,12 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatRow } from "@/components/athlete/StatRow";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
+import { categoryLabel } from "@/lib/programs/categories";
 import {
   ArrowLeft,
   Dumbbell,
   ClipboardList,
   FileText,
-  MessageSquare,
   AlertTriangle,
   Trash2,
   UserCheck,
@@ -318,14 +318,6 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
               <span className="ml-1.5">Invite</span>
             </button>
           )}
-          <Link
-            href={`/outreach?clientId=${client.id}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 w-9 p-0 md:w-auto md:px-3")}
-            title="Message"
-          >
-            <MessageSquare className="w-4 h-4 shrink-0" />
-            <span className="hidden md:inline ml-1.5">Message</span>
-          </Link>
           <Link
             href={`/clients/${client.id}/log`}
             className={cn(buttonVariants({ size: "sm" }), "h-9 w-9 p-0 md:w-auto md:px-3")}
@@ -636,6 +628,33 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                     </Link>
                   </CardContent>
                 </Card>
+              ) : intakes[0]?.sourceType === "intake-note" ? (
+                (() => {
+                  const note = (intakes[0].parsedData ?? {}) as { tag?: string; notes?: string };
+                  return (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-sm font-semibold">Intake</CardTitle>
+                          <Link href={`/intake?clientId=${client.id}`} className="text-xs font-medium text-muted-foreground hover:text-foreground">
+                            Update
+                          </Link>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {note.tag ? `${categoryLabel(note.tag)} · ` : ""}
+                          {new Date(intakes[0].createdAt).toLocaleDateString()}
+                        </p>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {note.notes ? (
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{note.notes}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No notes written.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()
               ) : intakes[0]?.aiSummary ? (
                 <Card>
                   <CardHeader className="pb-2">

@@ -7,7 +7,7 @@ const { auth } = NextAuth(authConfig);
 /** Pages anyone can see without signing in. */
 const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents"];
 /** Public pages a signed-in visitor may also read, whatever their role. */
-const SHARED_PATHS = ["/agents"];
+const SHARED_PATHS = ["/agents", "/error"];
 /** The athlete app. Coaches use it too, for their own training ("My training"). */
 const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you"];
 
@@ -29,7 +29,7 @@ export default auth((req) => {
   if (matches(path, SHARED_PATHS)) return NextResponse.next();
 
   const isAthlete = user.role === "CLIENT";
-  const home = isAthlete ? "/today" : "/inbox";
+  const home = isAthlete ? "/today" : "/log";
 
   // Signed-in visitors skip the marketing and sign-in pages.
   if (path === "/" || path === "/login" || path === "/start") return go(home);

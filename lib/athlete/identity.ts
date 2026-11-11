@@ -24,7 +24,10 @@ export async function athleteIdentity(user: SessionUser | undefined): Promise<At
   if (!user?.id || !user.workspaceId) return null;
 
   if (user.role === "CLIENT") {
-    return user.clientProfileId ? { clientId: user.clientProfileId, workspaceId: user.workspaceId, isCoach: false } : null;
+    if (!user.clientProfileId) return null;
+    // A client the coach has deleted no longer gets into the app.
+    const live = await prisma.clientProfile.findFirst({ where: { id: user.clientProfileId, workspaceId: user.workspaceId, deletedAt: null }, select: { id: true } });
+    return live ? { clientId: live.id, workspaceId: user.workspaceId, isCoach: false } : null;
   }
 
   const own = await prisma.clientProfile.findFirst({

@@ -6,7 +6,7 @@ export async function getClients(workspaceId: string) {
     where: { workspaceId, deletedAt: null, ...ROSTER },
     orderBy: { updatedAt: "desc" },
     include: {
-      _count: { select: { sessionNotes: true, programAssignments: true } },
+      _count: { select: { sessionNotes: true, programAssignments: true, workoutLogs: true } },
     },
   });
 }

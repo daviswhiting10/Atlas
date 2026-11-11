@@ -58,7 +58,7 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
           <div className="flex items-center gap-2">
             {isDemo && <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-medium text-ink-mute">Demo data</span>}
             {isCoach && (
-              <Link href="/inbox" className="press hidden h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-sm font-medium text-ink-soft hover:border-ink/20 hover:text-ink md:flex">
+              <Link href="/log" className="press hidden h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-sm font-medium text-ink-soft hover:border-ink/20 hover:text-ink md:flex">
                 <ArrowLeft className="h-4 w-4" /> Coaching
               </Link>
             )}
@@ -91,7 +91,7 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
               );
             })}
             {isCoach && (
-              <Link href="/inbox" className="press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium text-ink-mute">
+              <Link href="/log" className="press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium text-ink-mute">
                 <Users className="h-[22px] w-[22px]" strokeWidth={1.8} />
                 Coaching
               </Link>

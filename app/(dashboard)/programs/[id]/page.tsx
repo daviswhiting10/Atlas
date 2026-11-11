@@ -9,6 +9,8 @@ import { getProgram } from "@/lib/db/programs";
 import { displayName } from "@/lib/plan/catalog";
 import { repLabel } from "@/lib/plan/overview";
 import { TemplateActions } from "@/components/coach/TemplateActions";
+import { CategorySelect } from "@/components/coach/CategorySelect";
+import { categoryLabel, categoryOf } from "@/lib/programs/categories";
 
 export const metadata: Metadata = { title: "Library program" };
 
@@ -28,7 +30,8 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
   if (!program) notFound();
 
   const tags = (program.goalTags as { goals?: string[]; conditions?: string[] } | null) ?? {};
-  const chips = [...(tags.goals ?? []), ...(tags.conditions ?? [])];
+  const category = categoryOf(program.goalTags);
+  const chips = [...(tags.goals ?? []).filter((g) => g !== category).map(categoryLabel), ...(tags.conditions ?? [])];
 
   return (
     <div>
@@ -40,6 +43,9 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
         <p className="eyebrow">Library program · {program.durationWeeks} week{program.durationWeeks === 1 ? "" : "s"}</p>
         <h1 className="mt-1.5 text-[34px] leading-[1.08] text-ink sm:text-[42px]">{program.name}</h1>
         {program.description && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-soft">{program.description}</p>}
+        <div className="mt-4">
+          <CategorySelect programId={program.id} value={category} />
+        </div>
         {chips.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {chips.map((c) => (

@@ -69,7 +69,8 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
   const session = await auth();
   if (!session?.user) redirect("/login");
   const identity = await athleteIdentity(session.user);
-  if (!identity) redirect("/login");
+  // Signed in, but no athlete profile to show (e.g. the coach removed this client).
+  if (!identity) redirect("/error?error=NoAccess");
   const { clientId, workspaceId, isCoach } = identity;
 
   const profile = await prisma.clientProfile.findUnique({
