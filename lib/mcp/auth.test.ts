@@ -17,30 +17,17 @@ const EVERYONE: McpRole[] = ["TRAINER", "ADMIN", "CLIENT"];
 
 /** The permission matrix from the implementation plan. A tool missing here fails the suite. */
 const EXPECTED: Record<string, { roles: McpRole[]; permission: string; scope: "client" | "workspace" }> = {
+  get_user_fitness_profile: { roles: EVERYONE, permission: "read", scope: "client" },
+  get_active_program: { roles: EVERYONE, permission: "read", scope: "client" },
   get_workout_history: { roles: EVERYONE, permission: "read", scope: "client" },
   get_exercise_history: { roles: EVERYONE, permission: "read", scope: "client" },
   analyze_progress: { roles: EVERYONE, permission: "read", scope: "client" },
-  get_personal_records: { roles: EVERYONE, permission: "read", scope: "client" },
-  detect_plateaus: { roles: EVERYONE, permission: "read", scope: "client" },
-  get_training_volume: { roles: EVERYONE, permission: "read", scope: "client" },
-  get_active_program: { roles: EVERYONE, permission: "read", scope: "client" },
-  get_program_details: { roles: EVERYONE, permission: "read", scope: "workspace" },
-  generate_program: { roles: COACHES, permission: "generate", scope: "client" },
-  save_program: { roles: COACHES, permission: "write", scope: "workspace" },
-  update_program: { roles: COACHES, permission: "write", scope: "workspace" },
-  search_exercises: { roles: EVERYONE, permission: "read", scope: "workspace" },
   get_training_recommendations: { roles: EVERYONE, permission: "read", scope: "client" },
-  get_user_fitness_profile: { roles: EVERYONE, permission: "read", scope: "client" },
+  search_exercises: { roles: EVERYONE, permission: "read", scope: "workspace" },
   log_workout: { roles: EVERYONE, permission: "write", scope: "client" },
   // Plan editing: an athlete edits their own plan, a coach any client's in their workspace.
-  add_plan_workout: { roles: EVERYONE, permission: "write", scope: "client" },
-  remove_plan_workout: { roles: EVERYONE, permission: "write", scope: "client" },
-  add_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
-  remove_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
-  swap_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
-  set_plan_exercise_targets: { roles: EVERYONE, permission: "write", scope: "client" },
-  set_plan_note: { roles: EVERYONE, permission: "write", scope: "client" },
-  set_plan_lighter_weeks: { roles: EVERYONE, permission: "write", scope: "client" },
+  edit_plan: { roles: EVERYONE, permission: "write", scope: "client" },
+  generate_program: { roles: COACHES, permission: "generate", scope: "client" },
 };
 
 /** Otherwise-valid arguments for tools that require more than a client, so each case fails for the reason under test. */
@@ -48,14 +35,7 @@ const VALID: Record<string, Record<string, unknown>> = {
   get_exercise_history: { exerciseId: "ex_1" },
   log_workout: { assignedWorkoutId: "aw_1", sets: [{ exerciseId: "ex_1", setNumber: 1, weight: 100, reps: 8 }] },
   generate_program: { goal: "hypertrophy", durationWeeks: 8, sessionsPerWeek: 3, sessionLength: 60, equipment: "full gym" },
-  add_plan_workout: { week: 3, name: "Extra" },
-  remove_plan_workout: { assignedWorkoutId: "aw_1" },
-  add_plan_exercise: { assignedWorkoutId: "aw_1", slug: "plank" },
-  remove_plan_exercise: { planExerciseId: "awe_1" },
-  swap_plan_exercise: { planExerciseId: "awe_1", slug: "plank" },
-  set_plan_exercise_targets: { planExerciseId: "awe_1", sets: 4 },
-  set_plan_note: { text: "Felt strong" },
-  set_plan_lighter_weeks: { on: true },
+  edit_plan: { action: "swap_exercise", planExerciseId: "awe_1", slug: "plank" },
 };
 const argsFor = (tool: { name: string }, extra: Record<string, unknown> = {}) => ({ ...VALID[tool.name], ...extra });
 
@@ -108,9 +88,11 @@ describe("role gate (403)", () => {
     expect(lookup).not.toHaveBeenCalled();
   });
 
-  it("refuses an athlete only on the coach's program-library tools", () => {
+  it("keeps the toolset small, and refuses an athlete only the coach's program drafting", () => {
+    expect(TOOLS.length).toBeGreaterThanOrEqual(5);
+    expect(TOOLS.length).toBeLessThanOrEqual(15);
     const refused = TOOLS.filter((t) => !t.roles.includes("CLIENT")).map((t) => t.name).sort();
-    expect(refused).toEqual(["generate_program", "save_program", "update_program"]);
+    expect(refused).toEqual(["generate_program"]);
   });
 });
 
@@ -181,30 +163,43 @@ describe("resolveClientScope", () => {
 });
 
 describe("plan editing", () => {
-  const editTools = TOOLS.filter((t) => t.name.includes("plan_") && t.permission === "write");
+  const editPlan = TOOLS.find((t) => t.name === "edit_plan")!;
+  const ACTIONS: Record<string, Record<string, unknown>> = {
+    add_workout: { week: 3, name: "Extra" },
+    remove_workout: { assignedWorkoutId: "aw_1" },
+    add_exercise: { assignedWorkoutId: "aw_1", slug: "plank" },
+    remove_exercise: { planExerciseId: "awe_1" },
+    swap_exercise: { planExerciseId: "awe_1", slug: "plank" },
+    set_targets: { planExerciseId: "awe_1", sets: 4 },
+    set_note: { text: "Felt strong" },
+    set_lighter_weeks: { on: true },
+  };
 
   it("is open to an athlete for their own plan", () => {
-    expect(editTools.map((t) => t.name).sort()).toEqual(
-      ["add_plan_exercise", "add_plan_workout", "remove_plan_exercise", "remove_plan_workout", "set_plan_exercise_targets", "set_plan_lighter_weeks", "set_plan_note", "swap_plan_exercise"].sort()
-    );
-    for (const t of editTools) expect(t.roles, t.name).toContain("CLIENT");
+    expect(editPlan.roles).toContain("CLIENT");
+    expect(Object.keys(ACTIONS).sort()).toEqual([...(editPlan.input.shape.action as unknown as { options: string[] }).options].sort());
   });
 
-  it.each(editTools.map((t) => [t.name, t] as const))("%s: an athlete reaching for another client's plan gets 404, never 403", async (_n, tool) => {
+  it.each(Object.entries(ACTIONS))("%s: an athlete reaching for another client's plan gets 404, never 403", async (action, args) => {
     for (const other of ["bob", "zed"]) {
-      const result = await executeTool(tool, caller("CLIENT", "alice"), argsFor(tool, { clientId: other }), deps);
+      const result = await executeTool(editPlan, caller("CLIENT", "alice"), { action, ...args, clientId: other }, deps);
       expect(result).toEqual({ outcome: "not_found", message: "Not found." });
     }
   });
 
-  it.each(editTools.map((t) => [t.name, t] as const))("%s: a coach reaching into another workspace gets 404", async (_n, tool) => {
-    expect(await executeTool(tool, caller("TRAINER"), argsFor(tool, { clientId: "zed" }), deps)).toEqual({ outcome: "not_found", message: "Not found." });
+  it.each(Object.entries(ACTIONS))("%s: a coach reaching into another workspace gets 404", async (action, args) => {
+    expect(await executeTool(editPlan, caller("TRAINER"), { action, ...args, clientId: "zed" }, deps)).toEqual({ outcome: "not_found", message: "Not found." });
+  });
+
+  it("refuses an action that's missing what it needs, before anything is written", async () => {
+    const result = await executeTool(editPlan, caller("CLIENT", "alice"), { action: "swap_exercise", slug: "plank" }, { ...deps, lookupClient: lookup });
+    expect(result.outcome).toBe("validation_error");
   });
 
   it("writes an audit row for every edit, including refused ones", async () => {
     const rows: string[] = [];
     const audited: ToolDeps = { ...deps, audit: async (e) => void rows.push(`${e.tool}:${e.outcome}`) };
-    for (const tool of editTools) await executeTool(tool, caller("CLIENT", "alice"), argsFor(tool, { clientId: "bob" }), audited);
-    expect(rows).toEqual(editTools.map((t) => `${t.name}:not_found`));
+    for (const [action, args] of Object.entries(ACTIONS)) await executeTool(editPlan, caller("CLIENT", "alice"), { action, ...args, clientId: "bob" }, audited);
+    expect(rows).toEqual(Object.keys(ACTIONS).map(() => "edit_plan:not_found"));
   });
 });

@@ -183,3 +183,58 @@ export const setPlanLighterWeeks = clientTool({
     return { lighterWeeks: args.on };
   },
 });
+
+/**
+ * Every plan edit through one tool. Each action is handed to the matching
+ * single-purpose definition above, which validates its own arguments, so
+ * the rules for each edit live in one place.
+ */
+const EDITS = {
+  add_workout: addPlanWorkout,
+  remove_workout: removePlanWorkout,
+  add_exercise: addPlanExercise,
+  remove_exercise: removePlanExercise,
+  swap_exercise: swapPlanExercise,
+  set_targets: setPlanExerciseTargets,
+  set_note: setPlanNotes,
+  set_lighter_weeks: setPlanLighterWeeks,
+} as const;
+
+export const editPlan = clientTool({
+  name: "edit_plan",
+  title: "Edit the plan",
+  description: [
+    "Change the client's active plan. Pick an action and give the fields it needs (ids come from get_active_program):",
+    "add_workout: week, name, optional copyFromWorkoutId.",
+    "remove_workout: assignedWorkoutId. Anything already logged in it stays in the history.",
+    "add_exercise: assignedWorkoutId, exerciseId or slug, optional sets / repMin / repMax / weightLb.",
+    "remove_exercise: planExerciseId.",
+    "swap_exercise: planExerciseId, exerciseId or slug. Sets and reps carry over; the target weight resets.",
+    "set_targets: planExerciseId, any of sets / repMin / repMax / weightLb.",
+    "set_note: text (empty clears it), optional assignedWorkoutId to note one workout instead of the whole plan.",
+    "set_lighter_weeks: on (true or false). Lighter weeks are the last week of every 4-week block.",
+  ].join("\n"),
+  permission: "write",
+  roles: ALL_ROLES,
+  input: z.object({
+    clientId: ClientIdArg,
+    action: z.enum(["add_workout", "remove_workout", "add_exercise", "remove_exercise", "swap_exercise", "set_targets", "set_note", "set_lighter_weeks"]),
+    assignedWorkoutId: Id.optional(),
+    planExerciseId: Id.optional(),
+    week: z.number().int().min(1).max(52).optional(),
+    name: z.string().trim().min(1).max(LIMITS.name).optional(),
+    copyFromWorkoutId: Id.optional(),
+    ...exerciseRef,
+    ...targets,
+    text: z.string().max(LIMITS.note).optional(),
+    on: z.boolean().optional(),
+  }),
+  async handler(ctx, args) {
+    const { action, ...rest } = args;
+    const sub = EDITS[action];
+    const parsed = sub.input.safeParse(rest);
+    if (!parsed.success) throw invalid(`${action}: ${z.prettifyError(parsed.error)}`);
+    const result = await (sub.handler as (c: typeof ctx, a: unknown) => Promise<unknown>)(ctx, parsed.data);
+    return { action, ...(result as object) };
+  },
+});

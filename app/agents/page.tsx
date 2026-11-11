@@ -20,7 +20,7 @@ const GUARANTEES = [
   {
     title: "404, never 403",
     body: "Reaching for another athlete's data says “not found”, not “forbidden”, so a refusal never confirms that a record exists.",
-    code: "save_program\n→ 403 role may not use this tool\nget_program_details\n→ 404 not yours, or not there",
+    code: "generate_program  (as an athlete)\n→ 403 role may not use this tool\nget_workout_history  (someone else)\n→ 404 not yours, or not there",
   },
   {
     title: "Every call is logged",
@@ -97,10 +97,7 @@ export default function AgentsPage() {
 
         {/* ── Demo ─────────────────────────────────────────────────────── */}
         <section id="demo" className="mx-auto max-w-6xl scroll-mt-6 px-5 pb-16 sm:px-8">
-          <div className="rise rise-1 mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="text-3xl text-ink">See it in action.</h2>
-            <p className="text-[15px] text-ink-soft">One athlete, one assistant, fourteen steps. Press play.</p>
-          </div>
+          <h2 className="rise rise-1 mx-auto mb-6 max-w-3xl text-3xl text-ink">See it in action.</h2>
           <div className="rise rise-1">
             <AgentDemo />
           </div>

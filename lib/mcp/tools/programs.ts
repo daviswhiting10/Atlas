@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { isLighterWeek, lighterWeeksOn } from "@/lib/plan/lighter";
 import { prisma } from "@/lib/db/client";
-import { getProgram, upsertProgram } from "@/lib/db/programs";
 import { getClient } from "@/lib/db/clients";
 import { getTrainer } from "@/lib/db/trainer";
 import { callAI, MODELS } from "@/lib/ai/client";
@@ -12,8 +11,8 @@ import { iso, weekOf } from "@/lib/athlete/sessions";
 import { ALL_ROLES, COACH_ROLES } from "../auth";
 import { notFound, rateLimited } from "../context";
 import { describePrescription, loadActiveAssignment } from "../data";
-import { ClientIdArg, Id, ProgramBodySchema } from "../schemas";
-import { clientTool, workspaceTool } from "../tool";
+import { ClientIdArg } from "../schemas";
+import { clientTool } from "../tool";
 
 const GENERATIONS_PER_WORKSPACE_PER_HOUR = 10;
 
@@ -77,68 +76,11 @@ export const getActiveProgram = clientTool({
   },
 });
 
-export const getProgramDetails = workspaceTool({
-  name: "get_program_details",
-  title: "Program details",
-  description:
-    "Structure of a program: blocks, phases, workouts and prescriptions. Coaches can read any program in their workspace; athletes only a program assigned to them.",
-  permission: "read",
-  roles: ALL_ROLES,
-  input: z.object({ programId: Id }),
-  async handler({ caller }, args) {
-    // An athlete may only see a program they have been assigned. Anything else is "not found".
-    if (caller.role === "CLIENT") {
-      const assigned = caller.clientProfileId
-        ? await prisma.programAssignment.findFirst({
-            where: { sourceProgramId: args.programId, clientId: caller.clientProfileId, workspaceId: caller.workspaceId },
-            select: { id: true },
-          })
-        : null;
-      if (!assigned) throw notFound();
-    }
-
-    const program = await getProgram(args.programId, caller.workspaceId);
-    if (!program) throw notFound();
-
-    return {
-      id: program.id,
-      name: program.name,
-      description: program.description,
-      durationWeeks: program.durationWeeks,
-      goalTags: program.goalTags,
-      isDraft: program.isDraft,
-      blocks: program.blocks.map((b) => ({
-        id: b.id,
-        name: b.name,
-        order: b.order,
-        weeks: b.weeks,
-        phase: b.phase,
-        workouts: b.workouts.map((w) => ({
-          id: w.id,
-          name: w.name,
-          dayOfWeek: w.dayOfWeek,
-          exercises: w.exercises.map((e) => ({
-            exerciseId: e.exerciseId,
-            exercise: e.exercise.name,
-            section: e.section,
-            notes: e.notes,
-            prescribedSets: e.prescribedSets,
-          })),
-        })),
-      })),
-      note:
-        program.blocks.every((b) => b.workouts.length === 0)
-          ? "This program was generated for one athlete; its week-by-week workouts are on the assignment. Use get_active_program."
-          : null,
-    };
-  },
-});
-
 export const generateProgram = clientTool({
   name: "generate_program",
   title: "Generate a program proposal",
   description:
-    "Draft a program for a client with the coach's methodology and the client's intake. Returns a proposal only — nothing is saved until save_program is called.",
+    "Draft a program for a client with the coach's methodology and the client's intake. Returns a written proposal only; nothing is saved. To change the client's actual plan, use edit_plan.",
   permission: "generate",
   roles: COACH_ROLES,
   input: z.object({
@@ -194,49 +136,8 @@ export const generateProgram = clientTool({
       client: client.fullName,
       saved: false,
       proposal: result.content,
-      next: "Review the proposal with the coach. To keep it, build a program body and call save_program.",
+      next: "Review the proposal with the coach. To apply parts of it, change the client's plan with edit_plan.",
     };
   },
 });
 
-export const saveProgram = workspaceTool({
-  name: "save_program",
-  title: "Save a program",
-  description: "Create a program in the coach's library. Saved as a draft unless isDraft is false. Does not assign it to anyone.",
-  permission: "write",
-  roles: COACH_ROLES,
-  input: z.object({
-    program: ProgramBodySchema,
-    isDraft: z.boolean().default(true).describe("Drafts stay out of the assignable library until published."),
-  }),
-  async handler({ caller }, args) {
-    const created = await upsertProgram(caller.workspaceId, args.program);
-    if (args.isDraft) {
-      await prisma.program.updateMany({ where: { id: created.id, workspaceId: caller.workspaceId }, data: { isDraft: true } });
-    }
-    return { programId: created.id, name: created.name, durationWeeks: created.durationWeeks, isDraft: args.isDraft };
-  },
-});
-
-export const updateProgram = workspaceTool({
-  name: "update_program",
-  title: "Update a program",
-  description: "Replace the contents of an existing program in the coach's library. Plans already assigned to clients are snapshots and do not change.",
-  permission: "write",
-  roles: COACH_ROLES,
-  input: z.object({ programId: Id, program: ProgramBodySchema, isDraft: z.boolean().optional() }),
-  async handler({ caller }, args) {
-    // Scope check before mutating: the program must be in the caller's workspace.
-    const existing = await prisma.program.findFirst({
-      where: { id: args.programId, workspaceId: caller.workspaceId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!existing) throw notFound();
-
-    const updated = await upsertProgram(caller.workspaceId, args.program, existing.id);
-    if (args.isDraft !== undefined) {
-      await prisma.program.updateMany({ where: { id: existing.id, workspaceId: caller.workspaceId }, data: { isDraft: args.isDraft } });
-    }
-    return { programId: updated.id, name: updated.name, durationWeeks: updated.durationWeeks };
-  },
-});

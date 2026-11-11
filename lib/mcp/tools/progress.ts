@@ -5,8 +5,8 @@ import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
 import type { ScopedClient } from "../context";
 import { describePrescription, loadActiveAssignment, loadSetRows } from "../data";
-import { groupByExercise, muscleTrends, personalRecords, plateauReport, summarizeSession, volumeByWeek, type ExerciseHistory } from "../derive";
-import { ClientIdArg, Id, TimeZoneArg } from "../schemas";
+import { groupByExercise, personalRecords, summarizeSession, volumeByWeek, type ExerciseHistory } from "../derive";
+import { ClientIdArg, TimeZoneArg } from "../schemas";
 import { clientTool } from "../tool";
 
 const DAY_MS = 86_400_000;
@@ -40,7 +40,7 @@ export const analyzeProgress = clientTool({
   name: "analyze_progress",
   title: "Analyze progress",
   description:
-    "Strength, volume and body-weight trends for a client: estimated 1-rep max series for their key lifts, weekly training volume, and the body-weight trend from logged measurements.",
+    "A client's progress in one call: estimated 1-rep max trends for their key lifts (with a composite % change), weekly training volume, the body-weight trend, and personal records (heaviest weight and best estimated 1-rep max per exercise, all time). For what to do next session, and which lifts have stalled, use get_training_recommendations.",
   permission: "read",
   roles: ALL_ROLES,
   input: z.object({
@@ -51,8 +51,10 @@ export const analyzeProgress = clientTool({
   async handler({ client }, args) {
     const tz = safeTimeZone(args.timezone);
     const since = new Date(Date.now() - args.weeks * 7 * DAY_MS);
-    const [rows, measurements] = await Promise.all([
+    const [rows, allRows, measurements] = await Promise.all([
       loadSetRows(client, { since }),
+      // Records are all-time, not just the window.
+      loadSetRows(client),
       prisma.measurement.findMany({
         where: { clientId: client.id, workspaceId: client.workspaceId, measuredAt: { gte: since }, bodyWeightKg: { not: null } },
         orderBy: { measuredAt: "asc" },
@@ -85,81 +87,8 @@ export const analyzeProgress = clientTool({
       weeklyVolume: weeks.map((w) => ({ week: w.week, tonnageLb: w.tonnageLb, sets: w.sets })),
       bodyWeight: weight.map((w) => ({ date: localDay(w.date, tz), weightKg: w.weightKg, trendKg: Math.round(w.ema * 100) / 100 })),
       sessionsLogged: new Set(rows.filter((r) => r.completed).map((r) => r.workoutLogId)).size,
+      personalRecords: personalRecords(groupByExercise(allRows, tz)).slice(0, 25),
     };
   },
 });
 
-export const getPersonalRecords = clientTool({
-  name: "get_personal_records",
-  title: "Personal records",
-  description:
-    "Best lifts for a client, computed from logged sets: heaviest weight and best estimated 1-rep max per exercise, with the date of each.",
-  permission: "read",
-  roles: ALL_ROLES,
-  input: z.object({ clientId: ClientIdArg, exerciseId: Id.optional().describe("Limit to one exercise."), timezone: TimeZoneArg }),
-  async handler({ client }, args) {
-    const tz = safeTimeZone(args.timezone);
-    const [rows, milestones] = await Promise.all([
-      loadSetRows(client, args.exerciseId ? { exerciseIds: [args.exerciseId] } : {}),
-      prisma.milestone.findMany({
-        where: { clientId: client.id, workspaceId: client.workspaceId, type: "first_pr" },
-        select: { exerciseId: true, achievedAt: true },
-      }),
-    ]);
-    // Milestones are context only. A missing one never hides a record, and one never overrides the computed value.
-    const firstAwarded = new Map(milestones.map((m) => [m.exerciseId, localDay(m.achievedAt, tz)]));
-    return {
-      client: client.fullName,
-      records: personalRecords(groupByExercise(rows, tz)).map((r) => ({ ...r, firstPrMilestoneDate: firstAwarded.get(r.exerciseId) ?? null })),
-    };
-  },
-});
-
-export const getTrainingVolume = clientTool({
-  name: "get_training_volume",
-  title: "Training volume",
-  description:
-    "Weekly training volume for a client, split by muscle group. Tonnage is weight × reps; bodyweight and band sets are counted as sets but add no tonnage.",
-  permission: "read",
-  roles: ALL_ROLES,
-  input: z.object({ clientId: ClientIdArg, weeks: z.number().int().min(2).max(26).default(8), timezone: TimeZoneArg }),
-  async handler({ client }, args) {
-    const tz = safeTimeZone(args.timezone);
-    const rows = await loadSetRows(client, { since: new Date(Date.now() - args.weeks * 7 * DAY_MS) });
-    const weeks = volumeByWeek(rows, tz);
-    const unloaded = weeks.reduce((n, w) => n + w.unloadedSets, 0);
-    return {
-      client: client.fullName,
-      weeks,
-      trendByMuscle: muscleTrends(weeks),
-      note: unloaded > 0 ? `${unloaded} bodyweight or band sets are counted as sets but contribute no tonnage.` : null,
-    };
-  },
-});
-
-export const detectPlateaus = clientTool({
-  name: "detect_plateaus",
-  title: "Detect plateaus",
-  description:
-    "Flags exercises where neither top weight nor estimated 1-rep max has improved over the last 3 counted sessions (within 21 days). Lighter-week sessions are not counted. Returns facts only, no coaching.",
-  permission: "read",
-  roles: ALL_ROLES,
-  input: z.object({ clientId: ClientIdArg, exerciseIds: z.array(Id).max(30).optional(), timezone: TimeZoneArg }),
-  async handler({ client }, args) {
-    const tz = safeTimeZone(args.timezone);
-    const [rows, planned] = await Promise.all([
-      loadSetRows(client, args.exerciseIds ? { exerciseIds: args.exerciseIds } : {}),
-      plannedRepsByExercise(client),
-    ]);
-    const today = localDay(new Date(), tz);
-    const histories = groupByExercise(rows, tz);
-    const chosen = args.exerciseIds ? histories : keyLifts(client, histories, 12);
-    const reports = chosen.map((h) => plateauReport(h, { today, goal: client.primaryGoal ?? "general", plannedReps: planned[h.exerciseId] }));
-    return {
-      client: client.fullName,
-      plateaued: reports.filter((r) => r.plateaued === true),
-      progressing: reports.filter((r) => r.plateaued === false),
-      insufficientData: reports.filter((r) => r.plateaued === null).map((r) => ({ exerciseId: r.exerciseId, exercise: r.exercise, sessionsConsidered: r.sessionsConsidered })),
-    };
-  },
-});

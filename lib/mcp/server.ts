@@ -12,36 +12,28 @@ import type { McpCaller, McpTransport } from "./context";
 import { lookupClient } from "./data";
 import { executeTool, type ToolDef, type ToolDeps, type ToolResult } from "./tool";
 import { getExerciseHistory, getWorkoutHistory, logWorkout } from "./tools/workouts";
-import { analyzeProgress, detectPlateaus, getPersonalRecords, getTrainingVolume } from "./tools/progress";
-import { generateProgram, getActiveProgram, getProgramDetails, saveProgram, updateProgram } from "./tools/programs";
+import { analyzeProgress } from "./tools/progress";
+import { generateProgram, getActiveProgram } from "./tools/programs";
 import { searchExercises } from "./tools/exercises";
 import { getTrainingRecommendations, getUserFitnessProfile } from "./tools/coaching";
-import { addPlanExercise, addPlanWorkout, removePlanExercise, removePlanWorkout, setPlanExerciseTargets, setPlanLighterWeeks, setPlanNotes, swapPlanExercise } from "./tools/plan";
+import { editPlan } from "./tools/plan";
 
+/**
+ * Ten tools, each a whole job: read the athlete, the plan, the history and
+ * the progress; get next-session advice; find an exercise; log a session;
+ * edit the plan; and (for coaches) draft a program.
+ */
 export const TOOLS: ToolDef[] = [
+  getUserFitnessProfile,
+  getActiveProgram,
   getWorkoutHistory,
   getExerciseHistory,
   analyzeProgress,
-  getPersonalRecords,
-  detectPlateaus,
-  getTrainingVolume,
-  getActiveProgram,
-  getProgramDetails,
-  generateProgram,
-  saveProgram,
-  updateProgram,
-  searchExercises,
   getTrainingRecommendations,
-  getUserFitnessProfile,
+  searchExercises,
   logWorkout,
-  addPlanWorkout,
-  removePlanWorkout,
-  addPlanExercise,
-  removePlanExercise,
-  swapPlanExercise,
-  setPlanExerciseTargets,
-  setPlanNotes,
-  setPlanLighterWeeks,
+  editPlan,
+  generateProgram,
 ];
 
 /** Writes the audit row. A failed write is reported, never thrown: an audit outage must not take the tools down. */
@@ -90,8 +82,8 @@ export function createMcpServer(caller: McpCaller, deps: ToolDeps): McpServer {
     {
       instructions:
         caller.role === "CLIENT"
-          ? "Atlas training data for one athlete. Every tool acts on the signed-in athlete's own data; clientId can be omitted. You can read the plan and progress, log workouts, and edit the plan itself: add or remove workouts and exercises, swap an exercise, change targets, write notes on the plan or a workout, and turn lighter weeks on or off. Call get_active_program first for the assignedWorkoutId and planExerciseId values those edits take. Edits never delete logged history. Weights are in pounds."
-          : "Atlas coaching data for one workspace. Pass clientId to say which client a tool acts on. You can read any client's plan and progress, log workouts, and edit a client's plan (add_plan_workout, add_plan_exercise, swap_plan_exercise, set_plan_exercise_targets, set_plan_note, set_plan_lighter_weeks and the remove tools); get_active_program returns the ids those take. save_program and update_program work on the coach's program library, not on a client's plan. generate_program returns a proposal and saves nothing. Weights are in pounds.",
+          ? "Atlas training data for one athlete. Every tool acts on the signed-in athlete's own data; clientId can be omitted. Start with get_active_program (the plan, and the ids edits take) or analyze_progress (trends and records). get_training_recommendations says what to do next session and which lifts have stalled. Change the plan with edit_plan and record a session with log_workout; edits never delete logged history. Weights are in pounds."
+          : "Atlas coaching data for one workspace. Pass clientId to say which client a tool acts on. Start with get_active_program (the plan, and the ids edits take) or analyze_progress (trends and records). get_training_recommendations says what to do next session and which lifts have stalled. Change a client's plan with edit_plan and record a session with log_workout. generate_program drafts a program and saves nothing. Weights are in pounds.",
     }
   );
 
@@ -157,10 +149,8 @@ const RESOURCES: ResourceSpec[] = [
     template: "atlas://clients/{clientId}/progress",
     title: "Progress",
     description: "Strength series, weekly volume, body-weight trend and personal records.",
-    parts: [
-      { key: "progress", tool: analyzeProgress },
-      { key: "personalRecords", tool: getPersonalRecords },
-    ],
+    // analyze_progress includes the personal records.
+    parts: [{ key: "progress", tool: analyzeProgress }],
   },
 ];
 
