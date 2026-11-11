@@ -112,7 +112,7 @@ function ProgressSkeleton() {
 
       {/* 1 ── Hero chart block: 80px header + 280px chart = 360px */}
       <div className="rounded-2xl border bg-card overflow-hidden">
-        <div className="flex items-start justify-between px-5 pt-5 pb-2">
+        <div className="flex items-start justify-between pb-2">
           <div>
             {/* label: h-4 = 16px */}
             <div className="h-4 w-28 rounded bg-muted animate-pulse" />
@@ -206,7 +206,7 @@ export function ProgressShell({
   const phase = useContentFade(loading);
 
   return (
-    <div className="px-5 pt-5 md:px-8 md:pt-8 md:max-w-5xl pb-20 md:pb-8">
+    <div className="pb-20 md:pb-8">
       {/* Back */}
       <Link
         href={`/clients/${clientId}`}

@@ -19,7 +19,7 @@ export function StatTile({ label, value, sub, delta, deltaPositive }: Props) {
         {label}
       </p>
       <p
-        className="font-display italic leading-none mt-1"
+        className="font-semibold leading-none mt-1"
         style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", color: "var(--ink)" }}
       >
         {value}

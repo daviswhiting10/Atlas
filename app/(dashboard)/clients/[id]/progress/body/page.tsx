@@ -51,7 +51,7 @@ function MeasurementRow({ label, value, unit, change }: {
           <p
             className={cn(
               "text-xs font-medium",
-              change.positive ? "text-green-700" : "text-red-500"
+              change.positive ? "text-signal" : "text-destructive"
             )}
           >
             {change.display}

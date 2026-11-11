@@ -35,8 +35,8 @@ function getMilestoneAccent(type: string): AccentStyle {
   };
   // Blue (strength / session milestones)
   const blueAccent: AccentStyle = {
-    border: "rgba(43,107,255,0.30)",
-    bg: "rgba(43,107,255,0.07)",
+    border: "rgba(30,107,78,0.30)",
+    bg: "rgba(30,107,78,0.07)",
     color: "var(--blue)",
   };
   // Warn (plate milestones)

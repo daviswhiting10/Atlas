@@ -21,6 +21,7 @@ import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf
 export const MAX_SETS = 20;
 
 export const TZ_COOKIE = "tz";
+export { safeTimeZone };
 
 /**
  * The athlete's timezone, reported by the browser in a cookie. Logged
@@ -130,13 +131,36 @@ export type ProgressData = {
 };
 
 
+/** The signed-in athlete's progress. The read model itself is shared with the coach side. */
 export const getProgress = cache(async (): Promise<ProgressData> => {
   const athlete = await getAthlete();
   const plan = await getPlanOverview();
-  const tz = getTimeZone();
-  const generated = plan?.generated ?? athlete.selfServe;
+  return loadProgress({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, plan, generated: plan?.generated ?? athlete.selfServe, timeZone: getTimeZone() });
+});
+
+/**
+ * Progress for one client: per-exercise series, weekly totals, records.
+ * The athlete's Progress screen and the coach's view of that client both
+ * render exactly this.
+ */
+export async function loadProgress({
+  clientId,
+  workspaceId,
+  plan,
+  generated,
+  timeZone,
+}: {
+  clientId: string;
+  workspaceId: string;
+  /** The client's live plan, for next-session targets. */
+  plan: PlanOverview | null;
+  /** Whether lighter weeks apply (generated plans). */
+  generated: boolean;
+  timeZone: string;
+}): Promise<ProgressData> {
+  const tz = timeZone;
   const sets = await prisma.setLog.findMany({
-    where: { workoutLog: { clientId: athlete.clientId }, exerciseId: { not: null } },
+    where: { workoutLog: { clientId, client: { workspaceId } }, exerciseId: { not: null } },
     orderBy: { createdAt: "asc" },
     select: {
       exerciseId: true,
@@ -254,7 +278,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
     },
     recentPRs: recentPRs.slice(0, 12),
   };
-});
+}
 
 // ── Workout (logger) ────────────────────────────────────────────────────────
 
