@@ -328,6 +328,7 @@ model ProgramAssignment {
   status          AssignmentStatus @default(ACTIVE)
   goalText        String?          @db.Text // the goal in the athlete's (or coach's) own words, as the plan was built from
   notes           String?          @db.Text // free notes on the plan as a whole
+  lighterWeeks    Boolean? // every 4th week is lighter; null = the default (on for generated plans, off for hand-built ones)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

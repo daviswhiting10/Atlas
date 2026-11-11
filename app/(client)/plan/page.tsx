@@ -9,6 +9,7 @@ import {
   planAddWorkout,
   planRemoveExercise,
   planRemoveWorkout,
+  planSetLighterWeeks,
   planSetNote,
   planSetTargets,
   planSetWorkoutNote,
@@ -29,6 +30,7 @@ const ACTIONS: PlanActions = {
   setTargets: planSetTargets,
   setWorkoutNote: planSetWorkoutNote,
   setPlanNote: planSetNote,
+  setLighterWeeks: planSetLighterWeeks,
   setSkipped: setWorkoutSkipped,
 };
 

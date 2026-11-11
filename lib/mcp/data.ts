@@ -5,9 +5,8 @@
  */
 
 import { prisma } from "@/lib/db/client";
-import { BLOCK_WEEKS } from "@/lib/plan/generator";
+import { LIGHTER_SELECT, isLighterWeek } from "@/lib/plan/lighter";
 import { displayName } from "@/lib/plan/catalog";
-import { weekOf } from "@/lib/athlete/sessions";
 import type { ClientLookup } from "./auth";
 import type { ScopedClient } from "./context";
 
@@ -42,7 +41,7 @@ export type SetRow = {
   completed: boolean;
   workoutLogId: string;
   date: Date;
-  /** Logged in a lighter week of a generated plan. */
+  /** Logged in one of the plan's lighter weeks. */
   deload: boolean;
 };
 
@@ -76,7 +75,7 @@ export async function loadSetRows(
       workoutLog: {
         select: {
           date: true,
-          assignedWorkout: { select: { scheduledDate: true, programAssignment: { select: { startDate: true } } } },
+          assignedWorkout: { select: { scheduledDate: true, programAssignment: { select: LIGHTER_SELECT } } },
         },
       },
     },
@@ -85,8 +84,7 @@ export async function loadSetRows(
   return rows.flatMap((r) => {
     if (!r.exerciseId || !r.exercise) return [];
     const aw = r.workoutLog.assignedWorkout;
-    const deload =
-      client.selfServe && aw != null && weekOf(aw.scheduledDate.getTime(), aw.programAssignment.startDate.getTime()) % BLOCK_WEEKS === 0;
+    const deload = aw != null && isLighterWeek(aw.scheduledDate, aw.programAssignment, client.selfServe);
     return [
       {
         exerciseId: r.exerciseId,
@@ -131,6 +129,8 @@ export async function loadActiveAssignment(client: ScopedClient) {
       sourceProgramId: true,
       goalText: true,
       notes: true,
+      lighterWeeks: true,
+      sourceProgram: { select: { goalTags: true } },
       assignedWorkouts: {
         orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
         select: {

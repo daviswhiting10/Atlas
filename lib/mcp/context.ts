@@ -42,6 +42,6 @@ export type ScopedClient = {
   fullName: string;
   primaryGoal: string | null;
   keyLiftIds: string[];
-  /** True when the athlete generated their own plan (lighter weeks follow the generator's rule). */
+  /** True when the athlete runs their own plans (older ones count as generated for lighter weeks). */
   selfServe: boolean;
 };

@@ -33,7 +33,7 @@ export default async function ClientProgressPage({ params }: { params: { id: str
     clientId: client.id,
     workspaceId,
     plan,
-    generated: plan?.generated ?? false,
+    selfServe: false,
     timeZone: safeTimeZone(cookies().get(TZ_COOKIE)?.value),
   });
 

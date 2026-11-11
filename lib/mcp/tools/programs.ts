@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isLighterWeek, lighterWeeksOn } from "@/lib/plan/lighter";
 import { prisma } from "@/lib/db/client";
 import { getProgram, upsertProgram } from "@/lib/db/programs";
 import { getClient } from "@/lib/db/clients";
@@ -33,6 +34,7 @@ export const getActiveProgram = clientTool({
       assignedWorkoutId: w.id,
       name: w.name,
       week: weekOf(w.scheduledDate.getTime(), start),
+      lighterWeek: isLighterWeek(w.scheduledDate, assignment, client.selfServe),
       scheduledDate: iso(w.scheduledDate),
       status: w.status,
       note: w.notes,
@@ -61,6 +63,7 @@ export const getActiveProgram = clientTool({
         name: assignment.name,
         goal: assignment.goalText,
         note: assignment.notes,
+        lighterWeeks: lighterWeeksOn(assignment, client.selfServe),
         startDate: iso(assignment.startDate),
         totalWeeks,
         currentWeek,

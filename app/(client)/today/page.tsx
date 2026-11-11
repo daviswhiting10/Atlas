@@ -41,7 +41,7 @@ export default async function TodayPage() {
   const weekDone = week.filter((w) => w.status === "LOGGED").length;
   const weekLeft = week.filter((w) => w.status === "PLANNED").length;
   const block = plan.blocks[Math.min(Math.floor((plan.currentWeek - 1) / BLOCK_WEEKS), plan.blocks.length - 1)];
-  const lighterWeek = athlete.selfServe && next != null && next.week % BLOCK_WEEKS === 0;
+  const lighterWeek = plan.lighterWeeks && next != null && next.week % BLOCK_WEEKS === 0;
 
   // Lead with the lift coming up first today, if it has history; otherwise the biggest lift.
   const focus =

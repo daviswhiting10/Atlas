@@ -274,6 +274,15 @@ export async function setWorkoutNote(scope: PlanScope, workoutId: string, text: 
   await prisma.assignedWorkout.update({ where: { id: w.id }, data: { notes: cleanText(text, LIMITS.note) } });
 }
 
+/**
+ * Turn the plan's lighter weeks on or off. Nothing stored is rewritten: the
+ * weeks are read from this switch, so turning it back restores the plan.
+ */
+export async function setLighterWeeks(scope: PlanScope, on: boolean): Promise<void> {
+  const { count } = await prisma.programAssignment.updateMany({ where: planWhere(scope), data: { lighterWeeks: on } });
+  if (count === 0) throw notFound("An active plan");
+}
+
 export async function setPlanNote(scope: PlanScope, text: string | null): Promise<void> {
   const { count } = await prisma.programAssignment.updateMany({
     where: planWhere(scope),

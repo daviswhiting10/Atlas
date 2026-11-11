@@ -18,6 +18,7 @@ import {
   addWorkout,
   removeExercise,
   removeWorkout,
+  setLighterWeeks,
   setPlanNote,
   setTargets,
   setWorkoutNote,
@@ -163,5 +164,22 @@ export const setPlanNotes = clientTool({
     const scope = scopeOf(client);
     await run(() => (args.assignedWorkoutId ? setWorkoutNote(scope, args.assignedWorkoutId, args.text) : setPlanNote(scope, args.text)));
     return { on: args.assignedWorkoutId ?? "plan", cleared: args.text.trim() === "" };
+  },
+});
+
+export const setPlanLighterWeeks = clientTool({
+  name: "set_plan_lighter_weeks",
+  title: "Turn the plan's lighter weeks on or off",
+  description:
+    "Lighter weeks: the last week of every 4-week block, the athlete keeps the weights and stops each set a couple of reps short, and those sessions don't count toward records or plateaus. Generated plans have them on; hand-built plans have them off. Nothing in the plan is rewritten, so this can be switched back.",
+  permission: "write",
+  roles: ALL_ROLES,
+  input: z.object({
+    clientId: ClientIdArg,
+    on: z.boolean(),
+  }),
+  async handler({ client }, args) {
+    await run(() => setLighterWeeks(scopeOf(client), args.on));
+    return { lighterWeeks: args.on };
   },
 });

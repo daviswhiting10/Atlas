@@ -29,10 +29,58 @@ export type PlanActions = {
   setTargets: (input: { aweId: string; workoutId: string } & TargetValues) => Promise<Result>;
   setWorkoutNote: (input: { workoutId: string; text: string }) => Promise<Result>;
   setPlanNote: (text: string) => Promise<Result>;
+  setLighterWeeks?: (on: boolean) => Promise<Result>;
   setSkipped?: (input: { assignedWorkoutId: string; skipped: boolean }) => Promise<void>;
 };
 
 const DELOAD_NOTE = "Lighter week: same weights, but stop each set two or three reps early and recover.";
+
+/** The plan's lighter weeks, on or off. Saves immediately; the week labels follow on refresh. */
+function LighterWeeksSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => Promise<Result> }) {
+  const [value, setValue] = useState(on);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  useEffect(() => setValue(on), [on]);
+
+  function toggle() {
+    const next = !value;
+    setValue(next);
+    start(async () => {
+      const res = await onChange(next);
+      if (!res.ok) {
+        setValue(!next);
+        toast.error(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <p id="lighter-weeks-label" className="text-[15px] font-medium text-ink">
+          Lighter every 4th week
+        </p>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-ink-mute">
+          Weeks {BLOCK_WEEKS}, {BLOCK_WEEKS * 2}, {BLOCK_WEEKS * 3}…: same weights, stop each set two or three reps early. Those sessions never count as a record or a stall.
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-labelledby="lighter-weeks-label"
+        onClick={toggle}
+        disabled={pending}
+        className={cn("press relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60", value ? "bg-signal" : "bg-ink/15")}
+      >
+        <span className={cn("absolute left-0 top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform", value ? "translate-x-[22px]" : "translate-x-0.5")} />
+      </button>
+    </div>
+  );
+}
 
 /** A notes field that saves when you leave it. */
 function NoteField({ value, placeholder, label, onSave }: { value: string | null; placeholder: string; label: string; onSave: (text: string) => Promise<Result> }) {
@@ -398,7 +446,7 @@ export function PlanView({
   const shown = plan.workouts.filter((w) => w.week === week);
   const blockIndex = plan.blocks.length > 0 ? Math.min(Math.floor((week - 1) / BLOCK_WEEKS), plan.blocks.length - 1) : -1;
   const block = blockIndex >= 0 ? plan.blocks[blockIndex] : null;
-  const isDeload = plan.generated && week % BLOCK_WEEKS === 0;
+  const isDeload = plan.lighterWeeks && week % BLOCK_WEEKS === 0;
 
   return (
     <div className="min-w-0">
@@ -461,7 +509,7 @@ export function PlanView({
           Week {week}
           {week === plan.currentWeek && <span className="ml-2 align-middle text-sm font-medium text-signal">current</span>}
         </h2>
-        {block && <p className="truncate text-sm text-ink-mute">{isDeload ? "Lighter week — recover" : block.focus}</p>}
+        {(block || isDeload) && <p className="truncate text-sm text-ink-mute">{isDeload ? "Lighter week — recover" : block?.focus}</p>}
       </div>
 
       <div key={week} className="fade-in mt-3 space-y-3">
@@ -474,6 +522,11 @@ export function PlanView({
 
       <div className="rule mt-8 pt-6">
         <NoteField key={plan.id} label={noteLabel} value={plan.note} placeholder="Anything about the plan as a whole: what it's for, what to watch, when to revisit it." onSave={actions.setPlanNote} />
+        {actions.setLighterWeeks && (
+          <div className="mt-6">
+            <LighterWeeksSwitch on={plan.lighterWeeks} onChange={actions.setLighterWeeks} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import {
   coachAddWorkout,
   coachRemoveExercise,
   coachRemoveWorkout,
+  coachSetLighterWeeks,
   coachSetPlanNote,
   coachSetTargets,
   coachSetWorkoutNote,
@@ -52,6 +53,7 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
     setTargets: coachSetTargets.bind(null, client.id, plan.id),
     setWorkoutNote: coachSetWorkoutNote.bind(null, client.id, plan.id),
     setPlanNote: coachSetPlanNote.bind(null, client.id, plan.id),
+    setLighterWeeks: coachSetLighterWeeks.bind(null, client.id, plan.id),
   };
 
   const firstName = client.fullName.split(" ")[0];
@@ -92,7 +94,7 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
           </div>
         )}
         {!plan.generated && (
-          <p className="mt-3 max-w-2xl text-[13px] text-ink-mute">Built from a library program. It edits the same way; phases and lighter weeks apply to generated plans.</p>
+          <p className="mt-3 max-w-2xl text-[13px] text-ink-mute">Built from a library program, exactly as written. It edits the same way; lighter weeks are off unless you turn them on below.</p>
         )}
       </div>
 

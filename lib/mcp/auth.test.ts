@@ -40,6 +40,7 @@ const EXPECTED: Record<string, { roles: McpRole[]; permission: string; scope: "c
   swap_plan_exercise: { roles: EVERYONE, permission: "write", scope: "client" },
   set_plan_exercise_targets: { roles: EVERYONE, permission: "write", scope: "client" },
   set_plan_note: { roles: EVERYONE, permission: "write", scope: "client" },
+  set_plan_lighter_weeks: { roles: EVERYONE, permission: "write", scope: "client" },
 };
 
 /** Otherwise-valid arguments for tools that require more than a client, so each case fails for the reason under test. */
@@ -54,6 +55,7 @@ const VALID: Record<string, Record<string, unknown>> = {
   swap_plan_exercise: { planExerciseId: "awe_1", slug: "plank" },
   set_plan_exercise_targets: { planExerciseId: "awe_1", sets: 4 },
   set_plan_note: { text: "Felt strong" },
+  set_plan_lighter_weeks: { on: true },
 };
 const argsFor = (tool: { name: string }, extra: Record<string, unknown> = {}) => ({ ...VALID[tool.name], ...extra });
 
@@ -183,7 +185,7 @@ describe("plan editing", () => {
 
   it("is open to an athlete for their own plan", () => {
     expect(editTools.map((t) => t.name).sort()).toEqual(
-      ["add_plan_exercise", "add_plan_workout", "remove_plan_exercise", "remove_plan_workout", "set_plan_exercise_targets", "set_plan_note", "swap_plan_exercise"].sort()
+      ["add_plan_exercise", "add_plan_workout", "remove_plan_exercise", "remove_plan_workout", "set_plan_exercise_targets", "set_plan_lighter_weeks", "set_plan_note", "swap_plan_exercise"].sort()
     );
     for (const t of editTools) expect(t.roles, t.name).toContain("CLIENT");
   });

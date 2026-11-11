@@ -9,10 +9,11 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { CATALOG_BY_SLUG, displayName } from "@/lib/plan/catalog";
-import { BLOCK_WEEKS, GOALS, normalizePrefs, resolvePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
+import { GOALS, normalizePrefs, resolvePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
 import { buildSeries, nextTarget, sessionPoint, type LoggedSet, type SessionPoint, type Target } from "@/lib/plan/overload";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/guest";
-import { loadPlanOverview, storedPrefs, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
+import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/lighter";
+import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
 export type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf, weekStreak } from "./sessions";
@@ -36,16 +37,14 @@ type Session =
 
 /** Select shape that lets a logged set be traced back to its plan week. */
 const WEEK_SOURCE = {
-  select: { date: true, assignedWorkout: { select: { scheduledDate: true, programAssignment: { select: { startDate: true } } } } },
+  select: { date: true, assignedWorkout: { select: { scheduledDate: true, programAssignment: { select: LIGHTER_SELECT } } } },
 } as const;
 
-type WeekSource = { assignedWorkout: { scheduledDate: Date; programAssignment: { startDate: Date } } | null };
+type WeekSource = { assignedWorkout: { scheduledDate: Date; programAssignment: LighterSource } | null };
 
-/** Generated plans close every block with a lighter week. Coach-written plans have no such rule. */
+/** Whether a logged session fell in a lighter week of the plan it was logged against. */
 function isDeloadSession(log: WeekSource, selfServe: boolean): boolean {
-  if (!selfServe || !log.assignedWorkout) return false;
-  const { scheduledDate, programAssignment } = log.assignedWorkout;
-  return weekOf(scheduledDate.getTime(), programAssignment.startDate.getTime()) % BLOCK_WEEKS === 0;
+  return log.assignedWorkout != null && isLighterWeek(log.assignedWorkout.scheduledDate, log.assignedWorkout.programAssignment, selfServe);
 }
 
 export type Athlete = {
@@ -135,7 +134,7 @@ export type ProgressData = {
 export const getProgress = cache(async (): Promise<ProgressData> => {
   const athlete = await getAthlete();
   const plan = await getPlanOverview();
-  return loadProgress({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, plan, generated: plan?.generated ?? athlete.selfServe, timeZone: getTimeZone() });
+  return loadProgress({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, plan, selfServe: athlete.selfServe, timeZone: getTimeZone() });
 });
 
 /**
@@ -147,15 +146,15 @@ export async function loadProgress({
   clientId,
   workspaceId,
   plan,
-  generated,
+  selfServe,
   timeZone,
 }: {
   clientId: string;
   workspaceId: string;
   /** The client's live plan, for next-session targets. */
   plan: PlanOverview | null;
-  /** Whether lighter weeks apply (generated plans). */
-  generated: boolean;
+  /** An athlete running their own plans (older ones count as generated). */
+  selfServe: boolean;
   timeZone: string;
 }): Promise<ProgressData> {
   const tz = timeZone;
@@ -200,7 +199,7 @@ export async function loadProgress({
     }
     let session = entry.sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date, deload: isDeloadSession(s.workoutLog, generated), sets: [] };
+      session = { date, deload: isDeloadSession(s.workoutLog, selfServe), sets: [] };
       entry.sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
@@ -319,7 +318,7 @@ export type LoggerData = {
   note: string | null;
   workoutLogId: string | null;
   exercises: LoggerExercise[];
-  /** True in a lighter week of a generated plan: no progression is asked for, and nothing counts as a record. */
+  /** True in one of the plan's lighter weeks: no progression is asked for, and nothing counts as a record. */
   deloadWeek: boolean;
   /** Other workouts from the same week, for quick switching. */
   siblings: Array<{ id: string; name: string; status: WorkoutSummary["status"]; date: string }>;
@@ -338,7 +337,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       notes: true,
       scheduledDate: true,
       programAssignmentId: true,
-      programAssignment: { select: { startDate: true, sourceProgram: { select: { goalTags: true } } } },
+      programAssignment: { select: LIGHTER_SELECT },
       exercises: {
         orderBy: { order: "asc" },
         select: {
@@ -361,8 +360,6 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     },
   });
   if (!workout) return null;
-  // Generated plans (the athlete's own or a coach's) close each block with a lighter week.
-  const generated = storedPrefs(workout.programAssignment.sourceProgram.goalTags) != null || athlete.selfServe;
 
   const start = workout.programAssignment.startDate.getTime();
   const week = weekOf(workout.scheduledDate.getTime(), start);
@@ -404,14 +401,14 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     }
     let session = sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, generated), sets: [] };
+      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [] };
       sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
   }
 
   const logged = workout.workoutLog?.sets ?? [];
-  const deloadWeek = generated && week % BLOCK_WEEKS === 0;
+  const deloadWeek = isLighterWeek(workout.scheduledDate, workout.programAssignment, athlete.selfServe);
 
   const exercises: LoggerExercise[] = workout.exercises.map((e) => {
     const prescribed = ((e.prescribedSets as RawSet[]) ?? []).length > 0 ? (e.prescribedSets as RawSet[]) : [{}];

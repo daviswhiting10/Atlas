@@ -8,11 +8,11 @@
 
 import { prisma } from "@/lib/db/client";
 import { displayName } from "./catalog";
-import { BLOCK_WEEKS, generatePlan, normalizePrefs, type Prefs } from "./generator";
+import { generatePlan, normalizePrefs, type Prefs } from "./generator";
+import { isLighterWeek, lighterWeeksOn } from "./lighter";
+import { weekOf } from "@/lib/athlete/sessions";
 
-const DAY_MS = 86_400_000;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
-const weekOf = (time: number, start: number) => Math.max(1, Math.floor(Math.round((time - start) / DAY_MS) / 7) + 1);
 
 type RawSet = { weight?: number | null; repMin?: number; repMax?: number; unit?: "reps" | "secs"; restSeconds?: number | null };
 
@@ -26,7 +26,7 @@ export type WorkoutSummary = {
   status: WorkoutStatus;
   /** A note written by the athlete or their coach. */
   note: string | null;
-  /** A lighter week of a generated plan. */
+  /** One of the plan's lighter weeks. */
   deload: boolean;
   estMinutes: number;
   exercises: Array<{
@@ -54,6 +54,8 @@ export type PlanOverview = {
   currentWeek: number;
   /** Built by the plan generator (as opposed to written by hand in the old builder). */
   generated: boolean;
+  /** Whether the last week of every 4-week block is lighter. */
+  lighterWeeks: boolean;
   /** The preferences the plan was generated from, when it was. */
   prefs: Prefs | null;
   /** The goal in the words it was given. */
@@ -113,6 +115,7 @@ export async function loadPlanOverview({
       startDate: true,
       goalText: true,
       notes: true,
+      lighterWeeks: true,
       sourceProgram: { select: { goalTags: true } },
       assignedWorkouts: {
         orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
@@ -136,7 +139,10 @@ export async function loadPlanOverview({
   const generated = prefs != null;
   const plan = prefs ? generatePlan(prefs) : null;
   const start = assignment.startDate.getTime();
-  const isDeload = (date: Date) => generated && weekOf(date.getTime(), start) % BLOCK_WEEKS === 0;
+  // An athlete's own plan from before prefs were stored with it still counts as generated.
+  const selfServe = fallbackPrefs != null;
+  const lighterWeeks = lighterWeeksOn(assignment, selfServe);
+  const isDeload = (date: Date) => isLighterWeek(date, assignment, selfServe);
 
   const workouts: WorkoutSummary[] = assignment.assignedWorkouts.map((w) => ({
     id: w.id,
@@ -187,6 +193,7 @@ export async function loadPlanOverview({
     totalWeeks,
     currentWeek: nextUp?.week ?? totalWeeks,
     generated,
+    lighterWeeks,
     prefs,
     goalText: assignment.goalText ?? prefs?.goalText ?? null,
     note: assignment.notes,

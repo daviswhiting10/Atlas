@@ -23,6 +23,7 @@ import {
   addWorkout,
   removeExercise,
   removeWorkout,
+  setLighterWeeks,
   setPlanNote,
   setTargets,
   setWorkoutNote,
@@ -144,6 +145,13 @@ export async function coachSetWorkoutNote(clientId: string, assignmentId: string
 export async function coachSetPlanNote(clientId: string, assignmentId: string, text: string) {
   return run(async () => {
     await setPlanNote(await scopeFor(clientId, assignmentId), z.string().max(LIMITS.note * 2).parse(text));
+    refresh(clientId, assignmentId);
+  });
+}
+
+export async function coachSetLighterWeeks(clientId: string, assignmentId: string, on: boolean) {
+  return run(async () => {
+    await setLighterWeeks(await scopeFor(clientId, assignmentId), z.boolean().parse(on));
     refresh(clientId, assignmentId);
   });
 }
