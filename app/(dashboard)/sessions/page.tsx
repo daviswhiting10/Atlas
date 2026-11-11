@@ -142,13 +142,10 @@ export default function SessionsPage() {
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
-        <h1
-          className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
-        >
+        <h1 className="text-4xl leading-none text-ink">
           Log Session
         </h1>
-        <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>
+        <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Speak or type post-session notes. Atlas structures them into SOAP format.
         </p>
       </div>

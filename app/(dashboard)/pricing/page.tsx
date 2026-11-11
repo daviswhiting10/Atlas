@@ -10,13 +10,10 @@ export default function PricingPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-6 md:mb-8">
-        <h1
-          className="font-display leading-[1.04] tracking-[-0.01em]"
-          style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
-        >
+        <h1 className="text-4xl leading-none text-ink">
           Pricing
         </h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
+        <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Davis Whiting · NASM CPT · Life Time Columbia, MD · 513-828-8682
         </p>
       </div>

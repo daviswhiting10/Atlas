@@ -124,7 +124,7 @@ function SlotPickerDialog({
       <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Assign to program slot</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
             Pick the day/week this session counts toward.
           </p>
         </DialogHeader>

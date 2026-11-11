@@ -325,10 +325,7 @@ export default function IntakePage() {
       <div className="max-w-2xl">
         <div className="flex items-center gap-2 mb-6">
           <CheckCircle className="w-5 h-5 text-signal" />
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-[30px] leading-[1.08] text-ink">
             Intake Complete
           </h1>
         </div>
@@ -378,15 +375,12 @@ export default function IntakePage() {
   return (
     <div className="max-w-2xl">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-4xl leading-none text-ink">
             Goal Setting Session
           </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
             {mode === "form"
               ? "Fill out with your client."
               : "Upload an existing intake PDF to extract."}

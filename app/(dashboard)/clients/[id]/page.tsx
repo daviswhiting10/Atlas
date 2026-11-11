@@ -256,7 +256,7 @@ export default function ClientDetailPage() {
       </Link>
 
       {/* ── Header strip ──────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-4 gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
           {/* Avatar */}
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-base font-semibold text-white md:h-14 md:w-14 md:text-lg">
@@ -264,7 +264,7 @@ export default function ClientDetailPage() {
           </div>
           {/* Name + meta */}
           <div className="min-w-0">
-            <h1 className="truncate text-[30px] leading-[1.08] text-ink sm:text-[38px]">{client.fullName}</h1>
+            <h1 className="text-[30px] leading-[1.08] text-ink sm:truncate sm:text-[38px]">{client.fullName}</h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <DropdownMenu>
                 <DropdownMenuTrigger

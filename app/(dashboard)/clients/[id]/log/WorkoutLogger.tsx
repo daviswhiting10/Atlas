@@ -1038,10 +1038,7 @@ export default function WorkoutLogger({
 
       <div className="flex items-start justify-between mb-4 gap-3">
         <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em] leading-tight"
-            style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-[30px] leading-[1.08] text-ink">
             {workoutName}
           </h1>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">

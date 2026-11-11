@@ -144,13 +144,10 @@ export default function NewMeasurementPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-[30px] leading-[1.08] text-ink">
             Log measurement
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
             All fields optional — enter what you have.
           </p>
         </div>

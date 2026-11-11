@@ -97,13 +97,10 @@ export default function ClientsPage() {
     <div className="">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-4xl leading-none text-ink">
             Clients
           </h1>
-          <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>
+          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
             {clients.length} total · {clients.filter((c) => c.status === "ACTIVE").length} active
           </p>
         </div>
@@ -224,7 +221,7 @@ export default function ClientsPage() {
                 <CardContent className="py-16 flex flex-col items-center text-center">
                   <Users className="w-10 h-10 text-muted-foreground mb-3" />
                   <p className="font-medium">No clients found</p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
                     {search || filterStatus !== "all" ? "Try adjusting your filters" : "Add your first client above"}
                   </p>
                 </CardContent>

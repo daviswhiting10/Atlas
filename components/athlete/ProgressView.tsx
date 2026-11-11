@@ -33,7 +33,16 @@ function WeekTooltip({ active, payload }: { active?: boolean; payload?: Array<{ 
   );
 }
 
-export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMetric: FocusMetric }) {
+export function ProgressView({
+  data,
+  goalMetric,
+  emptyAction = { href: "/today", label: "Log your first workout" },
+}: {
+  data: ProgressData;
+  goalMetric: FocusMetric;
+  /** Where the empty state points: the athlete starts a workout, a coach logs one for the client. */
+  emptyAction?: { href: string; label: string };
+}) {
   const [exerciseId, setExerciseId] = useState(data.exercises[0]?.exerciseId ?? null);
   const [chosen, setChosen] = useState<FocusMetric>(goalMetric);
   const [showAll, setShowAll] = useState(false);
@@ -65,8 +74,8 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
     return (
       <div className="rise rise-1">
         <ProgressChart series={[]} metric={goalMetric} loaded height={260} legend={false} />
-        <Link href="/today" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
-          Log your first workout <ArrowRight className="h-4 w-4" />
+        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
+          {emptyAction.label} <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
     );

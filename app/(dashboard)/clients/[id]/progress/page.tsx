@@ -65,7 +65,7 @@ export default async function ClientProgressPage({ params }: { params: { id: str
           </Link>
         </nav>
       </div>
-      <ProgressView data={data} goalMetric={metric} />
+      <ProgressView data={data} goalMetric={metric} emptyAction={{ href: `/clients/${client.id}/log`, label: `Log a workout for ${firstName}` }} />
     </div>
   );
 }

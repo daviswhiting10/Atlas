@@ -92,14 +92,11 @@ export default function ProgramIdeaPage() {
       <div>
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5" style={{ color: "var(--blue)" }} />
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-[30px] leading-[1.08] text-ink">
             AI Program Idea
           </h1>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Describe a client in plain language. Get a full NASM OPT-based session outline to use as a starting point.
         </p>
       </div>

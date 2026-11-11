@@ -103,13 +103,10 @@ export default function LeadsPage() {
     <div className="">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1
-            className="font-display leading-[1.04] tracking-[-0.01em]"
-            style={{ fontSize: "clamp(2.5rem, 5vw, 3rem)", color: "var(--ink)" }}
-          >
+          <h1 className="text-4xl leading-none text-ink">
             Pipeline
           </h1>
-          <p className="font-body text-sm mt-1" style={{ color: "var(--ink-mute)" }}>{leads.length} leads total</p>
+          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">{leads.length} leads total</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger>
