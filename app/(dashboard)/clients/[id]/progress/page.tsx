@@ -1,20 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db/client";
-import { TZ_COOKIE, loadProgress, safeTimeZone } from "@/lib/athlete/data";
-import { loadPlanOverview } from "@/lib/plan/overview";
-import { GOALS, resolvePrefs } from "@/lib/plan/generator";
+import { loadClientProgress } from "@/lib/coach/progress";
 import { ProgressView } from "@/components/athlete/ProgressView";
 
 export const metadata: Metadata = { title: "Progress" };
-
-/** Map the coach's free-form primary goal onto the metric charts lead with. */
-const metricForGoal = (goal: string | null) => (goal === "performance" || goal === "strength" ? "e1rm" : goal === "weight_loss" ? "reps" : "weight");
 
 /**
  * A client's progress, as the coach sees it: the athlete's own Progress
@@ -25,22 +18,11 @@ export default async function ClientProgressPage({ params }: { params: { id: str
   const workspaceId = session?.user?.workspaceId;
   if (!workspaceId) redirect("/login");
 
-  const client = await prisma.clientProfile.findFirst({ where: { id: params.id, workspaceId, deletedAt: null }, select: { id: true, fullName: true, primaryGoal: true } });
-  if (!client) notFound();
-
-  const plan = await loadPlanOverview({ clientId: client.id, workspaceId });
-  const data = await loadProgress({
-    clientId: client.id,
-    workspaceId,
-    plan,
-    selfServe: false,
-    timeZone: safeTimeZone(cookies().get(TZ_COOKIE)?.value),
-  });
-
-  const goal = plan?.prefs ? GOALS[resolvePrefs(plan.prefs).goal] : null;
-  const metric = goal?.metric ?? metricForGoal(client.primaryGoal);
+  const progress = await loadClientProgress(params.id, workspaceId);
+  if (!progress) notFound();
+  const { client, data, metric } = progress;
   const { sessions, prs, since } = data.totals;
-  const firstName = client.fullName.split(" ")[0];
+  const firstName = client.firstName;
 
   return (
     <div>

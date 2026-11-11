@@ -2,6 +2,8 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
+import { ProgressChart } from "@/components/athlete/ProgressChart";
+import type { SessionPoint, Target } from "@/lib/plan/overload";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -211,7 +213,31 @@ type WorkoutOption = {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+export type ExerciseTrend = { series: SessionPoint[]; loaded: boolean; timed: boolean; target: Target | null };
+
+/** The exercise's trend across past sessions, the same chart the client sees. Collapsible. */
+function TrendChart({ trend }: { trend: ExerciseTrend | undefined }) {
+  const [open, setOpen] = useState(true);
+  if (!trend || trend.series.length === 0) return null;
+  const metric = trend.loaded && !trend.timed ? "e1rm" : "reps";
+  const sessions = trend.series.length;
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink">
+        <TrendingUp className="h-3 w-3" />
+        {open ? "Hide trend" : "Show trend"} · {sessions} session{sessions === 1 ? "" : "s"}
+      </button>
+      {open && (
+        <div className="mt-2">
+          <ProgressChart series={trend.series} metric={metric} loaded={trend.loaded} timed={trend.timed} target={trend.target} height={150} legend={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WorkoutLogger({
+  trends,
   clientId,
   clientName,
   assignedWorkoutId,
@@ -224,6 +250,8 @@ export default function WorkoutLogger({
   existingSetLogs,
   availableWorkouts,
 }: {
+  /** History per exercise id, for the trend chart under each exercise. */
+  trends: Record<string, ExerciseTrend>;
   clientId: string;
   clientName: string;
   assignedWorkoutId: string;
@@ -909,6 +937,7 @@ export default function WorkoutLogger({
                           setSwappingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))
                         }
                         onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                        trend={trends[ex.exerciseId]}
                       />
 
                       <div className="space-y-2">
@@ -1171,6 +1200,8 @@ export default function WorkoutLogger({
                   </p>
                 )}
 
+                <TrendChart trend={trends[ex.exerciseId]} />
+
                 {s.type === "progress" && (
                   <div className="flex items-center gap-1 mt-1">
                     <TrendingUp className="w-3 h-3 text-[var(--success)] shrink-0" />
@@ -1289,7 +1320,9 @@ function ExerciseHeader({
   swapping,
   onToggleSwap,
   onSwap,
+  trend,
 }: {
+  trend?: ExerciseTrend;
   ex: LoggerExercise;
   index: number;
   isSwapping: boolean;
@@ -1351,6 +1384,8 @@ function ExerciseHeader({
           <span className="font-semibold">Prev week:</span> {formatPrevSets(ex.prevWorkoutSets)}
         </p>
       )}
+
+      <TrendChart trend={trend} />
 
       {s.type === "progress" && (
         <div className="flex items-center gap-1 mt-1">

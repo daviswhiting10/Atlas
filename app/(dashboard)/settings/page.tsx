@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { PasswordPanel } from "@/components/athlete/account";
 
-type Profile = { name: string; email: string; voiceProfile: string };
+type Profile = { name: string; email: string; voiceProfile: string; hasPassword?: boolean };
 
 const VOICE_PLACEHOLDER = `How you coach and how you talk to clients. For example:
 
@@ -18,7 +19,7 @@ const field =
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState<Profile | null>(null);
-  const [form, setForm] = useState<Profile>({ name: "", email: "", voiceProfile: "" });
+  const [form, setForm] = useState<Profile>({ name: "", email: "", voiceProfile: "", hasPassword: false });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -110,6 +111,13 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+
+      {saved && (
+        <section className="rise rise-2 mt-10">
+          <p className="eyebrow">Sign-in</p>
+          <PasswordPanel key={String(saved.hasPassword)} className="mt-3" email={saved.email} hasPassword={saved.hasPassword === true} />
+        </section>
+      )}
     </div>
   );
 }

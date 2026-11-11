@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatRow } from "@/components/athlete/StatRow";
+import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import {
   ArrowLeft,
   Dumbbell,
@@ -46,6 +47,8 @@ type Client = {
   id: string;
   fullName: string;
   email: string | null;
+  /** Set once the client has a login (they've been invited). */
+  userId: string | null;
   phone: string | null;
   status: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
   primaryGoal: string | null;
@@ -137,11 +140,16 @@ function relativeTime(date: string) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-export default function ClientDetailPage() {
+/**
+ * The client page. `progress` is rendered on the server (the client's lift
+ * charts, the same screen they see) and shown above the tabs.
+ */
+export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [invite, setInvite] = useState<InviteResult | null>(null);
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -176,8 +184,7 @@ export default function ClientDetailPage() {
       toast.error(err?.error ?? "Invite failed");
       return;
     }
-    const data = await res.json();
-    toast.success(`Invite sent to ${data.email}`);
+    setInvite((await res.json()) as InviteResult);
   }
 
   async function deleteClient() {
@@ -294,6 +301,17 @@ export default function ClientDetailPage() {
 
         {/* Actions — icon-only on mobile, labeled on desktop */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {!client.userId && (
+            <button
+              type="button"
+              onClick={inviteClient}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 px-3")}
+              title={client.email ? `Give ${client.fullName.split(" ")[0]} access to their plan and progress` : "Add an email to invite"}
+            >
+              <UserCheck className="w-4 h-4 shrink-0" />
+              <span className="ml-1.5">Invite</span>
+            </button>
+          )}
           <Link
             href={`/outreach?clientId=${client.id}`}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 w-9 p-0 md:w-auto md:px-3")}
@@ -317,7 +335,7 @@ export default function ClientDetailPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={inviteClient}>
                 <UserCheck className="w-3.5 h-3.5 mr-2" />
-                Invite client
+                {client.userId ? "New sign-in link" : "Invite client"}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={deleteClient}
@@ -382,6 +400,11 @@ export default function ClientDetailPage() {
           { label: "Last session", value: lastSession ? relativeTime(lastSession.date) : "—", hint: lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "None yet" },
         ]}
       />
+
+      {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
+
+      {/* ── Progress: the reason the plan exists ──────────────────────────── */}
+      <section className="mb-10 mt-8">{progress}</section>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
       <Tabs defaultValue="overview">

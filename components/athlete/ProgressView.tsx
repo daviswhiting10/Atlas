@@ -37,11 +37,14 @@ export function ProgressView({
   data,
   goalMetric,
   emptyAction = { href: "/today", label: "Log your first workout" },
+  totals = true,
 }: {
   data: ProgressData;
   goalMetric: FocusMetric;
   /** Where the empty state points: the athlete starts a workout, a coach logs one for the client. */
   emptyAction?: { href: string; label: string };
+  /** The workouts / sets / records / streak row. Off where the page already shows those numbers. */
+  totals?: boolean;
 }) {
   const [exerciseId, setExerciseId] = useState(data.exercises[0]?.exerciseId ?? null);
   const [chosen, setChosen] = useState<FocusMetric>(goalMetric);
@@ -89,15 +92,17 @@ export function ProgressView({
 
   return (
     <div className="space-y-10">
-      <StatRow
-        className="rise rise-1"
-        stats={[
-          { label: "Workouts", value: String(data.totals.sessions) },
-          { label: "Sets", value: data.totals.sets.toLocaleString() },
-          { label: "Records", value: String(data.totals.prs) },
-          { label: "Streak", value: String(data.totals.streak), unit: data.totals.streak === 1 ? "week" : "weeks" },
-        ]}
-      />
+      {totals && (
+        <StatRow
+          className="rise rise-1"
+          stats={[
+            { label: "Workouts", value: String(data.totals.sessions) },
+            { label: "Sets", value: data.totals.sets.toLocaleString() },
+            { label: "Records", value: String(data.totals.prs) },
+            { label: "Streak", value: String(data.totals.streak), unit: data.totals.streak === 1 ? "week" : "weeks" },
+          ]}
+        />
+      )}
 
       {/* ── One exercise ─────────────────────────────────────────────── */}
       <section className="rise rise-2">

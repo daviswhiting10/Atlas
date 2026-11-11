@@ -16,13 +16,14 @@ const UpdateSchema = z.object({
 async function profile(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { name: true, email: true, trainerProfile: { select: { voiceProfile: true } } },
+    select: { name: true, email: true, passwordHash: true, trainerProfile: { select: { voiceProfile: true } } },
   });
   const voice = user?.trainerProfile?.voiceProfile;
   return {
     name: user?.name ?? "",
     email: user?.email ?? "",
     voiceProfile: typeof voice === "string" ? voice : voice ? JSON.stringify(voice) : "",
+    hasPassword: user?.passwordHash != null,
   };
 }
 

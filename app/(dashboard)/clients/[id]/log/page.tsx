@@ -6,7 +6,8 @@ import {
   getLastPerformance,
   getLastExerciseNote,
 } from "@/lib/actions/workout-logger";
-import WorkoutLogger from "./WorkoutLogger";
+import { loadClientProgress } from "@/lib/coach/progress";
+import WorkoutLogger, { type ExerciseTrend } from "./WorkoutLogger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -290,9 +291,16 @@ export default async function LogPage({
     })
   );
 
+  // Each exercise's history, from the same read model as the Progress charts.
+  const progress = await loadClientProgress(clientId, workspaceId);
+  const trends: Record<string, ExerciseTrend> = Object.fromEntries(
+    (progress?.data.exercises ?? []).map((e) => [e.exerciseId, { series: e.series, loaded: e.loaded, timed: e.timed, target: e.target }])
+  );
+
   return (
     <WorkoutLogger
       key={assignedWorkout.id}
+      trends={trends}
       clientId={clientId}
       clientName={client.fullName}
       assignedWorkoutId={assignedWorkout.id}

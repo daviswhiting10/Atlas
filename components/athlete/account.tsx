@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { saveGuestAccount } from "@/lib/actions/account";
+import { saveGuestAccount, setAccountPassword } from "@/lib/actions/account";
 import { PASSWORD_MIN } from "@/lib/password-rules";
 import { cn } from "@/lib/utils";
 
@@ -99,6 +99,103 @@ export function SaveAccountPanel({ className }: { className?: string }) {
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save my account"}
         </button>
       </form>
+    </section>
+  );
+}
+
+/**
+ * Set (or change) the password on a signed-in account. For people who came
+ * in by link, it means they can sign in any time without an email.
+ */
+export function PasswordPanel({ email, hasPassword, className }: { email: string; hasPassword: boolean; className?: string }) {
+  const [has, setHas] = useState(hasPassword);
+  const [open, setOpen] = useState(!hasPassword);
+  const [current, setCurrent] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await setAccountPassword({ password, current: has ? current : undefined });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setHas(true);
+    setOpen(false);
+    setCurrent("");
+    setPassword("");
+    setDone(true);
+  }
+
+  return (
+    <section className={cn("rounded-2xl border border-line bg-white p-5", className)}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[17px] font-semibold text-ink">{has ? "Password" : "Set a password"}</p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">
+            {done
+              ? "Saved. Sign in any time with your email and this password."
+              : has
+                ? `You sign in as ${email} with a password.`
+                : `So you can sign in as ${email} any time, without waiting for an email link.`}
+          </p>
+        </div>
+        {has && !open && (
+          <button type="button" onClick={() => setOpen(true)} className="press shrink-0 text-sm font-semibold text-signal hover:underline">
+            Change
+          </button>
+        )}
+      </div>
+      {open && (
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          {/* Lets password managers file the new password under the right account. */}
+          <input type="email" value={email} readOnly autoComplete="username" className="sr-only" tabIndex={-1} aria-hidden />
+          {has && (
+            <input
+              type="password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              placeholder="Current password"
+              required
+              autoComplete="current-password"
+              maxLength={200}
+              className={inputClass}
+            />
+          )}
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={`New password (${PASSWORD_MIN}+ characters)`}
+            required
+            minLength={PASSWORD_MIN}
+            maxLength={200}
+            autoComplete="new-password"
+            className={inputClass}
+          />
+          {error && (
+            <p role="alert" className="text-sm leading-relaxed text-destructive">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            {has && (
+              <button type="button" onClick={() => setOpen(false)} className="press h-12 flex-1 rounded-2xl border border-line bg-white text-[15px] font-semibold text-ink-soft hover:border-ink/20">
+                Cancel
+              </button>
+            )}
+            <button type="submit" disabled={busy} className="press flex h-12 flex-[2] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save password"}
+            </button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }

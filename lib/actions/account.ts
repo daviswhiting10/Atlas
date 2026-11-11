@@ -11,7 +11,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN, createAthlete } from "@/lib/guest";
-import { Email, Password, hashPassword, rateLimiter } from "@/lib/password";
+import { Email, Password, hashPassword, rateLimiter, verifyPassword } from "@/lib/password";
 
 export type AccountResult = { ok: true } | { ok: false; error: string };
 
@@ -85,4 +85,31 @@ export async function saveGuestAccount(raw: { email: string; password: string })
     console.error("[save guest account]", err);
     return { ok: false, error: "Couldn't save your account. Please try again." };
   }
+}
+
+const SetPassword = z.object({ password: Password, current: z.string().max(200).optional() });
+
+/**
+ * Set a password on a signed-in account (an invited client who came in by
+ * link, or a coach), so they can sign in without an email. Changing an
+ * existing one needs the current password.
+ */
+export async function setAccountPassword(raw: { password: string; current?: string }): Promise<AccountResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Sign in first." };
+
+  const parsed = SetPassword.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  if (!perIp(clientIp())) return { ok: false, error: "Too many attempts from this connection. Try again in a while." };
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, passwordHash: true } });
+  if (!user) return { ok: false, error: "Sign in first." };
+  if (user.email.endsWith(`@${GUEST_EMAIL_DOMAIN}`)) return { ok: false, error: "Save your account with an email first." };
+  if (user.passwordHash && !(await verifyPassword(parsed.data.current ?? "", user.passwordHash))) {
+    return { ok: false, error: "Your current password isn't right." };
+  }
+
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(parsed.data.password) } });
+  return { ok: true };
 }

@@ -3,14 +3,19 @@ import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { EQUIPMENT, EXPERIENCE, GOALS } from "@/lib/plan/generator";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
 import { StatRow } from "@/components/athlete/StatRow";
-import { SaveAccountPanel } from "@/components/athlete/account";
+import { PasswordPanel, SaveAccountPanel } from "@/components/athlete/account";
+import { prisma } from "@/lib/db/client";
 
 export const metadata: Metadata = { title: "You" };
 
 export default async function YouPage({ searchParams }: { searchParams: { goals?: string } }) {
   const [athlete, plan, progress] = await Promise.all([getAthlete(), getPlanOverview(), getProgress()]);
   const { prefs } = athlete;
-  const kind = athlete.isDemo ? "Demo account · sample training" : athlete.isGuest ? "Guest account" : "Athlete";
+  // Real accounts (not guests or the demo) can set or change a password here.
+  const account = athlete.isGuest
+    ? null
+    : await prisma.user.findUnique({ where: { id: athlete.userId }, select: { email: true, passwordHash: true } });
+  const kind = athlete.isDemo ? "Demo account · sample training" : athlete.isGuest ? "Guest account" : athlete.isCoach ? "My training" : "Athlete";
 
   return (
     <div className="rise">
@@ -26,6 +31,7 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
 
       {/* A demo account is sample data; a guest's own plan is worth keeping. */}
       {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-8" />}
+      {account && !athlete.isCoach && <PasswordPanel className="mt-8" email={account.email} hasPassword={account.passwordHash != null} />}
 
       {athlete.selfServe && (
         <StatRow
