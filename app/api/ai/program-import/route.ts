@@ -38,23 +38,29 @@ type AllowedType = (typeof ALLOWED_TYPES)[number];
 
 // ─── Exercise resolver ───────────────────────────────────────────────────────
 
-async function resolveExercise(name: string): Promise<{ id: string; name: string }> {
+/**
+ * Match an exercise name from the screenshot to the library: the shared one,
+ * or this workspace's own. Anything new is created privately for this
+ * workspace, never in the shared library.
+ */
+async function resolveExercise(name: string, workspaceId: string): Promise<{ id: string; name: string }> {
+  const visible = { OR: [{ workspaceId: null }, { workspaceId }] };
   // 1) exact match
   let ex = await prisma.exercise.findFirst({
-    where: { name: { equals: name, mode: "insensitive" } },
+    where: { ...visible, name: { equals: name, mode: "insensitive" } },
     select: { id: true, name: true },
   });
   if (ex) return ex;
 
   // 2) contains match
   ex = await prisma.exercise.findFirst({
-    where: { name: { contains: name, mode: "insensitive" } },
+    where: { ...visible, name: { contains: name, mode: "insensitive" } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
   if (ex) return ex;
 
-  // 3) auto-create as a global exercise
+  // 3) create it, private to this workspace
   const slug =
     name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") +
     "-" +
@@ -68,7 +74,7 @@ async function resolveExercise(name: string): Promise<{ id: string; name: string
       primaryMuscles: [],
       secondaryMuscles: [],
       instructions: [],
-      workspaceId: null,
+      workspaceId,
     },
     select: { id: true, name: true },
   });
@@ -153,7 +159,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
   const nameToId = new Map<string, { id: string; name: string }>();
   await Promise.all(
     Array.from(allNames).map(async (name) => {
-      const resolved = await resolveExercise(name);
+      const resolved = await resolveExercise(name, workspaceId);
       nameToId.set(name, resolved);
     })
   );

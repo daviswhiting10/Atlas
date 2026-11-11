@@ -22,6 +22,8 @@ export async function GET(req: Request) {
       // "atlas-" entries belong to the plan generator's own catalog; hiding
       // them keeps the coach's picker free of near-duplicates.
       NOT: { slug: { startsWith: "atlas-" } },
+      // The shared library, plus exercises private to this coach's workspace.
+      OR: [{ workspaceId: null }, ...(session.user.workspaceId ? [{ workspaceId: session.user.workspaceId }] : [])],
       ...(q && { name: { contains: q, mode: "insensitive" } }),
       ...(pattern && { movementPattern: pattern as never }),
       ...(equipment && { equipment }),
@@ -49,6 +51,9 @@ export async function POST(req: Request) {
   if (session.user.role === "CLIENT") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (!session.user.workspaceId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const body = await req.json();
   const { name, movementPattern, equipment } = body;
@@ -74,7 +79,8 @@ export async function POST(req: Request) {
       primaryMuscles: [],
       secondaryMuscles: [],
       instructions: [],
-      workspaceId: null, // global — available to all clients
+      // Private to this workspace: one coach's custom exercise never appears in anyone else's library.
+      workspaceId: session.user.workspaceId ?? null,
     },
     select: { id: true, name: true, movementPattern: true, equipment: true },
   });
