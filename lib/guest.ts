@@ -7,7 +7,7 @@
 
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db/client";
-import { GOALS, normalizePrefs, type Prefs } from "@/lib/plan/generator";
+import { GOALS, normalizePrefs, resolvePrefs, type Prefs } from "@/lib/plan/generator";
 import { createPlanForClient, ensureCatalog, seedDemoHistory } from "@/lib/plan/persist";
 
 export const GUEST_EMAIL_DOMAIN = "guest.atlas.app";
@@ -87,7 +87,7 @@ export async function createGuest(input: {
           workspaceId: workspace.id,
           userId: user.id,
           fullName: name,
-          primaryGoal: GOALS[prefs.goal].primaryGoal,
+          primaryGoal: GOALS[resolvePrefs(prefs).goal].primaryGoal,
           status: "ACTIVE",
           goalTargets: { athlete: meta },
         },

@@ -4,7 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, Clock, Dumbbell, Flame, HeartPulse, Home, Loader2, PersonStanding, Sparkles, Trophy, Warehouse } from "lucide-react";
-import { EQUIPMENT, EXPERIENCE, GOALS, generatePlan, type Experience, type Goal, type Prefs } from "@/lib/plan/generator";
+import { DAYS_PER_WEEK, EQUIPMENT, EXPERIENCE, GOALS, GOAL_TEXT_MAX, generatePlan, type Experience, type Goal, type Prefs } from "@/lib/plan/generator";
+import { interpretGoal } from "@/lib/plan/goal";
 import type { Equipment } from "@/lib/plan/catalog";
 import { rebuildPlan } from "@/lib/actions/athlete";
 import { BuildingOverlay, useGuestSignIn } from "./guest";
@@ -139,16 +140,57 @@ export function PlanWizard({
   const { pending, start } = useGuestSignIn();
 
   const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setPrefs((p) => ({ ...p, [key]: value }));
+  const reading = useMemo(() => interpretGoal(prefs.goalText), [prefs.goalText]);
 
   const steps = [
     {
       title: "What are you training for?",
-      hint: "This decides your rep ranges, rest times, and which number your charts lead with.",
+      hint: "Say it in your own words. Atlas reads the goal, any area you want to prioritise, and anything you need to work around.",
       body: (
-        <div className="space-y-2.5">
-          {(Object.keys(GOALS) as Goal[]).map((g) => (
-            <Choice key={g} selected={prefs.goal === g} onClick={() => set("goal", g)} title={GOALS[g].label} blurb={GOALS[g].blurb} icon={GOAL_ICONS[g]} />
-          ))}
+        <div>
+          <label className="block">
+            <span className="sr-only">Your goal, in your own words</span>
+            <textarea
+              value={prefs.goalText ?? ""}
+              onChange={(e) => setPrefs((p) => ({ ...p, goalText: e.target.value.slice(0, GOAL_TEXT_MAX) }))}
+              rows={3}
+              maxLength={GOAL_TEXT_MAX}
+              placeholder="e.g. Build bigger glutes and legs, but my knees are a bit dodgy"
+              className="w-full resize-none rounded-2xl border border-line bg-white p-4 text-[17px] leading-relaxed text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:shadow-[0_0_0_3px_rgba(30,107,78,0.18)]"
+            />
+          </label>
+          <p className="mt-2 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
+            {reading.understood.length > 0 ? (
+              <>
+                <span className="font-semibold text-signal">Atlas read:</span> {reading.understood.join(", ")}.
+              </>
+            ) : (prefs.goalText ?? "").trim() ? (
+              "Nothing specific yet — add a few more words, or use a quick pick below."
+            ) : null}
+          </p>
+
+          <p className="eyebrow mb-2 mt-5">{reading.goal ? "Quick picks — your words above decide the goal" : "Or pick one"}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.keys(GOALS) as Goal[]).map((g) => {
+              const Icon = GOAL_ICONS[g];
+              const selected = (reading.goal ?? prefs.goal) === g;
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => set("goal", g)}
+                  className={cn(
+                    "press flex items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 text-left text-[15px] font-semibold",
+                    selected ? "border-signal text-ink shadow-[0_0_0_3px_rgba(30,107,78,0.18)]" : "border-line text-ink-soft hover:border-ink/20"
+                  )}
+                >
+                  <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-signal" : "text-ink-mute")} />
+                  {GOALS[g].label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       ),
     },
@@ -170,8 +212,8 @@ export function PlanWizard({
         <div className="space-y-6">
           <div>
             <p className="mb-2.5 text-sm font-medium text-ink-soft">Days per week</p>
-            <div className="flex gap-2">
-              {([2, 3, 4, 5, 6] as const).map((d) => (
+            <div className="flex gap-1.5 sm:gap-2">
+              {DAYS_PER_WEEK.map((d) => (
                 <Pill key={d} selected={prefs.daysPerWeek === d} onClick={() => set("daysPerWeek", d)}>
                   {d}
                 </Pill>

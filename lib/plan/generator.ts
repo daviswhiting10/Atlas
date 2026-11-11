@@ -5,25 +5,65 @@
  * 12-week periodised program: three 4-week blocks, a lighter week closing each
  * block, and a training split matched to how many days they can train.
  *
+ * The goal can be a quick pick or the athlete's own words (see ./goal.ts).
+ * Their words can name areas to emphasise and things to work around; a coach
+ * can set the same conditions explicitly. All of it lands in one place:
+ * which exercise fills each slot, and how many sets and reps it gets.
+ *
  * Because it is pure it runs in the browser for the live preview during
  * onboarding and on the server when the plan is persisted — same output both
  * places.
  */
 
 import { CATALOG_BY_SLUG, SLOTS, type CatalogExercise, type Equipment, type Slot } from "./catalog";
+import { AREAS, CONDITIONS, interpretGoal, type Area, type Condition } from "./goal";
+
+export type { Area, Condition } from "./goal";
 
 export type Goal = "muscle" | "strength" | "fat_loss" | "general";
 export type Experience = "beginner" | "intermediate" | "advanced";
 export type FocusMetric = "weight" | "reps" | "e1rm" | "volume";
 
+export type DaysPerWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export const DAYS_PER_WEEK: readonly DaysPerWeek[] = [1, 2, 3, 4, 5, 6, 7];
+export const GOAL_TEXT_MAX = 280;
+
 export type Prefs = {
+  /** Quick pick. Used as-is when there is no goal text, and as the fallback when the text doesn't name a goal. */
   goal: Goal;
   experience: Experience;
-  daysPerWeek: 2 | 3 | 4 | 5 | 6;
+  daysPerWeek: DaysPerWeek;
   equipment: Equipment;
   /** Target session length in minutes. */
   minutes: 30 | 45 | 60 | 75;
+  /** The goal in the athlete's own words. Primary input when present. */
+  goalText?: string;
+  /** Things to work around, set explicitly (by a coach) on top of anything the goal text mentions. */
+  conditions?: Condition[];
+  /** Areas to emphasise, set explicitly on top of anything the goal text mentions. */
+  emphasis?: Area[];
 };
+
+/** Prefs after the goal text has been read: what the generator actually builds from. */
+export type ResolvedPrefs = Prefs & { conditions: Condition[]; emphasis: Area[]; conditioning: boolean; understood: string[] };
+
+const unique = <T,>(xs: T[]) => Array.from(new Set(xs));
+
+export function resolvePrefs(input: Prefs): ResolvedPrefs {
+  const prefs = normalizePrefs(input);
+  const read = interpretGoal(prefs.goalText);
+  const conditions = unique([...(prefs.conditions ?? []), ...read.conditions]);
+  // A protected area is never also an emphasised one.
+  const emphasis = unique([...(prefs.emphasis ?? []), ...read.emphasis]).filter((a) => !(a === "shoulders" && conditions.includes("shoulder")));
+  return {
+    ...prefs,
+    goal: read.goal ?? prefs.goal,
+    conditions,
+    emphasis,
+    conditioning: read.conditioning,
+    understood: read.understood,
+  };
+}
 
 export const DEFAULT_PREFS: Prefs = {
   goal: "muscle",
@@ -116,7 +156,8 @@ export type PlanBlock = { name: string; weeks: number; focus: string };
 export type Plan = {
   name: string;
   split: string;
-  prefs: Prefs;
+  /** The preferences as built from: goal text already read, conditions and emphasis merged. */
+  prefs: ResolvedPrefs;
   blocks: PlanBlock[];
   /** Baseline week. Use `weekVariant` for a specific week of the 12. */
   days: PlannedDay[];
@@ -142,13 +183,91 @@ const PUSH_B: DayTemplate = { name: "Push B", focus: "Shoulders · Upper chest",
 const PULL_B: DayTemplate = { name: "Pull B", focus: "Rows · Lats", slots: ["row", "pull", "row2", "curl", "reardelt", "core2"] };
 const LEGS_B: DayTemplate = { name: "Legs B", focus: "Posterior chain", slots: ["deadlift", "quad", "lunge", "legext", "calf", "core2"] };
 
-const SPLITS: Record<Prefs["daysPerWeek"], { label: string; days: DayTemplate[]; offsets: number[] }> = {
-  2: { label: "Full Body", days: [FULL_A, FULL_B], offsets: [0, 3] },
-  3: { label: "Full Body", days: [FULL_A, FULL_B, FULL_C], offsets: [0, 2, 4] },
-  4: { label: "Upper / Lower", days: [UPPER_A, LOWER_A, UPPER_B, LOWER_B], offsets: [0, 1, 3, 4] },
-  5: { label: "Push / Pull / Legs + Upper / Lower", days: [PUSH_A, PULL_A, LEGS_A, UPPER_B, LOWER_B], offsets: [0, 1, 2, 4, 5] },
-  6: { label: "Push / Pull / Legs ×2", days: [PUSH_A, PULL_A, LEGS_A, PUSH_B, PULL_B, LEGS_B], offsets: [0, 1, 2, 3, 4, 5] },
+/** The seventh day of a daily schedule: low-fatigue work that helps recovery instead of adding to it. */
+const CORE_DAY: DayTemplate = { name: "Conditioning & Core", focus: "Carries · Core · Shoulder health", slots: ["finisher", "core", "core2", "core3", "reardelt", "lateral"] };
+
+const SPLITS: Record<DaysPerWeek, { label: string; frequency: string; days: DayTemplate[]; offsets: number[] }> = {
+  1: { label: "Full Body", frequency: "one session covers every major movement, so nothing goes a week untrained", days: [FULL_A], offsets: [0] },
+  2: { label: "Full Body", frequency: "every muscle group gets trained twice a week", days: [FULL_A, FULL_B], offsets: [0, 3] },
+  3: { label: "Full Body", frequency: "every muscle group gets trained three times a week", days: [FULL_A, FULL_B, FULL_C], offsets: [0, 2, 4] },
+  4: { label: "Upper / Lower", frequency: "every muscle group gets trained twice a week", days: [UPPER_A, LOWER_A, UPPER_B, LOWER_B], offsets: [0, 1, 3, 4] },
+  5: { label: "Push / Pull / Legs + Upper / Lower", frequency: "every muscle group gets trained twice a week", days: [PUSH_A, PULL_A, LEGS_A, UPPER_B, LOWER_B], offsets: [0, 1, 2, 4, 5] },
+  6: { label: "Push / Pull / Legs ×2", frequency: "every muscle group gets trained twice a week", days: [PUSH_A, PULL_A, LEGS_A, PUSH_B, PULL_B, LEGS_B], offsets: [0, 1, 2, 3, 4, 5] },
+  7: {
+    label: "Push / Pull / Legs ×2 + Conditioning",
+    frequency: "every muscle group gets trained twice a week, and the seventh day is light on purpose",
+    days: [PUSH_A, PULL_A, LEGS_A, PUSH_B, PULL_B, LEGS_B, CORE_DAY],
+    offsets: [0, 1, 2, 3, 4, 5, 6],
+  },
 };
+
+// ── Exercise selection ──────────────────────────────────────────────────────
+
+/** Slots that train each area. Emphasis adds a set to these and pulls in any the day is missing. */
+const AREA_SLOTS: Record<Area, Slot[]> = {
+  chest: ["press", "incline", "fly"],
+  back: ["row", "pull", "row2"],
+  shoulders: ["overhead", "lateral", "reardelt"],
+  arms: ["curl", "triceps"],
+  legs: ["squat", "quad", "lunge", "legext", "legcurl"],
+  glutes: ["glute", "hinge", "lunge"],
+  core: ["core", "core2", "core3"],
+};
+
+/**
+ * What each condition swaps out. A slot maps to another slot (which then
+ * resolves for the athlete's equipment) — the day keeps its shape, the risky
+ * movement goes.
+ */
+const CONDITION_SWAPS: Record<Condition, Partial<Record<Slot, Slot>>> = {
+  lower_back: { deadlift: "glute", hinge: "legcurl", row: "row2", squat: "quad" },
+  knee: { lunge: "glute", legext: "legcurl", quad: "hinge" },
+  shoulder: { overhead: "incline", lateral: "reardelt" },
+  post_rehab: {},
+};
+
+/**
+ * Familiarity with lifting changes the tool, not just the volume. Someone new
+ * learns the pattern with dumbbells, cables and machines before a barbell;
+ * someone experienced gets the harder bodyweight pull.
+ */
+const BY_EXPERIENCE: Partial<Record<Experience, Partial<Record<Slot, string>>>> = {
+  beginner: {
+    squat: "goblet-squat",
+    deadlift: "stiff-legged-dumbbell-deadlift",
+    press: "dumbbell-bench-press",
+    overhead: "dumbbell-shoulder-press",
+    row: "seated-cable-rows",
+  },
+  advanced: { pull: "pullups" },
+};
+
+/** Gentler versions used when a condition is present and the slot itself stays. */
+const GENTLE: Partial<Record<Condition, Partial<Record<Slot, string>>>> = {
+  knee: { squat: "goblet-squat" },
+  shoulder: { press: "dumbbell-bench-press", triceps: "atlas-triceps-pushdown" },
+  lower_back: { quad: "atlas-leg-press" },
+};
+
+/** Extra slots tried when a day comes up short (a swap collided, or the equipment has no option). */
+const FILL: Slot[] = ["core2", "core", "reardelt", "curl", "calf", "lateral", "triceps", "core3"];
+
+function resolveSlug(slot: Slot, prefs: ResolvedPrefs): string | null {
+  let target = slot;
+  for (const c of prefs.conditions) target = CONDITION_SWAPS[c][target] ?? target;
+
+  // Experience and "gentle" picks are gym choices; other equipment has one option per slot.
+  if (prefs.equipment === "gym") {
+    for (const c of prefs.conditions) {
+      const gentle = GENTLE[c]?.[target];
+      if (gentle) return gentle;
+    }
+    const level = prefs.conditions.includes("post_rehab") ? "beginner" : prefs.experience;
+    const pick = BY_EXPERIENCE[level]?.[target];
+    if (pick) return pick;
+  }
+  return SLOTS[target][prefs.equipment];
+}
 
 // ── Loading parameters by goal ──────────────────────────────────────────────
 
@@ -179,7 +298,7 @@ const SCHEMES: Record<Goal, Record<PlannedExercise["role"], Scheme>> = {
 
 const EXERCISES_BY_MINUTES: Record<Prefs["minutes"], number> = { 30: 4, 45: 5, 60: 6, 75: 6 };
 
-function schemeFor(prefs: Prefs, role: PlannedExercise["role"], exercise: CatalogExercise): Scheme {
+function schemeFor(prefs: ResolvedPrefs, role: PlannedExercise["role"], exercise: CatalogExercise): Scheme {
   const base = { ...SCHEMES[prefs.goal][role] };
 
   if (exercise.unit === "secs") {
@@ -191,11 +310,31 @@ function schemeFor(prefs: Prefs, role: PlannedExercise["role"], exercise: Catalo
     base.repMin = Math.max(base.repMin, 6);
     base.repMax = Math.max(base.repMax, base.repMin + 6);
   }
-  if (prefs.experience === "beginner" && role === "main") base.sets = Math.min(base.sets, 3);
+  if (prefs.experience === "beginner" && role === "main") {
+    // New lifters practise the movement before loading it: fewer sets, two more reps.
+    base.sets = Math.min(base.sets, 3);
+    base.repMin += 2;
+    base.repMax += 2;
+  }
   if (prefs.experience === "advanced" && role !== "accessory") base.sets += 1;
   if (prefs.minutes === 75 && role === "accessory") base.sets += 1;
   if (prefs.minutes === 30) base.sets = Math.max(2, base.sets - 1);
+  if (prefs.conditioning && role === "accessory") base.rest = Math.max(30, base.rest - 15);
+  if (prefs.conditions.includes("post_rehab")) {
+    // Rebuilding tolerance: nothing heavy, nothing extra, a little more rest.
+    base.sets = Math.min(base.sets, 3);
+    if (base.repMin < 10) {
+      base.repMax += 10 - base.repMin;
+      base.repMin = 10;
+    }
+    base.rest += 15;
+  }
   return base;
+}
+
+/** Does this exercise train an emphasised area? */
+function emphasised(slot: Slot, prefs: ResolvedPrefs): boolean {
+  return prefs.emphasis.some((area) => AREA_SLOTS[area].includes(slot));
 }
 
 function roleFor(index: number): PlannedExercise["role"] {
@@ -204,18 +343,30 @@ function roleFor(index: number): PlannedExercise["role"] {
   return "accessory";
 }
 
-function buildDay(template: DayTemplate, offset: number, prefs: Prefs): PlannedDay {
+/** Exercises with the slot they came from, before the slot is dropped from the public shape. */
+type Slotted = PlannedExercise & { slot: Slot };
+
+type SlottedDay = Omit<PlannedDay, "exercises"> & { exercises: Slotted[] };
+
+function buildDay(template: DayTemplate, offset: number, prefs: ResolvedPrefs): SlottedDay {
   const limit = EXERCISES_BY_MINUTES[prefs.minutes];
   const seen = new Set<string>();
-  const exercises: PlannedExercise[] = [];
+  const exercises: Slotted[] = [];
 
   const slots: Slot[] = [...template.slots];
-  // Fat-loss plans close each session with a short conditioning finisher.
-  if (prefs.goal === "fat_loss") slots.splice(Math.max(limit - 1, 0), 0, "finisher");
+  // An emphasised area the day already trains gets its missing slots pulled
+  // in early, ahead of the accessories they would otherwise lose out to.
+  for (const area of prefs.emphasis) {
+    if (!template.slots.some((s) => AREA_SLOTS[area].includes(s))) continue;
+    const missing = AREA_SLOTS[area].filter((s) => !slots.includes(s));
+    slots.splice(Math.min(3, slots.length), 0, ...missing);
+  }
+  // Fat-loss plans, and anyone who asked for stamina, close each session with a short finisher.
+  if ((prefs.goal === "fat_loss" || prefs.conditioning) && !slots.includes("finisher")) slots.splice(Math.max(limit - 1, 0), 0, "finisher");
 
-  for (const slot of slots) {
+  for (const slot of [...slots, ...FILL]) {
     if (exercises.length >= limit) break;
-    const slug = SLOTS[slot][prefs.equipment];
+    const slug = resolveSlug(slot, prefs);
     if (!slug || seen.has(slug)) continue;
     const exercise = CATALOG_BY_SLUG[slug];
     if (!exercise) continue;
@@ -223,6 +374,7 @@ function buildDay(template: DayTemplate, offset: number, prefs: Prefs): PlannedD
     const role = roleFor(exercises.length);
     const s = schemeFor(prefs, role, exercise);
     exercises.push({
+      slot,
       slug,
       name: exercise.name,
       role,
@@ -244,7 +396,7 @@ const ROLE_RANK: Record<PlannedExercise["role"], number> = { main: 0, secondary:
  * its most important slot. Otherwise the same lift would alternate between two
  * rep ranges and its progress chart would zig-zag for no real reason.
  */
-function unifySchemes(days: PlannedDay[], prefs: Prefs): PlannedDay[] {
+function unifySchemes(days: SlottedDay[], prefs: ResolvedPrefs): SlottedDay[] {
   const best = new Map<string, PlannedExercise["role"]>();
   for (const e of days.flatMap((d) => d.exercises)) {
     const current = best.get(e.slug);
@@ -293,23 +445,34 @@ const BLOCKS: Record<Goal, PlanBlock[]> = {
 };
 
 export function generatePlan(input: Prefs): Plan {
-  const prefs = normalizePrefs(input);
+  const prefs = resolvePrefs(input);
   const split = SPLITS[prefs.daysPerWeek];
-  const days = unifySchemes(split.days.map((t, i) => buildDay(t, split.offsets[i], prefs)), prefs);
+
+  const built = unifySchemes(split.days.map((t, i) => buildDay(t, split.offsets[i], prefs)), prefs);
+  // Emphasis is applied after schemes are unified, so a lift keeps one
+  // prescription across the week and simply gets one more set of it.
+  const days: PlannedDay[] = built.map((day) => ({
+    ...day,
+    exercises: day.exercises.map(({ slot, ...e }) => (e.unit === "reps" && emphasised(slot, prefs) ? { ...e, sets: Math.min(e.sets + 1, 5) } : e)),
+  }));
+
   const estMinutes = Math.round(days.reduce((s, d) => s + estimateMinutes(d), 0) / days.length / 5) * 5;
   const g = GOALS[prefs.goal];
-  const main = SCHEMES[prefs.goal].main;
+  const main = days[0]?.exercises[0];
 
   const rationale = [
-    `${prefs.daysPerWeek} days a week fits a ${split.label} split — every muscle group gets trained ${prefs.daysPerWeek >= 4 ? "twice" : prefs.daysPerWeek === 3 ? "three times" : "twice"} a week.`,
-    `For "${g.label.toLowerCase()}" your main lifts sit at ${main.repMin}–${main.repMax} reps with ${Math.round(main.rest / 30) / 2} min rests.`,
+    ...(prefs.goalText ? [`From your goal — "${prefs.goalText}" — Atlas read: ${prefs.understood.length > 0 ? prefs.understood.join(", ") : `nothing specific, so it used "${g.label.toLowerCase()}"`}.`] : []),
+    `${prefs.daysPerWeek === 1 ? "One day" : `${prefs.daysPerWeek} days`} a week fits a ${split.label} split — ${split.frequency}.`,
+    ...(main ? [`For "${g.label.toLowerCase()}" your main lifts sit at ${main.repMin}–${main.repMax} reps with ${Math.round(main.restSeconds / 30) / 2} min rests.`] : []),
+    ...(prefs.emphasis.length > 0 ? [`Extra work for ${prefs.emphasis.map((a) => AREAS[a]).join(" and ")}: one more set on every lift that trains ${prefs.emphasis.length > 1 ? "them" : "it"}, and more of those lifts on the days that suit.`] : []),
+    ...prefs.conditions.map((c) => `${CONDITIONS[c].label}: ${CONDITIONS[c].blurb}`),
     `Progression is double: add reps until you reach the top of the range, then add weight and start again.`,
     `Three 4-week blocks. The last week of each is lighter — stop every set a couple of reps early — so you recover before the next step up.`,
     g.metricWhy,
   ];
 
   return {
-    name: `${g.label} · ${split.label}`,
+    name: [g.label, split.label, ...(prefs.emphasis.length > 0 ? [`${prefs.emphasis.map((a) => AREAS[a]).join(" + ")} focus`] : [])].join(" · "),
     split: split.label,
     prefs,
     blocks: BLOCKS[prefs.goal],
@@ -337,8 +500,8 @@ export function weekVariant(plan: Plan, week: number): PlannedDay[] {
       let { sets, repMin, repMax } = e;
       if (e.unit === "reps" && e.role === "main") {
         if (block >= 1) sets = Math.min(sets + 1, 5);
-        // Only strength plans trade reps for load in the final block.
-        if (block >= 2 && plan.prefs.goal === "strength") {
+        // Only strength plans trade reps for load in the final block — and never after rehab.
+        if (block >= 2 && plan.prefs.goal === "strength" && !plan.prefs.conditions.includes("post_rehab")) {
           const drop = Math.min(2, repMin - 2);
           repMin -= Math.max(drop, 0);
           repMax -= Math.max(drop, 0);
@@ -365,16 +528,26 @@ export function toPrescribedSets(e: PlannedExercise): PlannedSet[] {
 
 const isOneOf = <T,>(v: unknown, options: readonly T[]): v is T => options.includes(v as T);
 
+const AREA_KEYS = Object.keys(AREAS) as Area[];
+const CONDITION_KEYS = Object.keys(CONDITIONS) as Condition[];
+
 /** Coerce untrusted input (form posts, stored JSON) into valid Prefs. */
 export function normalizePrefs(input: unknown): Prefs {
   const p = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const days = Number(p.daysPerWeek);
   const minutes = Number(p.minutes);
+  const goalText = typeof p.goalText === "string" ? p.goalText.replace(/\s+/g, " ").trim().slice(0, GOAL_TEXT_MAX) : "";
+  const conditions = Array.isArray(p.conditions) ? unique(p.conditions.filter((c): c is Condition => isOneOf(c, CONDITION_KEYS))) : [];
+  const emphasis = Array.isArray(p.emphasis) ? unique(p.emphasis.filter((a): a is Area => isOneOf(a, AREA_KEYS))) : [];
   return {
     goal: isOneOf(p.goal, ["muscle", "strength", "fat_loss", "general"] as const) ? p.goal : DEFAULT_PREFS.goal,
     experience: isOneOf(p.experience, ["beginner", "intermediate", "advanced"] as const) ? p.experience : DEFAULT_PREFS.experience,
-    daysPerWeek: isOneOf(days, [2, 3, 4, 5, 6] as const) ? days : DEFAULT_PREFS.daysPerWeek,
+    daysPerWeek: isOneOf(days, DAYS_PER_WEEK) ? days : DEFAULT_PREFS.daysPerWeek,
     equipment: isOneOf(p.equipment, ["gym", "dumbbells", "bodyweight"] as const) ? p.equipment : DEFAULT_PREFS.equipment,
     minutes: isOneOf(minutes, [30, 45, 60, 75] as const) ? minutes : DEFAULT_PREFS.minutes,
+    // Optional fields are left off entirely when empty, so stored prefs stay small and comparable.
+    ...(goalText && { goalText }),
+    ...(conditions.length > 0 && { conditions }),
+    ...(emphasis.length > 0 && { emphasis }),
   };
 }
