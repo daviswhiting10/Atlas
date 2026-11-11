@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Medal, Minus, Plus, Timer, TrendingUp, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Medal, Minus, Plus, Repeat2, SlidersHorizontal, Timer, Trash2, TrendingUp, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
-import { finishWorkout, saveSet } from "@/lib/actions/athlete";
+import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveSet } from "@/lib/actions/athlete";
+import { ExercisePicker } from "./ExercisePicker";
+import { TargetEditor } from "./TargetEditor";
 import { METRICS, formatValue, buildSeries, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
@@ -97,6 +99,69 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     setSetsState(next);
   }, []);
 
+  /** Sets for an exercise: what's been edited here, or the server's list for one that just arrived. */
+  const listOf = (e: LoggerExercise) => sets[e.aweId] ?? e.sets;
+
+  // ── Changing the workout mid-session ──────────────────────────────────────
+  // Swaps, new targets and added exercises are saved to the plan, then the
+  // page re-reads it. This merges the new plan in without losing a single set
+  // already logged here.
+  const signature = (e: LoggerExercise) => [e.exerciseId, e.sets.length, e.repMin, e.repMax, e.target.weight, e.target.reps].join("|");
+  const signatures = useRef<Record<string, string>>(Object.fromEntries(data.exercises.map((e) => [e.aweId, signature(e)])));
+  const jumpTo = useRef<string | null>(null);
+  const swapped = useRef(new Set<string>());
+  const [busy, startBusy] = useTransition();
+  const [picker, setPicker] = useState<null | "add" | "swap">(null);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  useEffect(() => {
+    const prev = setsRef.current;
+    const next: SetMap = {};
+    for (const e of data.exercises) {
+      const local = prev[e.aweId];
+      const sig = signature(e);
+      const changed = signatures.current[e.aweId] !== sig;
+      signatures.current[e.aweId] = sig;
+      if (!local) next[e.aweId] = e.sets;
+      else if (!changed) next[e.aweId] = local;
+      else if (swapped.current.has(e.aweId)) {
+        // A swapped exercise starts clean. Sets logged before the swap stay with
+        // the exercise they were actually done on, in its history and charts.
+        swapped.current.delete(e.aweId);
+        next[e.aweId] = e.sets;
+      } else {
+        // Same exercise, new target: keep every set already saved, re-target the rest.
+        const merged = e.sets.map((server) => {
+          const mine = local.find((x) => x.setNumber === server.setNumber);
+          return mine && (mine.done || mine.setLogId) ? mine : server;
+        });
+        const extra = local.filter((x) => x.setNumber > e.sets.length && (x.done || x.setLogId));
+        next[e.aweId] = [...merged, ...extra];
+      }
+    }
+    apply(next);
+    if (jumpTo.current) {
+      const i = data.exercises.findIndex((e) => e.aweId === jumpTo.current);
+      if (i !== -1) setIndex(i);
+      jumpTo.current = null;
+    } else {
+      setIndex((i) => Math.min(i, Math.max(0, data.exercises.length - 1)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.exercises, apply]);
+
+  /** Save a change to the plan, say why if it was refused, and re-read the workout. */
+  function change(run: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: string) {
+    startBusy(async () => {
+      await queue.current; // sets already tapped are saved first
+      const res = await run();
+      if (!res.ok) return void toast.error(res.error);
+      if (done) toast.success(done);
+      router.refresh();
+    });
+  }
+
   // Escape closes the workout switcher.
   useEffect(() => {
     if (!switching) return;
@@ -143,14 +208,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           });
           apply({
             ...setsRef.current,
-            [aweId]: setsRef.current[aweId].map((x) => (x.setNumber === setNumber ? { ...x, setLogId: res.setLogId } : x)),
+            [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, setLogId: res.setLogId } : x)),
           });
         } catch {
           // A set that never reached the server must not keep looking done.
           if (!s.setLogId) {
             apply({
               ...setsRef.current,
-              [aweId]: setsRef.current[aweId].map((x) => (x.setNumber === setNumber ? { ...x, done: false } : x)),
+              [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, done: false } : x)),
             });
             setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== `${aweId}:${setNumber}`)));
           }
@@ -163,10 +228,10 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
   const deloadWeek = data.deloadWeek;
   const exercise = data.exercises[index];
-  const current = sets[exercise.aweId];
+  const current = listOf(exercise);
 
   function edit(ex: LoggerExercise, i: number, patch: Partial<Pick<LoggerSet, "weight" | "reps">>) {
-    const list = setsRef.current[ex.aweId];
+    const list = setsRef.current[ex.aweId] ?? ex.sets;
     const before = list[i];
     const next = list.map((s, j) => {
       if (j === i) return { ...s, ...patch };
@@ -183,7 +248,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   }
 
   function toggle(ex: LoggerExercise, i: number) {
-    const list = setsRef.current[ex.aweId];
+    const list = setsRef.current[ex.aweId] ?? ex.sets;
     const s = list[i];
     const done = !s.done;
     if (done && (s.reps == null || s.reps <= 0)) {
@@ -220,13 +285,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       toast.success(`New record on ${ex.name}`, { description: label });
     }
 
-    const everythingDone = data.exercises.every((e) => setsRef.current[e.aweId].every((x) => x.done));
+    const everythingDone = data.exercises.every((e) => (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));
     if (!everythingDone) setRest({ endsAt: Date.now() + ex.restSeconds * 1000, total: ex.restSeconds });
     else setRest(null);
   }
 
   function addSet(ex: LoggerExercise) {
-    const list = setsRef.current[ex.aweId];
+    const list = setsRef.current[ex.aweId] ?? ex.sets;
     const last = list[list.length - 1];
     apply({
       ...setsRef.current,
@@ -249,11 +314,11 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   }
 
   // ── Derived numbers ───────────────────────────────────────────────────────
-  const all = data.exercises.flatMap((e) => sets[e.aweId]);
+  const all = data.exercises.flatMap((e) => listOf(e));
   const doneCount = all.filter((s) => s.done).length;
   const totalCount = all.length;
   const volume = Math.round(all.reduce((sum, s) => (s.done && s.reps ? sum + (s.weight ?? 0) * s.reps : sum), 0));
-  const exerciseDone = (e: LoggerExercise) => sets[e.aweId].every((s) => s.done);
+  const exerciseDone = (e: LoggerExercise) => listOf(e).every((s) => s.done);
   const isLast = index === data.exercises.length - 1;
   const nextExercise = data.exercises[index + 1];
 
@@ -361,7 +426,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           {data.exercises.map((e, i) => {
             const done = exerciseDone(e);
             const active = i === index;
-            const count = sets[e.aweId].filter((s) => s.done).length;
+            const count = listOf(e).filter((s) => s.done).length;
             return (
               <button
                 key={e.aweId}
@@ -386,17 +451,31 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 <span className="min-w-0">
                   <span className="block max-w-[150px] truncate text-sm font-semibold lg:max-w-none">{e.name}</span>
                   <span className={cn("tnum hidden text-xs lg:block", active ? "text-white/60" : "text-ink-mute")}>
-                    {count}/{sets[e.aweId].length} sets
+                    {count}/{listOf(e).length} sets
                   </span>
                 </span>
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setPicker("add")}
+            disabled={busy}
+            className="press flex shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 px-3 py-2.5 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink lg:w-full"
+          >
+            <Plus className="h-4 w-4" /> Add an exercise
+          </button>
         </div>
 
         {/* ── Current exercise ───────────────────────────────────────── */}
         <div key={exercise.aweId} className="fade-in min-w-0 space-y-4">
-          {index === 0 && data.note && <p className="rounded-2xl bg-gold/10 px-4 py-3 text-sm text-ink-soft">{data.note}</p>}
+          {index === 0 && data.note && (
+            <p className="rounded-xl border border-line bg-white px-4 py-3 text-sm leading-relaxed text-ink-soft">
+              <span className="eyebrow mr-2">Note</span>
+              {data.note}
+            </p>
+          )}
+          {index === 0 && data.deloadWeek && <p className="text-[13px] text-ink-mute">Lighter week: same weights, but stop each set two or three reps early and recover.</p>}
 
           <div>
             <p className="eyebrow">
@@ -404,6 +483,65 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
               {exercise.muscles.length > 0 ? ` · ${exercise.muscles.slice(0, 2).join(", ")}` : ""}
             </p>
             <h1 className="mt-1 font-display text-4xl leading-tight text-ink sm:text-5xl">{exercise.name}</h1>
+            <div className="mt-2 flex flex-wrap gap-1 text-sm">
+              <button type="button" onClick={() => setPicker("swap")} disabled={busy} className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
+                <Repeat2 className="h-4 w-4" /> Swap
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingTarget(!editingTarget)}
+                aria-expanded={editingTarget}
+                disabled={busy}
+                className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+              >
+                <SlidersHorizontal className="h-4 w-4" /> Change target
+              </button>
+              {confirmRemove ? (
+                <span className="flex items-center gap-1.5 pl-1">
+                  <span className="text-ink-soft">{current.some((x) => x.done) ? "Remove? Logged sets stay in your history." : "Remove from this workout?"}</span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmRemove(false);
+                      change(() => planRemoveExercise({ aweId: exercise.aweId, workoutId: data.id }), `${exercise.name} removed`);
+                    }}
+                    className="press rounded-lg bg-ink px-2.5 py-1.5 font-semibold text-white"
+                  >
+                    Remove
+                  </button>
+                  <button type="button" onClick={() => setConfirmRemove(false)} className="press rounded-lg px-2 py-1.5 font-medium text-ink-soft">
+                    Keep
+                  </button>
+                </span>
+              ) : (
+                data.exercises.length > 1 && (
+                  <button type="button" onClick={() => setConfirmRemove(true)} disabled={busy} className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-mute hover:bg-ink/5 hover:text-ink">
+                    <Trash2 className="h-4 w-4" /> Remove
+                  </button>
+                )
+              )}
+              {busy && <Loader2 className="m-1.5 h-4 w-4 animate-spin text-ink-mute" />}
+            </div>
+            {editingTarget && (
+              <div className="mt-2">
+                <TargetEditor
+                  initial={{
+                    sets: current.length,
+                    repMin: exercise.repMin,
+                    repMax: exercise.repMax,
+                    weight: exercise.target.kind === "custom" ? exercise.target.weight : null,
+                  }}
+                  unit={exercise.unit}
+                  loaded={exercise.loaded}
+                  onCancel={() => setEditingTarget(false)}
+                  onSave={async (values) => {
+                    setEditingTarget(false);
+                    change(() => planSetTargets({ aweId: exercise.aweId, workoutId: data.id, ...values }), "Target updated for this session");
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Target */}
@@ -558,6 +696,29 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             </button>
           </div>
         </div>
+      )}
+
+      {picker && (
+        <ExercisePicker
+          title={picker === "add" ? "Add an exercise" : `Swap ${exercise.name}`}
+          exclude={data.exercises.map((e) => e.slug).filter((x): x is string => x != null)}
+          suggestLike={picker === "swap" ? exercise.slug : null}
+          onClose={() => setPicker(null)}
+          onPick={(chosen) => {
+            const mode = picker;
+            setPicker(null);
+            if (mode === "add") {
+              change(async () => {
+                const res = await planAddExercise({ workoutId: data.id, slug: chosen.slug });
+                if (res.ok) jumpTo.current = res.aweId;
+                return res;
+              }, `${chosen.name} added`);
+            } else {
+              swapped.current.add(exercise.aweId);
+              change(() => planSwapExercise({ aweId: exercise.aweId, workoutId: data.id, slug: chosen.slug }), `Swapped for ${chosen.name}`);
+            }
+          }}
+        />
       )}
 
       {/* ── Workout switcher ─────────────────────────────────────────── */}
