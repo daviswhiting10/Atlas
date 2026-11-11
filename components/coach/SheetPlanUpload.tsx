@@ -16,7 +16,8 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   const fileRef = useRef<HTMLInputElement>(null);
   const [link, setLink] = useState("");
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
-  const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  // Optional: left empty, week 1 is dated back from the weeks the sheet shows as done.
+  const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +32,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(file ? { csv: file.text } : { sheetUrl: link.trim() }), startDate: date }),
+        body: JSON.stringify({ ...(file ? { csv: file.text } : { sheetUrl: link.trim() }), ...(date ? { weekOneStart: date } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -39,7 +40,11 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
         setBusy(false);
         return;
       }
-      toast.success(`Read ${data.workouts} workout${data.workouts === 1 ? "" : "s"}, ${data.exercises} exercises. Check it, then assign.`);
+      toast.success(
+        data.weeksDone > 0
+          ? `Read ${data.weeks} weeks. ${data.weeksDone} already done (${data.sessionsLogged} session${data.sessionsLogged === 1 ? "" : "s"} logged), picking up at week ${Math.min(data.weeksDone + 1, data.weeks)}. Check it, then assign.`
+          : `Read ${data.weeks} week${data.weeks === 1 ? "" : "s"}, ${data.exercises} exercises. Check it, then assign.`
+      );
       router.push(`/clients/${clientId}/programs/${data.assignmentId}`);
     } catch {
       setError("Couldn't reach the server. Please try again.");
@@ -100,7 +105,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="text-xs font-medium text-ink-soft">
-          Starts
+          Week 1 started <span className="font-normal text-ink-mute">(optional)</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} className={cn(field, "mt-1 sm:w-44")} />
         </label>
         <button type="button" onClick={read} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-70">
@@ -113,7 +118,11 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           )}
         </button>
       </div>
-      {busy && <p className="text-[12px] text-ink-mute">This takes about half a minute.</p>}
+      <p className="text-[12px] text-ink-mute">
+        {busy
+          ? "This takes about half a minute."
+          : "Weeks with loads filled in come in as logged sessions, and the plan picks up at the next week. Leave the date empty and Atlas works it out."}
+      </p>
       {error && (
         <p role="alert" className="text-sm leading-relaxed text-destructive">
           {error}

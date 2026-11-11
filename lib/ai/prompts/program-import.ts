@@ -63,24 +63,46 @@ The JSON must follow this exact structure:
 }
 
 /**
- * The same output as the screenshot import, read from a spreadsheet
- * exported as CSV. Coaches lay sheets out every which way, so the model
- * reads the content, not fixed columns.
+ * A coach's plan spreadsheet, transcribed cell for cell. The model doesn't
+ * interpret anything (sets, weights, which weeks are done): it copies each
+ * exercise's name, notes, and every week's Sets/reps and Load cells exactly
+ * as written. lib/programs/sheet-plan.ts reads them by rule.
  */
-export function buildProgramSheetPrompt(csv: string, notes?: string) {
-  const { system } = buildProgramImportPrompt(1);
+export function buildProgramSheetPrompt(csv: string) {
   return {
-    system: system
-      .replace("parse a screenshot of a workout plan", "read a coach's workout plan from a spreadsheet (given as CSV)")
-      .replace(
-        "- **durationWeeks**: 1 unless the screenshots indicate a multi-week programme.",
-        "- **durationWeeks**: how many weeks the plan runs. If the sheet repeats the same workouts across several weeks (week columns, week tabs or week headings), use that number of weeks and the first week's prescription."
-      )
-      .replace(
-        "- **name**: use the day label exactly as written in the screenshot",
-        "- **name**: use the day or workout label exactly as written in the sheet"
-      )
-      .replace("- Do NOT invent exercises not visible in the images.", "- Do NOT invent exercises that aren't in the sheet.\n- Ignore rows that aren't exercises: titles, totals, blank rows, the client's name, dates, notes to self.\n- Rows and columns may be in any order; read the sheet like a coach would."),
-    user: `The spreadsheet, as CSV:\n\n${csv}${notes ? `\n\nAdditional context: ${notes}` : ""}`,
+    system: `You transcribe a fitness coach's workout plan from a spreadsheet (given as CSV) into JSON. Copy cells exactly; do not interpret, convert, correct or invent anything.
+
+## Typical layout (yours may differ)
+- A training day starts with a label like "Day 1" (often in the first column of a header row).
+- Each exercise is a row: its name, often a notes column, then for each week a "Sets/reps" cell and a "Load" cell.
+- Week headings ("Week 1", "Week 2", …) sit above their columns; in CSV a heading is often in one cell with the cells to its right blank.
+- Blank rows separate groups. Ignore them.
+
+## Output
+Respond ONLY with JSON, no markdown fences, no commentary:
+{
+  "programName": string,
+  "days": [
+    {
+      "name": string,
+      "exercises": [
+        {
+          "name": string,
+          "notes": string,
+          "weeks": [ { "week": number, "setsReps": string, "load": string } ]
+        }
+      ]
+    }
+  ]
+}
+
+## Rules
+- One entry per training day, in sheet order. "name" is the day label as written (e.g. "Day 1").
+- One entry per exercise row, in order. Copy the exercise name and its notes exactly.
+- "weeks": one entry for every week column the sheet has, numbered 1, 2, 3… in order. "setsReps" and "load" are the cell text exactly as written ("2x12-15", "5 min", "4x20 yd", "12.5", "BW", "blue", "2nd to hardest. 3x"). Use "" for an empty cell. Never fill a cell in from another week.
+- If the sheet has no week columns, treat the single set of columns as week 1.
+- Skip rows that aren't exercises: titles, headers, totals, blank rows, the client's name, dates.
+- "programName": a short name from the sheet's title if it has one, otherwise "".`,
+    user: `The spreadsheet, as CSV:\n\n${csv}`,
   };
 }

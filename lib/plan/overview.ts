@@ -75,7 +75,12 @@ export function repLabel(sets: RawSet[]): string {
   const s = sets[0];
   if (!s) return "";
   const range = s.repMin === s.repMax ? `${s.repMax}` : `${s.repMin}–${s.repMax}`;
-  return s.unit === "secs" ? `${range}s` : range;
+  if (s.unit !== "secs") return range;
+  // Whole minutes read as minutes: "5 min", not "300s".
+  const lo = s.repMin ?? 0;
+  const hi = s.repMax ?? lo;
+  if (lo >= 60 && lo % 60 === 0 && hi % 60 === 0) return lo === hi ? `${lo / 60} min` : `${lo / 60}–${hi / 60} min`;
+  return `${range}s`;
 }
 
 function estimate(exercises: Array<{ prescribedSets: unknown }>): number {

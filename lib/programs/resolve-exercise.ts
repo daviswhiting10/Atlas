@@ -26,15 +26,24 @@ export async function resolveExercise(name: string, workspaceId: string): Promis
   });
   if (ex) return ex;
 
-  // 3) a name containing it: prefer clean names (no "1A " block labels from old imports), then the shortest.
-  const candidates = await prisma.exercise.findMany({
-    where: { ...visible, name: { contains: name, mode: "insensitive" } },
-    select: { id: true, name: true },
-    take: 25,
-  });
-  const labelled = (n: string) => /^\d+[A-Z]?\s/.test(n);
-  ex = candidates.sort((a, b) => Number(labelled(a.name)) - Number(labelled(b.name)) || a.name.length - b.name.length)[0] ?? null;
-  if (ex) return ex;
+  // 3) a name containing it, only when it's specific enough to be the same exercise: two words or
+  //    more, and not much longer ("Seated cable row" → "Seated Cable Rows", but "Hinge" never becomes
+  //    "KB Swing (hip hinge explosive)"). Clean names first (no "1A " block labels), then the shortest.
+  const words = (s: string) => s.trim().split(/[\s/-]+/).filter(Boolean).length;
+  if (words(name) >= 2) {
+    const candidates = await prisma.exercise.findMany({
+      where: { ...visible, name: { contains: name, mode: "insensitive" } },
+      select: { id: true, name: true },
+      take: 25,
+    });
+    const labelled = (n: string) => /^\d+[A-Z]?\s/.test(n);
+    ex =
+      candidates
+        // Not a combined entry ("Band Pull-Apart / Face Pull") unless that's what was asked for.
+        .filter((c) => !labelled(c.name) && words(c.name) <= words(name) + 2 && (name.includes("/") || !c.name.includes("/")))
+        .sort((a, b) => a.name.length - b.name.length)[0] ?? null;
+    if (ex) return ex;
+  }
 
   // 4) create it, private to this workspace
   const slug =

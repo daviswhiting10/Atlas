@@ -197,7 +197,7 @@ export async function assignDraftPlan(raw: { clientId: string; assignmentId: str
     const scope = await scopeFor(input.clientId, input.assignmentId);
     const draft = await prisma.programAssignment.findFirst({
       where: { id: input.assignmentId, clientId: scope.clientId, workspaceId: scope.workspaceId, status: "PAUSED" },
-      select: { id: true, startDate: true, sourceProgramId: true, assignedWorkouts: { select: { id: true, scheduledDate: true } } },
+      select: { id: true, startDate: true, sourceProgramId: true, assignedWorkouts: { select: { id: true, scheduledDate: true, workoutLog: { select: { id: true, date: true } } } } },
     });
     if (!draft) throw new PlanEditError("not_found", "That draft has already been assigned or removed.");
 
@@ -211,6 +211,12 @@ export async function assignDraftPlan(raw: { clientId: string; assignmentId: str
           const d = new Date(w.scheduledDate);
           d.setDate(d.getDate() + shiftDays);
           await tx.assignedWorkout.update({ where: { id: w.id }, data: { scheduledDate: d } });
+          // Sessions already logged against it (from a sheet import) move with it.
+          if (w.workoutLog) {
+            const logged = new Date(w.workoutLog.date);
+            logged.setDate(logged.getDate() + shiftDays);
+            await tx.workoutLog.update({ where: { id: w.workoutLog.id }, data: { date: logged } });
+          }
         }
       }
       await tx.programAssignment.update({ where: { id: draft.id }, data: { status: "ACTIVE", startDate: start } });
@@ -231,6 +237,13 @@ export async function discardDraftPlan(raw: { clientId: string; assignmentId: st
     });
     if (!draft) throw new PlanEditError("not_found", "Only an unassigned draft can be discarded.");
     await prisma.$transaction(async (tx) => {
+      // A draft can only have logged sessions if they came in with it (a sheet import): they go with it,
+      // so importing the sheet again never doubles the history.
+      const imported = await tx.workoutLog.findMany({ where: { assignedWorkout: { programAssignmentId: draft.id } }, select: { id: true } });
+      if (imported.length > 0) {
+        await tx.setLog.deleteMany({ where: { workoutLogId: { in: imported.map((l) => l.id) } } });
+        await tx.workoutLog.deleteMany({ where: { id: { in: imported.map((l) => l.id) } } });
+      }
       await tx.programAssignment.delete({ where: { id: draft.id } });
       // A program generated for this draft alone goes with it; a library program stays.
       if (!draft.sourceProgram.isTemplate && draft.sourceProgram._count.assignments === 1) {
