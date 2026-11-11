@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { ROSTER } from "@/lib/db/roster";
-import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
+import { NewPlanChooser } from "@/components/coach/NewPlanChooser";
 
 export const metadata: Metadata = { title: "New plan" };
 
@@ -28,13 +28,14 @@ export default async function NewPlanPage({ searchParams }: { searchParams: { cl
       <div className="rise mb-8 mt-3">
         <h1 className="text-4xl leading-none text-ink">New plan</h1>
         <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-          {template ? `Starting from the goals of “${template.name}”. ` : ""}The same generator the athletes use: set the inputs, check the preview, then review and edit the draft before assigning it.
+          {template ? `Starting from the goals of “${template.name}”. ` : ""}Upload your own, or have Atlas build one. Either way you check it before it’s assigned.
         </p>
       </div>
-      <CoachPlanForm
+      <NewPlanChooser
         clients={clients}
         initialClientId={clients.some((c) => c.id === searchParams.client) ? searchParams.client : undefined}
         initialTags={tags ? { goals: tags.goals ?? [], conditions: tags.conditions ?? [] } : undefined}
+        initialMode={template ? "build" : "upload"}
       />
     </div>
   );

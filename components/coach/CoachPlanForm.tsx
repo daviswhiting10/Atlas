@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Loader2, Sparkles } from "lucide-react";
 import {
   COACH_GOALS,
   COACH_MODIFIERS,
@@ -78,9 +78,22 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const today = () => new Date().toLocaleDateString("en-CA");
 
-export function CoachPlanForm({ clients, initialClientId, initialTags }: { clients: Client[]; initialClientId?: string; initialTags?: { goals: string[]; conditions: string[] } }) {
+export function CoachPlanForm({
+  clients,
+  initialClientId,
+  initialTags,
+  fixedClientId,
+}: {
+  clients: Client[];
+  initialClientId?: string;
+  initialTags?: { goals: string[]; conditions: string[] };
+  /** The client is chosen outside the form (the New plan page's own picker). */
+  fixedClientId?: string;
+}) {
   const router = useRouter();
-  const [clientId, setClientId] = useState(initialClientId ?? "");
+  const [ownClientId, setClientId] = useState(initialClientId ?? "");
+  const clientId = fixedClientId ?? ownClientId;
+  const [more, setMore] = useState(false);
   const [startDate, setStartDate] = useState(today());
   const [goalText, setGoalText] = useState("");
   const [goals, setGoals] = useState<string[]>(initialTags?.goals.filter((g) => COACH_GOALS[g]) ?? []);
@@ -89,7 +102,7 @@ export function CoachPlanForm({ clients, initialClientId, initialTags }: { clien
   const [daysPerWeek, setDays] = useState<Prefs["daysPerWeek"]>(3);
   const [minutes, setMinutes] = useState<Prefs["minutes"]>(60);
   const [equipment, setEquipment] = useState<Equipment>("gym");
-  const [phases, setPhases] = useState<Phase[]>([...PHASES]);
+  const [phases, setPhases] = useState<Phase[]>([PHASES[0]]);
   const [pending, start] = useTransition();
 
   const toggle = (list: string[], set: (v: string[]) => void, item: string) => set(list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
@@ -116,7 +129,8 @@ export function CoachPlanForm({ clients, initialClientId, initialTags }: { clien
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
       <div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px]">
+        <div className={cn("grid gap-3", fixedClientId == null && "sm:grid-cols-[minmax(0,1fr)_170px]")}>
+          {fixedClientId == null && (
           <label className="block">
             <span className="eyebrow">For</span>
             <select
@@ -132,7 +146,8 @@ export function CoachPlanForm({ clients, initialClientId, initialTags }: { clien
               ))}
             </select>
           </label>
-          <label className="block">
+          )}
+          <label className="block sm:max-w-[200px]">
             <span className="eyebrow">Starts</span>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
           </label>
@@ -143,7 +158,7 @@ export function CoachPlanForm({ clients, initialClientId, initialTags }: { clien
             value={goalText}
             onChange={(e) => setGoalText(e.target.value.slice(0, GOAL_TEXT_MAX))}
             rows={2}
-            placeholder={client?.primaryGoal ? `e.g. ${client.primaryGoal}` : "e.g. Bench 225 by summer, mind the left shoulder"}
+            placeholder="e.g. Lose 20 lb, bad left knee"
             className="w-full resize-none rounded-lg border border-line bg-white p-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute/60 focus:border-ink/40"
           />
           <p className="mt-1.5 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
@@ -165,6 +180,21 @@ export function CoachPlanForm({ clients, initialClientId, initialTags }: { clien
           </div>
         </Field>
 
+        {/* Everything else has a sensible default: folded away until it's wanted. */}
+        <div className="rule py-4">
+          <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="press flex w-full items-center justify-between gap-3 text-left">
+            <span>
+              <span className="block text-[15px] font-semibold text-ink">More options</span>
+              <span className="block text-sm text-ink-mute">
+                {EXPERIENCE[resolved.experience].label} · {daysPerWeek} day{daysPerWeek === 1 ? "" : "s"} a week · {minutes} min · {EQUIPMENT[resolved.equipment].label} · {phases.length * 4} weeks
+                {modifiers.length > 0 ? ` · ${modifiers.join(", ")}` : ""}
+              </span>
+            </span>
+            <ChevronDown className={cn("h-5 w-5 shrink-0 text-ink-mute transition-transform", more && "rotate-180")} />
+          </button>
+        </div>
+        {more && (
+        <div className="fade-in">
         <Field label="Conditions and modifiers" hint="These change which exercises are chosen and how they're loaded.">
           <div className="flex flex-wrap gap-1.5">
             {Object.keys(COACH_MODIFIERS).map((c) => (
@@ -203,6 +233,8 @@ export function CoachPlanForm({ clients, initialClientId, initialTags }: { clien
             ))}
           </div>
         </Field>
+        </div>
+        )}
 
         <div className="rule pt-5">
           <button
