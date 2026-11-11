@@ -72,6 +72,9 @@ type Client = {
   }>;
   intakeForms: Array<{
     id: string;
+    /** "csv-import" rows hold spreadsheet details from an import, not an intake. */
+    sourceType: string;
+    parsedData: unknown;
     aiSummary: string | null;
     createdAt: string;
     redFlags: Array<{ issue: string; severity: string; recommendedAction: string }> | null;
@@ -246,7 +249,10 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   const goalLabel = client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null;
   const avatarBg = client.primaryGoal ? (GOAL_AVATAR_BG[client.primaryGoal] ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground";
   const activeProgram = client.programAssignments.find((a) => a.status === "ACTIVE");
-  const redFlags = client.intakeForms[0]?.redFlags ?? null;
+  // Spreadsheet details from an import are shown on their own, never as an intake.
+  const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
+  const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
+  const redFlags = intakes[0]?.redFlags ?? null;
   const { monday, sunday } = getWeekBounds();
   const sessionsThisWeek = client.workoutLogs.filter((s) => {
     const d = localDate(s.date);
@@ -430,9 +436,9 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
           </TabsTrigger>
           <TabsTrigger value="files" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
             Files
-            {client.intakeForms.length > 0 && (
+            {intakes.length > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1 py-0">
-                {client.intakeForms.length}
+                {intakes.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -559,6 +565,33 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                 </CardContent>
               </Card>
 
+              {/* Details carried over from a spreadsheet import */}
+              {imported.map((f) => {
+                const data = (f.parsedData ?? {}) as { fileName?: string; fields?: Record<string, string> };
+                const fields = Object.entries(data.fields ?? {});
+                if (fields.length === 0) return null;
+                return (
+                  <Card key={f.id}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Imported details</CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        From {data.fileName ?? "a spreadsheet"} · {new Date(f.createdAt).toLocaleDateString()}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <dl className="space-y-2">
+                        {fields.map(([k, v]) => (
+                          <div key={k}>
+                            <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{k}</dt>
+                            <dd className="whitespace-pre-wrap break-words text-sm text-ink">{v}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
               {/* Red flags / intake CTA */}
               {redFlags && redFlags.length > 0 ? (
                 <Card className="border-destructive/30">
@@ -590,7 +623,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                     ))}
                   </CardContent>
                 </Card>
-              ) : client.intakeForms.length === 0 ? (
+              ) : intakes.length === 0 ? (
                 <Card className="border-dashed">
                   <CardContent className="py-5 text-center">
                     <FileText className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
@@ -603,14 +636,14 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                     </Link>
                   </CardContent>
                 </Card>
-              ) : client.intakeForms[0]?.aiSummary ? (
+              ) : intakes[0]?.aiSummary ? (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold">AI Intake Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="text-xs text-muted-foreground leading-relaxed line-clamp-6">
-                      {client.intakeForms[0].aiSummary}
+                      {intakes[0].aiSummary}
                     </p>
                   </CardContent>
                 </Card>
@@ -771,13 +804,13 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
         {/* ── Files tab ─────────────────────────────────────────────────── */}
         <TabsContent value="files">
           <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">{client.intakeForms.length} files</p>
+            <p className="text-sm text-muted-foreground">{intakes.length} files</p>
             <Link href={`/intake?clientId=${client.id}`} className={cn(buttonVariants({ size: "sm" }))}>
               <FileText className="w-3 h-3 mr-1.5" />
               New Intake
             </Link>
           </div>
-          {client.intakeForms.length === 0 ? (
+          {intakes.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center">
                 <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
@@ -786,7 +819,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
             </Card>
           ) : (
             <div className="space-y-2">
-              {client.intakeForms.map((f) => (
+              {intakes.map((f) => (
                 <Card key={f.id}>
                   <CardContent className="py-3 px-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">

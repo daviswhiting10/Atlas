@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, Search, Upload, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Client = {
   id: string;
@@ -104,6 +105,11 @@ export default function ClientsPage() {
             {clients.length} total · {clients.filter((c) => c.status === "ACTIVE").length} active
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <Link href="/clients/import" className={buttonVariants({ variant: "outline" })}>
+          <Upload className="w-4 h-4 mr-1.5" />
+          Import
+        </Link>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger>
             <span className={buttonVariants()}>
@@ -178,6 +184,7 @@ export default function ClientsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Filters */}
@@ -220,10 +227,18 @@ export default function ClientsPage() {
               <Card className="border-dashed">
                 <CardContent className="py-16 flex flex-col items-center text-center">
                   <Users className="w-10 h-10 text-muted-foreground mb-3" />
-                  <p className="font-medium">No clients found</p>
+                  <p className="font-medium">{clients.length === 0 ? "No clients yet" : "No clients found"}</p>
                   <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-                    {search || filterStatus !== "all" ? "Try adjusting your filters" : "Add your first client above"}
+                    {clients.length > 0
+                      ? "Try adjusting your filters"
+                      : "Have a client list in a spreadsheet? Bring it over in one go, or add clients one at a time above."}
                   </p>
+                  {clients.length === 0 && (
+                    <Link href="/clients/import" className={cn(buttonVariants(), "mt-5")}>
+                      <Upload className="w-4 h-4 mr-1.5" />
+                      Import your clients
+                    </Link>
+                  )}
                 </CardContent>
               </Card>
             ) : (

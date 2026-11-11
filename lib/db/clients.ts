@@ -51,9 +51,13 @@ export async function createClient(
     phone?: string;
     primaryGoal?: string;
     status?: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
-  }
+    lastContactAt?: Date;
+  },
+  /** A transaction, when the caller writes more than the client (the CSV import). */
+  db: Pick<typeof prisma, "clientProfile"> = prisma
 ) {
-  return prisma.clientProfile.create({ data: { workspaceId, ...data } });
+  // The workspace comes from the caller's session, never from the request.
+  return db.clientProfile.create({ data: { ...data, workspaceId } });
 }
 
 export async function updateClient(

@@ -34,7 +34,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
 
-  const intakeSummary = client.intakeForms?.[0]?.aiSummary ?? null;
+  const intakeSummary = client.intakeForms?.find((f) => f.sourceType !== "csv-import")?.aiSummary ?? null;
 
 
   const { system, user } = buildProgramPrompt({

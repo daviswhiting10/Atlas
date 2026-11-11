@@ -168,7 +168,7 @@ export const generateProgram = clientTool({
 
     const { system, user } = buildProgramPrompt({
       clientName: full.fullName,
-      clientSummary: full.intakeForms?.[0]?.aiSummary ?? null,
+      clientSummary: full.intakeForms?.find((f) => f.sourceType !== "csv-import")?.aiSummary ?? null,
       goal: args.goal,
       durationWeeks: args.durationWeeks,
       sessionsPerWeek: args.sessionsPerWeek,

@@ -63,7 +63,7 @@ export const getUserFitnessProfile = clientTool({
         status: true,
         goalTargets: true,
         createdAt: true,
-        intakeForms: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, aiSummary: true, redFlags: true } },
+        intakeForms: { where: { sourceType: { not: "csv-import" } }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, aiSummary: true, redFlags: true } },
         assessments: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, type: true, findings: true, referralFlag: true, referralReason: true } },
         milestones: { orderBy: { achievedAt: "desc" }, take: 5, select: { title: true, description: true, achievedAt: true } },
       },
