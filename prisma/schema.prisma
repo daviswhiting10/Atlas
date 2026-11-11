@@ -326,6 +326,8 @@ model ProgramAssignment {
   name            String // copied from Program.name at assignment time; editable
   startDate       DateTime
   status          AssignmentStatus @default(ACTIVE)
+  goalText        String?          @db.Text // the goal in the athlete's (or coach's) own words, as the plan was built from
+  notes           String?          @db.Text // free notes on the plan as a whole
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

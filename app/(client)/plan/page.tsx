@@ -2,29 +2,59 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, SlidersHorizontal } from "lucide-react";
 import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
-import { EQUIPMENT, EXPERIENCE, GOALS } from "@/lib/plan/generator";
-import { PlanView } from "@/components/athlete/PlanView";
+import { EQUIPMENT, EXPERIENCE, GOALS, resolvePrefs } from "@/lib/plan/generator";
+import {
+  planAddExercise,
+  planAddWorkout,
+  planRemoveExercise,
+  planRemoveWorkout,
+  planSetNote,
+  planSetTargets,
+  planSetWorkoutNote,
+  planSwapExercise,
+  setWorkoutSkipped,
+} from "@/lib/actions/athlete";
+import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
 
 export const metadata: Metadata = { title: "Plan" };
+
+/** The athlete's own edits. The coach's editor passes the same shape, scoped to a client. */
+const ACTIONS: PlanActions = {
+  addWorkout: planAddWorkout,
+  removeWorkout: planRemoveWorkout,
+  addExercise: planAddExercise,
+  removeExercise: planRemoveExercise,
+  swapExercise: planSwapExercise,
+  setTargets: planSetTargets,
+  setWorkoutNote: planSetWorkoutNote,
+  setPlanNote: planSetNote,
+  setSkipped: setWorkoutSkipped,
+};
 
 export default async function PlanPage() {
   const [athlete, plan] = await Promise.all([getAthlete(), getPlanOverview()]);
 
   if (!plan) {
     return (
-      <div className="surface rise p-8 text-center">
-        <h1 className="font-display text-4xl text-ink">No plan yet</h1>
-        <p className="mx-auto mt-2 max-w-sm text-[15px] text-ink-soft">Answer four questions and Atlas lays out your next 12 weeks.</p>
-        <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
-          Build my plan <ArrowRight className="h-4 w-4" />
-        </Link>
+      <div className="surface rise p-8">
+        <h1 className="text-3xl text-ink">No plan yet</h1>
+        {athlete.selfServe ? (
+          <>
+            <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it lays out your next 12 weeks.</p>
+            <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
+              Build my plan <ArrowRight className="h-4 w-4" />
+            </Link>
+          </>
+        ) : (
+          <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Your coach hasn&apos;t assigned a program yet. It will show up here as soon as they do.</p>
+        )}
       </div>
     );
   }
 
-  const { prefs } = athlete;
-  const chips = athlete.selfServe
-    ? [GOALS[prefs.goal].label, `${prefs.daysPerWeek} days a week`, `${prefs.minutes} min`, EQUIPMENT[prefs.equipment].label, EXPERIENCE[prefs.experience].label]
+  const prefs = plan.prefs ? resolvePrefs(plan.prefs) : null;
+  const chips = prefs
+    ? [GOALS[prefs.goal].label, `${prefs.daysPerWeek} day${prefs.daysPerWeek === 1 ? "" : "s"} a week`, `${prefs.minutes} min`, EQUIPMENT[prefs.equipment].label, EXPERIENCE[prefs.experience].label]
     : [];
 
   return (
@@ -32,7 +62,8 @@ export default async function PlanPage() {
       <div className="rise mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="eyebrow">Your plan · {plan.totalWeeks} weeks</p>
-          <h1 className="mt-1.5 font-display text-[38px] leading-[1.05] text-ink sm:text-5xl">{plan.name}</h1>
+          <h1 className="mt-1.5 text-[34px] leading-[1.08] text-ink sm:text-[42px]">{plan.name}</h1>
+          {plan.goalText && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-soft">“{plan.goalText}”</p>}
           {chips.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {chips.map((c) => (
@@ -50,16 +81,16 @@ export default async function PlanPage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
-        <PlanView plan={plan} />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
+        <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" />
 
         {plan.rationale.length > 0 && (
-          <aside className="surface rise rise-3 h-fit p-5 sm:p-6 lg:sticky lg:top-24">
+          <aside className="rise rise-3 h-fit lg:sticky lg:top-24">
             <p className="eyebrow">Why this plan</p>
-            <ul className="mt-3 space-y-3">
+            <ul className="rule mt-3 divide-y divide-line">
               {plan.rationale.map((r, i) => (
-                <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-ink-soft">
-                  <span className="tnum mt-0.5 font-mono text-xs text-signal">0{i + 1}</span>
+                <li key={i} className="flex gap-3 py-3 text-[14px] leading-relaxed text-ink-soft">
+                  <span className="mt-0.5 font-mono text-xs text-ink-mute">{String(i + 1).padStart(2, "0")}</span>
                   <span>{r}</span>
                 </li>
               ))}

@@ -4,10 +4,23 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { GOALS, normalizePrefs } from "@/lib/plan/generator";
+import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS } from "@/lib/athlete/data";
+import {
+  LIMITS,
+  PlanEditError,
+  addExercise,
+  addWorkout,
+  removeExercise,
+  removeWorkout,
+  setPlanNote,
+  setTargets,
+  setWorkoutNote,
+  swapExercise,
+  type PlanScope,
+} from "@/lib/plan/edit";
 
 // Every write derives the athlete from the session — never from the request —
 // and re-checks ownership of the row it touches.
@@ -170,7 +183,7 @@ export async function rebuildPlan(rawPrefs: unknown): Promise<void> {
       await tx.clientProfile.update({
         where: { id: clientId },
         data: {
-          primaryGoal: GOALS[prefs.goal].primaryGoal,
+          primaryGoal: GOALS[resolvePrefs(prefs).goal].primaryGoal,
           goalTargets: { ...existing, athlete: { prefs, demo: meta.demo === true } },
         },
       });
@@ -179,4 +192,73 @@ export async function rebuildPlan(rawPrefs: unknown): Promise<void> {
   );
   refresh();
   revalidatePath("/you");
+}
+
+// ── Editing the plan ─────────────────────────────────────────────────────────
+// Thin wrappers over lib/plan/edit.ts, which the coach editor and the MCP
+// tools call too. These return a result instead of throwing, because Next
+// hides the message of an error thrown from a server action in production and
+// the athlete should be told why something was refused.
+
+export type EditResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string };
+
+async function edit<T extends object>(run: (scope: PlanScope) => Promise<T | void>, workoutId?: string): Promise<EditResult<T>> {
+  try {
+    const { clientId, workspaceId } = await requireAthlete();
+    const result = await run({ clientId, workspaceId });
+    refresh();
+    if (workoutId) revalidatePath(`/workouts/${workoutId}`);
+    return { ok: true, ...((result ?? {}) as T) };
+  } catch (err) {
+    if (err instanceof PlanEditError) return { ok: false, error: err.message };
+    if (err instanceof z.ZodError) return { ok: false, error: "That doesn't look right. Check the values and try again." };
+    console.error("[plan edit]", err);
+    return { ok: false, error: "Couldn't save that change. Please try again." };
+  }
+}
+
+const Ref = z.string().min(1).max(64);
+const Targets = z.object({
+  sets: z.number().int().min(1).max(LIMITS.sets).optional(),
+  repMin: z.number().int().min(1).max(LIMITS.seconds).optional(),
+  repMax: z.number().int().min(1).max(LIMITS.seconds).optional(),
+  weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
+});
+
+export async function planAddWorkout(raw: { week: number; name: string; copyFromWorkoutId?: string }) {
+  const input = z.object({ week: z.number().int().min(1).max(52), name: z.string().max(200), copyFromWorkoutId: Ref.optional() }).parse(raw);
+  return edit((scope) => addWorkout(scope, input));
+}
+
+export async function planRemoveWorkout(workoutId: string) {
+  return edit((scope) => removeWorkout(scope, Ref.parse(workoutId)));
+}
+
+export async function planAddExercise(raw: { workoutId: string; slug: string } & z.input<typeof Targets>) {
+  const input = Targets.extend({ workoutId: Ref, slug: Ref }).parse(raw);
+  return edit((scope) => addExercise(scope, input), input.workoutId);
+}
+
+export async function planRemoveExercise(raw: { aweId: string; workoutId: string }) {
+  const input = z.object({ aweId: Ref, workoutId: Ref }).parse(raw);
+  return edit((scope) => removeExercise(scope, input.aweId), input.workoutId);
+}
+
+export async function planSwapExercise(raw: { aweId: string; slug: string; workoutId: string }) {
+  const input = z.object({ aweId: Ref, slug: Ref, workoutId: Ref }).parse(raw);
+  return edit((scope) => swapExercise(scope, input), input.workoutId);
+}
+
+export async function planSetTargets(raw: { aweId: string; workoutId: string } & z.input<typeof Targets>) {
+  const input = Targets.extend({ aweId: Ref, workoutId: Ref }).parse(raw);
+  return edit((scope) => setTargets(scope, input), input.workoutId);
+}
+
+export async function planSetWorkoutNote(raw: { workoutId: string; text: string }) {
+  const input = z.object({ workoutId: Ref, text: z.string().max(LIMITS.note * 2) }).parse(raw);
+  return edit((scope) => setWorkoutNote(scope, input.workoutId, input.text), input.workoutId);
+}
+
+export async function planSetNote(text: string) {
+  return edit((scope) => setPlanNote(scope, z.string().max(LIMITS.note * 2).parse(text)));
 }

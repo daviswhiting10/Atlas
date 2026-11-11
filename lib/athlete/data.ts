@@ -9,9 +9,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { CATALOG_BY_SLUG, displayName } from "@/lib/plan/catalog";
-import { BLOCK_WEEKS, GOALS, generatePlan, normalizePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
+import { BLOCK_WEEKS, GOALS, normalizePrefs, resolvePrefs, type FocusMetric, type Prefs } from "@/lib/plan/generator";
 import { buildSeries, nextTarget, sessionPoint, type LoggedSet, type SessionPoint, type Target } from "@/lib/plan/overload";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/guest";
+import { loadPlanOverview, storedPrefs, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
+
+export type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf, weekStreak } from "./sessions";
 
 /** Upper bound on sets per exercise in one workout. */
@@ -82,7 +85,7 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
     name,
     firstName: name.split(" ")[0],
     prefs,
-    metric: GOALS[prefs.goal].metric,
+    metric: GOALS[resolvePrefs(prefs).goal].metric,
     isDemo: meta?.demo === true,
     isGuest: (session.user.email ?? "").endsWith(`@${GUEST_EMAIL_DOMAIN}`),
     selfServe: meta != null,
@@ -91,125 +94,16 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
 
 // ── Plan overview ───────────────────────────────────────────────────────────
 
-type RawSet = { repMin?: number; repMax?: number; unit?: "reps" | "secs"; restSeconds?: number | null };
+type RawSet = { weight?: number | null; repMin?: number; repMax?: number; unit?: "reps" | "secs"; restSeconds?: number | null };
 
-export type WorkoutSummary = {
-  id: string;
-  name: string;
-  week: number;
-  date: string;
-  status: "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
-  note: string | null;
-  estMinutes: number;
-  exercises: Array<{ name: string; sets: number; reps: string }>;
-};
-
-export type PlanOverview = {
-  id: string;
-  name: string;
-  startDate: string;
-  totalWeeks: number;
-  currentWeek: number;
-  blocks: Array<{ name: string; weeks: number; focus: string }>;
-  rationale: string[];
-  workouts: WorkoutSummary[];
-  nextUp: WorkoutSummary | null;
-  done: number;
-  /** The next prescription for each exercise — used to project chart targets. */
-  rx: Record<string, { repMin: number; repMax: number; unit: "reps" | "secs"; deload: boolean }>;
-};
-
-export function repLabel(sets: RawSet[]): string {
-  const s = sets[0];
-  if (!s) return "";
-  const range = s.repMin === s.repMax ? `${s.repMax}` : `${s.repMin}–${s.repMax}`;
-  return s.unit === "secs" ? `${range}s` : range;
-}
-
-function estimate(exercises: Array<{ prescribedSets: unknown }>): number {
-  const seconds = exercises.reduce((sum, e) => {
-    const sets = (e.prescribedSets as RawSet[]) ?? [];
-    return sum + sets.reduce((t, s) => t + 40 + (s.restSeconds ?? 60), 60);
-  }, 300);
-  return Math.max(10, Math.round(seconds / 300) * 5);
-}
-
+/** The signed-in athlete's active plan. The read model itself is shared with the coach side. */
 export const getPlanOverview = cache(async (): Promise<PlanOverview | null> => {
   const athlete = await getAthlete();
-  const assignment = await prisma.programAssignment.findFirst({
-    where: { clientId: athlete.clientId, status: "ACTIVE" },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      startDate: true,
-      assignedWorkouts: {
-        orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
-        select: {
-          id: true,
-          name: true,
-          scheduledDate: true,
-          status: true,
-          notes: true,
-          exercises: {
-            orderBy: { order: "asc" },
-            select: { exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true } } },
-          },
-        },
-      },
-    },
+  return loadPlanOverview({
+    clientId: athlete.clientId,
+    workspaceId: athlete.workspaceId,
+    fallbackPrefs: athlete.selfServe ? athlete.prefs : null,
   });
-  if (!assignment) return null;
-
-  const start = assignment.startDate.getTime();
-  const workouts: WorkoutSummary[] = assignment.assignedWorkouts.map((w) => ({
-    id: w.id,
-    name: w.name,
-    week: weekOf(w.scheduledDate.getTime(), start),
-    date: iso(w.scheduledDate),
-    status: w.status,
-    note: w.notes,
-    estMinutes: estimate(w.exercises),
-    exercises: w.exercises.map((e) => {
-      const sets = (e.prescribedSets as RawSet[]) ?? [];
-      return { name: displayName(e.exercise.slug, e.exercise.name), sets: sets.length, reps: repLabel(sets) };
-    }),
-  }));
-
-  const rx: PlanOverview["rx"] = {};
-  for (const w of assignment.assignedWorkouts) {
-    if (w.status !== "PLANNED") continue;
-    for (const e of w.exercises) {
-      if (rx[e.exerciseId]) continue;
-      const first = ((e.prescribedSets as RawSet[]) ?? [])[0];
-      if (!first) continue;
-      const repMin = first.repMin ?? 8;
-      rx[e.exerciseId] = {
-        repMin,
-        repMax: first.repMax ?? repMin,
-        unit: first.unit === "secs" ? "secs" : "reps",
-        deload: athlete.selfServe && weekOf(w.scheduledDate.getTime(), start) % BLOCK_WEEKS === 0,
-      };
-    }
-  }
-
-  const nextUp = workouts.find((w) => w.status === "PLANNED") ?? null;
-  const totalWeeks = workouts.reduce((m, w) => Math.max(m, w.week), 1);
-  const plan = athlete.selfServe ? generatePlan(athlete.prefs) : null;
-
-  return {
-    id: assignment.id,
-    name: assignment.name,
-    startDate: iso(assignment.startDate),
-    totalWeeks,
-    currentWeek: nextUp?.week ?? totalWeeks,
-    blocks: plan?.blocks ?? [],
-    rationale: plan?.rationale ?? [],
-    workouts,
-    nextUp,
-    done: workouts.filter((w) => w.status === "LOGGED").length,
-    rx,
-  };
 });
 
 // ── Progress ────────────────────────────────────────────────────────────────
@@ -240,6 +134,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
   const athlete = await getAthlete();
   const plan = await getPlanOverview();
   const tz = getTimeZone();
+  const generated = plan?.generated ?? athlete.selfServe;
   const sets = await prisma.setLog.findMany({
     where: { workoutLog: { clientId: athlete.clientId }, exerciseId: { not: null } },
     orderBy: { createdAt: "asc" },
@@ -281,7 +176,7 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
     }
     let session = entry.sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [] };
+      session = { date, deload: isDeloadSession(s.workoutLog, generated), sets: [] };
       entry.sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
@@ -374,6 +269,8 @@ export type LoggerSet = {
 export type LoggerExercise = {
   aweId: string;
   exerciseId: string;
+  /** Catalog slug, when the exercise is one of Atlas's own. */
+  slug: string | null;
   name: string;
   muscles: string[];
   role: string | null;
@@ -417,7 +314,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       notes: true,
       scheduledDate: true,
       programAssignmentId: true,
-      programAssignment: { select: { startDate: true } },
+      programAssignment: { select: { startDate: true, sourceProgram: { select: { goalTags: true } } } },
       exercises: {
         orderBy: { order: "asc" },
         select: {
@@ -440,6 +337,8 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     },
   });
   if (!workout) return null;
+  // Generated plans (the athlete's own or a coach's) close each block with a lighter week.
+  const generated = storedPrefs(workout.programAssignment.sourceProgram.goalTags) != null || athlete.selfServe;
 
   const start = workout.programAssignment.startDate.getTime();
   const week = weekOf(workout.scheduledDate.getTime(), start);
@@ -481,14 +380,14 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     }
     let session = sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [] };
+      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, generated), sets: [] };
       sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
   }
 
   const logged = workout.workoutLog?.sets ?? [];
-  const deloadWeek = athlete.selfServe && week % BLOCK_WEEKS === 0;
+  const deloadWeek = generated && week % BLOCK_WEEKS === 0;
 
   const exercises: LoggerExercise[] = workout.exercises.map((e) => {
     const prescribed = ((e.prescribedSets as RawSet[]) ?? []).length > 0 ? (e.prescribedSets as RawSet[]) : [{}];
@@ -509,7 +408,20 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     const bodyweight = cat ? cat.tool === "bodyweight" : /body ?only|bodyweight|n\/?a/i.test(e.exercise.equipment) && !everLoaded;
     const increment = bodyweight ? 0 : cat?.inc ?? 5;
 
-    const target = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit, deload: deloadWeek });
+    const computed = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit, deload: deloadWeek });
+    // A weight written into the plan (by the athlete mid-session, or by a
+    // coach) is the target. Otherwise it is worked out from the last session.
+    const setWeight = typeof first.weight === "number" && first.weight > 0 && !bodyweight ? first.weight : null;
+    const target: Target =
+      setWeight == null
+        ? computed
+        : {
+            weight: setWeight,
+            reps: repMin,
+            kind: "custom",
+            headline: `${setWeight} lb × ${repMin === repMax ? repMax : `${repMin}–${repMax}`}`,
+            reason: `The target set for this session.${computed.weight != null && computed.kind !== "first" ? ` From your last session Atlas would suggest ${computed.weight} lb × ${computed.reps}.` : ""}`,
+          };
 
     const mine = logged.filter((s) => s.assignedWorkoutExerciseId === e.id || (!s.assignedWorkoutExerciseId && s.exerciseId === e.exerciseId));
     const count = Math.min(MAX_SETS, Math.max(prescribed.length, mine.reduce((m, s) => Math.max(m, s.setNumber), 0)));
@@ -524,6 +436,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     return {
       aweId: e.id,
       exerciseId: e.exerciseId,
+      slug: cat ? e.exercise.slug : null,
       name: displayName(e.exercise.slug, e.exercise.name),
       muscles: cat?.muscles ?? ((e.exercise.primaryMuscles as string[] | null) ?? []),
       role: e.section,

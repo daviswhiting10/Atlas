@@ -100,11 +100,14 @@ export async function createPlanForClient(
     clientId,
     prefs,
     startDate,
+    draft = false,
   }: {
     workspaceId: string;
     clientId: string;
     prefs: Prefs;
     startDate: Date;
+    /** A coach's draft: saved but not yet the client's live plan. */
+    draft?: boolean;
   },
   db: Db = prisma
 ): Promise<{ assignmentId: string; workouts: CreatedWorkout[] }> {
@@ -149,9 +152,9 @@ export async function createPlanForClient(
         loggedBy: "CLIENT" as const,
         status: "PLANNED" as const,
         order: order++,
-        notes: info.deload
-          ? "Lighter week — same weights, but stop each set two or three reps early and recover."
-          : null,
+        // Left empty for the athlete's or coach's own notes. The lighter-week
+        // reminder is derived from the week number wherever it is shown.
+        notes: null,
       });
       day.exercises.forEach((e, i) => {
         const exerciseId = exerciseIds[e.slug];
@@ -181,10 +184,13 @@ export async function createPlanForClient(
     }
   }
 
-  await db.programAssignment.updateMany({
-    where: { clientId, status: "ACTIVE" },
-    data: { status: "COMPLETED" },
-  });
+  // A new live plan replaces the old one. A draft leaves the live plan alone.
+  if (!draft) {
+    await db.programAssignment.updateMany({
+      where: { clientId, status: "ACTIVE" },
+      data: { status: "COMPLETED" },
+    });
+  }
 
   await db.program.create({
     data: {
@@ -192,7 +198,9 @@ export async function createPlanForClient(
       workspaceId,
       name: plan.name,
       description: plan.rationale.join(" "),
-      goalTags: { goals: [GOALS[prefs.goal].primaryGoal], conditions: [] },
+      // The preferences travel with the program, so any screen can rebuild
+      // the plan's phases and reasoning without knowing who generated it.
+      goalTags: { goals: [GOALS[plan.prefs.goal].primaryGoal], conditions: plan.prefs.conditions, prefs },
       durationWeeks: TOTAL_WEEKS,
       isTemplate: false,
       blocks: {
@@ -215,7 +223,8 @@ export async function createPlanForClient(
       sourceProgramId: programId,
       name: plan.name,
       startDate: start,
-      status: "ACTIVE",
+      status: draft ? "PAUSED" : "ACTIVE",
+      goalText: prefs.goalText ?? null,
     },
   });
   await db.assignedWorkout.createMany({ data: workoutRows });

@@ -13,7 +13,7 @@ export type LoggedSet = { weight: number | null; reps: number | null; completed:
 export type Target = {
   weight: number | null;
   reps: number;
-  kind: "first" | "add_weight" | "add_reps" | "hold" | "reset" | "deload";
+  kind: "first" | "add_weight" | "add_reps" | "hold" | "reset" | "deload" | "custom";
   headline: string;
   reason: string;
 };
