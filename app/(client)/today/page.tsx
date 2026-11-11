@@ -65,6 +65,11 @@ export default async function TodayPage() {
     <div className="space-y-8">
       <div className="rise">
         <Greeting name={athlete.firstName} />
+        {athlete.isGuest && !athlete.isDemo && (
+          <Link href="/you" className="press mt-3 inline-flex items-center gap-1.5 rounded-full border border-signal/30 bg-signal/5 px-3 py-1.5 text-[13px] font-medium text-signal hover:bg-signal/10">
+            Guest account · save it to keep your progress <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
 
       {/* ── Up next ──────────────────────────────────────────────────── */}

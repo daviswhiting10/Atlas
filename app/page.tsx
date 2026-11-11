@@ -42,7 +42,7 @@ export default function LandingPage() {
         <Logo />
         <nav className="flex items-center gap-1.5 sm:gap-3">
           <Link href="/login" className="press rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink">
-            Coach sign in
+            Sign in
           </Link>
           <Link href="/start" className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink/85">
             Get started
@@ -76,7 +76,7 @@ export default function LandingPage() {
               </DemoButton>
             </div>
             <p className="rise rise-4 mt-4 text-sm text-ink-mute">
-              No email or password. The demo opens with nine weeks of training already logged.
+              Your plan is ready in under a minute. The demo needs no account and opens with nine weeks already logged.
             </p>
           </div>
 

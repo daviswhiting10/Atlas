@@ -2,24 +2,43 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
 import { ArrowRight, Loader2, Play } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
+import { CredentialFields, inputClass, signInWithPassword } from "@/components/athlete/account";
+
+const primary =
+  "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60";
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<"password" | "link">("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function signInPassword(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setFailed(false);
-    const res = await signIn("email", { email, redirect: false, callbackUrl: "/inbox" });
+    setError(null);
+    if (await signInWithPassword(email, password)) {
+      // The home page sends each account to its own start: Today for athletes, Inbox for coaches.
+      window.location.assign("/");
+      return;
+    }
+    setError("That email and password don't match an account. Check them and try again.");
+    setLoading(false);
+  }
+
+  async function sendLink(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const { signIn } = await import("next-auth/react");
+    const res = await signIn("email", { email, redirect: false, callbackUrl: "/" });
     // Unknown addresses are refused server-side; say so rather than promise an email.
-    if (res?.error) setFailed(true);
+    if (res?.error) setError("We couldn't send a link to that address. Links are for existing accounts; to start fresh, create an account below.");
     else setSent(true);
     setLoading(false);
   }
@@ -43,47 +62,60 @@ export default function LoginPage() {
       ) : (
         <div className="rise mt-10">
           <h1 className="font-display text-4xl text-ink">Welcome back</h1>
-          <p className="mt-2 text-[15px] text-ink-soft">Coaches and invited clients sign in with a link sent by email.</p>
+          <p className="mt-2 text-[15px] text-ink-soft">Sign in to pick up where you left off.</p>
 
-          <form onSubmit={handleSubmit} className="mt-7 space-y-3">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              autoComplete="email"
-              className="h-[52px] w-full rounded-2xl border border-line bg-white px-4 text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Email me a sign-in link"}
-            </button>
-            {failed && (
-              <p role="alert" className="text-sm leading-relaxed text-destructive">
-                We couldn&apos;t send a link to that address. Email sign-in is for coaches and invited clients — to try Atlas yourself, use one of the options below.
-              </p>
-            )}
-          </form>
+          {mode === "password" ? (
+            <form onSubmit={signInPassword} className="mt-7 space-y-3">
+              <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} newPassword={false} />
+              {error && (
+                <p role="alert" className="text-sm leading-relaxed text-destructive">
+                  {error}
+                </p>
+              )}
+              <button type="submit" disabled={loading} className={primary}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={sendLink} className="mt-7 space-y-3">
+              <label className="block">
+                <span className="sr-only">Email</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required autoComplete="email" className={inputClass} />
+              </label>
+              {error && (
+                <p role="alert" className="text-sm leading-relaxed text-destructive">
+                  {error}
+                </p>
+              )}
+              <button type="submit" disabled={loading} className={primary}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Email me a sign-in link"}
+              </button>
+            </form>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === "password" ? "link" : "password");
+              setError(null);
+            }}
+            className="mt-4 text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+          >
+            {mode === "password" ? "Coach or invited client? Get a sign-in link instead" : "Sign in with a password instead"}
+          </button>
 
           <div className="my-8 flex items-center gap-3 text-xs text-ink-mute">
             <span className="h-px flex-1 bg-line" /> New here? <span className="h-px flex-1 bg-line" />
           </div>
 
           <div className="space-y-3">
-            <Link
-              href="/start"
-              className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85"
-            >
-              Build my plan <ArrowRight className="h-4 w-4" />
+            <Link href="/start" className={primary}>
+              Create an account <ArrowRight className="h-4 w-4" />
             </Link>
             <DemoButton className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white text-[15px] font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
               <Play className="h-4 w-4 fill-current" /> Explore a live demo
             </DemoButton>
-            <p className="text-center text-[13px] text-ink-mute">No email or password needed for either.</p>
+            <p className="text-center text-[13px] text-ink-mute">Answer a few questions and your plan is ready in under a minute.</p>
           </div>
         </div>
       )}

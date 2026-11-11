@@ -14,7 +14,7 @@ export default function StartPage() {
           <Logo />
         </Link>
         <Link href="/login" className="press rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink">
-          Coach sign in
+          Sign in
         </Link>
       </header>
       <main className="mx-auto max-w-6xl px-5 pb-20 pt-4 sm:px-8 sm:pt-8">

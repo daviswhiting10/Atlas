@@ -8,7 +8,9 @@ import { DAYS_PER_WEEK, EQUIPMENT, EXPERIENCE, GOALS, GOAL_TEXT_MAX, generatePla
 import { interpretGoal } from "@/lib/plan/goal";
 import type { Equipment } from "@/lib/plan/catalog";
 import { rebuildPlan } from "@/lib/actions/athlete";
+import { createAccount } from "@/lib/actions/account";
 import { BuildingOverlay, useGuestSignIn } from "./guest";
+import { CredentialFields, inputClass, signInWithPassword } from "./account";
 import { cn } from "@/lib/utils";
 
 const GOAL_ICONS: Record<Goal, typeof Dumbbell> = { muscle: Dumbbell, strength: Trophy, fat_loss: Flame, general: HeartPulse };
@@ -138,6 +140,10 @@ export function PlanWizard({
   const [step, setStep] = useState(0);
   const [saving, startSaving] = useTransition();
   const { pending, start } = useGuestSignIn();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
 
   const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setPrefs((p) => ({ ...p, [key]: value }));
   const reading = useMemo(() => interpretGoal(prefs.goalText), [prefs.goalText]);
@@ -248,17 +254,28 @@ export function PlanWizard({
     ...(mode === "signup"
       ? [
           {
-            title: "Last thing — what should we call you?",
-            hint: "No email, no password. You can start logging right away.",
+            title: "Last thing — create your account",
+            hint: "Your plan and everything you log are saved to it, so you can pick up on any device.",
             body: (
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="First name"
-                maxLength={40}
-                autoComplete="given-name"
-                className="h-14 w-full rounded-2xl border border-line bg-white px-4 text-lg text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:"
-              />
+              <form
+                id="create-account"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submit();
+                }}
+                className="space-y-3"
+              >
+                <label className="block">
+                  <span className="sr-only">First name</span>
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" required maxLength={40} autoComplete="given-name" className={inputClass} />
+                </label>
+                <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} newPassword />
+                {accountError && (
+                  <p role="alert" className="text-sm leading-relaxed text-destructive">
+                    {accountError}
+                  </p>
+                )}
+              </form>
             ),
           },
         ]
@@ -266,11 +283,28 @@ export function PlanWizard({
   ];
 
   const last = step === steps.length - 1;
-  const busy = saving || pending != null;
+  const busy = saving || creating || pending != null;
+
+  async function signUp() {
+    setAccountError(null);
+    setCreating(true);
+    const res = await createAccount({ name, email, password, prefs });
+    if (!res.ok) {
+      setAccountError(res.error);
+      setCreating(false);
+      return;
+    }
+    if (await signInWithPassword(email, password)) {
+      window.location.assign("/today");
+      return;
+    }
+    // The account exists; signing in is the only step left.
+    window.location.assign("/login");
+  }
 
   function submit() {
     if (mode === "signup") {
-      start({ name, prefs });
+      void signUp();
       return;
     }
     startSaving(async () => {
@@ -314,20 +348,29 @@ export function PlanWizard({
               </button>
             )}
             <button
-              type="button"
-              onClick={() => (last ? submit() : setStep((s) => s + 1))}
+              type={last && mode === "signup" ? "submit" : "button"}
+              form={last && mode === "signup" ? "create-account" : undefined}
+              onClick={last && mode === "signup" ? undefined : () => (last ? submit() : setStep((s) => s + 1))}
               disabled={busy}
               className="press flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : last ? (
-                <>{mode === "signup" ? "Build my plan" : "Rebuild my plan"} <Sparkles className="h-4 w-4" /></>
+                <>{mode === "signup" ? "Create account & build my plan" : "Rebuild my plan"} <Sparkles className="h-4 w-4" /></>
               ) : (
                 <>Continue <ArrowRight className="h-4 w-4" /></>
               )}
             </button>
           </div>
+          {mode === "signup" && last && (
+            <p className="mt-4 text-center text-[13px] text-ink-mute">
+              Just looking?{" "}
+              <button type="button" onClick={() => start({ name, prefs })} disabled={busy} className="font-semibold text-signal underline-offset-4 hover:underline">
+                Try it without an account
+              </button>
+            </p>
+          )}
           {mode === "rebuild" && (
             <p className="mt-4 text-[13px] leading-relaxed text-ink-mute">
               Rebuilding starts a fresh 12 weeks from today. Everything you&apos;ve logged stays, so your charts carry on.
@@ -337,7 +380,7 @@ export function PlanWizard({
 
         <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />
       </div>
-      <BuildingOverlay mode={pending} />
+      <BuildingOverlay mode={creating ? "plan" : pending} />
     </>
   );
 }

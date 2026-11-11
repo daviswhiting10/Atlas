@@ -44,13 +44,15 @@ const DEMO_WEEKS_OF_HISTORY = 9;
 
 export type AthleteMeta = { prefs: Prefs; demo: boolean };
 
+type NewAthlete = { id: string; name: string; email: string; role: "CLIENT"; workspaceId: string };
+
 export async function createGuest(input: {
   name?: string;
   prefs?: unknown;
   demo?: boolean;
   /** Caller's IP, when known, for the per-visitor limit. */
   ip?: string | null;
-}): Promise<{ id: string; name: string; email: string; role: "CLIENT"; workspaceId: string }> {
+}): Promise<NewAthlete> {
   if (!underIpLimit(input.ip ?? null)) throw new Error("Too many new accounts from this connection. Try again later.");
 
   const recent = await prisma.user.count({
@@ -61,10 +63,26 @@ export async function createGuest(input: {
   });
   if (recent >= MAX_GUESTS_PER_HOUR) throw new Error("Too many new accounts right now. Try again shortly.");
 
+  return createAthlete({ ...input, email: `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`, passwordHash: null });
+}
+
+/**
+ * A self-serve athlete: their own workspace (isolated from every coach's
+ * client list and from other athletes), their profile, and a plan built from
+ * their answers. A guest gets a placeholder email and no password; a real
+ * account gets both. Rate limits are the caller's job.
+ */
+export async function createAthlete(input: {
+  name?: string;
+  prefs?: unknown;
+  demo?: boolean;
+  email: string;
+  passwordHash: string | null;
+}): Promise<NewAthlete> {
   const demo = input.demo === true;
   const prefs = demo ? DEMO_PREFS : normalizePrefs(input.prefs);
   const name = (typeof input.name === "string" ? input.name : "").trim().slice(0, 40) || (demo ? "Alex" : "Athlete");
-  const email = `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`;
+  const email = input.email;
   const meta: AthleteMeta = { prefs, demo };
 
   const today = new Date();
@@ -79,7 +97,7 @@ export async function createGuest(input: {
     async (tx) => {
       const workspace = await tx.workspace.create({ data: { name: `${name} — personal` }, select: { id: true } });
       const user = await tx.user.create({
-        data: { name, email, role: "CLIENT", workspaceId: workspace.id, emailVerified: new Date() },
+        data: { name, email, passwordHash: input.passwordHash, role: "CLIENT", workspaceId: workspace.id, emailVerified: input.passwordHash ? null : new Date() },
         select: { id: true },
       });
       const profile = await tx.clientProfile.create({

@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
 import { createGuest } from "@/lib/guest"
+import { Email as EmailAddress, rateLimiter, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
 
 const baseAdapter = PrismaAdapter(prisma)
 
@@ -21,6 +22,11 @@ const adapter = {
   },
 }
 
+// Sign-in attempts: per address (stops guessing one account's password) and
+// per connection (stops one visitor trying many addresses).
+const perEmail = rateLimiter(10, 15 * 60_000)
+const perIp = rateLimiter(30, 15 * 60_000)
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter,
   session: { strategy: "jwt" },
@@ -28,6 +34,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     // Guest sign-in: always creates a brand-new account, never signs into an
     // existing one — so there is no credential to guess and nothing to hijack.
+    // Email + password. Wrong address and wrong password look the same from
+    // outside: same answer, same time taken.
+    Credentials({
+      id: "password",
+      name: "Email and password",
+      credentials: { email: {}, password: {} },
+      async authorize(credentials, request) {
+        const parsed = EmailAddress.safeParse(credentials?.email)
+        const password = typeof credentials?.password === "string" ? credentials.password.slice(0, 200) : ""
+        if (!parsed.success || !password) return null
+        const email = parsed.data
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
+        if (!perEmail(email) || !perIp(ip)) return null
+
+        const user = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true, name: true, email: true, role: true, workspaceId: true, passwordHash: true },
+        })
+        if (!user?.passwordHash) {
+          await verifyAgainstDecoy(password)
+          return null
+        }
+        if (!(await verifyPassword(password, user.passwordHash))) return null
+        return { id: user.id, name: user.name, email: user.email, role: user.role, workspaceId: user.workspaceId }
+      },
+    }),
     Credentials({
       id: "guest",
       name: "Guest",

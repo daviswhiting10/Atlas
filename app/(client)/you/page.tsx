@@ -3,6 +3,7 @@ import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { EQUIPMENT, EXPERIENCE, GOALS } from "@/lib/plan/generator";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
 import { StatRow } from "@/components/athlete/StatRow";
+import { SaveAccountPanel } from "@/components/athlete/account";
 
 export const metadata: Metadata = { title: "You" };
 
@@ -22,6 +23,9 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
           <p className="mt-2 text-sm text-ink-mute">{kind}</p>
         </div>
       </header>
+
+      {/* A demo account is sample data; a guest's own plan is worth keeping. */}
+      {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-8" />}
 
       {athlete.selfServe && (
         <StatRow
