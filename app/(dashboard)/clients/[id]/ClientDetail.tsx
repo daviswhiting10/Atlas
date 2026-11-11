@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatRow } from "@/components/athlete/StatRow";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
+import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { categoryLabel } from "@/lib/programs/categories";
 import {
   ArrowLeft,
@@ -249,6 +250,8 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   const goalLabel = client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null;
   const avatarBg = client.primaryGoal ? (GOAL_AVATAR_BG[client.primaryGoal] ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground";
   const activeProgram = client.programAssignments.find((a) => a.status === "ACTIVE");
+  const draftProgram = client.programAssignments.find((a) => a.status === "PAUSED");
+  const firstName = client.fullName.split(" ")[0];
   // Spreadsheet details from an import are shown on their own, never as an intake.
   const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
@@ -451,18 +454,26 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
             {/* Main column */}
             <div className="lg:col-span-3 space-y-4">
-              {/* Current Program card */}
-              <Card>
+              {/* Current Program card: with no plan, uploading the coach's own comes first. */}
+              <Card className={cn(!activeProgram && !draftProgram && "border-signal/40 ring-1 ring-signal/20")}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">Current Program</CardTitle>
+                    <CardTitle className="text-sm font-semibold">{activeProgram || draftProgram ? "Current Program" : `Upload ${firstName}'s plan`}</CardTitle>
                     <Link href="/programs" className="text-xs text-muted-foreground hover:text-foreground">
                       Browse library →
                     </Link>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {activeProgram ? (
+                  {!activeProgram && draftProgram ? (
+                    <div>
+                      <p className="text-sm font-medium">{draftProgram.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Draft · not assigned yet. Check it, then assign it.</p>
+                      <Link href={`/clients/${client.id}/programs/${draftProgram.id}`} className={cn(buttonVariants({ size: "sm" }), "mt-3")}>
+                        Review &amp; assign
+                      </Link>
+                    </div>
+                  ) : activeProgram ? (
                     <div>
                       <Link
                         href={`/clients/${client.id}/programs/${activeProgram.id}`}
@@ -474,17 +485,30 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                         Started {new Date(activeProgram.startDate).toLocaleDateString()} ·{" "}
                         {activeProgram._count.assignedWorkouts} total sessions
                       </p>
+                      <details className="mt-3 group">
+                        <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground">
+                          Replace with a plan from a sheet
+                        </summary>
+                        <div className="mt-3">
+                          <SheetPlanUpload clientId={client.id} firstName={firstName} />
+                        </div>
+                      </details>
                     </div>
                   ) : (
-                    <div className="py-4 text-center">
-                      <Dumbbell className="w-7 h-7 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm font-medium">No program assigned</p>
-                      <p className="text-xs text-muted-foreground mt-1 mb-3">
-                        Generate one, or start from a library program.
+                    <div>
+                      <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
+                        From your Google Sheet or a CSV. Atlas reads it into a plan, and you check it before {firstName} sees it.
                       </p>
-                      <Link href={`/programs/new?client=${client.id}`} className={buttonVariants({ size: "sm" })}>
-                        New plan
-                      </Link>
+                      <SheetPlanUpload clientId={client.id} firstName={firstName} />
+                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t pt-3 text-xs">
+                        <Link href="/programs" className="font-medium text-muted-foreground hover:text-foreground">
+                          Use a library program
+                        </Link>
+                        <Link href={`/programs/new?client=${client.id}`} className="font-medium text-muted-foreground hover:text-foreground">
+                          <Dumbbell className="mr-1 inline h-3 w-3" />
+                          Or have Atlas build one
+                        </Link>
+                      </div>
                     </div>
                   )}
                 </CardContent>

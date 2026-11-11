@@ -61,3 +61,26 @@ The JSON must follow this exact structure:
       : `Parse the workout plan in this image.${notes ? `\n\nAdditional context: ${notes}` : ""}`,
   };
 }
+
+/**
+ * The same output as the screenshot import, read from a spreadsheet
+ * exported as CSV. Coaches lay sheets out every which way, so the model
+ * reads the content, not fixed columns.
+ */
+export function buildProgramSheetPrompt(csv: string, notes?: string) {
+  const { system } = buildProgramImportPrompt(1);
+  return {
+    system: system
+      .replace("parse a screenshot of a workout plan", "read a coach's workout plan from a spreadsheet (given as CSV)")
+      .replace(
+        "- **durationWeeks**: 1 unless the screenshots indicate a multi-week programme.",
+        "- **durationWeeks**: how many weeks the plan runs. If the sheet repeats the same workouts across several weeks (week columns, week tabs or week headings), use that number of weeks and the first week's prescription."
+      )
+      .replace(
+        "- **name**: use the day label exactly as written in the screenshot",
+        "- **name**: use the day or workout label exactly as written in the sheet"
+      )
+      .replace("- Do NOT invent exercises not visible in the images.", "- Do NOT invent exercises that aren't in the sheet.\n- Ignore rows that aren't exercises: titles, totals, blank rows, the client's name, dates, notes to self.\n- Rows and columns may be in any order; read the sheet like a coach would."),
+    user: `The spreadsheet, as CSV:\n\n${csv}${notes ? `\n\nAdditional context: ${notes}` : ""}`,
+  };
+}

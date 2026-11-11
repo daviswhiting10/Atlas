@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { withWorkspace } from "@/lib/api/middleware";
 import { callAIVision, MODELS, type ImageInput } from "@/lib/ai/client";
 import { buildProgramImportPrompt } from "@/lib/ai/prompts/program-import";
-import { prisma } from "@/lib/db/client";
-import { MovementPattern } from "@/app/generated/prisma/client";
+import { resolveExercise } from "@/lib/programs/resolve-exercise";
 
 // ─── Types matching ProgramBuilder's internal state ─────────────────────────
 
@@ -35,50 +34,6 @@ const ALLOWED_TYPES = [
   "image/webp",
 ] as const;
 type AllowedType = (typeof ALLOWED_TYPES)[number];
-
-// ─── Exercise resolver ───────────────────────────────────────────────────────
-
-/**
- * Match an exercise name from the screenshot to the library: the shared one,
- * or this workspace's own. Anything new is created privately for this
- * workspace, never in the shared library.
- */
-async function resolveExercise(name: string, workspaceId: string): Promise<{ id: string; name: string }> {
-  const visible = { OR: [{ workspaceId: null }, { workspaceId }] };
-  // 1) exact match
-  let ex = await prisma.exercise.findFirst({
-    where: { ...visible, name: { equals: name, mode: "insensitive" } },
-    select: { id: true, name: true },
-  });
-  if (ex) return ex;
-
-  // 2) contains match
-  ex = await prisma.exercise.findFirst({
-    where: { ...visible, name: { contains: name, mode: "insensitive" } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-  if (ex) return ex;
-
-  // 3) create it, private to this workspace
-  const slug =
-    name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") +
-    "-" +
-    Date.now();
-  return prisma.exercise.create({
-    data: {
-      name,
-      slug,
-      movementPattern: MovementPattern.LOCOMOTION, // placeholder
-      equipment: "other",
-      primaryMuscles: [],
-      secondaryMuscles: [],
-      instructions: [],
-      workspaceId,
-    },
-    select: { id: true, name: true },
-  });
-}
 
 // ─── Route ───────────────────────────────────────────────────────────────────
 
