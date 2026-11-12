@@ -70,6 +70,12 @@ const STOP = new Set(["with", "w", "the", "on", "and", "or", "to", "of", "a", "a
 /** Library entries that share a common word but are a different exercise. */
 const NEVER = new Set(["Air Bike"]); // a bicycle crunch, not the fan bike
 
+/**
+ * Exercises the library has nothing close to, checked by the coach: any name
+ * with one of these gets no picture rather than a near miss.
+ */
+const NO_PICTURE = /\b(nordic|ghd|partner|suitcase|landmine|land mine)\b/i;
+
 /** Names the library uses for common gym terms. */
 const ALIASES: Record<string, string> = {
   "recumbent bike": "Recumbent Bike",
@@ -80,7 +86,6 @@ const ALIASES: Record<string, string> = {
   "incline treadmill walk": "Walking, Treadmill",
   "treadmill walk": "Walking, Treadmill",
   "farmers walk": "Farmer's Walk",
-  "suitcase carry": "Farmer's Walk",
   "kettlebell swing": "One-Arm Kettlebell Swings",
   "two kettlebell swing": "One-Arm Kettlebell Swings",
   "glute bridge": "Single Leg Glute Bridge",
@@ -163,6 +168,7 @@ const ALIAS_KEYS = Array.from(ALIAS.keys()).sort((a, b) => b.length - a.length);
 
 /** The library entry for a name, or null when nothing is close enough. */
 function match(name: string): Entry | null {
+  if (NO_PICTURE.test(name)) return null;
   const w = words(name);
   if (w.length === 0) return null;
   const key = w.join(" ");
