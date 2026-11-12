@@ -6,8 +6,7 @@ import {
   getLastPerformance,
   getLastExerciseNote,
 } from "@/lib/actions/workout-logger";
-import { loadClientProgress } from "@/lib/coach/progress";
-import WorkoutLogger, { type ExerciseTrend } from "./WorkoutLogger";
+import WorkoutLogger from "./WorkoutLogger";
 import { PlanNotLive } from "./PlanNotLive";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -28,6 +27,7 @@ export type PrevSet = {
   bandColor: string | null;
   reps: number | null;
   rpe: number | null;
+  note: string | null;
 };
 
 export type LoggerExercise = {
@@ -169,12 +169,12 @@ export default async function LogPage({
           })
         : Promise.resolve([] as Array<{ order: number; section: string | null }>),
 
-      // (b) Previous occurrence of this same workout template
-      assignedWorkout.sourceWorkoutId
-        ? prisma.assignedWorkout.findFirst({
+      // (b) The last time this day was done in this plan ("Day 1" last week). Matched by
+      // name as well as template: a plan read from a sheet has a template per week.
+      prisma.assignedWorkout.findFirst({
             where: {
-              sourceWorkoutId: assignedWorkout.sourceWorkoutId,
-              programAssignment: { clientId, workspaceId },
+              programAssignmentId: assignedWorkout.programAssignmentId,
+              ...(assignedWorkout.sourceWorkoutId ? { OR: [{ sourceWorkoutId: assignedWorkout.sourceWorkoutId }, { name: assignedWorkout.name }] } : { name: assignedWorkout.name }),
               status: "LOGGED",
               scheduledDate: { lt: assignedWorkout.scheduledDate },
             },
@@ -191,13 +191,13 @@ export default async function LogPage({
                       bandColor: true,
                       reps: true,
                       rpe: true,
+                      note: true,
                     },
                   },
                 },
               },
             },
-          })
-        : Promise.resolve(null),
+          }),
 
       // (c) All workouts for the day-picker (PLANNED + LOGGED + SKIPPED)
       prisma.assignedWorkout.findMany({
@@ -251,6 +251,7 @@ export default async function LogPage({
       bandColor: set.bandColor,
       reps: set.reps,
       rpe: set.rpe,
+      note: set.note,
     });
   }
 
@@ -295,24 +296,16 @@ export default async function LogPage({
     })
   );
 
-  // Each exercise's history, from the same read model as the Progress charts.
-  const progress = await loadClientProgress(clientId, workspaceId);
-  const stalledIds = new Set((progress?.data.stalled ?? []).map((s) => s.exerciseId));
-  const trends: Record<string, ExerciseTrend> = Object.fromEntries(
-    (progress?.data.exercises ?? []).map((e) => [e.exerciseId, { series: e.series, loaded: e.loaded, timed: e.timed, target: e.target, stalled: stalledIds.has(e.exerciseId) }])
-  );
-
   return (
     <WorkoutLogger
       key={assignedWorkout.id}
-      trends={trends}
       clientId={clientId}
       clientName={client.fullName}
       assignedWorkoutId={assignedWorkout.id}
       assignmentId={assignedWorkout.programAssignmentId}
       workoutName={assignedWorkout.name}
       scheduledDate={assignedWorkout.scheduledDate.toISOString()}
-      assignmentName={assignedWorkout.programAssignment.name}
+      completed={assignedWorkout.status === "LOGGED"}
       assignmentStartDate={assignedWorkout.programAssignment.startDate.toISOString()}
       exercises={exercises}
       existingWorkoutLogId={existingLog?.id ?? null}

@@ -99,6 +99,7 @@ export function ProgressView({
   goalMetric,
   emptyAction = { href: "/today", label: "Log your first workout" },
   totals = true,
+  records = true,
 }: {
   data: ProgressData;
   goalMetric: FocusMetric;
@@ -106,6 +107,8 @@ export function ProgressView({
   emptyAction?: { href: string; label: string };
   /** The workouts / sets / records / streak row. Off where the page already shows those numbers. */
   totals?: boolean;
+  /** Personal records at the end. Off where they have their own tab (the coach's client page). */
+  records?: boolean;
 }) {
   const [exerciseId, setExerciseId] = useState<string | null>(null);
   const [chosen, setChosen] = useState<FocusMetric>(goalMetric);
@@ -289,27 +292,31 @@ export function ProgressView({
         )}
       </section>
 
-      {/* ── Records ────────────────────────────────────────────────────── */}
-      <section className="rise rise-4 rule pt-8">
-        <h2 className="text-xl text-ink">Personal records</h2>
-        <p className="mt-0.5 text-sm text-ink-mute">The heaviest weight lifted on each exercise.</p>
-        {data.recentPRs.length === 0 ? (
-          <p className="rule mt-4 pt-4 text-[15px] leading-relaxed text-ink-soft">None yet. The first session sets the baseline; lift heavier than it and the record lands here.</p>
-        ) : (
-          <ul className="rule mt-4 divide-y divide-line">
-            {data.recentPRs.slice(0, 6).map((r, i) => (
-              <li key={`${r.exercise}-${r.date}-${i}`} className="flex items-baseline gap-3 py-2.5">
-                <span className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full bg-gold" />
-                <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{r.exercise}</span>
-                <span className="shrink-0 text-[13px] text-ink-mute">{day(r.date)}</span>
-                <span className="w-20 shrink-0 text-right text-[15px] font-semibold text-ink">
-                  {formatValue(r.value, "weight")} <span className="text-xs font-normal text-ink-mute">{r.unit}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {records && (
+        <section className="rise rise-4 rule pt-8">
+          <h2 className="text-xl text-ink">Personal records</h2>
+          <RecordsList prs={data.recentPRs.slice(0, 6)} />
+        </section>
+      )}
     </div>
+  );
+}
+
+/** Personal records, newest first: the best weight on each exercise. */
+export function RecordsList({ prs }: { prs: ProgressData["recentPRs"] }) {
+  if (prs.length === 0) return <p className="rule mt-4 pt-4 text-[15px] text-ink-soft">None yet.</p>;
+  return (
+    <ul className="rule mt-4 divide-y divide-line">
+      {prs.map((r, i) => (
+        <li key={`${r.exercise}-${r.date}-${i}`} className="flex items-baseline gap-3 py-2.5">
+          <span className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full bg-gold" />
+          <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{r.exercise}</span>
+          <span className="shrink-0 text-[13px] text-ink-mute">{day(r.date)}</span>
+          <span className="w-20 shrink-0 text-right text-[15px] font-semibold text-ink">
+            {formatValue(r.value, "weight")} <span className="text-xs font-normal text-ink-mute">{r.unit}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

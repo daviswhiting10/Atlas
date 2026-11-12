@@ -2,8 +2,6 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
-import { ProgressChart } from "@/components/athlete/ProgressChart";
-import type { SessionPoint, Target } from "@/lib/plan/overload";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -27,10 +25,7 @@ import {
   Mic,
   MicOff,
   Plus,
-  SkipForward,
   Timer,
-  TrendingUp,
-  AlertTriangle,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -42,7 +37,7 @@ import {
 } from "@/lib/actions/workout-logger";
 import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
-import type { LoggerExercise, PrescribedSet, ExistingSetLog, PrevSet } from "./page";
+import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -78,35 +73,6 @@ type ExerciseState = {
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatLastSets(lastSets: LoggerExercise["lastSets"]): string {
-  if (lastSets.length === 0) return "";
-  const parts = lastSets.map((s) => {
-    const w = s.weight != null ? `${s.weight} lb` : "BW";
-    const r = s.reps != null ? `× ${s.reps}` : "";
-    return `${w} ${r}`.trim();
-  });
-  const rpeParts = lastSets.map((s) => s.rpe).filter((r): r is number => r != null);
-  const rpeStr =
-    rpeParts.length > 0 ? ` @ RPE ${Math.max(...rpeParts).toFixed(1)}` : "";
-  return `${parts.join(", ")}${rpeStr}`;
-}
-
-function formatPrevSets(sets: PrevSet[]): string {
-  if (sets.length === 0) return "";
-  const parts = sets.map((s) => {
-    const w = s.bandColor
-      ? `${s.bandColor.charAt(0).toUpperCase() + s.bandColor.slice(1)} band`
-      : s.weight != null
-      ? `${s.weight} lb`
-      : "BW";
-    const r = s.reps != null ? `× ${s.reps}` : "";
-    return `${w} ${r}`.trim();
-  });
-  const rpeParts = sets.map((s) => s.rpe).filter((r): r is number => r != null);
-  const rpeStr = rpeParts.length > 0 ? ` @ RPE ${Math.max(...rpeParts).toFixed(1)}` : "";
-  return `${parts.join(", ")}${rpeStr}`;
-}
 
 function formatRest(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -174,6 +140,71 @@ function buildInitialState(
   return state;
 }
 
+function CompletedPill() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--success)]">
+      <Check className="h-3.5 w-3.5" strokeWidth={3} /> Completed
+    </span>
+  );
+}
+
+/** "3 × 8–12", "1 × 5 min", "3 × 30s". */
+function rxLabel(ex: LoggerExercise): string {
+  const p = ex.prescribedSets[0];
+  if (!p) return "";
+  const n = ex.prescribedSets.length;
+  if (p.unit === "secs") {
+    if (p.repMax >= 60 && p.repMax % 60 === 0 && p.repMin % 60 === 0) {
+      return `${n} × ${p.repMin === p.repMax ? p.repMax / 60 : `${p.repMin / 60}–${p.repMax / 60}`} min`;
+    }
+    return `${n} × ${p.repMin === p.repMax ? p.repMax : `${p.repMin}–${p.repMax}`}s`;
+  }
+  return `${n} × ${p.repMin === p.repMax ? p.repMax : `${p.repMin}–${p.repMax}`}`;
+}
+
+/** "3 × 12 @ 15 lb", "5 min", "12, 10, 8 @ Blue band": identical sets collapse into one. */
+function describeSets(sets: Array<{ weight: number | null; bandColor?: string | null; reps: number | null }>, secs: boolean): string {
+  if (sets.length === 0) return "";
+  const amount = (r: number | null) => (r == null ? "" : secs ? (r >= 60 && r % 60 === 0 ? `${r / 60} min` : `${r}s`) : `${r}`);
+  const load = (x: (typeof sets)[number]) =>
+    x.bandColor ? `${x.bandColor.charAt(0).toUpperCase()}${x.bandColor.slice(1)} band` : x.weight != null ? `${x.weight} lb` : secs ? "" : "BW";
+  const loads = Array.from(new Set(sets.map(load)));
+  const amounts = sets.map((x) => amount(x.reps)).filter(Boolean);
+  if (loads.length === 1) {
+    const same = amounts.length > 0 && amounts.every((a) => a === amounts[0]);
+    const work = same ? (sets.length > 1 ? `${sets.length} × ${amounts[0]}` : amounts[0]) : amounts.join(", ");
+    return [work, loads[0]].filter(Boolean).join(" @ ");
+  }
+  return sets.map((x) => [amount(x.reps), load(x)].filter(Boolean).join(" @ ")).join(", ");
+}
+
+/**
+ * What was done on this exercise last week (this same workout), or the last
+ * time it was done, with any notes left then: the coach's note on the
+ * exercise and notes on the sets.
+ */
+function LastWeek({ ex }: { ex: LoggerExercise }) {
+  const fromLastWeek = ex.prevWorkoutSets.length > 0;
+  const secs = ex.prescribedSets[0]?.unit === "secs";
+  const sets: Array<{ weight: number | null; bandColor?: string | null; reps: number | null }> = fromLastWeek ? ex.prevWorkoutSets : ex.lastSets;
+  const done = describeSets(sets, secs);
+  const setNotes = fromLastWeek ? ex.prevWorkoutSets.map((x) => x.note?.trim()).filter((x): x is string => !!x) : [];
+  const notes = Array.from(new Set([ex.lastNote?.trim(), ...setNotes].filter((x): x is string => !!x)));
+  if (!done && notes.length === 0) return null;
+  return (
+    <div className="mt-1.5 ml-1 border-l-2 border-[var(--success)]/40 pl-2.5 text-xs leading-relaxed text-[var(--success)]">
+      {done && (
+        <p>
+          <span className="font-semibold">{fromLastWeek ? "Last week" : "Last time"}:</span> {done}
+        </p>
+      )}
+      {notes.map((n, i) => (
+        <p key={i} className="italic">&ldquo;{n}&rdquo;</p>
+      ))}
+    </div>
+  );
+}
+
 /** Set rows straight from the prescription, nothing logged yet. */
 function freshState(ex: LoggerExercise): ExerciseState {
   return { sets: ex.prescribedSets.map((ps) => initSetEntry(ps, ex.suggestion)), noteInput: "", noteSaving: false, noteAdded: false };
@@ -220,49 +251,21 @@ type WorkoutOption = {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export type ExerciseTrend = { series: SessionPoint[]; loaded: boolean; timed: boolean; target: Target | null; stalled: boolean };
-
-/** The exercise's trend across past sessions, the same chart the client sees. Collapsible. */
-function TrendChart({ trend }: { trend: ExerciseTrend | undefined }) {
-  const [open, setOpen] = useState(true);
-  if (!trend || trend.series.length === 0) return null;
-  const metric = trend.loaded && !trend.timed ? "e1rm" : "reps";
-  const sessions = trend.series.length;
-  return (
-    <div className="mt-2">
-      {trend.stalled && (
-        <p className="mb-1 text-xs font-medium text-warn">Stalled: no gain in the last 3 sessions. Worth changing something today.</p>
-      )}
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink">
-        <TrendingUp className="h-3 w-3" />
-        {open ? "Hide trend" : "Show trend"} · {sessions} session{sessions === 1 ? "" : "s"}
-      </button>
-      {open && (
-        <div className="mt-2">
-          <ProgressChart series={trend.series} metric={metric} loaded={trend.loaded} timed={trend.timed} target={trend.target} height={150} legend={false} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function WorkoutLogger({
-  trends,
   clientId,
   clientName,
   assignedWorkoutId,
   assignmentId,
   workoutName,
   scheduledDate,
-  assignmentName,
   assignmentStartDate,
+  completed,
   exercises,
   existingWorkoutLogId,
   existingSetLogs,
   availableWorkouts,
 }: {
-  /** History per exercise id, for the trend chart under each exercise. */
-  trends: Record<string, ExerciseTrend>;
   clientId: string;
   clientName: string;
   assignedWorkoutId: string;
@@ -270,8 +273,9 @@ export default function WorkoutLogger({
   assignmentId: string;
   workoutName: string;
   scheduledDate: string;
-  assignmentName: string;
   assignmentStartDate: string;
+  /** This workout has already been done. */
+  completed: boolean;
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
   existingSetLogs: ExistingSetLog[];
@@ -746,6 +750,7 @@ export default function WorkoutLogger({
             {allWeeks.map((wk) => (
               <option key={wk} value={wk}>
                 Week {wk}
+                {availableWorkouts.filter((w) => getWeekNum(w) === wk).every((w) => w.status === "LOGGED") ? " ✓" : ""}
               </option>
             ))}
           </select>
@@ -961,7 +966,7 @@ export default function WorkoutLogger({
           <span className="max-w-[100px] truncate">{clientName}</span>
         </Link>
         <div className="flex items-center gap-2">
-          {isResuming && <Badge variant="warn">Resuming</Badge>}
+          {isResuming && !completed && <Badge variant="warn">Resuming</Badge>}
           <div
             className="text-xs font-semibold tabular-nums px-2.5 py-1 rounded-full"
             style={{ border: "1px solid var(--line)", color: "var(--ink)" }}
@@ -985,7 +990,8 @@ export default function WorkoutLogger({
       </div>
 
       {/* ── Session date chip ─────────────────────────────────────── */}
-      <div className="flex items-center justify-center mb-2">
+      <div className="flex items-center justify-center gap-2 mb-2">
+        {completed && <CompletedPill />}
         <button
           type="button"
           onClick={() => dateInputRef.current?.showPicker()}
@@ -1061,7 +1067,6 @@ export default function WorkoutLogger({
                         isEditing={editingAweId === ex.aweId}
                         busy={busy}
                         onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
-                        trend={trends[ex.exerciseId]}
                       />
                       {editingAweId === ex.aweId && (
                         <ChangePanel
@@ -1076,15 +1081,12 @@ export default function WorkoutLogger({
 
                       <div className="space-y-2">
                         {state.sets.map((entry, idx) => {
-                          const repMax =
-                            ex.prescribedSets[idx]?.repMax ?? ex.prescribedSets[0]?.repMax ?? null;
                           const prescribedWeight = ex.prescribedSets[idx]?.weight ?? null;
                           return (
                             <MobileSetRow
                               key={idx}
                               idx={idx}
                               entry={entry}
-                              repMax={repMax}
                               prescribedWeight={prescribedWeight}
                               last={ex.lastSets[idx] ?? null}
                               onChange={(patch) => updateSet(ex.aweId, idx, patch)}
@@ -1208,10 +1210,7 @@ export default function WorkoutLogger({
             {workoutName}
           </h1>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="font-body text-sm" style={{ color: "var(--ink-mute)" }}>
-              {assignmentName}
-            </span>
-            <span className="text-muted-foreground/50 text-sm">·</span>
+            {completed && <CompletedPill />}
             <button
               type="button"
               onClick={() => dateInputRef.current?.showPicker()}
@@ -1228,7 +1227,7 @@ export default function WorkoutLogger({
               onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
               className="sr-only"
             />
-            {isResuming && <Badge variant="warn">Resuming</Badge>}
+            {isResuming && !completed && <Badge variant="warn">Resuming</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1238,10 +1237,6 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.push(`/clients/${clientId}`)}>
-            <SkipForward className="w-3.5 h-3.5 mr-1.5" />
-            Skip
-          </Button>
           <Button size="sm" disabled={completing || !anyCompleted} onClick={handleCompleteSession}>
             {completing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1.5" />}
             Done
@@ -1256,9 +1251,6 @@ export default function WorkoutLogger({
       <div className="space-y-4">
         {exercises.map((ex, exI) => {
           const state = stateFor(ex);
-          const lastStr = formatLastSets(ex.lastSets);
-          const s = ex.suggestion;
-          const hasLastData = ex.lastSets.length > 0;
           // Show a block header when section changes
           const prevSection = exI > 0 ? exercises[exI - 1].section : "__start__";
           const showBlockHeader = ex.section !== prevSection && ex.section != null;
@@ -1299,69 +1291,18 @@ export default function WorkoutLogger({
                       onRemove={() => handleRemoveExercise(ex)}
                     />
                   )}
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {ex.prescribedSets.length} ×{" "}
-                    {ex.prescribedSets[0]
-                      ? ex.prescribedSets[0].unit === "secs"
-                        ? `${ex.prescribedSets[0].repMax}s`
-                        : ex.prescribedSets[0].repMin === ex.prescribedSets[0].repMax
-                          ? ex.prescribedSets[0].repMax
-                          : `${ex.prescribedSets[0].repMin}–${ex.prescribedSets[0].repMax}`
-                      : "?"}
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{rxLabel(ex)}</p>
                 </div>
-
-                {hasLastData ? (
-                  <p className="text-xs text-muted-foreground mt-1">{lastStr}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1 italic">First time — start conservative.</p>
-                )}
-
-                {/* Previous week reference */}
-                {ex.prevWorkoutSets.length > 0 && (
-                  <p className="text-xs mt-1" style={{ color: "var(--blue)" }}>
-                    <span className="font-semibold">Prev week:</span>{" "}
-                    {formatPrevSets(ex.prevWorkoutSets)}
-                  </p>
-                )}
-
-                <TrendChart trend={trends[ex.exerciseId]} />
-
-                {s.type === "progress" && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <TrendingUp className="w-3 h-3 text-[var(--success)] shrink-0" />
-                    <p className="text-xs text-[var(--success)]">{s.reasoning}</p>
-                  </div>
-                )}
-                {s.type === "hold" && hasLastData && (
-                  <p className="text-xs text-[var(--warn)] mt-1">{s.reasoning}</p>
-                )}
-                {s.type === "deload" && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <AlertTriangle className="w-3 h-3 text-[var(--destructive)] shrink-0" />
-                    <p className="text-xs text-[var(--destructive)]">{s.reasoning}</p>
-                  </div>
-                )}
-                {s.type === "match_last" && (
-                  <p className="text-xs text-muted-foreground mt-1 italic">{s.reasoning}</p>
-                )}
-
-                {ex.lastNote && (
-                  <p className="text-xs text-muted-foreground italic mt-1 border-l-2 border-muted pl-2">
-                    📝 {ex.lastNote}
-                  </p>
-                )}
+                <LastWeek ex={ex} />
               </CardHeader>
 
               <CardContent className="px-4 pb-4 space-y-1.5">
                 {state.sets.map((entry, idx) => {
-                  const repMax = ex.prescribedSets[idx]?.repMax ?? ex.prescribedSets[0]?.repMax ?? null;
                   return (
                     <DesktopSetRow
                       key={idx}
                       idx={idx}
                       entry={entry}
-                      repMax={repMax}
                       onChange={(patch) => updateSet(ex.aweId, idx, patch)}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
@@ -1447,27 +1388,13 @@ function ExerciseHeader({
   isEditing,
   busy,
   onToggleEdit,
-  trend,
 }: {
-  trend?: ExerciseTrend;
   ex: LoggerExercise;
   index: number;
   isEditing: boolean;
   busy: boolean;
   onToggleEdit: () => void;
 }) {
-  const lastStr = formatLastSets(ex.lastSets);
-  const hasLastData = ex.lastSets.length > 0;
-  const s = ex.suggestion;
-  const ps0 = ex.prescribedSets[0];
-  const repDesc = ps0
-    ? ps0.unit === "secs"
-      ? `${ps0.repMax}s`
-      : ps0.repMin === ps0.repMax
-        ? `${ps0.repMax}`
-        : `${ps0.repMin}–${ps0.repMax}`
-    : "?";
-
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2">
@@ -1482,48 +1409,8 @@ function ExerciseHeader({
         </div>
         <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} />
       </div>
-      <p className="text-xs text-muted-foreground mt-0.5">
-        {ex.prescribedSets.length} × {repDesc}
-      </p>
-
-      {hasLastData ? (
-        lastStr && <p className="text-xs text-muted-foreground mt-1">{lastStr}</p>
-      ) : (
-        <p className="text-xs text-muted-foreground mt-1 italic">First time — start conservative.</p>
-      )}
-
-      {ex.prevWorkoutSets.length > 0 && (
-        <p className="text-xs mt-1" style={{ color: "var(--blue)" }}>
-          <span className="font-semibold">Prev week:</span> {formatPrevSets(ex.prevWorkoutSets)}
-        </p>
-      )}
-
-      <TrendChart trend={trend} />
-
-      {s.type === "progress" && (
-        <div className="flex items-center gap-1 mt-1">
-          <TrendingUp className="w-3 h-3 text-[var(--success)] shrink-0" />
-          <p className="text-xs text-[var(--success)]">{s.reasoning}</p>
-        </div>
-      )}
-      {s.type === "hold" && hasLastData && (
-        <p className="text-xs text-[var(--warn)] mt-1">{s.reasoning}</p>
-      )}
-      {s.type === "deload" && (
-        <div className="flex items-center gap-1 mt-1">
-          <AlertTriangle className="w-3 h-3 text-[var(--destructive)] shrink-0" />
-          <p className="text-xs text-[var(--destructive)]">{s.reasoning}</p>
-        </div>
-      )}
-      {s.type === "match_last" && (
-        <p className="text-xs text-muted-foreground mt-1 italic">{s.reasoning}</p>
-      )}
-
-      {ex.lastNote && (
-        <p className="text-xs text-muted-foreground italic mt-1 border-l-2 border-muted pl-2">
-          {ex.lastNote}
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground mt-0.5">{rxLabel(ex)}</p>
+      <LastWeek ex={ex} />
     </div>
   );
 }
@@ -1626,7 +1513,6 @@ function ChangePanel({
 function MobileSetRow({
   idx,
   entry,
-  repMax,
   prescribedWeight,
   last,
   onChange,
@@ -1638,7 +1524,6 @@ function MobileSetRow({
   onRemove?: () => void;
   idx: number;
   entry: SetEntry;
-  repMax: number | null;
   prescribedWeight: number | null;
   last: { weight: number | null; reps: number | null; rpe: number | null; completed: boolean } | null;
   onChange: (patch: Partial<SetEntry>) => void;
@@ -1646,12 +1531,6 @@ function MobileSetRow({
   onComplete: () => void;
   onBlurPersist: () => void;
 }) {
-  const hitsTopOfRange =
-    !entry.isSeconds &&
-    entry.completed &&
-    repMax != null &&
-    entry.reps !== "" &&
-    parseInt(entry.reps, 10) >= repMax;
 
   function persistIfCompleted() {
     if (entry.completed) onBlurPersist();
@@ -1837,12 +1716,6 @@ function MobileSetRow({
       {prescribedWeight != null && !entry.isBodyweight && !entry.isBand && (
         <p className="text-xs text-[var(--success)] pl-[62px]">Prescribed: {prescribedWeight} lb</p>
       )}
-      {hitsTopOfRange && (
-        <p className="text-xs text-[var(--success)] pl-[62px] flex items-center gap-1">
-          <TrendingUp className="w-3 h-3 shrink-0" />
-          Increase weight next session
-        </p>
-      )}
     </div>
   );
 }
@@ -1852,7 +1725,6 @@ function MobileSetRow({
 function DesktopSetRow({
   idx,
   entry,
-  repMax,
   onChange,
   onComplete,
   onRemove,
@@ -1860,16 +1732,9 @@ function DesktopSetRow({
   onRemove?: () => void;
   idx: number;
   entry: SetEntry;
-  repMax: number | null;
   onChange: (patch: Partial<SetEntry>) => void;
   onComplete: () => void;
 }) {
-  const hitsTopOfRange =
-    !entry.isSeconds &&
-    entry.completed &&
-    repMax != null &&
-    entry.reps !== "" &&
-    parseInt(entry.reps, 10) >= repMax;
 
   return (
     <div className="space-y-0.5">
@@ -1996,13 +1861,6 @@ function DesktopSetRow({
           className="h-6 text-xs px-2 text-muted-foreground border-transparent hover:border-border focus:border-border bg-transparent"
         />
       </div>
-
-      {hitsTopOfRange && (
-        <p className="text-xs text-[var(--success)] pl-7 flex items-center gap-1">
-          <TrendingUp className="w-3 h-3 shrink-0" />
-          Increase weight next session
-        </p>
-      )}
     </div>
   );
 }
