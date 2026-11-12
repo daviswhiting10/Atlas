@@ -56,7 +56,18 @@ function videoSeconds(file: File): Promise<number> {
  * Upload the coach's own photo or short clip for an exercise, or take it off.
  * It replaces the library picture for this coach and their clients.
  */
-export function ExerciseMediaUpload({ workspaceId, exerciseId, picture }: { workspaceId: string; exerciseId: string; picture: Picture | null | undefined }) {
+export function ExerciseMediaUpload({
+  workspaceId,
+  exerciseId,
+  picture,
+  compact = false,
+}: {
+  workspaceId: string;
+  exerciseId: string;
+  picture: Picture | null | undefined;
+  /** In a list: no hint line. */
+  compact?: boolean;
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -138,7 +149,7 @@ export function ExerciseMediaUpload({ workspaceId, exerciseId, picture }: { work
           if (f) send(f);
         }}
       />
-      <p className="w-full text-[11px] text-muted-foreground">A photo, or a clip up to 15 seconds and 10 MB (record at 720p). Shown to your clients instead of the library picture.</p>
+      {!compact && <p className="w-full text-[11px] text-muted-foreground">A photo, or a clip up to 15 seconds and 10 MB (record at 720p). Shown to your clients instead of the library picture.</p>}
     </div>
   );
 }

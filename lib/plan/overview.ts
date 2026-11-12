@@ -182,7 +182,7 @@ export async function loadPlanOverview({
   }));
 
   // The coach's own photos and clips win over the library's.
-  const own = await mediaPictures(workspaceId, workouts.flatMap((w) => w.exercises.map((e) => e.exerciseId)));
+  const own = await mediaPictures(workspaceId, workouts.flatMap((w) => w.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name }))));
   if (own.size > 0) for (const w of workouts) for (const e of w.exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
 
   const rx: PlanOverview["rx"] = {};

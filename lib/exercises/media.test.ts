@@ -6,6 +6,7 @@ const blob = vi.hoisted(() => ({
   deleted: [] as string[],
 }));
 const rows = vi.hoisted(() => [] as Array<{ id: string; workspaceId: string; exerciseId: string; url: string; kind: string; sizeBytes: number }>);
+const names = vi.hoisted(() => new Map<string, string>());
 
 vi.mock("@vercel/blob", () => ({
   head: async (url: string) => {
@@ -35,17 +36,25 @@ vi.mock("@/lib/db/client", () => {
       exerciseMedia: {
         findUnique: async ({ where }: { where: Parameters<typeof key>[0] }) => rows.find(key(where)) ?? null,
         findMany: async ({ where }: { where: { workspaceId?: string; exerciseId?: string } }) =>
-          rows.filter((r) => (!where.workspaceId || r.workspaceId === where.workspaceId) && (!where.exerciseId || r.exerciseId === where.exerciseId)),
+          rows
+            .filter((r) => (!where.workspaceId || r.workspaceId === where.workspaceId) && (!where.exerciseId || r.exerciseId === where.exerciseId))
+            .map((r) => ({ ...r, exercise: { name: names.get(r.exerciseId) ?? r.exerciseId } })),
+        deleteMany: async ({ where }: { where: { id: { in: string[] } } }) => {
+          for (const id of where.id.in) rows.splice(rows.findIndex((r) => r.id === id), 1);
+        },
         upsert: async ({ where, create, update }: { where: Parameters<typeof key>[0]; create: (typeof rows)[number]; update: Partial<(typeof rows)[number]> }) => {
           const r = rows.find(key(where));
           if (r) Object.assign(r, update);
-          else rows.push({ ...create, id: String(rows.length + 1) });
+          else rows.push({ ...create, id: `row${Math.random()}` });
         },
         delete: async ({ where }: { where: { id: string } }) => {
           rows.splice(rows.findIndex((r) => r.id === where.id), 1);
         },
       },
-      exercise: { delete: async () => {} },
+      exercise: {
+        delete: async () => {},
+        findUnique: async ({ where }: { where: { id: string } }) => ({ name: names.get(where.id) ?? where.id }),
+      },
     },
   };
 });
@@ -65,6 +74,7 @@ beforeEach(() => {
   blob.files.clear();
   blob.deleted.length = 0;
   rows.length = 0;
+  names.clear();
 });
 
 describe("exercise uploads", () => {
@@ -76,6 +86,20 @@ describe("exercise uploads", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ url: second, kind: "video" });
     expect(blob.deleted).toEqual([first]);
+  });
+
+  it("treats same-named exercises as one: a new photo on either replaces the other's", async () => {
+    names.set("legpress-a", "Leg Press");
+    names.set("legpress-b", "leg  press");
+    const first = file("lp-a.jpg");
+    await saveMedia(W, "legpress-a", first);
+    const second = file("lp-b.jpg");
+    await saveMedia(W, "legpress-b", second);
+    expect(rows.map((r) => r.url)).toEqual([second]);
+    expect(blob.deleted).toEqual([first]);
+    await removeMedia(W, "legpress-a");
+    expect(rows).toHaveLength(0);
+    expect(blob.deleted).toEqual([first, second]);
   });
 
   it("deletes the file when an upload is removed", async () => {

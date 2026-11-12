@@ -509,7 +509,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     };
   });
   // The coach's own photos and clips win over the library's.
-  const own = await mediaPictures(athlete.workspaceId, exercises.map((e) => e.exerciseId));
+  const own = await mediaPictures(athlete.workspaceId, exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name })));
   for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
 
   return {

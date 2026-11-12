@@ -30,16 +30,33 @@ export const folderFor = (workspaceId: string) => `exercise-media/${workspaceId}
 
 export const blobConfigured = () => !!process.env.BLOB_READ_WRITE_TOKEN;
 
-/** The coach's uploads for these exercises, as pictures. */
-export async function mediaPictures(workspaceId: string, exerciseIds: string[]): Promise<Map<string, Picture>> {
-  if (exerciseIds.length === 0) return new Map();
+/** An exercise name for matching: "Leg  Press" and "leg press" are the same exercise. */
+export const sameName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * The coach's uploads for these exercises, as pictures, keyed by exercise id.
+ * A photo belongs to the exercise for good: it also covers any other exercise
+ * of the same name (a duplicate in the library, a sheet import's own copy).
+ */
+export async function mediaPictures(workspaceId: string, exercises: Array<{ exerciseId: string; name: string }>): Promise<Map<string, Picture>> {
+  if (exercises.length === 0) return new Map();
   const rows = await prisma.exerciseMedia.findMany({
-    where: { workspaceId, exerciseId: { in: Array.from(new Set(exerciseIds)) } },
+    where: { workspaceId },
+    orderBy: { createdAt: "desc" },
     select: { exerciseId: true, url: true, kind: true, exercise: { select: { name: true } } },
   });
-  return new Map(
-    rows.map((r) => [r.exerciseId, r.kind === "video" ? { name: r.exercise.name, frames: [], video: r.url, own: true } : { name: r.exercise.name, frames: [r.url], own: true }])
-  );
+  if (rows.length === 0) return new Map();
+  const toPicture = (r: (typeof rows)[number]): Picture =>
+    r.kind === "video" ? { name: r.exercise.name, frames: [], video: r.url, own: true } : { name: r.exercise.name, frames: [r.url], own: true };
+  const byId = new Map(rows.map((r) => [r.exerciseId, r]));
+  const byName = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) if (!byName.has(sameName(r.exercise.name))) byName.set(sameName(r.exercise.name), r); // newest wins
+  const out = new Map<string, Picture>();
+  for (const e of exercises) {
+    const r = byId.get(e.exerciseId) ?? byName.get(sameName(e.name));
+    if (r) out.set(e.exerciseId, toPicture(r));
+  }
+  return out;
 }
 
 /** Delete files, quietly: a file that's already gone is fine. */
@@ -67,23 +84,33 @@ export async function saveMedia(workspaceId: string, exerciseId: string, url: st
     throw new Error(kind ? "That file is too big." : "Use a photo (JPG, PNG, WebP) or a short video (MP4, MOV, WebM).");
   }
 
-  const oldUrl = (await prisma.exerciseMedia.findUnique({ where: { workspaceId_exerciseId: { workspaceId, exerciseId } }, select: { url: true } }))?.url ?? null;
+  // Earlier uploads for this exercise, or another of the same name: this one replaces them all.
+  const replaced = await uploadsFor(workspaceId, exerciseId);
   await prisma.exerciseMedia.upsert({
     where: { workspaceId_exerciseId: { workspaceId, exerciseId } },
     create: { workspaceId, exerciseId, url: meta.url, kind, sizeBytes: meta.size },
     update: { url: meta.url, kind, sizeBytes: meta.size, createdAt: new Date() },
   });
-  if (oldUrl && oldUrl !== meta.url) await deleteFiles([oldUrl]);
+  const others = replaced.filter((r) => r.exerciseId !== exerciseId);
+  if (others.length > 0) await prisma.exerciseMedia.deleteMany({ where: { id: { in: others.map((r) => r.id) } } });
+  await deleteFiles(replaced.map((r) => r.url).filter((u) => u !== meta.url));
   await sweepOrphans(workspaceId);
   return { kind };
 }
 
-/** Take a coach's upload off an exercise, and delete the file. */
+/** The coach's uploads covering an exercise: its own, and any on an exercise of the same name. */
+async function uploadsFor(workspaceId: string, exerciseId: string) {
+  const ex = await prisma.exercise.findUnique({ where: { id: exerciseId }, select: { name: true } });
+  const rows = await prisma.exerciseMedia.findMany({ where: { workspaceId }, select: { id: true, exerciseId: true, url: true, exercise: { select: { name: true } } } });
+  return rows.filter((r) => r.exerciseId === exerciseId || (ex && sameName(r.exercise.name) === sameName(ex.name)));
+}
+
+/** Take a coach's upload off an exercise (and any same-named copy), and delete the files. */
 export async function removeMedia(workspaceId: string, exerciseId: string): Promise<void> {
-  const row = await prisma.exerciseMedia.findUnique({ where: { workspaceId_exerciseId: { workspaceId, exerciseId } }, select: { id: true, url: true } });
-  if (!row) return;
-  await prisma.exerciseMedia.delete({ where: { id: row.id } });
-  await deleteFiles([row.url]);
+  const rows = await uploadsFor(workspaceId, exerciseId);
+  if (rows.length === 0) return;
+  await prisma.exerciseMedia.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  await deleteFiles(rows.map((r) => r.url));
 }
 
 /** Delete an exercise. Anything that removes exercises must come through here, so their files go too. */

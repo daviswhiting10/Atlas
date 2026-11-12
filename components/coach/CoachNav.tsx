@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/log", label: "Log session", icon: ClipboardPen },
   { href: "/clients", label: "Roster", icon: Users },
   { href: "/programs", label: "Programs", icon: Dumbbell },
+  { href: "/exercises", label: "Exercises" },
   { href: "/intake", label: "Intake" },
 ] as const;
 

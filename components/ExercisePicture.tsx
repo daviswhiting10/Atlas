@@ -68,7 +68,7 @@ export function ExerciseThumb({ picture, name, className }: { picture: Picture |
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`See ${name}`}
-        className={cn("press relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-line bg-white", className)}
+        className={cn("press relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-line bg-ink/5", className)}
       >
         {picture.video ? (
           // The clip's first frame; it plays in the large view.
