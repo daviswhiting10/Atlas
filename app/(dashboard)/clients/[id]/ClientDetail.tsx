@@ -32,6 +32,8 @@ import {
   CalendarDays,
   MoreHorizontal,
   BarChart2,
+  Upload,
+  X,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -154,6 +156,8 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [invite, setInvite] = useState<InviteResult | null>(null);
+  // Null until the coach opens or closes it: open by default while there's no live plan.
+  const [uploadOpen, setUploadOpen] = useState<boolean | null>(null);
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -252,6 +256,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   const activeProgram = client.programAssignments.find((a) => a.status === "ACTIVE");
   const draftProgram = client.programAssignments.find((a) => a.status === "PAUSED");
   const firstName = client.fullName.split(" ")[0];
+  const showUpload = uploadOpen ?? !activeProgram;
   // Spreadsheet details from an import are shown on their own, never as an intake.
   const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
@@ -310,6 +315,15 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
 
         {/* Actions — icon-only on mobile, labeled on desktop */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setUploadOpen(!showUpload)}
+            aria-expanded={showUpload}
+            className={cn(buttonVariants({ size: "sm" }), "h-9 bg-signal px-3 text-white hover:bg-signal/90")}
+          >
+            <Upload className="w-4 h-4 shrink-0" />
+            <span className="ml-1.5">Upload plan</span>
+          </button>
           {!client.userId && (
             <button
               type="button"
@@ -391,6 +405,22 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
         </div>
       )}
 
+      {/* ── The coach's own plan, from a sheet: always one click from the top ── */}
+      {showUpload && (
+        <section className="mb-6 rounded-2xl border border-signal/40 bg-white p-5 ring-1 ring-signal/20 fade-in">
+          <div className="mb-1 flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-ink">Upload {firstName}&rsquo;s plan</h2>
+            <button type="button" onClick={() => setUploadOpen(false)} aria-label="Close" className="press -mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute hover:bg-ink/5 hover:text-ink">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mb-4 text-[13px] text-muted-foreground">
+            Paste the Google Sheet link or choose a CSV.{activeProgram || draftProgram ? " The new plan comes in as a draft; the current one stays until you assign it." : ""}
+          </p>
+          <SheetPlanUpload clientId={client.id} firstName={firstName} />
+        </section>
+      )}
+
       {/* ── Headline numbers: the athlete app's stat row ───────────────── */}
       <StatRow
         className="mb-6"
@@ -455,10 +485,10 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
             {/* Main column */}
             <div className="lg:col-span-3 space-y-4">
               {/* Current Program card: with no plan, uploading the coach's own comes first. */}
-              <Card className={cn(!activeProgram && !draftProgram && "border-signal/40 ring-1 ring-signal/20")}>
+              <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">{activeProgram || draftProgram ? "Current Program" : `Upload ${firstName}'s plan`}</CardTitle>
+                    <CardTitle className="text-sm font-semibold">Current Program</CardTitle>
                     <Link href="/programs" className="text-xs text-muted-foreground hover:text-foreground">
                       Browse library →
                     </Link>
@@ -485,22 +515,11 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                         Started {new Date(activeProgram.startDate).toLocaleDateString()} ·{" "}
                         {activeProgram._count.assignedWorkouts} total sessions
                       </p>
-                      <details className="mt-3 group">
-                        <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground">
-                          Replace with a plan from a sheet
-                        </summary>
-                        <div className="mt-3">
-                          <SheetPlanUpload clientId={client.id} firstName={firstName} />
-                        </div>
-                      </details>
                     </div>
                   ) : (
                     <div>
-                      <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
-                        From your Google Sheet or a CSV. Atlas reads it into a plan, and you check it before {firstName} sees it.
-                      </p>
-                      <SheetPlanUpload clientId={client.id} firstName={firstName} />
-                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t pt-3 text-xs">
+                      <p className="text-[13px] leading-relaxed text-muted-foreground">No plan yet. Upload yours at the top of the page.</p>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         <Link href="/programs" className="font-medium text-muted-foreground hover:text-foreground">
                           Use a library program
                         </Link>
