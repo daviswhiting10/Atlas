@@ -4,6 +4,7 @@
  */
 
 import { cache } from "react";
+import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -333,6 +334,8 @@ export type LoggerExercise = {
   /** History before today, for the mini chart and live PR detection. */
   history: SessionPoint[];
   sets: LoggerSet[];
+  /** What the movement looks like, when the library has it. */
+  picture: Picture | null;
 };
 
 export type LoggerData = {
@@ -370,7 +373,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
           exerciseId: true,
           prescribedSets: true,
           section: true,
-          exercise: { select: { name: true, slug: true, equipment: true, primaryMuscles: true } },
+          exercise: { select: { name: true, slug: true, equipment: true, primaryMuscles: true, gifUrl: true } },
         },
       },
       workoutLog: {
@@ -484,6 +487,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       exerciseId: e.exerciseId,
       slug: cat ? e.exercise.slug : null,
       name: displayName(e.exercise.slug, e.exercise.name),
+      picture: pictureFor({ name: displayName(e.exercise.slug, e.exercise.name), gifUrl: e.exercise.gifUrl }),
       muscles: cat?.muscles ?? ((e.exercise.primaryMuscles as string[] | null) ?? []),
       role: e.section,
       loaded: !bodyweight,

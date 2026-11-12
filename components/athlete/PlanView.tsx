@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { ExerciseThumb } from "@/components/ExercisePicture";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, Clock, Dumbbell, Loader2, Plus, RotateCcw, SkipForward, Trash2, X } from "lucide-react";
@@ -219,6 +220,7 @@ function WorkoutCard({
                   <li key={e.aweId} className="py-2">
                     <div className="flex items-center gap-2">
                       <span className="w-4 shrink-0 text-[13px] text-ink-mute">{i + 1}</span>
+                      <ExerciseThumb picture={e.picture} name={e.name} className="h-9 w-9" />
                       <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{e.name}</span>
                       <button
                         type="button"

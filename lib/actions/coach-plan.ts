@@ -259,3 +259,34 @@ export async function discardDraftPlan(raw: { clientId: string; assignmentId: st
     refresh(scope.clientId);
   });
 }
+
+/**
+ * Delete one of a client's plans: its scheduled workouts go with it. A draft
+ * is discarded as above. For a plan that has run, sessions already logged
+ * stay as the client's history (their progress and records don't change);
+ * they just no longer point at a plan.
+ */
+export async function deletePlan(raw: { clientId: string; assignmentId: string }): Promise<CoachResult> {
+  const input = z.object({ clientId: Ref, assignmentId: Ref }).safeParse(raw);
+  if (!input.success) return { ok: false, error: "That plan couldn't be found." };
+  const found = await prisma.programAssignment.findFirst({ where: { id: input.data.assignmentId, clientId: input.data.clientId }, select: { status: true } });
+  if (found?.status === "PAUSED") return discardDraftPlan(input.data);
+
+  return run(async () => {
+    const scope = await scopeFor(input.data.clientId, input.data.assignmentId);
+    const plan = await prisma.programAssignment.findFirst({
+      where: { id: input.data.assignmentId, clientId: scope.clientId, workspaceId: scope.workspaceId },
+      select: { id: true, sourceProgram: { select: { id: true, isTemplate: true, _count: { select: { assignments: true } } } } },
+    });
+    if (!plan) throw new PlanEditError("not_found", "That plan has already been deleted.");
+    await prisma.$transaction(async (tx) => {
+      await tx.setLog.updateMany({ where: { assignedWorkoutExercise: { assignedWorkout: { programAssignmentId: plan.id } } }, data: { assignedWorkoutExerciseId: null } });
+      await tx.workoutLog.updateMany({ where: { assignedWorkout: { programAssignmentId: plan.id } }, data: { assignedWorkoutId: null } });
+      await tx.programAssignment.delete({ where: { id: plan.id } });
+      if (!plan.sourceProgram.isTemplate && plan.sourceProgram._count.assignments === 1) {
+        await tx.program.delete({ where: { id: plan.sourceProgram.id } });
+      }
+    });
+    refresh(scope.clientId);
+  });
+}

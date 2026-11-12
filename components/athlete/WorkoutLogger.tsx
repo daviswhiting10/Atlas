@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ExercisePicture } from "@/components/ExercisePicture";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -497,6 +498,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
               {exercise.muscles.length > 0 ? ` · ${exercise.muscles.slice(0, 2).join(", ")}` : ""}
             </p>
             <h1 className="mt-1 font-display text-4xl leading-tight text-ink sm:text-5xl">{exercise.name}</h1>
+            <ExercisePicture picture={exercise.picture} name={exercise.name} className="mt-3 max-w-sm" />
             <div className="mt-2 flex flex-wrap gap-1 text-sm">
               <button type="button" onClick={() => setPicker("swap")} disabled={busy} className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
                 <Repeat2 className="h-4 w-4" /> Swap

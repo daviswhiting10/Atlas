@@ -8,6 +8,7 @@ import {
 } from "@/lib/actions/workout-logger";
 import WorkoutLogger from "./WorkoutLogger";
 import { PlanNotLive } from "./PlanNotLive";
+import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ export type LoggerExercise = {
   prevWorkoutSets: PrevSet[];
   lastNote: string | null;
   suggestion: ProgressionSuggestion;
+  /** What the movement looks like, when the library has it. */
+  picture: Picture | null;
 };
 
 export type ExistingSetLog = {
@@ -119,6 +122,7 @@ export default async function LogPage({
                 name: true,
                 movementPattern: true,
                 equipment: true,
+                gifUrl: true,
               },
             },
           },
@@ -292,6 +296,7 @@ export default async function LogPage({
         prevWorkoutSets: prevWorkoutSetsByExercise[awe.exerciseId] ?? [],
         lastNote,
         suggestion,
+        picture: pictureFor({ name: awe.exercise.name, gifUrl: awe.exercise.gifUrl }),
       };
     })
   );

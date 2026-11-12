@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { StatRow } from "@/components/athlete/StatRow";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
+import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
 import {
   ArrowLeft,
@@ -181,6 +182,21 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
       setClient((prev) => (prev ? { ...prev, reachOutDate: date } : null));
       toast.success(date ? "Reach-out date set" : "Reach-out date cleared");
     }
+  }
+
+  async function removePlan(a: ProgramAssignment, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const first = client?.fullName.split(" ")[0] ?? "Their";
+    const ask =
+      a.status === "PAUSED"
+        ? `Delete the draft "${a.name}"?`
+        : `Delete "${a.name}"? Sessions already logged stay in ${first}'s history. This can't be undone.`;
+    if (!confirm(ask)) return;
+    const res = await deletePlan({ clientId: id, assignmentId: a.id });
+    if (!res.ok) return void toast.error(res.error);
+    setClient((prev) => (prev ? { ...prev, programAssignments: prev.programAssignments.filter((p) => p.id !== a.id) } : null));
+    toast.success("Plan deleted");
   }
 
   async function deleteWorkoutLog(logId: string, e: React.MouseEvent) {
@@ -469,7 +485,7 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
                 <Link key={a.id} href={`/clients/${client.id}/programs/${a.id}`}>
                   <Card className="hover:border-primary/40 transition-colors cursor-pointer">
                     <CardContent className="py-3 px-4 flex items-center justify-between">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold">{a.name}</p>
                         <p className="text-xs text-muted-foreground">Started {new Date(a.startDate).toLocaleDateString()}</p>
                       </div>
@@ -483,6 +499,15 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
                       >
                         {a.status === "PAUSED" ? "draft" : a.status === "ACTIVE" ? "live" : a.status.toLowerCase()}
                       </Badge>
+                      <button
+                        type="button"
+                        onClick={(e) => removePlan(a, e)}
+                        aria-label={`Delete ${a.name}`}
+                        title="Delete plan"
+                        className="press ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </CardContent>
                   </Card>
                 </Link>

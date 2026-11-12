@@ -3,6 +3,7 @@
 /// <reference types="@types/dom-speech-recognition" />
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { ExerciseThumb } from "@/components/ExercisePicture";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -1277,6 +1278,7 @@ export default function WorkoutLogger({
                       >
                         {exI + 1}
                       </div>
+                      <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
                       <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
                     </div>
                     <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
@@ -1405,6 +1407,7 @@ function ExerciseHeader({
           >
             {index}
           </div>
+          <ExerciseThumb picture={ex.picture} name={ex.name} className="h-10 w-10" />
           <h3 className="font-display text-sm leading-tight truncate min-w-0">{ex.name}</h3>
         </div>
         <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} />

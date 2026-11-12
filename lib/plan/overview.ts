@@ -11,6 +11,7 @@ import { displayName } from "./catalog";
 import { generatePlan, normalizePrefs, type Prefs } from "./generator";
 import { isLighterWeek, lighterWeeksOn } from "./lighter";
 import { weekOf } from "@/lib/athlete/sessions";
+import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -42,6 +43,8 @@ export type WorkoutSummary = {
     unit: "reps" | "secs";
     /** A target weight written into the plan, if there is one. */
     weight: number | null;
+    /** What the movement looks like, when the library has it. */
+    picture: Picture | null;
   }>;
 };
 
@@ -132,7 +135,7 @@ export async function loadPlanOverview({
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
-            select: { id: true, exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true } } },
+            select: { id: true, exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true, gifUrl: true } } },
           },
         },
       },
@@ -172,6 +175,7 @@ export async function loadPlanOverview({
         repMax: sets[0]?.repMax ?? 0,
         unit: sets[0]?.unit === "secs" ? ("secs" as const) : ("reps" as const),
         weight: sets[0]?.weight ?? null,
+        picture: pictureFor({ name: displayName(e.exercise.slug, e.exercise.name), gifUrl: e.exercise.gifUrl }),
       };
     }),
   }));
