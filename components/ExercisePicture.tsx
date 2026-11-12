@@ -19,7 +19,7 @@ function useFrame(frames: string[], running: boolean) {
 function Frames({ picture, running, className }: { picture: Picture; running: boolean; className?: string }) {
   const src = useFrame(picture.frames, running);
   return (
-    <div className={cn("relative overflow-hidden bg-white", className)}>
+    <div className={cn("relative overflow-hidden bg-ink/5", className)}>
       {/* Both frames load up front, so switching never flashes. */}
       {picture.frames.map((f) => (
         // eslint-disable-next-line @next/next/no-img-element

@@ -1,5 +1,5 @@
 /**
- * A picture for an exercise, from free-exercise-db (public domain, CC0):
+ * A picture for an exercise, from free-exercise-db (public domain, the Unlicense):
  * two photos per exercise, the start and end of the movement, shown
  * alternating so it reads like a short clip.
  *
