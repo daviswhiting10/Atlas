@@ -305,6 +305,7 @@ export default async function LogPage({
       clientId={clientId}
       clientName={client.fullName}
       assignedWorkoutId={assignedWorkout.id}
+      assignmentId={assignedWorkout.programAssignmentId}
       workoutName={assignedWorkout.name}
       scheduledDate={assignedWorkout.scheduledDate.toISOString()}
       assignmentName={assignedWorkout.programAssignment.name}

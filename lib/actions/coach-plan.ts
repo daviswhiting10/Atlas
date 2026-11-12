@@ -101,9 +101,12 @@ export async function coachRemoveWorkout(clientId: string, assignmentId: string,
   });
 }
 
-export async function coachAddExercise(clientId: string, assignmentId: string, raw: { workoutId: string; slug: string } & z.input<typeof Targets>) {
+export async function coachAddExercise(clientId: string, assignmentId: string, raw: { workoutId: string; slug?: string; exerciseId?: string } & z.input<typeof Targets>) {
   return run(async () => {
-    const input = Targets.extend({ workoutId: Ref, slug: Ref }).parse(raw);
+    // A catalog slug (plan editor) or any exercise id this workspace can see (the session logger's picker).
+    const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() })
+      .refine((v) => v.slug || v.exerciseId)
+      .parse(raw);
     const result = await addExercise(await scopeFor(clientId, assignmentId), input);
     refresh(clientId, assignmentId);
     return result;
@@ -118,9 +121,12 @@ export async function coachRemoveExercise(clientId: string, assignmentId: string
   });
 }
 
-export async function coachSwapExercise(clientId: string, assignmentId: string, raw: { aweId: string; workoutId: string; slug: string }) {
+export async function coachSwapExercise(clientId: string, assignmentId: string, raw: { aweId: string; workoutId: string; slug?: string; exerciseId?: string }) {
   return run(async () => {
-    const input = z.object({ aweId: Ref, workoutId: Ref, slug: Ref }).parse(raw);
+    const input = z
+      .object({ aweId: Ref, workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() })
+      .refine((v) => v.slug || v.exerciseId)
+      .parse(raw);
     await swapExercise(await scopeFor(clientId, assignmentId), input);
     refresh(clientId, assignmentId);
   });

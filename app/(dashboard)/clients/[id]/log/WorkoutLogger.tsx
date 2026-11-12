@@ -18,6 +18,8 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   Calendar,
+  SlidersHorizontal,
+  Trash2,
   Check,
   ChevronDown,
   ChevronUp,
@@ -37,8 +39,8 @@ import {
   completeSession,
   addExerciseNote,
   updateSessionDate,
-  swapExercise,
 } from "@/lib/actions/workout-logger";
+import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog, PrevSet } from "./page";
 
@@ -172,6 +174,11 @@ function buildInitialState(
   return state;
 }
 
+/** Set rows straight from the prescription, nothing logged yet. */
+function freshState(ex: LoggerExercise): ExerciseState {
+  return { sets: ex.prescribedSets.map((ps) => initSetEntry(ps, ex.suggestion)), noteInput: "", noteSaving: false, noteAdded: false };
+}
+
 // ── Block helpers ───────────────────────────────────────────────────────────────
 
 /** A contiguous group of exercises sharing the same section label. */
@@ -244,6 +251,7 @@ export default function WorkoutLogger({
   clientId,
   clientName,
   assignedWorkoutId,
+  assignmentId,
   workoutName,
   scheduledDate,
   assignmentName,
@@ -258,6 +266,8 @@ export default function WorkoutLogger({
   clientId: string;
   clientName: string;
   assignedWorkoutId: string;
+  /** The plan this workout is in: changes made mid-session are saved to this one workout. */
+  assignmentId: string;
   workoutName: string;
   scheduledDate: string;
   assignmentName: string;
@@ -293,9 +303,11 @@ export default function WorkoutLogger({
   }, [finished]);
   const sessionElapsedSec = Math.floor((sessionNow - sessionStart) / 1000);
 
-  // ── Swap exercise (mid-workout substitution) ────────────────────────────────
-  const [swappingAweId, setSwappingAweId] = useState<string | null>(null);
-  const [swapping, setSwapping] = useState(false);
+  // ── Changing the workout on the spot: swap, new targets, add, drop ─────────
+  // Each change is saved to this one workout; the rest of the plan stays as written.
+  const [editingAweId, setEditingAweId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   // ── Collapsible blocks (mobile) — start with the first unfinished block open ──
   const [expandedBlocks, setExpandedBlocks] = useState<Set<number>>(() => {
@@ -315,6 +327,35 @@ export default function WorkoutLogger({
       return next;
     });
   }
+
+  // An exercise added or swapped mid-session arrives in new props: give it fresh
+  // set rows, and open its block so it's in view.
+  const seenExercises = useRef(new Map(exercises.map((e) => [e.aweId, e.exerciseId])));
+  useEffect(() => {
+    const seen = seenExercises.current;
+    const fresh = exercises.filter((e) => seen.get(e.aweId) !== e.exerciseId);
+    const added = exercises.filter((e) => !seen.has(e.aweId));
+    seenExercises.current = new Map(exercises.map((e) => [e.aweId, e.exerciseId]));
+    if (fresh.length === 0) return;
+    setExState((prev) => {
+      const next = { ...prev };
+      for (const ex of fresh) next[ex.aweId] = freshState(ex);
+      return next;
+    });
+    if (added.length > 0) {
+      const blocks = groupIntoBlocks(exercises);
+      setExpandedBlocks((prev) => {
+        const next = new Set(prev);
+        blocks.forEach((b, bi) => {
+          if (b.exIndices.some((i) => added.some((a) => a.aweId === exercises[i].aweId))) next.add(bi);
+        });
+        return next;
+      });
+    }
+  }, [exercises]);
+
+  /** An exercise's set rows; new ones before the effect above has stored them. */
+  const stateFor = (ex: LoggerExercise): ExerciseState => exState[ex.aweId] ?? freshState(ex);
 
   // ── Mobile-specific state ────────────────────────────────────────────────────
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
@@ -420,6 +461,15 @@ export default function WorkoutLogger({
     });
   }
 
+  /** Drop a set that hasn't been logged. */
+  function removeSet(aweId: string, idx: number) {
+    setExState((prev) => {
+      const sets = prev[aweId].sets;
+      if (sets.length <= 1 || sets[idx]?.completed) return prev;
+      return { ...prev, [aweId]: { ...prev[aweId], sets: sets.filter((_, i) => i !== idx) } };
+    });
+  }
+
   // ── Log set ───────────────────────────────────────────────────────────────
   async function handleComplete(aweId: string, exerciseId: string, idx: number) {
     const entry = exState[aweId].sets[idx];
@@ -517,19 +567,66 @@ export default function WorkoutLogger({
     }
   }
 
-  // ── Swap exercise (mid-workout substitution) ──────────────────────────────
-  async function handleSwapExercise(aweId: string, newEx: ExerciseOption) {
-    setSwapping(true);
+  // ── Changing the workout on the spot ──────────────────────────────────────
+  async function change(run: () => Promise<{ ok: true } | { ok: false; error: string }>, done: string, after?: () => void) {
+    setBusy(true);
     try {
-      await swapExercise({ assignedWorkoutExerciseId: aweId, exerciseId: newEx.id });
-      toast.success(`Switched to ${newEx.name}`);
-      setSwappingAweId(null);
+      const res = await run();
+      if (!res.ok) {
+        toast.error(res.error);
+        return false;
+      }
+      after?.();
+      toast.success(done);
+      setEditingAweId(null);
       router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't switch exercise");
+      return true;
+    } catch {
+      toast.error("Couldn't save that change. Please try again.");
+      return false;
     } finally {
-      setSwapping(false);
+      setBusy(false);
     }
+  }
+
+  /** Swap for another exercise. Sets already logged stay with the one they were done on. */
+  function handleSwapExercise(aweId: string, newEx: ExerciseOption) {
+    return change(
+      () => coachSwapExercise(clientId, assignmentId, { aweId, workoutId: assignedWorkoutId, exerciseId: newEx.id }),
+      `Switched to ${newEx.name}`
+    );
+  }
+
+  /** Today's sets and rep range for one exercise. Rows already logged are kept. */
+  function handleSetTargets(ex: LoggerExercise, t: { sets: number; repMin: number; repMax: number }) {
+    return change(
+      () => coachSetTargets(clientId, assignmentId, { aweId: ex.aweId, workoutId: assignedWorkoutId, ...t }),
+      `${ex.name}: ${t.sets} × ${t.repMin === t.repMax ? t.repMax : `${t.repMin}–${t.repMax}`}${ex.prescribedSets[0]?.unit === "secs" ? "s" : ""} today`,
+      () =>
+        setExState((prev) => {
+          const cur = prev[ex.aweId] ?? freshState(ex);
+          let sets = cur.sets.map((set) => (set.completed ? set : { ...set, reps: String(t.repMax) }));
+          // Fewer sets: drop unlogged rows from the end. Never a logged one.
+          for (let i = sets.length - 1; i >= 0 && sets.length > t.sets; i--) if (!sets[i].completed) sets = sets.filter((_, j) => j !== i);
+          const last = sets[sets.length - 1];
+          while (sets.length < t.sets) {
+            sets = [...sets, { ...(last ?? initSetEntry(ex.prescribedSets[0], ex.suggestion)), setLogId: null, reps: String(t.repMax), rpe: "", note: "", completed: false, saving: false }];
+          }
+          return { ...prev, [ex.aweId]: { ...cur, sets } };
+        })
+    );
+  }
+
+  function handleRemoveExercise(ex: LoggerExercise) {
+    return change(() => coachRemoveExercise(clientId, assignmentId, { aweId: ex.aweId, workoutId: assignedWorkoutId }), `Dropped ${ex.name} from today`);
+  }
+
+  async function handleAddExercise(newEx: ExerciseOption) {
+    const ok = await change(
+      () => coachAddExercise(clientId, assignmentId, { workoutId: assignedWorkoutId, exerciseId: newEx.id, sets: 3 }),
+      `Added ${newEx.name}`
+    );
+    if (ok) setAdding(false);
   }
 
   // ── Structure SOAP note ───────────────────────────────────────────────────
@@ -675,6 +772,33 @@ export default function WorkoutLogger({
     </div>
   ) : null;
 
+  // ── Add an exercise that isn't in the plan (both layouts) ─────────────────
+  const addExercise = (
+    <div className="mt-4">
+      {adding ? (
+        <div className="rounded-[18px] p-3" style={{ border: "1px solid var(--line)" }}>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-medium">Add an exercise to today</p>
+            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ExercisePicker onSelect={(newEx) => handleAddExercise(newEx)} placeholder="Search exercises…" />
+          {busy && <p className="mt-2 text-xs text-muted-foreground">Adding…</p>}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          disabled={busy}
+          className="flex h-11 w-full items-center justify-center gap-1.5 rounded-[18px] border border-dashed border-ink/20 text-sm font-medium text-muted-foreground hover:border-ink/40 hover:text-foreground disabled:opacity-50 touch-manipulation"
+        >
+          <Plus className="h-4 w-4" /> Add exercise
+        </button>
+      )}
+    </div>
+  );
+
   // ── Shared SOAP panel (used in both layouts) ──────────────────────────────
   const soapPanel = (
     <div className="mt-4 rounded-[18px] overflow-hidden" style={{ border: "1px solid var(--line)" }}>
@@ -765,7 +889,7 @@ export default function WorkoutLogger({
     let doneSetsAll = 0;
     let totalVolumeAll = 0;
     for (const ex of exercises) {
-      for (const entry of exState[ex.aweId].sets) {
+      for (const entry of stateFor(ex).sets) {
         if (entry.completed) {
           doneSetsAll++;
           const w = entry.isBodyweight || entry.isBand ? 0 : parseFloat(entry.weight) || 0;
@@ -882,11 +1006,11 @@ export default function WorkoutLogger({
           const isCollapsible = !!blockLabel;
           const isExpanded = !isCollapsible || expandedBlocks.has(bi);
           const totalSets = block.exIndices.reduce(
-            (sum, exI) => sum + exState[exercises[exI].aweId].sets.length,
+            (sum, exI) => sum + stateFor(exercises[exI]).sets.length,
             0
           );
           const doneSets = block.exIndices.reduce(
-            (sum, exI) => sum + exState[exercises[exI].aweId].sets.filter((s) => s.completed).length,
+            (sum, exI) => sum + stateFor(exercises[exI]).sets.filter((s) => s.completed).length,
             0
           );
           const blockDone = totalSets > 0 && doneSets === totalSets;
@@ -927,21 +1051,28 @@ export default function WorkoutLogger({
               )}
               {isExpanded && block.exIndices.map((exI) => {
                 const ex = exercises[exI];
-                const state = exState[ex.aweId];
+                const state = stateFor(ex);
                 return (
                   <Card key={ex.aweId} size="sm">
                     <CardContent className="space-y-3">
                       <ExerciseHeader
                         ex={ex}
                         index={exI + 1}
-                        isSwapping={swappingAweId === ex.aweId}
-                        swapping={swapping}
-                        onToggleSwap={() =>
-                          setSwappingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))
-                        }
-                        onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                        isEditing={editingAweId === ex.aweId}
+                        busy={busy}
+                        onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
                         trend={trends[ex.exerciseId]}
                       />
+                      {editingAweId === ex.aweId && (
+                        <ChangePanel
+                          ex={ex}
+                          setCount={state.sets.length}
+                          busy={busy}
+                          onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                          onTargets={(t) => handleSetTargets(ex, t)}
+                          onRemove={() => handleRemoveExercise(ex)}
+                        />
+                      )}
 
                       <div className="space-y-2">
                         {state.sets.map((entry, idx) => {
@@ -960,6 +1091,7 @@ export default function WorkoutLogger({
                               onAdjustWeight={(delta) => adjustWeight(ex.aweId, idx, delta)}
                               onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                               onBlurPersist={() => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
+                              onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
                             />
                           );
                         })}
@@ -1014,6 +1146,8 @@ export default function WorkoutLogger({
           );
         })}
       </div>
+
+      {addExercise}
 
       {soapPanel}
 
@@ -1121,7 +1255,7 @@ export default function WorkoutLogger({
       {/* Exercise cards — grouped by block */}
       <div className="space-y-4">
         {exercises.map((ex, exI) => {
-          const state = exState[ex.aweId];
+          const state = stateFor(ex);
           const lastStr = formatLastSets(ex.lastSets);
           const s = ex.suggestion;
           const hasLastData = ex.lastSets.length > 0;
@@ -1153,29 +1287,17 @@ export default function WorkoutLogger({
                       </div>
                       <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSwappingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))
-                      }
-                      disabled={swapping}
-                      className="text-muted-foreground hover:text-foreground shrink-0 disabled:opacity-50"
-                      title="Did a different exercise?"
-                    >
-                      {swappingAweId === ex.aweId ? (
-                        <X className="w-3.5 h-3.5" />
-                      ) : (
-                        <ArrowLeftRight className="w-3.5 h-3.5" />
-                      )}
-                    </button>
+                    <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                   </div>
-                  {swappingAweId === ex.aweId && (
-                    <div className="mt-1.5">
-                      <ExercisePicker
-                        onSelect={(newEx) => handleSwapExercise(ex.aweId, newEx)}
-                        placeholder="Switch to exercise..."
-                      />
-                    </div>
+                  {editingAweId === ex.aweId && (
+                    <ChangePanel
+                      ex={ex}
+                      setCount={state.sets.length}
+                      busy={busy}
+                      onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                      onTargets={(t) => handleSetTargets(ex, t)}
+                      onRemove={() => handleRemoveExercise(ex)}
+                    />
                   )}
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {ex.prescribedSets.length} ×{" "}
@@ -1242,6 +1364,7 @@ export default function WorkoutLogger({
                       repMax={repMax}
                       onChange={(patch) => updateSet(ex.aweId, idx, patch)}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
+                      onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
                     />
                   );
                 })}
@@ -1291,6 +1414,8 @@ export default function WorkoutLogger({
         })}
       </div>
 
+      {addExercise}
+
       {soapPanel}
 
       <div className="mt-6 flex justify-end gap-3">
@@ -1319,19 +1444,17 @@ export default function WorkoutLogger({
 function ExerciseHeader({
   ex,
   index,
-  isSwapping,
-  swapping,
-  onToggleSwap,
-  onSwap,
+  isEditing,
+  busy,
+  onToggleEdit,
   trend,
 }: {
   trend?: ExerciseTrend;
   ex: LoggerExercise;
   index: number;
-  isSwapping: boolean;
-  swapping: boolean;
-  onToggleSwap: () => void;
-  onSwap: (ex: ExerciseOption) => void;
+  isEditing: boolean;
+  busy: boolean;
+  onToggleEdit: () => void;
 }) {
   const lastStr = formatLastSets(ex.lastSets);
   const hasLastData = ex.lastSets.length > 0;
@@ -1357,21 +1480,8 @@ function ExerciseHeader({
           </div>
           <h3 className="font-display text-sm leading-tight truncate min-w-0">{ex.name}</h3>
         </div>
-        <button
-          type="button"
-          onClick={onToggleSwap}
-          disabled={swapping}
-          className="text-muted-foreground hover:text-foreground shrink-0 disabled:opacity-50 touch-manipulation"
-          title="Did a different exercise?"
-        >
-          {isSwapping ? <X className="w-3.5 h-3.5" /> : <ArrowLeftRight className="w-3.5 h-3.5" />}
-        </button>
+        <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} />
       </div>
-      {isSwapping && (
-        <div className="mt-1.5">
-          <ExercisePicker onSelect={onSwap} placeholder="Switch to exercise..." />
-        </div>
-      )}
       <p className="text-xs text-muted-foreground mt-0.5">
         {ex.prescribedSets.length} × {repDesc}
       </p>
@@ -1418,6 +1528,99 @@ function ExerciseHeader({
   );
 }
 
+// ── Changing one exercise on the spot ──────────────────────────────────────────
+
+function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-expanded={open}
+      className={cn(
+        "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
+        open ? "border-ink bg-ink text-white" : "border-border text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
+      {open ? "Close" : "Change"}
+    </button>
+  );
+}
+
+/**
+ * Swap the exercise, change today's sets and reps, or drop it from today.
+ * Saved to this one workout; the rest of the plan stays as written.
+ */
+function ChangePanel({
+  ex,
+  setCount,
+  busy,
+  onSwap,
+  onTargets,
+  onRemove,
+}: {
+  ex: LoggerExercise;
+  setCount: number;
+  busy: boolean;
+  onSwap: (ex: ExerciseOption) => void;
+  onTargets: (t: { sets: number; repMin: number; repMax: number }) => void;
+  onRemove: () => void;
+}) {
+  const ps0 = ex.prescribedSets[0];
+  const secs = ps0?.unit === "secs";
+  const [sets, setSets] = useState(String(setCount || ex.prescribedSets.length || 3));
+  const [lo, setLo] = useState(String(ps0?.repMin ?? 8));
+  const [hi, setHi] = useState(String(ps0?.repMax ?? ps0?.repMin ?? 10));
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const n = (v: string) => parseInt(v, 10);
+  const valid = n(sets) >= 1 && n(sets) <= 12 && n(lo) >= 1 && n(hi) >= 1;
+  const box = "h-10 w-14 rounded-lg border border-border bg-background text-center text-base tabular-nums focus:outline-none focus:border-primary";
+
+  return (
+    <div className="mt-2 space-y-4 rounded-xl bg-muted/40 p-3">
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Swap for another exercise</p>
+        <ExercisePicker onSelect={onSwap} placeholder="Search exercises…" />
+      </div>
+
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Today&rsquo;s sets &amp; {secs ? "seconds" : "reps"}</p>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <input aria-label="Sets" inputMode="numeric" value={sets} onChange={(e) => setSets(e.target.value.replace(/\D/g, ""))} className={box} />
+          <span className="text-muted-foreground">×</span>
+          <input aria-label={secs ? "Seconds from" : "Reps from"} inputMode="numeric" value={lo} onChange={(e) => setLo(e.target.value.replace(/\D/g, ""))} className={box} />
+          <span className="text-muted-foreground">–</span>
+          <input aria-label={secs ? "Seconds to" : "Reps to"} inputMode="numeric" value={hi} onChange={(e) => setHi(e.target.value.replace(/\D/g, ""))} className={box} />
+          {secs && <span className="text-muted-foreground">sec</span>}
+          <Button
+            size="sm"
+            className="h-10"
+            disabled={busy || !valid}
+            onClick={() => onTargets({ sets: n(sets), repMin: Math.min(n(lo), n(hi)), repMax: Math.max(n(lo), n(hi)) })}
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+          </Button>
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">Just this session. The rest of the plan stays as written.</p>
+      </div>
+
+      <div className="border-t pt-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => (confirmRemove ? onRemove() : setConfirmRemove(true))}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--destructive)] disabled:opacity-50"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          {confirmRemove ? `Tap again to drop ${ex.name} from today` : "Skip this exercise today"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Mobile SetRow ─────────────────────────────────────────────────────────────
 
 function MobileSetRow({
@@ -1430,7 +1633,9 @@ function MobileSetRow({
   onAdjustWeight,
   onComplete,
   onBlurPersist,
+  onRemove,
 }: {
+  onRemove?: () => void;
   idx: number;
   entry: SetEntry;
   repMax: number | null;
@@ -1568,6 +1773,16 @@ function MobileSetRow({
           <ArrowLeftRight className="w-3 h-3 shrink-0" />
           {loadModeLabel}
         </button>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-[var(--destructive)] touch-manipulation"
+          >
+            <X className="w-3 h-3 shrink-0" />
+            Remove set
+          </button>
+        )}
         <div className="flex-1" />
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">RPE</label>
         <Input
@@ -1640,7 +1855,9 @@ function DesktopSetRow({
   repMax,
   onChange,
   onComplete,
+  onRemove,
 }: {
+  onRemove?: () => void;
   idx: number;
   entry: SetEntry;
   repMax: number | null;
@@ -1761,6 +1978,13 @@ function DesktopSetRow({
         >
           {entry.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
         </button>
+        {onRemove ? (
+          <button type="button" onClick={onRemove} title="Remove set" aria-label={`Remove set ${idx + 1}`} className="w-6 h-7 flex items-center justify-center shrink-0 text-muted-foreground hover:text-[var(--destructive)]">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <span className="w-6 shrink-0" />
+        )}
       </div>
 
       {/* Per-set note (desktop) */}
