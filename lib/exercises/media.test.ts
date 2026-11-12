@@ -94,7 +94,7 @@ describe("exercise uploads", () => {
   });
 
   it("refuses a file over the limit, or from another coach's folder, and deletes it", async () => {
-    const big = file("ex1-big.mp4", "video/mp4", 30 * 1024 * 1024);
+    const big = file("ex1-big.mp4", "video/mp4", 11 * 1024 * 1024);
     await expect(saveMedia(W, "ex1", big)).rejects.toThrow(/too big/);
     expect(blob.deleted).toEqual([big]);
     await expect(saveMedia("someone-else", "ex1", file("ex1-c.jpg"))).rejects.toThrow(/isn't one of yours/);

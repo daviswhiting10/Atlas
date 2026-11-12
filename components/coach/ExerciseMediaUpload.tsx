@@ -10,7 +10,7 @@ import type { Picture } from "@/lib/exercises/pictures";
 
 // Mirrors lib/exercises/media.ts LIMITS (the server checks again).
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 15;
 const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
@@ -33,9 +33,16 @@ function videoSeconds(file: File): Promise<number> {
     const v = document.createElement("video");
     const url = URL.createObjectURL(file);
     v.preload = "metadata";
-    v.onloadedmetadata = () => {
+    const done = (secs: number) => {
       URL.revokeObjectURL(url);
-      resolve(v.duration);
+      resolve(secs);
+    };
+    v.onloadedmetadata = () => {
+      if (Number.isFinite(v.duration)) return done(v.duration);
+      // Some files (WebM especially) don't store their length: seek past the end and the
+      // browser works it out.
+      v.ondurationchange = () => Number.isFinite(v.duration) && done(v.duration);
+      v.currentTime = 1e7;
     };
     v.onerror = () => {
       URL.revokeObjectURL(url);
@@ -60,9 +67,13 @@ export function ExerciseMediaUpload({ workspaceId, exerciseId, picture }: { work
       if (!video && !original.type.startsWith("image/")) throw new Error("Choose a photo or a video.");
       let file = original;
       if (video) {
+        if (original.size > MAX_VIDEO_BYTES) {
+          throw new Error(
+            `That clip is ${(original.size / 1024 / 1024).toFixed(0)} MB; the limit is 10 MB. Record at 720p (iPhone: Settings → Camera → Record Video → 720p HD at 30 fps) and keep it under 15 seconds.`
+          );
+        }
         const secs = await videoSeconds(original);
         if (secs > MAX_VIDEO_SECONDS + 0.5) throw new Error(`Keep clips to ${MAX_VIDEO_SECONDS} seconds (that one is ${Math.round(secs)}).`);
-        if (original.size > MAX_VIDEO_BYTES) throw new Error("That clip is too big. Record at 720p, or trim it.");
       } else {
         setBusy("Preparing…");
         file = await shrinkPhoto(original);
@@ -127,7 +138,7 @@ export function ExerciseMediaUpload({ workspaceId, exerciseId, picture }: { work
           if (f) send(f);
         }}
       />
-      <p className="w-full text-[11px] text-muted-foreground">Photo, or a clip up to 15 seconds. Shown to your clients instead of the library picture.</p>
+      <p className="w-full text-[11px] text-muted-foreground">A photo, or a clip up to 15 seconds and 10 MB (record at 720p). Shown to your clients instead of the library picture.</p>
     </div>
   );
 }

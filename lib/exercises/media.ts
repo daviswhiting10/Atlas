@@ -17,7 +17,7 @@ import type { Picture } from "./pictures";
 /** Small on purpose: storage cost stays negligible. */
 export const LIMITS = {
   imageBytes: 2 * 1024 * 1024,
-  videoBytes: 20 * 1024 * 1024,
+  videoBytes: 10 * 1024 * 1024,
   videoSeconds: 15,
 };
 export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];

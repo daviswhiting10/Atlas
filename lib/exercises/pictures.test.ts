@@ -24,6 +24,7 @@ describe("exercise pictures", () => {
     expect(_match("Prone Partner Hamstring Curl")).toBeNull();
     expect(_match("Suitcase carry")).toBeNull();
     expect(_match("Landmine Staggered (Kickstand) RDL")).toBeNull();
+    expect(_match("Standing 1-Arm Cable / Band Row")).toBeNull();
     // ...and ones they kept.
     expect(_match("Dumbbell Hip Thrust")).toBe("Barbell Hip Thrust");
     expect(_match("Row or Bike Intervals")).toBe("Bicycling, Stationary");

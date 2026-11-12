@@ -82,7 +82,7 @@ const NEVER = new Set(["Air Bike"]); // a bicycle crunch, not the fan bike
  * Exercises the library has nothing close to, checked by the coach: any name
  * with one of these gets no picture rather than a near miss.
  */
-const NO_PICTURE = /\b(nordic|ghd|partner|suitcase|landmine|land mine)\b/i;
+const NO_PICTURE = /\b(nordic|ghd|partner|suitcase|landmine|land mine)\b|standing 1-arm cable/i;
 
 /** Names the library uses for common gym terms. */
 const ALIASES: Record<string, string> = {
