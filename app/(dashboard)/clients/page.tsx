@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -305,7 +304,6 @@ export default function ClientsPage() {
                             </p>
                           )}
                         </div>
-                        <StatusBadge status={client.status} />
                       </div>
                     </Link>
                     <button
