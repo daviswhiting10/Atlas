@@ -32,8 +32,6 @@ import {
   CalendarDays,
   MoreHorizontal,
   BarChart2,
-  Upload,
-  X,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -93,21 +91,6 @@ const GOAL_LABELS: Record<string, string> = {
   general: "General Fitness",
 };
 
-const GOAL_AVATAR_BG: Record<string, string> = {
-  weight_loss: "bg-signal/10 text-signal",
-  hypertrophy: "bg-signal/10 text-signal-deep",
-  pain_mgmt: "bg-warn/10 text-warn",
-  performance: "bg-[rgba(30,107,78,0.07)] text-[var(--blue)]",
-  general: "bg-muted text-muted-foreground",
-};
-
-const STATUS_CONFIG = {
-  PROSPECT: { label: "Prospect", className: "border border-[var(--line)] text-[var(--ink-soft)] bg-[var(--muted)]" },
-  ACTIVE: { label: "Active", className: "border border-signal/30 text-signal bg-signal/10" },
-  AT_RISK: { label: "At Risk", className: "border border-warn/30 text-warn bg-warn/10" },
-  CHURNED: { label: "Churned", className: "border border-destructive/30 text-destructive bg-destructive/10" },
-};
-
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -156,8 +139,8 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [invite, setInvite] = useState<InviteResult | null>(null);
-  // Null until the coach opens or closes it: open by default while there's no live plan.
-  const [uploadOpen, setUploadOpen] = useState<boolean | null>(null);
+  // ?tab=plan opens the Plan tab (the log page links there when there's no plan).
+  const [tab, setTab] = useState(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "plan" ? "plan" : "overview"));
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -170,19 +153,6 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
       .catch(() => setClient(null))
       .finally(() => setLoading(false));
   }, [id]);
-
-  async function updateStatus(status: string) {
-    const res = await fetch(`/api/clients/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setClient((prev) => (prev ? { ...prev, status: updated.status } : null));
-      toast.success("Status updated");
-    }
-  }
 
   async function inviteClient() {
     if (!client?.email) { toast.error("Add an email first"); return; }
@@ -250,13 +220,10 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
   }
 
   // ── Computed values ──────────────────────────────────────────────────────
-  const statusCfg = STATUS_CONFIG[client.status] ?? STATUS_CONFIG.PROSPECT;
   const goalLabel = client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null;
-  const avatarBg = client.primaryGoal ? (GOAL_AVATAR_BG[client.primaryGoal] ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground";
   const activeProgram = client.programAssignments.find((a) => a.status === "ACTIVE");
   const draftProgram = client.programAssignments.find((a) => a.status === "PAUSED");
   const firstName = client.fullName.split(" ")[0];
-  const showUpload = uploadOpen ?? !activeProgram;
   // Spreadsheet details from an import are shown on their own, never as an intake.
   const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
@@ -286,44 +253,12 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
           {/* Name + meta */}
           <div className="min-w-0">
             <h1 className="text-[30px] leading-[1.08] text-ink sm:truncate sm:text-[38px]">{client.fullName}</h1>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors cursor-pointer hover:opacity-80",
-                    statusCfg.className
-                  )}
-                >
-                  {statusCfg.label}
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" sideOffset={4}>
-                  {Object.entries(STATUS_CONFIG).map(([val, cfg]) => (
-                    <DropdownMenuItem key={val} onClick={() => updateStatus(val)}>
-                      <span className={cn("w-2 h-2 rounded-full mr-2 border", cfg.className)} />
-                      {cfg.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {goalLabel && (
-                <span className="text-xs text-muted-foreground hidden sm:inline">{goalLabel}</span>
-              )}
-            </div>
+            {goalLabel && <p className="mt-0.5 text-sm text-muted-foreground">{goalLabel}</p>}
           </div>
         </div>
 
-        {/* Actions — icon-only on mobile, labeled on desktop */}
+        {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setUploadOpen(!showUpload)}
-            aria-expanded={showUpload}
-            className={cn(buttonVariants({ size: "sm" }), "h-9 bg-signal px-3 text-white hover:bg-signal/90")}
-          >
-            <Upload className="w-4 h-4 shrink-0" />
-            <span className="ml-1.5">Upload plan</span>
-          </button>
           {!client.userId && (
             <button
               type="button"
@@ -335,14 +270,6 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
               <span className="ml-1.5">Invite</span>
             </button>
           )}
-          <Link
-            href={`/clients/${client.id}/log`}
-            className={cn(buttonVariants({ size: "sm" }), "h-9 w-9 p-0 md:w-auto md:px-3")}
-            title="Log Session"
-          >
-            <ClipboardList className="w-4 h-4 shrink-0" />
-            <span className="hidden md:inline ml-1.5">Log</span>
-          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
               <MoreHorizontal className="w-4 h-4" />
@@ -405,27 +332,19 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
         </div>
       )}
 
-      {/* ── The coach's own plan, from a sheet: always one click from the top ── */}
-      {showUpload && (
-        <section className="mb-6 rounded-2xl border border-signal/40 bg-white p-5 ring-1 ring-signal/20 fade-in">
-          <div className="mb-1 flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-ink">Upload {firstName}&rsquo;s plan</h2>
-            <button type="button" onClick={() => setUploadOpen(false)} aria-label="Close" className="press -mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute hover:bg-ink/5 hover:text-ink">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mb-4 text-[13px] text-muted-foreground">
-            Paste the Google Sheet link or choose a CSV.{activeProgram || draftProgram ? " The new plan comes in as a draft; the current one stays until you assign it." : ""}
-          </p>
-          <SheetPlanUpload clientId={client.id} firstName={firstName} />
-        </section>
-      )}
+      {/* ── The main thing a coach comes here to do ─────────────────────── */}
+      <Link
+        href={`/clients/${client.id}/log`}
+        className="press mb-6 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-ink text-lg font-semibold text-white hover:bg-ink/85 sm:w-auto sm:min-w-[300px] sm:inline-flex"
+      >
+        <ClipboardList className="h-5 w-5" />
+        Log session
+      </Link>
 
       {/* ── Headline numbers: the athlete app's stat row ───────────────── */}
       <StatRow
         className="mb-6"
         stats={[
-          { label: "Plan", value: activeProgram ? String(activeProgram._count.assignedWorkouts) : "—", unit: activeProgram ? "workouts" : undefined, hint: activeProgram ? activeProgram.name : "No live plan" },
           { label: "Sessions", value: String(client.workoutLogs.length), hint: "logged in total" },
           { label: "This week", value: String(sessionsThisWeek), hint: sessionsThisWeek === 1 ? "session" : "sessions" },
           { label: "Last session", value: lastSession ? relativeTime(lastSession.date) : "—", hint: lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "None yet" },
@@ -438,18 +357,10 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
       <section className="mb-10 mt-8">{progress}</section>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-      <Tabs defaultValue="overview">
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         <TabsList className="w-full justify-start mb-5 h-auto p-0 bg-transparent border-b rounded-none gap-0 overflow-x-auto flex-nowrap">
           <TabsTrigger value="overview" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
             Overview
-          </TabsTrigger>
-          <TabsTrigger value="programs" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
-            Programs
-            {client.programAssignments.length > 0 && (
-              <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1 py-0">
-                {client.programAssignments.length}
-              </Badge>
-            )}
           </TabsTrigger>
           <TabsTrigger value="sessions" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
             Sessions
@@ -477,6 +388,9 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
             <BarChart2 className="w-3.5 h-3.5" />
             Progress
           </Link>
+          <TabsTrigger value="plan" className="rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent px-4 py-2 text-sm">
+            Plan
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Overview tab ──────────────────────────────────────────────── */}
@@ -484,50 +398,33 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
             {/* Main column */}
             <div className="lg:col-span-3 space-y-4">
-              {/* Current Program card: with no plan, uploading the coach's own comes first. */}
+              {/* The plan, in a line. Uploading and switching plans live on the Plan tab. */}
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">Current Program</CardTitle>
-                    <Link href="/programs" className="text-xs text-muted-foreground hover:text-foreground">
-                      Browse library →
-                    </Link>
-                  </div>
+                  <CardTitle className="text-sm font-semibold">Plan</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {!activeProgram && draftProgram ? (
+                  {activeProgram ? (
+                    <div>
+                      <Link href={`/clients/${client.id}/programs/${activeProgram.id}`} className="text-sm font-medium hover:underline">
+                        {activeProgram.name}
+                      </Link>
+                      <p className="text-xs text-muted-foreground mt-1">Started {new Date(activeProgram.startDate).toLocaleDateString()}</p>
+                    </div>
+                  ) : draftProgram ? (
                     <div>
                       <p className="text-sm font-medium">{draftProgram.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Draft · not assigned yet. Check it, then assign it.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Not live yet</p>
                       <Link href={`/clients/${client.id}/programs/${draftProgram.id}`} className={cn(buttonVariants({ size: "sm" }), "mt-3")}>
                         Review &amp; assign
                       </Link>
                     </div>
-                  ) : activeProgram ? (
-                    <div>
-                      <Link
-                        href={`/clients/${client.id}/programs/${activeProgram.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {activeProgram.name}
-                      </Link>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Started {new Date(activeProgram.startDate).toLocaleDateString()} ·{" "}
-                        {activeProgram._count.assignedWorkouts} total sessions
-                      </p>
-                    </div>
                   ) : (
-                    <div>
-                      <p className="text-[13px] leading-relaxed text-muted-foreground">No plan yet. Upload yours at the top of the page.</p>
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        <Link href="/programs" className="font-medium text-muted-foreground hover:text-foreground">
-                          Use a library program
-                        </Link>
-                        <Link href={`/programs/new?client=${client.id}`} className="font-medium text-muted-foreground hover:text-foreground">
-                          <Dumbbell className="mr-1 inline h-3 w-3" />
-                          Or have Atlas build one
-                        </Link>
-                      </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">No plan yet</p>
+                      <Button size="sm" onClick={() => setTab("plan")}>
+                        Add a plan
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -537,14 +434,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">Recent Sessions</CardTitle>
-                    <Link
-                      href={`/clients/${client.id}/log`}
-                      className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "h-7 text-xs")}
-                    >
-                      <ClipboardList className="w-3 h-3 mr-1" />
-                      Log Session
-                    </Link>
+                    <CardTitle className="text-sm font-semibold">Recent sessions</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -565,7 +455,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                               {localDate(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
+                              {s._count.sets} sets
                             </p>
                           </div>
                           {s.durationMin != null && (
@@ -583,23 +473,6 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
 
             {/* Side column */}
             <div className="lg:col-span-2 space-y-4">
-              {/* Goals widget */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Goals</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {goalLabel ? (
-                    <div className="flex items-center gap-2">
-                      <div className={cn("w-2.5 h-2.5 rounded-full", avatarBg.split(" ")[0])} />
-                      <span className="text-sm">{goalLabel}</span>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No goal set. Edit the client to add one.</p>
-                  )}
-                </CardContent>
-              </Card>
-
               {/* Details carried over from a spreadsheet import */}
               {imported.map((f) => {
                 const data = (f.parsedData ?? {}) as { fileName?: string; fields?: Record<string, string> };
@@ -662,12 +535,9 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                 <Card className="border-dashed">
                   <CardContent className="py-5 text-center">
                     <FileText className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm font-medium">No intake form</p>
-                    <p className="text-xs text-muted-foreground mt-1 mb-2.5">
-                      Complete an intake to enable AI summaries and red-flag detection.
-                    </p>
-                    <Link href={`/intake?clientId=${client.id}`} className={buttonVariants({ size: "sm" })}>
-                      Start Intake
+                    <p className="text-sm font-medium mb-2.5">No intake yet</p>
+                    <Link href={`/intake?clientId=${client.id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+                      Start intake
                     </Link>
                   </CardContent>
                 </Card>
@@ -755,31 +625,36 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
           </div>
         </TabsContent>
 
-        {/* ── Programs tab ──────────────────────────────────────────────── */}
-        <TabsContent value="programs">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">
-              {client.programAssignments.length} assignment{client.programAssignments.length !== 1 ? "s" : ""}
-            </p>
-            <Link href={`/programs/new?client=${client.id}`} className={cn(buttonVariants({ size: "sm" }))}>
-              <Dumbbell className="w-3 h-3 mr-1.5" />
-              New plan
-            </Link>
-          </div>
+        {/* ── Plan tab: upload a plan, switch plans, see past ones ─────────── */}
+        <TabsContent value="plan">
           {client.programAssignments.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-10 text-center">
-                <Dumbbell className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium">No programs assigned</p>
-                <p className="text-xs text-muted-foreground mt-1 mb-3">
-                  Build a program in the library, then assign it here.
-                </p>
-                <Link href="/programs" className={cn(buttonVariants({ size: "sm" }))}>
-                  Go to Program Library
-                </Link>
+            <Card className="mb-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Upload plan</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <SheetPlanUpload clientId={client.id} firstName={firstName} />
               </CardContent>
             </Card>
           ) : (
+            <details className="group mb-4 rounded-xl border bg-card">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium">
+                Upload a new plan
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t px-4 pb-4 pt-3">
+                <SheetPlanUpload clientId={client.id} firstName={firstName} />
+              </div>
+            </details>
+          )}
+
+          <div className="mb-3 flex justify-end">
+            <Link href={`/programs/new?client=${client.id}`} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>
+              <Dumbbell className="w-3 h-3 mr-1.5" />
+              Build with Atlas
+            </Link>
+          </div>
+          {client.programAssignments.length > 0 && (
             <div className="space-y-2">
               {client.programAssignments.map((a) => (
                 <Link key={a.id} href={`/clients/${client.id}/programs/${a.id}`}>
@@ -787,9 +662,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                     <CardContent className="py-3 px-4 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold">{a.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Started {new Date(a.startDate).toLocaleDateString()} · {a._count.assignedWorkouts} sessions
-                        </p>
+                        <p className="text-xs text-muted-foreground">Started {new Date(a.startDate).toLocaleDateString()}</p>
                       </div>
                       <Badge
                         variant="outline"
@@ -799,7 +672,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                           a.status === "PAUSED" && "border-line text-ink-soft"
                         )}
                       >
-                        {a.status === "PAUSED" ? "draft" : a.status.toLowerCase()}
+                        {a.status === "PAUSED" ? "draft" : a.status === "ACTIVE" ? "live" : a.status.toLowerCase()}
                       </Badge>
                     </CardContent>
                   </Card>
@@ -812,11 +685,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
         {/* ── Sessions tab ──────────────────────────────────────────────── */}
         <TabsContent value="sessions">
           <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">{client.workoutLogs.length} sessions logged</p>
-            <Link href={`/clients/${client.id}/log`} className={cn(buttonVariants({ size: "sm" }))}>
-              <ClipboardList className="w-3 h-3 mr-1.5" />
-              Log Session
-            </Link>
+            <p className="text-sm text-muted-foreground">{client.workoutLogs.length} sessions</p>
           </div>
           {client.workoutLogs.length === 0 ? (
             <Card className="border-dashed">
@@ -850,7 +719,7 @@ export function ClientDetail({ progress }: { progress: React.ReactNode }) {
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {s.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"} · {s._count.sets} sets logged
+                        {s._count.sets} sets
                       </p>
                       {s.clientNotes && (
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>

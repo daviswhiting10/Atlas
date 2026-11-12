@@ -69,7 +69,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
             placeholder="https://docs.google.com/spreadsheets/d/…"
             className={cn(field, "mt-1")}
           />
-          <p className="mt-1 text-[12px] text-ink-mute">Share it as &ldquo;Anyone with the link can view&rdquo; first.</p>
+          <p className="mt-1 text-[12px] text-ink-mute">Shared as &ldquo;Anyone with the link&rdquo;.</p>
         </div>
       )}
 
@@ -118,11 +118,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           )}
         </button>
       </div>
-      <p className="text-[12px] text-ink-mute">
-        {busy
-          ? "This takes about half a minute."
-          : "Weeks with loads filled in come in as logged sessions, and the plan picks up at the next week. Leave the date empty and Atlas works it out."}
-      </p>
+      {busy && <p className="text-[12px] text-ink-mute">About half a minute.</p>}
       {error && (
         <p role="alert" className="text-sm leading-relaxed text-destructive">
           {error}

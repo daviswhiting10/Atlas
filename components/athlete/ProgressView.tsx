@@ -165,9 +165,6 @@ export function ProgressView({
       {/* ── At a glance: every lift at once ──────────────────────────── */}
       <section className="rise rise-2">
         <h2 className="text-3xl leading-none text-ink">Overall progress</h2>
-        <p className="mt-2 text-sm text-ink-mute">
-          Each exercise against its own first session ({anyLoaded ? "estimated 1-rep max" : "best reps"}), averaged across exercises. Lighter weeks are left out.
-        </p>
         {overall.change != null && overall.since ? (
           <>
             <div className="mt-6 flex flex-wrap items-end gap-x-10 gap-y-3">
@@ -176,7 +173,7 @@ export function ProgressView({
                 {overall.change}%
               </p>
               <p className="pb-0.5 text-sm text-ink-soft">
-                across {overall.lifts} exercise{overall.lifts === 1 ? "" : "s"} since {day(overall.since)}
+                across {overall.lifts} exercise{overall.lifts === 1 ? "" : "s"} since {day(overall.since)} · {anyLoaded ? "estimated 1-rep max" : "best reps"}
               </p>
             </div>
             <div className="mt-6">
@@ -185,13 +182,13 @@ export function ProgressView({
           </>
         ) : (
           <p className="rule mt-5 pt-4 text-[15px] leading-relaxed text-ink-soft">
-            The overall line starts once an exercise has been logged twice. Every session after adds to it.
+            Starts once an exercise is logged twice.
           </p>
         )}
       </section>
 
       {/* ── One exercise, on demand ──────────────────────────────────── */}
-      <section className="rise rise-3 rule pt-8">
+      <section className="rise rise-3 rule relative z-10 pt-8">
         <ExerciseSearch exercises={data.exercises} value={exerciseId} onChange={setExerciseId} />
 
         {exercise && (

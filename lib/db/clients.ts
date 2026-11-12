@@ -18,7 +18,8 @@ export async function getClient(id: string, workspaceId: string) {
       intakeForms: { orderBy: { createdAt: "desc" } },
       assessments: { orderBy: { createdAt: "desc" } },
       programAssignments: {
-        orderBy: { startDate: "desc" },
+        // Newest first, so the latest draft (say, a sheet just uploaded) is the one shown.
+        orderBy: { createdAt: "desc" },
         include: {
           sourceProgram: { select: { id: true, name: true } },
           _count: { select: { assignedWorkouts: true } },

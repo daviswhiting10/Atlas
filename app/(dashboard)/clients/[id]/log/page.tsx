@@ -8,6 +8,7 @@ import {
 } from "@/lib/actions/workout-logger";
 import { loadClientProgress } from "@/lib/coach/progress";
 import WorkoutLogger, { type ExerciseTrend } from "./WorkoutLogger";
+import { PlanNotLive } from "./PlanNotLive";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -138,15 +139,18 @@ export default async function LogPage({
 
   // ── No workout to log ───────────────────────────────────────────────────────
   if (!assignedWorkout) {
+    // No live plan: offer the newest draft (a sheet just uploaded, say), or the Plan tab.
+    const draft = await prisma.programAssignment.findFirst({
+      where: { clientId, workspaceId, status: "PAUSED" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, startDate: true },
+    });
     return (
-      <div className="max-w-2xl">
-        <p className="text-muted-foreground text-sm mb-2">
-          No planned workouts found for {client.fullName}.
-        </p>
-        <a href={`/clients/${clientId}`} className="text-sm underline">
-          Back to client profile
-        </a>
-      </div>
+      <PlanNotLive
+        clientId={clientId}
+        firstName={client.fullName.split(" ")[0]}
+        draft={draft ? { id: draft.id, name: draft.name, startDate: draft.startDate.toISOString().slice(0, 10) } : null}
+      />
     );
   }
 
