@@ -9,6 +9,7 @@ import {
 import WorkoutLogger from "./WorkoutLogger";
 import { PlanNotLive } from "./PlanNotLive";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
+import { blobConfigured, mediaPictures } from "@/lib/exercises/media";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -301,8 +302,14 @@ export default async function LogPage({
     })
   );
 
+  // The coach's own photos and clips win over the library's.
+  const own = await mediaPictures(workspaceId, exercises.map((e) => e.exerciseId));
+  for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
+
   return (
     <WorkoutLogger
+      uploadsEnabled={blobConfigured()}
+      workspaceId={workspaceId}
       key={assignedWorkout.id}
       clientId={clientId}
       clientName={client.fullName}

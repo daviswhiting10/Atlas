@@ -18,6 +18,13 @@ function useFrame(frames: string[], running: boolean) {
 
 function Frames({ picture, running, className }: { picture: Picture; running: boolean; className?: string }) {
   const src = useFrame(picture.frames, running);
+  if (picture.video) {
+    return (
+      <div className={cn("relative overflow-hidden bg-ink/5", className)}>
+        <video src={picture.video} autoPlay muted loop playsInline preload="auto" aria-label={picture.name} className="absolute inset-0 h-full w-full object-contain" />
+      </div>
+    );
+  }
   return (
     <div className={cn("relative overflow-hidden bg-ink/5", className)}>
       {/* Both frames load up front, so switching never flashes. */}
@@ -63,8 +70,13 @@ export function ExerciseThumb({ picture, name, className }: { picture: Picture |
         aria-label={`See ${name}`}
         className={cn("press relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-line bg-white", className)}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={picture.frames[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+        {picture.video ? (
+          // The clip's first frame; it plays in the large view.
+          <video src={`${picture.video}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={picture.frames[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+        )}
       </button>
       {open && <Viewer picture={picture} name={name} onClose={() => setOpen(false)} />}
     </>

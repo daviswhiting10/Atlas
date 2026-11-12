@@ -5,6 +5,7 @@
 
 import { cache } from "react";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
+import { mediaPictures } from "@/lib/exercises/media";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -507,6 +508,9 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       sets,
     };
   });
+  // The coach's own photos and clips win over the library's.
+  const own = await mediaPictures(athlete.workspaceId, exercises.map((e) => e.exerciseId));
+  for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
 
   return {
     id: workout.id,

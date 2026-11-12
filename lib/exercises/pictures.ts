@@ -12,7 +12,15 @@
 
 import LIBRARY from "@/data/exercise-library.json";
 
-export type Picture = { name: string; frames: string[] };
+export type Picture = {
+  name: string;
+  /** Photos, shown alternating. Empty for a video. */
+  frames: string[];
+  /** A coach's own short clip. */
+  video?: string;
+  /** The coach uploaded it (as opposed to the library). */
+  own?: boolean;
+};
 
 type Entry = { n: string; k: string; f: number; c: string; e: string | null };
 

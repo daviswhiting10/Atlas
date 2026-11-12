@@ -12,6 +12,7 @@ import { generatePlan, normalizePrefs, type Prefs } from "./generator";
 import { isLighterWeek, lighterWeeksOn } from "./lighter";
 import { weekOf } from "@/lib/athlete/sessions";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
+import { mediaPictures } from "@/lib/exercises/media";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -179,6 +180,10 @@ export async function loadPlanOverview({
       };
     }),
   }));
+
+  // The coach's own photos and clips win over the library's.
+  const own = await mediaPictures(workspaceId, workouts.flatMap((w) => w.exercises.map((e) => e.exerciseId)));
+  if (own.size > 0) for (const w of workouts) for (const e of w.exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
 
   const rx: PlanOverview["rx"] = {};
   for (const w of assignment.assignedWorkouts) {

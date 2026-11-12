@@ -31,6 +31,7 @@ model Workspace {
   measurements       Measurement[]
   milestones         Milestone[]
   auditLogs          AuditLog[]
+  exerciseMedia      ExerciseMedia[]
 }
 
 // ─────────────────────────────────────────────
@@ -225,6 +226,7 @@ model Exercise {
   setLogs           SetLog[]
   coachNotes        ExerciseCoachNote[]
   milestones        Milestone[]
+  media             ExerciseMedia[]
   createdAt         DateTime                  @default(now())
 }
 
@@ -463,6 +465,24 @@ model ExerciseCoachNote {
   exercise    Exercise      @relation(fields: [exerciseId], references: [id])
 
   @@index([clientId, exerciseId])
+}
+
+/// A coach's own photo or short clip of an exercise (stored in Vercel Blob).
+/// Shown in place of the library picture, to that coach and their clients only.
+model ExerciseMedia {
+  id          String    @id @default(cuid())
+  workspaceId String
+  exerciseId  String
+  url         String
+  kind        String // "image" | "video"
+  sizeBytes   Int
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  exercise    Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  // One per exercise per coach: a new upload replaces the old one.
+  @@unique([workspaceId, exerciseId])
 }
 
 // ─────────────────────────────────────────────

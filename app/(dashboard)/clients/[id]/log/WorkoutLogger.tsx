@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ExerciseThumb } from "@/components/ExercisePicture";
+import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -262,6 +263,8 @@ export default function WorkoutLogger({
   scheduledDate,
   assignmentStartDate,
   completed,
+  uploadsEnabled,
+  workspaceId,
   exercises,
   existingWorkoutLogId,
   existingSetLogs,
@@ -277,6 +280,9 @@ export default function WorkoutLogger({
   assignmentStartDate: string;
   /** This workout has already been done. */
   completed: boolean;
+  /** Blob storage is connected: coaches can upload their own exercise photos and clips. */
+  uploadsEnabled: boolean;
+  workspaceId: string;
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
   existingSetLogs: ExistingSetLog[];
@@ -1077,6 +1083,7 @@ export default function WorkoutLogger({
                           onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
                           onTargets={(t) => handleSetTargets(ex, t)}
                           onRemove={() => handleRemoveExercise(ex)}
+                          media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
                         />
                       )}
 
@@ -1291,6 +1298,7 @@ export default function WorkoutLogger({
                       onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
                       onTargets={(t) => handleSetTargets(ex, t)}
                       onRemove={() => handleRemoveExercise(ex)}
+                      media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
                     />
                   )}
                   <p className="text-xs text-muted-foreground mt-0.5">{rxLabel(ex)}</p>
@@ -1449,7 +1457,10 @@ function ChangePanel({
   onSwap,
   onTargets,
   onRemove,
+  media,
 }: {
+  /** The coach's own photo or clip for this exercise (when uploads are set up). */
+  media?: React.ReactNode;
   ex: LoggerExercise;
   setCount: number;
   busy: boolean;
@@ -1495,6 +1506,13 @@ function ChangePanel({
         </div>
         <p className="mt-1 text-[11px] text-muted-foreground">Just this session. The rest of the plan stays as written.</p>
       </div>
+
+      {media && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Picture</p>
+          {media}
+        </div>
+      )}
 
       <div className="border-t pt-3">
         <button
