@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requestDay } from "@/lib/sessions/request-day";
 import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
@@ -18,7 +19,7 @@ const CreateSchema = z.object({
   rawInput: z.string(),
   structuredNote: z.record(z.string(), z.unknown()),
   rpeAvg: z.number().nullable().optional(),
-  date: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 export const POST = withWorkspace(async (req, { workspaceId }) => {
@@ -46,7 +47,7 @@ export const POST = withWorkspace(async (req, { workspaceId }) => {
         rawInput,
         structuredNote: structuredNote as object,
         rpeAvg: rpeAvg ?? null,
-        date: new Date(date),
+        date: requestDay(date),
       },
     }),
     prisma.clientProfile.updateMany({

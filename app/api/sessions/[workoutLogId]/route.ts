@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requestDay } from "@/lib/sessions/request-day";
 import { planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
@@ -41,7 +42,7 @@ export const GET = withWorkspace<Ctx>(async (_req, { workspaceId }, { params }) 
 });
 
 const PatchSchema = z.object({
-  date: z.string().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   clientNotes: z.string().optional(),
   durationMin: z.number().int().positive().nullable().optional(),
   // null = detach from any program slot; string = link to this AssignedWorkout ID
@@ -65,7 +66,7 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { date, clientNotes, durationMin, assignedWorkoutId } = parsed.data;
-  const newDate = date ? new Date(date) : undefined;
+  const newDate = date ? requestDay(date) : undefined;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -115,7 +116,8 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
       if (newDate && effectiveSlotId) {
         await tx.assignedWorkout.update({
           where: { id: effectiveSlotId },
-          data: { scheduledDate: newDate },
+          // Plan days are stored as calendar midnight (UTC), unlike a session's date.
+          data: { scheduledDate: new Date(`${date}T00:00:00.000Z`) },
         });
       }
     });

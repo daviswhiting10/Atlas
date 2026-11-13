@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { requestDay } from "@/lib/sessions/request-day";
 import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import {
@@ -89,7 +90,7 @@ export async function logSet(input: {
       workoutLogId = existing.id;
     } else {
       // The day it was done: the coach's date if given, otherwise today.
-      const logDate = input.date ? new Date(input.date) : new Date();
+      const logDate = input.date ? requestDay(input.date) : new Date();
       const created = await prisma.workoutLog.create({
         data: {
           clientId: input.clientId,
@@ -380,7 +381,7 @@ export async function updateSessionDate(input: {
 
   await prisma.workoutLog.update({
     where: { id: input.workoutLogId },
-    data: { date: new Date(input.date) },
+    data: { date: requestDay(input.date) },
   });
 }
 
