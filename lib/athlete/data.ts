@@ -262,7 +262,7 @@ export async function loadProgress({
   // Biggest lifts first: order by the most volume moved in a single session.
   const peak = (e: ExerciseProgress) => (e.loaded ? Math.max(...e.series.map((p) => p.volume)) : 0);
   exercises.sort((a, b) => peak(b) - peak(a) || b.series.length - a.series.length || a.name.localeCompare(b.name));
-  recentPRs.sort((a, b) => b.date.localeCompare(a.date));
+  recentPRs.sort((a, b) => b.date.localeCompare(a.date) || a.exercise.localeCompare(b.exercise));
 
   const today = localDay(new Date(), tz);
   const stalled: StalledLift[] = exercises.flatMap((e) => {

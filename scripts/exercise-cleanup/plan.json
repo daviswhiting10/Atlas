@@ -1,0 +1,740 @@
+{
+ "merges": [
+  {
+   "into": {
+    "id": "cmwavm2we0003sjrlr9urr0dw",
+    "name": "Leg Press"
+   },
+   "from": [
+    {
+     "id": "cmplp6ae4000004l7pavda27d",
+     "name": "Leg Press",
+     "workspaceId": null
+    },
+    {
+     "id": "cmrdvrkcb000204jlk294hkyb",
+     "name": "1B Leg Press",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmwavm2we000bsjrlhzw1n7fe",
+    "name": "Standing Calf Raise"
+   },
+   "from": [
+    {
+     "id": "cmrdvrkcz000m04jlz1u5q6m6",
+     "name": "3B Standing Calf Raise",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifoy001stpbp81dkmf86",
+    "name": "Face Pull"
+   },
+   "from": [
+    {
+     "id": "cmq56f7qk001804l5mbq173ff",
+     "name": "3B Face Pull",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cif8r0011tpbpg41n2iha",
+    "name": "Incline Dumbbell Press"
+   },
+   "from": [
+    {
+     "id": "cmpwnrkh9000705jsi8e3am21",
+     "name": "Incline db press",
+     "workspaceId": null
+    },
+    {
+     "id": "cmq56f7qj001704l5b7zdri3p",
+     "name": "1A Incline Dumbbell Press",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4ciev4000gtpbpmsg6xa1v",
+    "name": "Romanian Deadlift"
+   },
+   "from": [
+    {
+     "id": "cmpmpafas000804lbh5hcugli",
+     "name": "BB RDL",
+     "workspaceId": null
+    },
+    {
+     "id": "cmrdvrkcg000904jldu2efx2x",
+     "name": "2A Barbell Romanian Deadlift",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifj8001ktpbpzerf02dz",
+    "name": "Bent Over Barbell Row"
+   },
+   "from": [
+    {
+     "id": "cmplf8v83000304l86ey89grb",
+     "name": "Barbell bent-over row",
+     "workspaceId": null
+    },
+    {
+     "id": "cmpv5bf3y000004l1d8ruux3k",
+     "name": "Barbell bell bent over row",
+     "workspaceId": null
+    },
+    {
+     "id": "cmwf57jqp000f07idmtbvcwqt",
+     "name": "Barbell Bent over row",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifuy0020tpbp6ph5yfn2",
+    "name": "Wide-Grip Lat Pulldown"
+   },
+   "from": [
+    {
+     "id": "cmqf8bikl000604l7pk8wnplr",
+     "name": "wide grip pull down",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifol001rtpbpk2zw1ti2",
+    "name": "Seated Cable Rows"
+   },
+   "from": [
+    {
+     "id": "cmrdvrkct000e04jljjqkqnz7",
+     "name": "2B Seated Cable Row (neutral)",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmwavm2we0006sjrl42a5mp81",
+    "name": "Leg Curl"
+   },
+   "from": [
+    {
+     "id": "cmpv5mxqj000o04l1kvhdzi0p",
+     "name": "Seated / Lying Leg Curl",
+     "workspaceId": null
+    },
+    {
+     "id": "cmpmpafah000704lb1gcfl2mw",
+     "name": "Lying Hamstring Curl",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cif5g000ztpbps6mdrmjn",
+    "name": "Dumbbell Bench Press"
+   },
+   "from": [
+    {
+     "id": "cmq56f7or000k04l5qnohwbn2",
+     "name": "1A Dumbbell Bench Press",
+     "workspaceId": null
+    },
+    {
+     "id": "cmqjk5jw5000804jf4r27grpz",
+     "name": "DB Chest Press (bench)",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4ciffu001ctpbpmrxcavrw",
+    "name": "Dumbbell Shoulder Press"
+   },
+   "from": [
+    {
+     "id": "cmwdm77p8000408iillnfmzq9",
+     "name": "Seated Dumbbell shoulder press",
+     "workspaceId": "ws_atlas_primary"
+    },
+    {
+     "id": "cmrdvrkd1000n04jljuh56549",
+     "name": "1A Seated Dumbbell Shoulder Press",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cieqm000ctpbp9085bm4j",
+    "name": "Goblet Squat"
+   },
+   "from": [
+    {
+     "id": "cmrdvrkcx000j04jlqyoetkqh",
+     "name": "2B Goblet Squat",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cif2g000stpbpnbqvnl74",
+    "name": "Pushups"
+   },
+   "from": [
+    {
+     "id": "cmq56f7oq000i04l5z5cuv874",
+     "name": "1B Push-Up",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cif42000wtpbp9xh4djl2",
+    "name": "Incline Push-Up"
+   },
+   "from": [
+    {
+     "id": "cmqf88f65000204l7sjnbnztc",
+     "name": "incline push up",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifkk001ntpbpbt4886lt",
+    "name": "One-Arm Dumbbell Row"
+   },
+   "from": [
+    {
+     "id": "cmq56f7qd001204l5r6smofvf",
+     "name": "3A One-Arm Dumbbell Row",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cif0r000otpbpvn03fz7c",
+    "name": "Single Leg Glute Bridge"
+   },
+   "from": [
+    {
+     "id": "cmq56f7o3000604l5i45fwkhy",
+     "name": "Single-Leg Glute Bridge",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifnq001ptpbpqsf8pi4e",
+    "name": "Dumbbell Incline Row"
+   },
+   "from": [
+    {
+     "id": "cmpe5qukt000104l8hgxej9ds",
+     "name": "chest supported Row",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cifso001vtpbpacavfuh5",
+    "name": "Pullups"
+   },
+   "from": [
+    {
+     "id": "cmpwm1pon000d04l7p1ztf5oj",
+     "name": "Overhand Pullup",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cig8l002htpbpw4xvkfac",
+    "name": "Farmer's Walk"
+   },
+   "from": [
+    {
+     "id": "cmwcotem3000608l6jckwfaf6",
+     "name": "Farm carry",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4ciewy000ktpbp4ysbt5b1",
+    "name": "Trap Bar Deadlift"
+   },
+   "from": [
+    {
+     "id": "cmrdvrkcy000l04jlvwyfh3cg",
+     "name": "1A Trap Bar Deadlift",
+     "workspaceId": null
+    },
+    {
+     "id": "cmqf89y25000404l7bhzlev2u",
+     "name": "hexbar deadlift",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmwavm2we0005sjrldbah0ioq",
+    "name": "Dumbbell Hip Thrust"
+   },
+   "from": [
+    {
+     "id": "cmrdvrkcf000804jlqmxqrmrr",
+     "name": "3B DB Hip Thrust",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cif3c000utpbpnxia3k5v",
+    "name": "Push-Ups - Close Triceps Position"
+   },
+   "from": [
+    {
+     "id": "cmwf57jqm000d07iddvjxapas",
+     "name": "Close grip push up",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpe604pa000504l8u8wn0e71",
+    "name": "DB romanian deadlift"
+   },
+   "from": [
+    {
+     "id": "cmq56f7o0000204l553x8baj8",
+     "name": "2A Dumbbell Romanian Deadlift",
+     "workspaceId": null
+    },
+    {
+     "id": "cmqf8s51g000104jp3fnyghin",
+     "name": "db rdl",
+     "workspaceId": null
+    },
+    {
+     "id": "cmp4ciewh000jtpbpo4etdp02",
+     "name": "Stiff-Legged Dumbbell Deadlift",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpe5eyg1000304jyc9wj7lfz",
+    "name": "Single leg RDL"
+   },
+   "from": [
+    {
+     "id": "cmqf8ao52000504l7ysez591l",
+     "name": "sl rdl",
+     "workspaceId": null
+    },
+    {
+     "id": "cmq56f7o5000904l5seqkmdbx",
+     "name": "2B Single-Leg RDL",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpe51vte000004jy9s6anto8",
+    "name": "Banded pull-aparts"
+   },
+   "from": [
+    {
+     "id": "cmqf8955b000304l7f3g3nl97",
+     "name": "Band pull apart",
+     "workspaceId": null
+    },
+    {
+     "id": "cmwdm77mi000108iij7pxcl86",
+     "name": "Band pull-apart",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmplf3xza000004l83hehuu2c",
+    "name": "Glute bridge"
+   },
+   "from": [
+    {
+     "id": "cmpv5mxqc000g04l12copvflz",
+     "name": "Bodyweight Glute Bridge",
+     "workspaceId": null
+    },
+    {
+     "id": "cmwdm77q1000508iic8uugh4j",
+     "name": "Glue bridge",
+     "workspaceId": "ws_atlas_primary"
+    },
+    {
+     "id": "cmpleyt5c000604juxs5m5y00",
+     "name": "Floor bridge",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpe5oj9q000004l8fxnvssbz",
+    "name": "Two-arm Kettlebell swings"
+   },
+   "from": [
+    {
+     "id": "cmpmpafah000604lbfqyvfddq",
+     "name": "KB Swing (hip hinge explosive)",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmq56f7o6000b04l5eb48ntj0",
+    "name": "3A Dumbbell Reverse Lunge"
+   },
+   "from": [
+    {
+     "id": "cmqjk5jwb000c04jft2xrgah1",
+     "name": "DB Reverse Lunge",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmq56f7o2000504l5zbafnjz8",
+    "name": "1A Goblet Box Squat"
+   },
+   "from": [
+    {
+     "id": "cmwdm77n3000208iirk0txoyq",
+     "name": "Goblet box squat",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmq56f7pw000r04l5pgrklebh",
+    "name": "1A Landmine Squat"
+   },
+   "from": [
+    {
+     "id": "cmplp8v23000104l780dc86ye",
+     "name": "Landmine squat",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpwmqunk000105jst80lokta",
+    "name": "Decline deficit push up"
+   },
+   "from": [
+    {
+     "id": "cmpwm1poo000e04l708dfbo3v",
+     "name": "Decline Deficit Pushup",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpe60s1x000604l881wmu6rt",
+    "name": "Lateral lunge"
+   },
+   "from": [
+    {
+     "id": "cmq56f7qa000x04l522yc4zkm",
+     "name": "3B Lateral Lunge",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpe62nhi000804l86wix3md6",
+    "name": "TRX inverted row"
+   },
+   "from": [
+    {
+     "id": "cmq56f7pt000m04l55tiytrd0",
+     "name": "3B TRX Inverted Row",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpwnqs2r000605js4oazb25g",
+    "name": "Deadman situp"
+   },
+   "from": [
+    {
+     "id": "cmwf57jq2000507ida4xp1vkh",
+     "name": "Deadman situps",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmpfhsxev000004jnzzojg6ge",
+    "name": "Suitcase carry"
+   },
+   "from": [
+    {
+     "id": "cmwf57jr5000n07id7by0o1tb",
+     "name": "Suitcase carry Carry",
+     "workspaceId": "ws_atlas_primary"
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmp4cigha002vtpbp29zirw2s",
+    "name": "Pallof Press"
+   },
+   "from": [
+    {
+     "id": "cmq56tqz1000104l1nhswzo5g",
+     "name": "palloff press",
+     "workspaceId": null
+    }
+   ]
+  },
+  {
+   "into": {
+    "id": "cmq56f7op000h04l5i6nuw33u",
+    "name": "Hollow Body Hold"
+   },
+   "from": [
+    {
+     "id": "cmpe63kho000904l81lygm1aw",
+     "name": "Hallow hold",
+     "workspaceId": null
+    }
+   ]
+  }
+ ],
+ "renames": [
+  {
+   "id": "cmpe604pa000504l8u8wn0e71",
+   "from": "DB romanian deadlift",
+   "to": "Dumbbell Romanian Deadlift"
+  },
+  {
+   "id": "cmpe5eyg1000304jyc9wj7lfz",
+   "from": "Single leg RDL",
+   "to": "Single-Leg RDL"
+  },
+  {
+   "id": "cmpe51vte000004jy9s6anto8",
+   "from": "Banded pull-aparts",
+   "to": "Band Pull-Apart"
+  },
+  {
+   "id": "cmplf3xza000004l83hehuu2c",
+   "from": "Glute bridge",
+   "to": "Glute Bridge"
+  },
+  {
+   "id": "cmpe5oj9q000004l8fxnvssbz",
+   "from": "Two-arm Kettlebell swings",
+   "to": "Kettlebell Swing"
+  },
+  {
+   "id": "cmq56f7o6000b04l5eb48ntj0",
+   "from": "3A Dumbbell Reverse Lunge",
+   "to": "Dumbbell Reverse Lunge"
+  },
+  {
+   "id": "cmq56f7o2000504l5zbafnjz8",
+   "from": "1A Goblet Box Squat",
+   "to": "Goblet Box Squat"
+  },
+  {
+   "id": "cmq56f7pw000r04l5pgrklebh",
+   "from": "1A Landmine Squat",
+   "to": "Landmine Squat"
+  },
+  {
+   "id": "cmpwmqunk000105jst80lokta",
+   "from": "Decline deficit push up",
+   "to": "Decline Deficit Push-Up"
+  },
+  {
+   "id": "cmpe60s1x000604l881wmu6rt",
+   "from": "Lateral lunge",
+   "to": "Lateral Lunge"
+  },
+  {
+   "id": "cmpe62nhi000804l86wix3md6",
+   "from": "TRX inverted row",
+   "to": "TRX Inverted Row"
+  },
+  {
+   "id": "cmpwnqs2r000605js4oazb25g",
+   "from": "Deadman situp",
+   "to": "Deadman Sit-Up"
+  },
+  {
+   "id": "cmpfhsxev000004jnzzojg6ge",
+   "from": "Suitcase carry",
+   "to": "Suitcase Carry"
+  },
+  {
+   "id": "cmp4cifen0019tpbpk19gujjs",
+   "from": "Standing Military Press",
+   "to": "Overhead Press"
+  },
+  {
+   "id": "cmp4cifuy0020tpbp6ph5yfn2",
+   "from": "Wide-Grip Lat Pulldown",
+   "to": "Lat Pulldown"
+  },
+  {
+   "id": "cmp4cif4i000xtpbpy4qvnd4z",
+   "from": "Barbell Bench Press - Medium Grip",
+   "to": "Bench Press"
+  },
+  {
+   "id": "cmp4ciemu0004tpbphbyyubci",
+   "from": "Barbell Squat",
+   "to": "Back Squat"
+  },
+  {
+   "id": "cmp4cieuo000ftpbp6em25h2a",
+   "from": "Barbell Deadlift",
+   "to": "Deadlift"
+  },
+  {
+   "id": "cmp4cifj8001ktpbpzerf02dz",
+   "from": "Bent Over Barbell Row",
+   "to": "Barbell Row"
+  },
+  {
+   "id": "cmp4ciezv000mtpbp226e6ik3",
+   "from": "Barbell Hip Thrust",
+   "to": "Hip Thrust"
+  },
+  {
+   "id": "cmp4cifol001rtpbpk2zw1ti2",
+   "from": "Seated Cable Rows",
+   "to": "Seated Cable Row"
+  },
+  {
+   "id": "cmp4cifh1001ftpbp72d1c9tk",
+   "from": "Side Lateral Raise",
+   "to": "Lateral Raise"
+  },
+  {
+   "id": "cmp4cifyk0028tpbpg2ef9wk5",
+   "from": "Dumbbell Lunges",
+   "to": "Dumbbell Lunge"
+  },
+  {
+   "id": "cmp4cig8l002htpbpw4xvkfac",
+   "from": "Farmer's Walk",
+   "to": "Farmer's Carry"
+  },
+  {
+   "id": "cmp4cif0r000otpbpvn03fz7c",
+   "from": "Single Leg Glute Bridge",
+   "to": "Single-Leg Glute Bridge"
+  },
+  {
+   "id": "cmp4cifso001vtpbpacavfuh5",
+   "from": "Pullups",
+   "to": "Pull-Up"
+  },
+  {
+   "id": "cmp4cif2g000stpbpnbqvnl74",
+   "from": "Pushups",
+   "to": "Push-Up"
+  },
+  {
+   "id": "cmp4cifnq001ptpbpqsf8pi4e",
+   "from": "Dumbbell Incline Row",
+   "to": "Chest-Supported Row"
+  },
+  {
+   "id": "cmp4cig43002ctpbpcbk982dx",
+   "from": "Split Squat with Dumbbells",
+   "to": "Dumbbell Split Squat"
+  },
+  {
+   "id": "cmp4cifwq0024tpbpiki4mysw",
+   "from": "Bent-Arm Dumbbell Pullover",
+   "to": "Dumbbell Pullover"
+  },
+  {
+   "id": "cmp4cifxd0025tpbpez0atead",
+   "from": "Bodyweight Walking Lunge",
+   "to": "Walking Lunge"
+  },
+  {
+   "id": "cmp4cig3a002btpbp5h3f02y4",
+   "from": "Split Squats",
+   "to": "Split Squat"
+  },
+  {
+   "id": "cmp4cif3c000utpbpnxia3k5v",
+   "from": "Push-Ups - Close Triceps Position",
+   "to": "Close-Grip Push-Up"
+  },
+  {
+   "id": "cmp4cifo4001qtpbp0gm8zqiw",
+   "from": "Seated Bent-Over Rear Delt Raise",
+   "to": "Rear Delt Raise"
+  }
+ ],
+ "scopeInto": "ws_atlas_primary",
+ "aliases": [
+  {
+   "id": "cmp4cifa50014tpbp0z5dlzim",
+   "exercise": "Low Cable Crossover",
+   "name": "Cable Fly"
+  }
+ ]
+}

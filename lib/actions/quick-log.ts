@@ -13,6 +13,8 @@ import { athleteIdentity } from "@/lib/athlete/identity";
 import { prisma } from "@/lib/db/client";
 import { MovementPattern, Prisma } from "@/app/generated/prisma/client";
 import { displayName } from "@/lib/plan/catalog";
+import { findExerciseByName, liveExercise, visibleTo } from "@/lib/exercises/find";
+import { hasBlockLabel, nameKey } from "@/lib/exercises/names";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { requestDay } from "@/lib/sessions/request-day";
 import { QuickSessionInput, cleanSession, matchesTokens, searchTokens, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
@@ -78,13 +80,20 @@ export async function searchQuickExercises(raw: { clientId?: string | null; q: s
   const mine = (await history(scope.clientId)).filter((e) => matchesTokens(e.name, tokens)).sort((a, b) => b.times - a.times).slice(0, 6);
   const seen = new Set(mine.map((e) => e.id));
   const names = new Set(mine.map((e) => e.name.toLowerCase()));
+  const keys = new Set(mine.map((e) => nameKey(e.name)));
+  // Old names find the exercise too ("military press" → Overhead Press).
+  const aliased = await prisma.exerciseAlias.findMany({
+    where: { OR: [{ workspaceId: null }, { workspaceId: scope.workspaceId }], AND: tokens.map((t) => ({ name: { contains: t, mode: "insensitive" as const } })) },
+    select: { exerciseId: true },
+    take: 25,
+  });
   const library = await prisma.exercise.findMany({
     where: {
-      // "atlas-" rows are the plan generator's catalog: near-duplicates of the library's own.
-      NOT: { slug: { startsWith: "atlas-" } },
-      OR: [{ workspaceId: null }, { workspaceId: scope.workspaceId }],
-      AND: tokens.map((t) => ({ name: { contains: t, mode: "insensitive" as const } })),
-      id: { notIn: Array.from(seen) },
+      ...visibleTo(scope.workspaceId),
+      AND: [
+        { OR: [{ AND: tokens.map((t) => ({ name: { contains: t, mode: "insensitive" as const } })) }, { id: { in: aliased.map((a) => a.exerciseId) } }] },
+        { id: { notIn: Array.from(seen) } },
+      ],
     },
     select: { id: true, name: true, slug: true, workspaceId: true, movementPattern: true, equipment: true },
     orderBy: { name: "asc" },
@@ -93,7 +102,7 @@ export async function searchQuickExercises(raw: { clientId?: string | null; q: s
   const lib = library
     .map((e) => ({ id: e.id, name: displayName(e.slug, e.name), times: 0, isNew: isTypedNew(e) }))
     // Not spreadsheet-labelled copies ("3A One-Arm Dumbbell Row") or names already listed.
-    .filter((e) => !/^\d+[A-Z]?\s/.test(e.name) && !names.has(e.name.toLowerCase()))
+    .filter((e) => !hasBlockLabel(e.name) && !names.has(e.name.toLowerCase()) && !keys.has(nameKey(e.name)) && keys.add(nameKey(e.name)))
     .sort((a, b) => a.name.length - b.name.length)
     .slice(0, 12 - mine.length);
   return [...mine.map(({ id, name, times, isNew }) => ({ id, name, times, isNew })), ...lib];
@@ -145,13 +154,9 @@ export async function loadQuickSession(raw: { clientId?: string | null; sessionI
   return { id: s.id, date: s.date.toISOString(), title: s.title, notes: s.clientNotes, durationMin: s.durationMin, exercises };
 }
 
-/** A typed name: the library's exercise of exactly that name if there is one, else a new private one. */
+/** A typed name: the exercise it means (exact, a saved alternate name, or the same name written differently), else a new private one. */
 async function exerciseForName(name: string, workspaceId: string, tx: Prisma.TransactionClient): Promise<string> {
-  const same = await tx.exercise.findFirst({
-    where: { name: { equals: name, mode: "insensitive" }, OR: [{ workspaceId: null }, { workspaceId }] },
-    orderBy: { workspaceId: "asc" }, // the shared one first
-    select: { id: true },
-  });
+  const same = await findExerciseByName(name, workspaceId, tx);
   if (same) return same.id;
   const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now()}`;
   const created = await tx.exercise.create({
@@ -176,10 +181,14 @@ export async function saveQuickSession(raw: unknown): Promise<QuickSaveResult> {
   const date = requestDay(input.date);
   if (date.getTime() > Date.now() + 36 * 3_600_000) return { ok: false, error: "That date is in the future." };
 
-  // Library exercises must be ones this client can see.
-  const ids = clean.exercises.map((e) => e.exerciseId).filter((id): id is string => id != null);
-  const visible = await prisma.exercise.count({ where: { id: { in: ids }, OR: [{ workspaceId: null }, { workspaceId: scope.workspaceId }] } });
-  if (visible !== new Set(ids).size) return { ok: false, error: "One of those exercises isn't available. Remove it and add it again." };
+  // Library exercises must be ones this client can see. One merged since the screen opened
+  // (an on-device copy can be days old) is saved as what it was merged into.
+  for (const e of clean.exercises) {
+    if (!e.exerciseId) continue;
+    const live = await liveExercise(e.exerciseId);
+    if (!live || (live.workspaceId !== null && live.workspaceId !== scope.workspaceId)) return { ok: false, error: "One of those exercises isn't available. Remove it and add it again." };
+    e.exerciseId = live.id;
+  }
 
   const sessionId = await prisma.$transaction(
     async (tx) => {

@@ -80,7 +80,7 @@ export const CATALOG: CatalogExercise[] = [
   ex("pushups", "Push-Up", "HORIZONTAL_PUSH", "bodyweight", "upper", ["chest", "triceps"], null, 0),
   ex("decline-push-up", "Decline Push-Up", "HORIZONTAL_PUSH", "bodyweight", "upper", ["upper chest", "shoulders"], null, 0),
   ex("push-ups-close-triceps-position", "Close-Grip Push-Up", "HORIZONTAL_PUSH", "bodyweight", "upper", ["triceps", "chest"], null, 0),
-  ex("low-cable-crossover", "Cable Fly", "HORIZONTAL_PUSH", "cable", "upper", ["chest"], 25, 5),
+  ex("low-cable-crossover", "Low Cable Crossover", "HORIZONTAL_PUSH", "cable", "upper", ["chest"], 25, 5),
   // ── Vertical push ────────────────────────────────────────────────────────
   ex("standing-military-press", "Overhead Press", "VERTICAL_PUSH", "barbell", "upper", ["shoulders", "triceps"], 95, 5),
   ex("dumbbell-shoulder-press", "Dumbbell Shoulder Press", "VERTICAL_PUSH", "dumbbell", "upper", ["shoulders", "triceps"], 40, 5),

@@ -1,0 +1,610 @@
+[
+ {
+  "id": "cmq56f7pw000r04l5pgrklebh",
+  "name": "Landmine Squat",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7py000u04l5znfr2juu",
+  "name": "1B Front-Foot-Elevated Split Squat",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "correction",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7ny000104l50lrlh0av",
+  "name": "1B Stability Ball Wall Squat",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7qf001504l56q418a3u",
+  "name": "1B Standing Single-Arm Landmine Press",
+  "workspaceId": null,
+  "group": "Shoulders",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmq56f7pz000v04l5ro4cw5q4",
+  "name": "2A Kettlebell / DB Deadlift",
+  "workspaceId": null,
+  "group": "Hamstrings",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7qe001304l5ioahk4ko",
+  "name": "2B Half-Kneeling Single-Arm Pulldown",
+  "workspaceId": null,
+  "group": "Back",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmq56f7pu000n04l5gf8d2jf0",
+  "name": "3A Half-Kneeling Landmine Press",
+  "workspaceId": null,
+  "group": "Shoulders",
+  "kind": "hand",
+  "sets": 9
+ },
+ {
+  "id": "cmpvd17ye000004gz4nn9qvrt",
+  "name": "90/90 stretch",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpmpafae000304lbecl9i6tq",
+  "name": "Assault Bike",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 0
+ },
+ {
+  "id": "cmpmpafaz000f04lb0i11bs8v",
+  "name": "Assault Bike — sprint intervals (seated, high seat)",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 4
+ },
+ {
+  "id": "cmpwmy79l000205jswe9kqwqg",
+  "name": "Band assisted Reverse nordic",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 7
+ },
+ {
+  "id": "cmpv5mxqi000n04l117lcfpdh",
+  "name": "Banded Standing Hip Abduction",
+  "workspaceId": null,
+  "group": "Glutes & hips",
+  "kind": "hand",
+  "sets": 12
+ },
+ {
+  "id": "cmq56f7pw000s04l5odom8pq0",
+  "name": "Battle Ropes",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 8
+ },
+ {
+  "id": "cmq56f7oo000g04l5uiwfmqoz",
+  "name": "Bird Dog",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 15
+ },
+ {
+  "id": "cmpwn2a2g000305js1yohb1zz",
+  "name": "Copenhagen Iso",
+  "workspaceId": null,
+  "group": "Glutes & hips",
+  "kind": "hand",
+  "sets": 5
+ },
+ {
+  "id": "cmpwnqs2r000605js4oazb25g",
+  "name": "Deadman Sit-Up",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpwm1poi000904l7im1vhrqf",
+  "name": "Depth Drop",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 8
+ },
+ {
+  "id": "cmqjk5jw4000604jfpi17lv84",
+  "name": "Dynamic: hip CARs, walking lunge w/ twist, wall slides, glute bridge",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmqjk5jw2000404jf4ore8rjy",
+  "name": "Dynamic: leg swings, world's greatest stretch, knee hugs, band pull-aparts",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmpmpafau000904lbwo5x40rz",
+  "name": "FS 90 deg. — feet out wide",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmq56f7ol000d04l5eiyqum19",
+  "name": "Foam Roll: Lats / T-Spine / Pecs",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmqjk5jvz000104jf20tw7lhb",
+  "name": "Foam Roll: calves, quads, lats, T-spine",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmqjk5jw8000a04jfbmuh14z0",
+  "name": "Foam Roll: glutes, adductors, upper back, lats",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmqz88d9t000904jr0zdpdmsz",
+  "name": "Foam-Roller Segmental T-Spine Extensions",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "correction",
+  "sets": 0
+ },
+ {
+  "id": "cmpe5bg8u000204jyaejjl293",
+  "name": "Front-foot elevated split squat hold",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "correction",
+  "sets": 2
+ },
+ {
+  "id": "cmpmpafaw000b04lb2lod2uvj",
+  "name": "GHD Hamstring Curl (or Nordic)",
+  "workspaceId": null,
+  "group": "Hamstrings",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpe63kho000904l81lygm1aw",
+  "name": "Hallow hold",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 8
+ },
+ {
+  "id": "cmwdm77nn000308iixu3gxp6e",
+  "name": "Hinge",
+  "workspaceId": "ws_atlas_primary",
+  "group": "Hamstrings",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7op000h04l5i6nuw33u",
+  "name": "Hollow Body Hold",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 9
+ },
+ {
+  "id": "cmpwnt4e7000805js604mkhhx",
+  "name": "IYT",
+  "workspaceId": null,
+  "group": "Shoulders",
+  "kind": "hand",
+  "sets": 4
+ },
+ {
+  "id": "cmqjk5jw3000504jfdzo5ay9n",
+  "name": "Incline Treadmill Walk (Fuji prep)",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 0
+ },
+ {
+  "id": "cmpe61k2f000704l8duit4qn3",
+  "name": "Incline chest press",
+  "workspaceId": null,
+  "group": "Chest",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7qc001004l5g7q3ddp8",
+  "name": "KB Swing + Farmer's Carry (combo)",
+  "workspaceId": null,
+  "group": "Hamstrings",
+  "kind": "correction",
+  "sets": 8
+ },
+ {
+  "id": "cmplf04dh000704jus8zvfe5z",
+  "name": "Kick Stand Lunge hold",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 21
+ },
+ {
+  "id": "cmpwn64ww000405jsqc31l4xr",
+  "name": "Land mine rotational push",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpe5sch1000204l8fdls048o",
+  "name": "Landmine",
+  "workspaceId": null,
+  "group": "Shoulders",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmplfaqou000404l8hmg10v2m",
+  "name": "Landmine press",
+  "workspaceId": null,
+  "group": "Shoulders",
+  "kind": "hand",
+  "sets": 10
+ },
+ {
+  "id": "cmpe5ft3l000404jymro3ioku",
+  "name": "Lat stretch",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 4
+ },
+ {
+  "id": "cmpe60s1x000604l881wmu6rt",
+  "name": "Lateral Lunge",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7pv000q04l5n90bjcty",
+  "name": "Leg Swings (front & side)",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 2
+ },
+ {
+  "id": "cmpv5mxq8000b04l1pldwv8ir",
+  "name": "Machine Chest Press",
+  "workspaceId": null,
+  "group": "Chest",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7qc001104l5rf4fw66b",
+  "name": "Med Ball Rotational Throw",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7o4000804l5wjmyoy7i",
+  "name": "Med Ball Slam",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "correction",
+  "sets": 9
+ },
+ {
+  "id": "cmpwm1por000j04l7rdbyv9zk",
+  "name": "Prone Partner Hamstring Curl",
+  "workspaceId": null,
+  "group": "Hamstrings",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpv5mxqd000i04l13grb7q6k",
+  "name": "Quadruped Open-Book Rotation",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq56f7qb000z04l5ljzl9zqy",
+  "name": "Quadruped T-Spine Rotation",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 2
+ },
+ {
+  "id": "cmwcoteib000108l6d0abrrf4",
+  "name": "Recumbent bike",
+  "workspaceId": "ws_atlas_primary",
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 5
+ },
+ {
+  "id": "cmq56f7qi001604l5sdeyzgar",
+  "name": "Row or Bike Intervals",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 0
+ },
+ {
+  "id": "cmwcoteje000308l6uep1kmdy",
+  "name": "Row with band",
+  "workspaceId": "ws_atlas_primary",
+  "group": "Back",
+  "kind": "hand",
+  "sets": 2
+ },
+ {
+  "id": "cmq56f7om000e04l5n1q7w2ri",
+  "name": "Scapular Wall Slides",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 10
+ },
+ {
+  "id": "cmpmpafav000a04lbajgs5dxa",
+  "name": "Short Arc Quad (30° → full extension)",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmpmpafad000204lbwn9dhdx0",
+  "name": "Side-Lying Hip Abduction",
+  "workspaceId": null,
+  "group": "Glutes & hips",
+  "kind": "hand",
+  "sets": 1
+ },
+ {
+  "id": "cmplf51xu000104l803q0qabt",
+  "name": "Single leg Reach Forward",
+  "workspaceId": null,
+  "group": "Hamstrings",
+  "kind": "hand",
+  "sets": 16
+ },
+ {
+  "id": "cmqjk5jw1000304jf4jssirhp",
+  "name": "Single-Leg Balance (progress to reach)",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 2
+ },
+ {
+  "id": "cmp4cigmf0031tpbpn2uxuxuw",
+  "name": "Sled Push",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 30
+ },
+ {
+  "id": "cmq56f7o7000c04l5yj5y7ffu",
+  "name": "Sled Push (20 yd)",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 6
+ },
+ {
+  "id": "cmpmpafay000e04lbr8f3u3l6",
+  "name": "Sled Push (moderate load, upright posture)",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 4
+ },
+ {
+  "id": "cmqz88d9x000c04jru00o4rj7",
+  "name": "Sled Push / Drag (high handles, short strides)",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 0
+ },
+ {
+  "id": "cmqjk5jwd000e04jfb7z1ii5w",
+  "name": "Standing 1-Arm Cable / Band Row",
+  "workspaceId": null,
+  "group": "Back",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpe5yz1i000404l8p7q27hug",
+  "name": "Standing Row athletic stance",
+  "workspaceId": null,
+  "group": "Back",
+  "kind": "hand",
+  "sets": 4
+ },
+ {
+  "id": "cmwcotelg000508l63frp1nm7",
+  "name": "Standing march w/ band",
+  "workspaceId": "ws_atlas_primary",
+  "group": "Core",
+  "kind": "hand",
+  "sets": 4
+ },
+ {
+  "id": "cmpv5mxqf000l04l1e14zdcx6",
+  "name": "Suitcase Hold / March (in place)",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 2
+ },
+ {
+  "id": "cmpfhsxev000004jnzzojg6ge",
+  "name": "Suitcase Carry",
+  "workspaceId": null,
+  "group": "Core",
+  "kind": "hand",
+  "sets": 7
+ },
+ {
+  "id": "cmqjk5jwe000f04jfwwl128wu",
+  "name": "Swim OR Incline Walk",
+  "workspaceId": null,
+  "group": "Conditioning",
+  "kind": "correction",
+  "sets": 0
+ },
+ {
+  "id": "cmpv5mxqa000d04l1p3wcp7uq",
+  "name": "T-spine ext. over roller + Cat-Cow",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmpmpafb0000g04lba6ies68i",
+  "name": "Terminal Knee Extension — band",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 11
+ },
+ {
+  "id": "cmpv5mxqe000j04l1xa1wpdeb",
+  "name": "Trap Bar Quarter Squat (high handles)",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 9
+ },
+ {
+  "id": "cmpwn94o1000505jswpeudtni",
+  "name": "Trap bar high pull",
+  "workspaceId": null,
+  "group": "Back",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpmpafax000d04lbow6ut2gk",
+  "name": "Wall Sit — partial (45–70° knee angle only)",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpe53hme000104jyaro2wpas",
+  "name": "World's Greatest",
+  "workspaceId": null,
+  "group": "Mobility",
+  "kind": "correction",
+  "sets": 2
+ },
+ {
+  "id": "cmpvfu1gq000404l8xc7ixhvk",
+  "name": "bent db row",
+  "workspaceId": null,
+  "group": "Back",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmq57mpn6000204i953cc9vaz",
+  "name": "bent knee copenhagen",
+  "workspaceId": null,
+  "group": "Glutes & hips",
+  "kind": "hand",
+  "sets": 4
+ },
+ {
+  "id": "cmq57ov4w000304i9o80sxa5h",
+  "name": "floor chest throw",
+  "workspaceId": null,
+  "group": "Chest",
+  "kind": "hand",
+  "sets": 6
+ },
+ {
+  "id": "cmqf86r5p000004l7lh0vtqgm",
+  "name": "lunge pulse",
+  "workspaceId": null,
+  "group": "Quads",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmqf8cncc000804l7xznf7exg",
+  "name": "marches on the belt squat",
+  "workspaceId": null,
+  "group": "Glutes & hips",
+  "kind": "hand",
+  "sets": 3
+ },
+ {
+  "id": "cmpv6cpfi000104l5pg9sigip",
+  "name": "nordic curl machine",
+  "workspaceId": null,
+  "group": "Hamstrings",
+  "kind": "hand",
+  "sets": 6
+ }
+]

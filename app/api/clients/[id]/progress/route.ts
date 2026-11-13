@@ -25,11 +25,9 @@ export const GET = withWorkspace<{ id: string }>(async (_req, { workspaceId }, c
   if (keyLiftIds.length === 0) {
     const defaultLifts = await prisma.exercise.findMany({
       where: {
-        OR: [{ workspaceId: null }, { workspaceId }],
-        name: {
-          in: ["Barbell Back Squat", "Barbell Bench Press", "Barbell Deadlift",
-               "Barbell Overhead Press", "Barbell Row"],
-        },
+        workspaceId: null,
+        // By slug, so renaming an exercise never drops it from here.
+        slug: { in: ["barbell-squat", "barbell-bench-press-medium-grip", "barbell-deadlift", "standing-military-press", "bent-over-barbell-row"] },
       },
       select: { id: true, name: true },
     });

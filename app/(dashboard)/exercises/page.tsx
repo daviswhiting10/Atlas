@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { visibleTo } from "@/lib/exercises/find";
 import { displayName } from "@/lib/plan/catalog";
 import { pictureFor } from "@/lib/exercises/pictures";
 import { blobConfigured, mediaPictures, sameName } from "@/lib/exercises/media";
@@ -20,7 +21,7 @@ export default async function ExercisesPage() {
   if (!workspaceId || session.user.role === "CLIENT") redirect("/login");
 
   const [exercises, assigned, templated] = await Promise.all([
-    prisma.exercise.findMany({ where: { OR: [{ workspaceId: null }, { workspaceId }] }, select: { id: true, name: true, slug: true, gifUrl: true } }),
+    prisma.exercise.findMany({ where: visibleTo(workspaceId), select: { id: true, name: true, slug: true, gifUrl: true } }),
     prisma.assignedWorkoutExercise.findMany({ where: { workspaceId }, distinct: ["exerciseId"], select: { exerciseId: true } }),
     prisma.workoutExercise.findMany({ where: { workspaceId }, distinct: ["exerciseId"], select: { exerciseId: true } }),
   ]);

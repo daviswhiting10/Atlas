@@ -3,6 +3,13 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { prisma } from "../lib/db/client";
 import { SEED_EXERCISES } from "../data/exercise-seed";
+import { isProductionDatabase } from "../lib/db/production";
+
+// The seed rewrites the exercise library and deletes rows not in its list. Never on production.
+if (isProductionDatabase(process.env.DATABASE_URL)) {
+  console.error("Refusing to seed: DATABASE_URL is the production database. Point it at a Neon branch.");
+  process.exit(1);
+}
 
 const WORKSPACE_ID = "ws_atlas_primary";
 

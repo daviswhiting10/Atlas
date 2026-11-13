@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@/lib/db/client";
+import { liveExercise } from "@/lib/exercises/find";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { CATALOG_BY_SLUG } from "./catalog";
 import { ensureCatalog } from "./persist";
@@ -85,11 +86,9 @@ async function resolveExercise(scope: PlanScope, ref: { slug?: string; exerciseI
     return { id, unit: CATALOG_BY_SLUG[ref.slug].unit ?? ("reps" as const) };
   }
   if (ref.exerciseId) {
-    const e = await prisma.exercise.findFirst({
-      where: { id: ref.exerciseId, OR: [{ workspaceId: null }, { workspaceId: scope.workspaceId }] },
-      select: { id: true, slug: true },
-    });
-    if (!e) throw notFound("That exercise");
+    // An exercise merged into another stands for that one.
+    const e = await liveExercise(ref.exerciseId);
+    if (!e || (e.workspaceId !== null && e.workspaceId !== scope.workspaceId)) throw notFound("That exercise");
     return { id: e.id, unit: CATALOG_BY_SLUG[e.slug]?.unit ?? ("reps" as const) };
   }
   throw invalid("Say which exercise.");

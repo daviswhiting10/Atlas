@@ -42,7 +42,7 @@ export function ensureCatalog(): Promise<Record<string, string>> {
     const slugs = CATALOG.map((e) => e.slug);
     const existing = await prisma.exercise.findMany({
       where: { slug: { in: slugs } },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, mergedIntoId: true },
     });
     const have = new Set(existing.map((e) => e.slug));
     const missing = CATALOG.filter((e) => !have.has(e.slug));
@@ -62,9 +62,10 @@ export function ensureCatalog(): Promise<Record<string, string>> {
     }
     const all =
       missing.length > 0
-        ? await prisma.exercise.findMany({ where: { slug: { in: slugs } }, select: { id: true, slug: true } })
+        ? await prisma.exercise.findMany({ where: { slug: { in: slugs } }, select: { id: true, slug: true, mergedIntoId: true } })
         : existing;
-    return Object.fromEntries(all.map((e) => [e.slug, e.id]));
+    // A catalog exercise merged into another (Stiff-Legged Dumbbell Deadlift → Dumbbell Romanian Deadlift) plans as that one.
+    return Object.fromEntries(all.map((e) => [e.slug, e.mergedIntoId ?? e.id]));
   })().catch((err) => {
     catalogReady = null; // don't cache a failure
     throw err;

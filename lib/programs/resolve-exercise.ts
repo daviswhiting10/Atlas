@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { MovementPattern } from "@/app/generated/prisma/client";
 import { CATALOG } from "@/lib/plan/catalog";
+import { findExerciseByName, liveExercise, visibleTo } from "@/lib/exercises/find";
 
 /**
  * Match an exercise name from the screenshot to the library: the shared one,
@@ -8,22 +9,20 @@ import { CATALOG } from "@/lib/plan/catalog";
  * workspace, never in the shared library.
  */
 export async function resolveExercise(name: string, workspaceId: string): Promise<{ id: string; name: string }> {
-  const visible = { OR: [{ workspaceId: null }, { workspaceId }] };
+  const visible = visibleTo(workspaceId);
   // Coaches' shorthand, spelled out: "DB Bench Press" is the Dumbbell Bench Press.
   name = expandShorthand(name);
 
   // 1) Atlas's own catalog, by its display name ("Walking Lunge"): the cleanest match there is.
   const fromCatalog = CATALOG.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
   if (fromCatalog) {
-    const ex = await prisma.exercise.findFirst({ where: { slug: fromCatalog.slug, workspaceId: null }, select: { id: true, name: true } });
-    if (ex) return ex;
+    const row = await prisma.exercise.findFirst({ where: { slug: fromCatalog.slug, workspaceId: null }, select: { id: true } });
+    const ex = row && (await liveExercise(row.id)); // it may have been merged into another
+    if (ex) return { id: ex.id, name: ex.name };
   }
 
-  // 2) exact name match
-  let ex = await prisma.exercise.findFirst({
-    where: { ...visible, name: { equals: name, mode: "insensitive" } },
-    select: { id: true, name: true },
-  });
+  // 2) the exact name, a saved alternate name, or the same name written differently ("1A DB RDL")
+  let ex = await findExerciseByName(name, workspaceId);
   if (ex) return ex;
 
   // 3) a name containing it, only when it's specific enough to be the same exercise: two words or

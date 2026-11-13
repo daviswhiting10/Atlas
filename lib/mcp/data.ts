@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@/lib/db/client";
+import { liveExercise } from "@/lib/exercises/find";
 import { withDerivedStatus } from "@/lib/sessions/status";
 import { LIGHTER_SELECT, isLighterWeek } from "@/lib/plan/lighter";
 import { displayName } from "@/lib/plan/catalog";
@@ -109,10 +110,11 @@ export async function loadSetRows(
 
 /** An exercise the workspace may see: its own, or the global library (workspaceId null). */
 export async function findVisibleExercise(exerciseId: string, workspaceId: string) {
-  const e = await prisma.exercise.findFirst({
-    where: { id: exerciseId, OR: [{ workspaceId: null }, { workspaceId }] },
-    select: { id: true, name: true, slug: true, movementPattern: true, equipment: true },
-  });
+  // An exercise merged into another stands for that one.
+  const live = await liveExercise(exerciseId);
+  const e = live && (live.workspaceId === null || live.workspaceId === workspaceId)
+    ? await prisma.exercise.findUnique({ where: { id: live.id }, select: { id: true, name: true, slug: true, movementPattern: true, equipment: true } })
+    : null;
   return e ? { ...e, name: displayName(e.slug, e.name) } : null;
 }
 

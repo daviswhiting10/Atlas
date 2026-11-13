@@ -227,7 +227,52 @@ model Exercise {
   coachNotes        ExerciseCoachNote[]
   milestones        Milestone[]
   media             ExerciseMedia[]
+  /// Set when this exercise was merged into another: hidden, kept so the merge can be undone.
+  mergedIntoId      String?
+  mergedInto        Exercise?                 @relation("ExerciseMerged", fields: [mergedIntoId], references: [id])
+  mergedFrom        Exercise[]                @relation("ExerciseMerged")
+  aliases           ExerciseAlias[]
   createdAt         DateTime                  @default(now())
+
+  @@index([mergedIntoId])
+}
+
+/// Another name for an exercise ("DB RDL" → Dumbbell Romanian Deadlift). Shared when workspaceId is null.
+model ExerciseAlias {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  exerciseId  String
+  exercise    Exercise @relation(fields: [exerciseId], references: [id])
+  name        String
+  /// The name as matching sees it (see lib/exercises/names.ts).
+  key         String
+  /// "merge" | "rename" | "confirmed"
+  source      String
+  createdAt   DateTime @default(now())
+
+  @@index([key])
+  @@index([exerciseId])
+}
+
+/// Every change made to the exercise library by a cleanup, with what's needed to undo it.
+model ExerciseChange {
+  id         String    @id @default(cuid())
+  /// One run of a cleanup; undo works a batch at a time, newest change first.
+  batch      String
+  /// "picture" | "merge" | "rename" | "alias" | "scope" | "muscles"
+  kind       String
+  exerciseId String
+  intoId     String?
+  before     Json
+  after      Json
+  /// For a merge: the ids of every row moved, by table.
+  moved      Json?
+  by         String
+  createdAt  DateTime  @default(now())
+  reversedAt DateTime?
+
+  @@index([batch])
+  @@index([exerciseId])
 }
 
 // Workout: used both as a standalone template (blockId=null) and as part of a Block (blockId set)

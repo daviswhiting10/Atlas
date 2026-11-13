@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
+import { visibleTo } from "@/lib/exercises/find";
 import { displayName } from "@/lib/plan/catalog";
 import { ALL_ROLES } from "../auth";
 import { MOVEMENT_PATTERNS } from "../schemas";
@@ -21,7 +22,7 @@ export const searchExercises = workspaceTool({
     const exercises = await prisma.exercise.findMany({
       where: {
         // Global library (workspaceId null) is readable by everyone; anything else must be the caller's own.
-        OR: [{ workspaceId: null }, { workspaceId: caller.workspaceId }],
+        ...visibleTo(caller.workspaceId),
         ...(args.query && { name: { contains: args.query, mode: "insensitive" } }),
         ...(args.movementPattern && { movementPattern: args.movementPattern }),
         ...(args.equipment && { equipment: { contains: args.equipment, mode: "insensitive" } }),

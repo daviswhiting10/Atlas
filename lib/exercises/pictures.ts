@@ -242,3 +242,12 @@ export function pictureFor(ex: { name: string; gifUrl?: string | null }): Pictur
 
 /** For tests and tuning. */
 export const _match = (name: string) => match(name)?.n ?? null;
+
+/**
+ * The library picture a name matches today, as a link to store on the
+ * exercise. Stored, it no longer depends on the name, so a rename keeps it.
+ */
+export function libraryPictureUrl(name: string): string | null {
+  const e = match(name);
+  return e ? framesFor(e.k, 1)[0] : null;
+}

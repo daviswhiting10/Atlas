@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { visibleTo } from "@/lib/exercises/find";
 import { MovementPattern } from "@/app/generated/prisma/client";
 
 export async function GET(req: Request) {
@@ -19,11 +20,8 @@ export async function GET(req: Request) {
 
   const exercises = await prisma.exercise.findMany({
     where: {
-      // "atlas-" entries belong to the plan generator's own catalog; hiding
-      // them keeps the coach's picker free of near-duplicates.
-      NOT: { slug: { startsWith: "atlas-" } },
-      // The shared library, plus exercises private to this coach's workspace.
-      OR: [{ workspaceId: null }, ...(session.user.workspaceId ? [{ workspaceId: session.user.workspaceId }] : [])],
+      // The shared library, plus exercises private to this coach's workspace; never a merged-away one.
+      ...visibleTo(session.user.workspaceId ?? null),
       ...(q && { name: { contains: q, mode: "insensitive" } }),
       ...(pattern && { movementPattern: pattern as never }),
       ...(equipment && { equipment }),
