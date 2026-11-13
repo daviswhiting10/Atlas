@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { ArrowRight, Check, ChevronRight, Dumbbell, SkipForward } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Dumbbell, Plus, SkipForward } from "lucide-react";
 import { getAthlete, getPlanOverview, getProgress } from "@/lib/athlete/data";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { Greeting } from "@/components/athlete/Greeting";
@@ -54,6 +54,9 @@ export default async function TodayPage() {
             <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Your coach hasn&apos;t assigned a program yet. It will show up here as soon as they do.</p>
           )}
         </div>
+        <Link href="/workouts/new" className="press mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+          <Plus className="h-4 w-4" /> Log a workout
+        </Link>
       </div>
     );
   }
@@ -135,6 +138,10 @@ export default async function TodayPage() {
           )}
         </section>
       )}
+
+      <Link href="/workouts/new" className="press -mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+        <Plus className="h-4 w-4" /> Log a different workout
+      </Link>
 
       <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
         {/* ── This week ──────────────────────────────────────────────── */}

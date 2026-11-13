@@ -57,6 +57,9 @@ export function PlanNotLive({
           <Link href={`/clients/${clientId}/programs/${draft.id}`} className="mt-3 block text-center text-sm text-muted-foreground hover:text-foreground">
             Check it first
           </Link>
+          <Link href={`/clients/${clientId}/log-workout`} className="mt-2 block text-center text-sm text-muted-foreground hover:text-foreground">
+            Log a workout without a plan
+          </Link>
         </>
       ) : (
         <>
@@ -66,6 +69,9 @@ export function PlanNotLive({
             className="press mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-ink text-lg font-semibold text-white hover:bg-ink/85"
           >
             Add {firstName}&rsquo;s plan
+          </Link>
+          <Link href={`/clients/${clientId}/log-workout`} className="mt-3 block text-center text-sm text-muted-foreground hover:text-foreground">
+            Log a workout without a plan
           </Link>
         </>
       )}

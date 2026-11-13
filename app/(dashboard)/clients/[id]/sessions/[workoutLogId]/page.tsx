@@ -32,6 +32,8 @@ type SessionDetail = {
   durationMin: number | null;
   rpeAvg: number | null;
   clientNotes: string | null;
+  source: "PLAN" | "GENERATED" | "MANUAL" | "SCREENSHOT" | "OFF_PLAN";
+  title: string | null;
   client: { id: string; fullName: string };
   assignedWorkout: {
     id: string;
@@ -432,11 +434,16 @@ export default function SessionDetailPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-              {session.assignedWorkout?.programAssignment.name ?? "Ad-hoc session"}
+              {session.assignedWorkout?.programAssignment.name ?? "Off-plan"}
             </p>
             <p className="text-lg font-semibold mt-0.5">
-              {session.assignedWorkout?.name ?? "Session"}
+              {session.assignedWorkout?.name ?? session.title ?? "Workout"}
             </p>
+            {session.source === "OFF_PLAN" && (
+              <Link href={`/clients/${clientId}/log-workout?session=${session.id}`} className="mt-1 inline-block text-sm font-medium text-ink-soft hover:text-ink">
+                Edit workout
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {session.rpeAvg != null && (

@@ -30,6 +30,7 @@ import {
   ChevronDown,
   CalendarDays,
   MoreHorizontal,
+  Plus,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -63,6 +64,8 @@ type Client = {
     date: string;
     durationMin: number | null;
     clientNotes: string | null;
+    source: "PLAN" | "GENERATED" | "MANUAL" | "SCREENSHOT" | "OFF_PLAN";
+    title: string | null;
     _count: { sets: number };
     assignedWorkout: {
       scheduledDate: string;
@@ -139,8 +142,12 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [invite, setInvite] = useState<InviteResult | null>(null);
-  // ?tab=plan opens the Plan view (the log page links there when there's no plan).
-  const [view, setView] = useState<View>(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "plan" ? "plan" : "progress"));
+  // ?tab=plan opens the Plan view (the log page links there when there's no plan);
+  // ?tab=sessions opens Sessions (after logging a workout).
+  const [view, setView] = useState<View>(() => {
+    const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+    return tab === "plan" || tab === "sessions" ? tab : "progress";
+  });
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -364,6 +371,13 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
           <ClipboardList className="h-5 w-5" />
           Log session
         </Link>
+        <Link
+          href={`/clients/${client.id}/log-workout`}
+          className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-white px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
+        >
+          <Plus className="h-4 w-4" />
+          Log a workout
+        </Link>
         <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
           {views.map((v) => (
             <button
@@ -436,6 +450,10 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
+                        {s.source === "OFF_PLAN" && (
+                          <span className="mr-1.5 rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">Off-plan</span>
+                        )}
+                        {s.title ? `${s.title} · ` : ""}
                         {s._count.sets} sets
                       </p>
                       {s.clientNotes && (
