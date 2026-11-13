@@ -15,6 +15,10 @@ Ideas that came up during build but weren't requested. Ask before building any o
 - **Canva integration**: auto-generate branded program PDFs using Canva API
 - **Wearable sync**: pull HRV / sleep from Apple Health or Whoop as retention signal inputs
 
+## Backlog
+
+- **Seconds by hand in the quick log**: a set shows "sec" only when the plan it came from said so. Let a coach or athlete switch a set (or the whole exercise) between reps and seconds for timed work like planks, carries and holds.
+
 ## Architecture Notes
 
 - When adding multi-user: methodology folder should move to per-trainer storage (S3 or DB)
