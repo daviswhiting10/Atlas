@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@/lib/db/client";
+import { withDerivedStatus } from "@/lib/sessions/status";
 import { LIGHTER_SELECT, isLighterWeek } from "@/lib/plan/lighter";
 import { displayName } from "@/lib/plan/catalog";
 import type { ClientLookup } from "./auth";
@@ -119,7 +120,7 @@ type RawSet = { repMin?: number; repMax?: number; unit?: "reps" | "secs" };
 
 /** The client's active plan with every assigned workout, or null. */
 export async function loadActiveAssignment(client: ScopedClient) {
-  return prisma.programAssignment.findFirst({
+  const assignment = await prisma.programAssignment.findFirst({
     where: { clientId: client.id, workspaceId: client.workspaceId, status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
     select: {
@@ -138,6 +139,7 @@ export async function loadActiveAssignment(client: ScopedClient) {
           name: true,
           scheduledDate: true,
           status: true,
+          workoutLog: { select: { completedAt: true } },
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
@@ -147,6 +149,8 @@ export async function loadActiveAssignment(client: ScopedClient) {
       },
     },
   });
+  // Done is read from the session.
+  return assignment && { ...assignment, assignedWorkouts: assignment.assignedWorkouts.map(withDerivedStatus) };
 }
 
 export function describePrescription(prescribedSets: unknown): { sets: number; reps: string; repMin: number | null } {

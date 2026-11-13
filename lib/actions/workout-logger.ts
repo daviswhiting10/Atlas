@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import {
   checkStrengthMilestones,
@@ -52,7 +53,7 @@ export async function logSet(input: {
   rpe: number | null;
   note: string | null;
   completed: boolean;
-  /** Override the WorkoutLog date when creating it (YYYY-MM-DD). Defaults to scheduledDate. */
+  /** The day the session was done, when creating it (YYYY-MM-DD). Defaults to today, never the scheduled day. */
   date?: string;
 }): Promise<{ workoutLogId: string; setLogId: string }> {
   const { workspaceId } = await requireWorkspace();
@@ -63,7 +64,7 @@ export async function logSet(input: {
       id: input.assignedWorkoutId,
       programAssignment: { workspaceId, clientId: input.clientId },
     },
-    select: { id: true, scheduledDate: true },
+    select: { id: true, ...PLAN_SOURCE_SELECT },
   });
   if (!assignedWorkout) throw new Error("Workout not found");
 
@@ -87,14 +88,13 @@ export async function logSet(input: {
     if (existing) {
       workoutLogId = existing.id;
     } else {
-      // Use provided date if trainer overrode it, otherwise fall back to scheduledDate
-      const logDate = input.date
-        ? new Date(input.date)
-        : assignedWorkout.scheduledDate;
+      // The day it was done: the coach's date if given, otherwise today.
+      const logDate = input.date ? new Date(input.date) : new Date();
       const created = await prisma.workoutLog.create({
         data: {
           clientId: input.clientId,
           assignedWorkoutId: input.assignedWorkoutId,
+          source: planSessionSource(assignedWorkout.programAssignment.sourceProgram),
           date: logDate,
         },
         select: { id: true },
@@ -171,7 +171,7 @@ export async function logSet(input: {
 // Called when trainer presses "Save & Complete Session".
 //
 // Behaviour:
-//  - Flips AssignedWorkout.status → LOGGED.
+//  - Marks the session finished (completedAt); that is what makes the plan workout done.
 //  - Computes rpeAvg from all SetLog.rpe values for this WorkoutLog.
 //  - Persists clientNotes + rpeAvg on WorkoutLog.
 //  - Optionally creates a SessionNote (SOAP) if rawInput is provided.
@@ -209,21 +209,14 @@ export async function completeSession(input: {
       : null;
 
   await prisma.$transaction([
-    // Mark the planned workout as done
-    prisma.assignedWorkout.updateMany({
-      where: {
-        id: input.assignedWorkoutId,
-        programAssignment: { workspaceId },
-      },
-      data: { status: "LOGGED" },
-    }),
-
-    // Persist session-level fields
+    // Persist session-level fields; finishing it is what makes the plan workout done.
+    // Saving again later keeps when it was first finished.
     prisma.workoutLog.update({
       where: { id: input.workoutLogId },
       data: {
         rpeAvg,
         clientNotes: input.clientNotes ?? null,
+        completedAt: workoutLog.completedAt ?? new Date(),
       },
     }),
 

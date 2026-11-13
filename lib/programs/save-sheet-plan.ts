@@ -89,7 +89,8 @@ export async function saveSheetPlan(input: {
     const date = new Date(aw.scheduledDate);
     date.setHours(12, 0, 0, 0);
     await prisma.$transaction(async (tx) => {
-      const log = await tx.workoutLog.create({ data: { clientId: input.clientId, assignedWorkoutId: aw.id, date, trainerSeen: true }, select: { id: true } });
+      // The sheet records that the week was done, not the day: the scheduled day is the only date there is.
+      const log = await tx.workoutLog.create({ data: { clientId: input.clientId, assignedWorkoutId: aw.id, source: "PLAN", date, completedAt: date, trainerSeen: true }, select: { id: true } });
       const sets = day.entries.flatMap((e, j) => {
         const awe = aw.exercises.find((x) => x.order === j + 1);
         if (!awe) return [];
@@ -106,7 +107,7 @@ export async function saveSheetPlan(input: {
         }));
       });
       if (sets.length > 0) await tx.setLog.createMany({ data: sets });
-      await tx.assignedWorkout.update({ where: { id: aw.id }, data: { status: "LOGGED", loggedBy: "TRAINER" } });
+      await tx.assignedWorkout.update({ where: { id: aw.id }, data: { loggedBy: "TRAINER" } });
     });
     sessionsLogged += 1;
   }

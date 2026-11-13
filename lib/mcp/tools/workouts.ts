@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import { displayName } from "@/lib/plan/catalog";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
@@ -44,7 +45,10 @@ export const getWorkoutHistory = clientTool({
         id: true,
         date: true,
         durationMin: true,
-        assignedWorkout: { select: { name: true, status: true } },
+        completedAt: true,
+        title: true,
+        source: true,
+        assignedWorkout: { select: { name: true } },
         sets: {
           orderBy: { setNumber: "asc" },
           select: {
@@ -93,8 +97,9 @@ export const getWorkoutHistory = clientTool({
         return {
           workoutLogId: log.id,
           date: localDay(log.date, tz),
-          name: log.assignedWorkout?.name ?? "Ad-hoc session",
-          finished: log.assignedWorkout?.status === "LOGGED",
+          name: log.assignedWorkout?.name ?? log.title ?? "Off-plan session",
+          source: log.source,
+          finished: log.completedAt != null,
           durationMin: log.durationMin,
           volumeLb: Math.round(volumeLb),
           exercises: Array.from(exercises.values()),
@@ -175,6 +180,11 @@ export const logWorkout = clientTool({
       .default(false)
       .describe("Mark the workout as finished."),
     durationMin: z.number().int().min(1).max(600).optional().catch(undefined),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe("The day the workout was actually done (YYYY-MM-DD). Defaults to today."),
   }),
   async handler({ client, caller }, args) {
     // Scope check before any write: the workout must belong to this client in this workspace.
@@ -187,8 +197,8 @@ export const logWorkout = clientTool({
       select: {
         id: true,
         name: true,
-        scheduledDate: true,
         exercises: { select: { id: true, exerciseId: true } },
+        ...PLAN_SOURCE_SELECT,
       },
     });
     if (!workout) throw notFound();
@@ -208,16 +218,17 @@ export const logWorkout = clientTool({
         const log =
           (await tx.workoutLog.findUnique({
             where: { assignedWorkoutId: workout.id },
-            select: { id: true },
+            select: { id: true, completedAt: true },
           })) ??
           (await tx.workoutLog.create({
-            // A client logs "now"; a coach logging after the fact files it on the scheduled day, as the dashboard does.
+            // The day it was actually done: the date given, else today. Never the scheduled day.
             data: {
               clientId: client.id,
               assignedWorkoutId: workout.id,
-              date: loggedBy === "CLIENT" ? new Date() : workout.scheduledDate,
+              source: planSessionSource(workout.programAssignment.sourceProgram),
+              date: args.date ? new Date(`${args.date}T12:00:00`) : new Date(),
             },
-            select: { id: true },
+            select: { id: true, completedAt: true },
           }));
 
         for (const s of args.sets) {
@@ -253,13 +264,16 @@ export const logWorkout = clientTool({
         if (args.complete) {
           await tx.assignedWorkout.update({
             where: { id: workout.id },
-            data: { status: "LOGGED", loggedBy },
+            data: { loggedBy },
           });
-          if (args.durationMin)
-            await tx.workoutLog.update({
-              where: { id: log.id },
-              data: { durationMin: args.durationMin },
-            });
+          // Finishing the session is what makes the plan workout done.
+          await tx.workoutLog.update({
+            where: { id: log.id },
+            data: {
+              completedAt: log.completedAt ?? new Date(),
+              ...(args.durationMin ? { durationMin: args.durationMin } : {}),
+            },
+          });
           await tx.clientProfile.update({
             where: { id: client.id },
             data: { lastContactAt: new Date() },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
+import { planWorkoutStatus } from "@/lib/sessions/status";
 
 /**
  * GET /api/clients/[id]/workout-slots
@@ -18,7 +19,7 @@ export const GET = withWorkspace<{ id: string }>(
       include: {
         assignedWorkouts: {
           orderBy: { scheduledDate: "asc" },
-          include: { workoutLog: { select: { id: true } } },
+          include: { workoutLog: { select: { id: true, completedAt: true } } },
         },
       },
     });
@@ -38,7 +39,7 @@ export const GET = withWorkspace<{ id: string }>(
           workoutName: w.name,
           scheduledDate: w.scheduledDate.toISOString(),
           weekNumber: Math.max(1, weekNumber),
-          status: w.status,
+          status: planWorkoutStatus(w.status, w.workoutLog),
           logId: w.workoutLog?.id ?? null,
         };
       });

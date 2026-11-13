@@ -261,7 +261,8 @@ export async function seedDemoHistory(
   const setRows: Prisma.SetLogCreateManyInput[] = [];
   for (const log of logs) {
     const logId = id();
-    logRows.push({ id: logId, clientId, assignedWorkoutId: log.workoutId, date: log.date, durationMin: log.durationMin, trainerSeen: true });
+    // A generated plan's history: each session finished the day it was done.
+    logRows.push({ id: logId, clientId, assignedWorkoutId: log.workoutId, source: "GENERATED", date: log.date, completedAt: log.date, durationMin: log.durationMin, trainerSeen: true });
     for (const s of log.sets) {
       setRows.push({
         workoutLogId: logId,
@@ -279,10 +280,7 @@ export async function seedDemoHistory(
 
   await db.workoutLog.createMany({ data: logRows });
   await db.setLog.createMany({ data: setRows });
-  const loggedIds = logs.map((l) => l.workoutId);
-  if (loggedIds.length > 0) {
-    await db.assignedWorkout.updateMany({ where: { id: { in: loggedIds } }, data: { status: "LOGGED" } });
-  }
+  // Done is the session's to say (completedAt above); nothing to mark on the plan workouts.
   if (skipped.length > 0) {
     await db.assignedWorkout.updateMany({ where: { id: { in: skipped } }, data: { status: "SKIPPED" } });
   }

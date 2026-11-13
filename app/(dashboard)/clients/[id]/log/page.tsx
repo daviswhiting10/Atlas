@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { DONE, planWorkoutStatus } from "@/lib/sessions/status";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { suggestNext, type LoadType, type ProgressionSuggestion } from "@/lib/progression";
@@ -103,6 +104,7 @@ export default async function LogPage({
           status: "ACTIVE" as const,
         },
         status: "PLANNED" as const,
+        NOT: DONE,
       };
 
   const [client, assignedWorkout] = await Promise.all([
@@ -128,6 +130,7 @@ export default async function LogPage({
             },
           },
         },
+        workoutLog: { select: { completedAt: true } },
         programAssignment: {
           select: {
             name: true,
@@ -180,7 +183,7 @@ export default async function LogPage({
             where: {
               programAssignmentId: assignedWorkout.programAssignmentId,
               ...(assignedWorkout.sourceWorkoutId ? { OR: [{ sourceWorkoutId: assignedWorkout.sourceWorkoutId }, { name: assignedWorkout.name }] } : { name: assignedWorkout.name }),
-              status: "LOGGED",
+              ...DONE,
               scheduledDate: { lt: assignedWorkout.scheduledDate },
             },
             orderBy: { scheduledDate: "desc" },
@@ -213,6 +216,7 @@ export default async function LogPage({
           name: true,
           scheduledDate: true,
           status: true,
+          workoutLog: { select: { completedAt: true } },
           _count: { select: { exercises: true } },
         },
       }),
@@ -222,6 +226,7 @@ export default async function LogPage({
         where: { assignedWorkoutId: assignedWorkout.id },
         select: {
           id: true,
+          date: true,
           sets: {
             orderBy: { createdAt: "asc" },
             select: {
@@ -317,7 +322,8 @@ export default async function LogPage({
       assignmentId={assignedWorkout.programAssignmentId}
       workoutName={assignedWorkout.name}
       scheduledDate={assignedWorkout.scheduledDate.toISOString()}
-      completed={assignedWorkout.status === "LOGGED"}
+      completed={planWorkoutStatus(assignedWorkout.status, assignedWorkout.workoutLog) === "LOGGED"}
+      sessionDate={existingLog ? existingLog.date.toISOString().slice(0, 10) : null}
       assignmentStartDate={assignedWorkout.programAssignment.startDate.toISOString()}
       exercises={exercises}
       existingWorkoutLogId={existingLog?.id ?? null}
@@ -327,7 +333,7 @@ export default async function LogPage({
         name: w.name,
         scheduledDate: w.scheduledDate.toISOString(),
         exerciseCount: w._count.exercises,
-        status: w.status,
+        status: planWorkoutStatus(w.status, w.workoutLog),
       }))}
     />
   );

@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@/lib/db/client";
+import { planWorkoutStatus } from "@/lib/sessions/status";
 import { displayName } from "./catalog";
 import { generatePlan, normalizePrefs, type Prefs } from "./generator";
 import { isLighterWeek, lighterWeeksOn } from "./lighter";
@@ -133,6 +134,7 @@ export async function loadPlanOverview({
           name: true,
           scheduledDate: true,
           status: true,
+          workoutLog: { select: { completedAt: true } },
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
@@ -159,7 +161,7 @@ export async function loadPlanOverview({
     name: w.name,
     week: weekOf(w.scheduledDate.getTime(), start),
     date: iso(w.scheduledDate),
-    status: w.status,
+    status: planWorkoutStatus(w.status, w.workoutLog),
     note: w.notes,
     deload: isDeload(w.scheduledDate),
     estMinutes: estimate(w.exercises),
@@ -187,7 +189,7 @@ export async function loadPlanOverview({
 
   const rx: PlanOverview["rx"] = {};
   for (const w of assignment.assignedWorkouts) {
-    if (w.status !== "PLANNED") continue;
+    if (planWorkoutStatus(w.status, w.workoutLog) !== "PLANNED") continue;
     for (const e of w.exercises) {
       if (rx[e.exerciseId]) continue;
       const first = ((e.prescribedSets as RawSet[]) ?? [])[0];

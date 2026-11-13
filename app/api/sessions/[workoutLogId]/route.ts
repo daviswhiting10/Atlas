@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
@@ -78,7 +79,7 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
             where: { id: newSlotId, workspaceId },
             include: {
               workoutLog: { select: { id: true } },
-              programAssignment: { select: { clientId: true } },
+              programAssignment: { select: { clientId: true, sourceProgram: { select: { isTemplate: true } } } },
             },
           });
           if (!slot) throw new Error("Workout slot not found");
@@ -89,20 +90,11 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
           if (slot.workoutLog && slot.workoutLog.id !== workoutLogId) {
             throw new Error("That slot already has a logged session");
           }
-          // Mark new slot as LOGGED
-          await tx.assignedWorkout.update({
-            where: { id: newSlotId },
-            data: { status: "LOGGED" },
-          });
-        }
-
-        // Revert old slot back to PLANNED if we're changing / detaching
-        const oldSlotId = existing.assignedWorkoutId;
-        if (oldSlotId && oldSlotId !== newSlotId) {
-          await tx.assignedWorkout.update({
-            where: { id: oldSlotId },
-            data: { status: "PLANNED" },
-          });
+          // Done follows the session: the new slot reads as done, the old one as not, with nothing to write.
+          await tx.workoutLog.update({ where: { id: workoutLogId }, data: { source: planSessionSource(slot.programAssignment.sourceProgram) } });
+        } else {
+          // Detached from its plan: an off-plan session now.
+          await tx.workoutLog.update({ where: { id: workoutLogId }, data: { source: "OFF_PLAN" } });
         }
       }
 

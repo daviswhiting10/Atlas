@@ -1,4 +1,5 @@
 import { prisma } from "./client";
+import { planSessionSource, withDerivedStatus } from "@/lib/sessions/status";
 import type { ProgramBody, UpdateAssignedWorkoutInput } from "@/lib/validations/program";
 
 // ─── Program library ──────────────────────────────────────────────────────────
@@ -332,6 +333,7 @@ export async function getAssignment(id: string, workspaceId: string) {
       assignedWorkouts: {
         orderBy: [{ scheduledDate: "asc" }, { order: "asc" }],
         include: {
+          workoutLog: { select: { completedAt: true } },
           exercises: {
             orderBy: { order: "asc" },
             include: {
@@ -346,6 +348,8 @@ export async function getAssignment(id: string, workspaceId: string) {
   });
 
   if (!assignment) return null;
+  // Done is read from the session.
+  assignment.assignedWorkouts = assignment.assignedWorkouts.map(withDerivedStatus);
 
   // ── Repair null sections from source workout exercises ──────────────────────
   // Sections may be null for workouts assigned before the section field was added.
@@ -389,7 +393,7 @@ export async function updateAssignedWorkout(
     // Verify ownership
     const existing = await tx.assignedWorkout.findFirst({
       where: { id, workspaceId },
-      include: { exercises: true, workoutLog: { select: { id: true } } },
+      include: { exercises: true, workoutLog: { select: { id: true, completedAt: true } } },
     });
     if (!existing) throw new Error("Not found");
 
@@ -414,7 +418,8 @@ export async function updateAssignedWorkout(
         ...(data.name != null && { name: data.name }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.loggedBy != null && { loggedBy: data.loggedBy }),
-        ...(data.status != null && { status: data.status }),
+        // LOGGED isn't stored: marking a workout done finishes its session (below).
+        ...(data.status != null && { status: data.status === "LOGGED" ? "PLANNED" : data.status }),
         ...(newScheduledDate != null && { scheduledDate: newScheduledDate }),
       },
     });
@@ -424,12 +429,23 @@ export async function updateAssignedWorkout(
       await tx.workoutLog.delete({ where: { id: existing.workoutLog.id } });
     }
 
-    // Sync WorkoutLog.date so "Last session" reflects the corrected date
-    if (newScheduledDate != null && existing.workoutLog && data.status !== "PLANNED") {
-      await tx.workoutLog.update({
-        where: { id: existing.workoutLog.id },
-        data: { date: newScheduledDate },
-      });
+    // Marked done: the session is finished (one with no sets if nothing was logged), dated today.
+    // Moving the scheduled day never changes a session's date: that is the day it was done.
+    if (data.status === "LOGGED") {
+      if (existing.workoutLog) {
+        if (!existing.workoutLog.completedAt) {
+          await tx.workoutLog.update({ where: { id: existing.workoutLog.id }, data: { completedAt: new Date() } });
+        }
+      } else {
+        const plan = await tx.programAssignment.findUniqueOrThrow({
+          where: { id: existing.programAssignmentId },
+          select: { clientId: true, sourceProgram: { select: { isTemplate: true } } },
+        });
+        const now = new Date();
+        await tx.workoutLog.create({
+          data: { clientId: plan.clientId, assignedWorkoutId: id, source: planSessionSource(plan.sourceProgram), date: now, completedAt: now },
+        });
+      }
     }
 
     // Reconcile exercises if provided

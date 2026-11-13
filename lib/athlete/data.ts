@@ -4,6 +4,7 @@
  */
 
 import { cache } from "react";
+import { planWorkoutStatus } from "@/lib/sessions/status";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 import { mediaPictures } from "@/lib/exercises/media";
 import { cookies } from "next/headers";
@@ -380,6 +381,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       workoutLog: {
         select: {
           id: true,
+          completedAt: true,
           sets: {
             orderBy: { setNumber: "asc" },
             select: { id: true, assignedWorkoutExerciseId: true, exerciseId: true, setNumber: true, weight: true, reps: true, completed: true },
@@ -416,7 +418,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     prisma.assignedWorkout.findMany({
       where: { programAssignmentId: workout.programAssignmentId, scheduledDate: { gte: weekStart, lt: weekEnd } },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, status: true, scheduledDate: true },
+      select: { id: true, name: true, status: true, scheduledDate: true, workoutLog: { select: { completedAt: true } } },
     }),
   ]);
 
@@ -516,12 +518,12 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     id: workout.id,
     name: workout.name,
     week,
-    status: workout.status,
+    status: planWorkoutStatus(workout.status, workout.workoutLog),
     note: workout.notes,
     workoutLogId: workout.workoutLog?.id ?? null,
     deloadWeek,
     exercises,
-    siblings: siblings.map((s) => ({ id: s.id, name: s.name, status: s.status, date: iso(s.scheduledDate) })),
+    siblings: siblings.map((s) => ({ id: s.id, name: s.name, status: planWorkoutStatus(s.status, s.workoutLog), date: iso(s.scheduledDate) })),
     metric: athlete.metric,
   };
 }

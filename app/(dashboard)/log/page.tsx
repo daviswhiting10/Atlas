@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DONE } from "@/lib/sessions/status";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { auth } from "@/lib/auth";
@@ -30,7 +31,7 @@ export default async function LogSessionPage() {
         take: 1,
         select: {
           startDate: true,
-          assignedWorkouts: { where: { status: "PLANNED" }, orderBy: { scheduledDate: "asc" }, take: 1, select: { name: true, scheduledDate: true } },
+          assignedWorkouts: { where: { status: "PLANNED", NOT: DONE }, orderBy: { scheduledDate: "asc" }, take: 1, select: { name: true, scheduledDate: true } },
         },
       },
     },

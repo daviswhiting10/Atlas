@@ -254,6 +254,12 @@ type WorkoutOption = {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 
+/** Today on this device, as YYYY-MM-DD. */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function WorkoutLogger({
   clientId,
   clientName,
@@ -267,6 +273,7 @@ export default function WorkoutLogger({
   workspaceId,
   exercises,
   existingWorkoutLogId,
+  sessionDate,
   existingSetLogs,
   availableWorkouts,
 }: {
@@ -285,6 +292,8 @@ export default function WorkoutLogger({
   workspaceId: string;
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
+  /** The existing session's date (YYYY-MM-DD), when resuming one. */
+  sessionDate: string | null;
   existingSetLogs: ExistingSetLog[];
   availableWorkouts: WorkoutOption[];
 }) {
@@ -373,11 +382,9 @@ export default function WorkoutLogger({
   const [restSecs, setRestSecs] = useState(0);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Session date (trainer can correct it) ─────────────────────────────────
-  // Initialise to the workout's scheduledDate as a YYYY-MM-DD string
-  const [logDate, setLogDate] = useState<string>(
-    () => new Date(scheduledDate).toISOString().slice(0, 10)
-  );
+  // ── Session date: the day it was actually done (trainer can correct it) ────
+  // A session already started keeps its date; a new one is today, never the scheduled day.
+  const [logDate, setLogDate] = useState<string>(() => sessionDate ?? localToday());
 
   // ── Week / day picker ────────────────────────────────────────────────────
   const currentWorkoutWeek =

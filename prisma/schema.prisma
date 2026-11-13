@@ -371,6 +371,9 @@ enum LoggedBy {
   CLIENT
 }
 
+/// Stored status of a plan workout. LOGGED is never stored: "done" means it
+/// has a finished session (WorkoutLog.completedAt). Kept in the enum because
+/// read models report it (lib/sessions/status.ts).
 enum WorkoutStatus {
   PLANNED
   LOGGED
@@ -396,22 +399,39 @@ model AssignedWorkoutExercise {
 }
 
 // ─────────────────────────────────────────────
-// WORKOUT LOGGING (Week 2 — stubs kept for FK hygiene)
+// SESSIONS: every workout done, from a plan or not
 // ─────────────────────────────────────────────
 
+/// Where a session came from.
+enum SessionSource {
+  PLAN // a workout from a coach's plan (built, imported or from the library)
+  GENERATED // a workout from a plan Atlas generated
+  MANUAL // typed in by hand after the fact
+  SCREENSHOT // read from a screenshot of a finished workout
+  OFF_PLAN // a workout done outside any plan
+}
+
+/// A session: one workout actually done. The single source of truth for
+/// training history and for whether a plan workout is done (completedAt set);
+/// AssignedWorkout.status never stores LOGGED (a CHECK constraint enforces it).
 model WorkoutLog {
   id                String           @id @default(cuid())
   clientId          String
   client            ClientProfile    @relation(fields: [clientId], references: [id])
-  assignedWorkoutId String?          @unique // null for ad-hoc sessions
+  assignedWorkoutId String?          @unique // the plan workout it fulfils; null off-plan
   assignedWorkout   AssignedWorkout? @relation(fields: [assignedWorkoutId], references: [id])
-  date              DateTime
+  source            SessionSource
+  title             String? // name of an off-plan session; plan sessions use the plan workout's name
+  date              DateTime // the day it was actually done (never the scheduled day)
+  completedAt       DateTime? // finished; null while in progress
   durationMin       Int?
   rpeAvg            Float?
   clientNotes       String?          @db.Text
   trainerSeen       Boolean          @default(false)
   sets              SetLog[]
   createdAt         DateTime         @default(now())
+
+  @@index([clientId, date])
 }
 
 model SetLog {

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { athleteIdentity } from "@/lib/athlete/identity";
@@ -70,7 +71,7 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
       assignedWorkoutId: input.assignedWorkoutId,
       assignedWorkout: { programAssignment: { clientId } },
     },
-    select: { exerciseId: true },
+    select: { exerciseId: true, assignedWorkout: { select: PLAN_SOURCE_SELECT } },
   });
   if (!awe) throw new Error("Workout not found");
 
@@ -83,7 +84,12 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
     (await findLog()) ??
     (await prisma.workoutLog
       .create({
-        data: { clientId, assignedWorkoutId: input.assignedWorkoutId, date: new Date() },
+        data: {
+          clientId,
+          assignedWorkoutId: input.assignedWorkoutId,
+          source: planSessionSource(awe.assignedWorkout.programAssignment.sourceProgram),
+          date: new Date(),
+        },
         select: { id: true, clientId: true },
       })
       // Two tabs logging the first set at once: the loser of the race reuses the winner's log.
@@ -126,17 +132,18 @@ export async function finishWorkout(raw: { assignedWorkoutId: string; durationMi
   const input = WorkoutRef.extend({ durationMin: z.number().optional() }).parse(raw);
   const workout = await prisma.assignedWorkout.findFirst({
     where: { id: input.assignedWorkoutId, programAssignment: { clientId } },
-    select: { id: true, workoutLog: { select: { id: true, sets: { where: { completed: true }, select: { id: true }, take: 1 } } } },
+    select: { id: true, workoutLog: { select: { id: true, completedAt: true, sets: { where: { completed: true }, select: { id: true }, take: 1 } } } },
   });
   if (!workout) throw new Error("Workout not found");
   if (!workout.workoutLog || workout.workoutLog.sets.length === 0) throw new Error("Log at least one set first");
 
   const duration = clean(input.durationMin ?? null, 600);
   await prisma.$transaction([
-    prisma.assignedWorkout.update({ where: { id: workout.id }, data: { status: "LOGGED", loggedBy: "CLIENT" } }),
+    prisma.assignedWorkout.update({ where: { id: workout.id }, data: { loggedBy: "CLIENT" } }),
     prisma.workoutLog.update({
       where: { id: workout.workoutLog.id },
-      data: duration == null ? {} : { durationMin: Math.round(duration) },
+      // Done is the session's to say. Saving changes later keeps when it was first finished.
+      data: { completedAt: workout.workoutLog.completedAt ?? new Date(), ...(duration == null ? {} : { durationMin: Math.round(duration) }) },
     }),
     prisma.clientProfile.update({ where: { id: clientId }, data: { lastContactAt: new Date() } }),
   ]);
@@ -155,6 +162,8 @@ export async function setWorkoutSkipped(raw: { assignedWorkoutId: string; skippe
       id: input.assignedWorkoutId,
       programAssignment: { clientId },
       status: input.skipped ? "PLANNED" : "SKIPPED",
+      // A finished workout can't be skipped.
+      NOT: DONE,
     },
     data: { status: input.skipped ? "SKIPPED" : "PLANNED" },
   });
