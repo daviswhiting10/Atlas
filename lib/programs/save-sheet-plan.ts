@@ -8,9 +8,10 @@
 import { prisma } from "@/lib/db/client";
 import { assignProgram, upsertProgram } from "@/lib/db/programs";
 import { resolveExercise } from "./resolve-exercise";
-import { inferWeekOneStart, planFromGrid, type SheetGrid } from "./sheet-plan";
+import { inferWeekOneStart, planFromGrid, shapePlan, type SheetGrid } from "./sheet-plan";
+import { NO_CONTEXT, type PlanContext } from "./plan-context";
 
-export type SavedSheetPlan = { assignmentId: string; programId: string; weeks: number; weeksDone: number; sessionsLogged: number; exercises: number };
+export type SavedSheetPlan = { assignmentId: string; programId: string; weeks: number; days: number; weeksDone: number; sessionsLogged: number; exercises: number };
 
 export async function saveSheetPlan(input: {
   workspaceId: string;
@@ -20,9 +21,11 @@ export async function saveSheetPlan(input: {
   goals: string[];
   /** When week 1 began. Left out: worked out from the weeks already done. */
   weekOneStart?: Date | null;
+  /** The coach's note ("4 week block, start fresh"), already read. */
+  context?: PlanContext;
   today?: Date;
 }): Promise<SavedSheetPlan> {
-  const { weeks, lastLoggedWeek } = planFromGrid(input.grid);
+  const { weeks, lastLoggedWeek } = shapePlan(planFromGrid(input.grid), input.context ?? NO_CONTEXT);
 
   const names = Array.from(new Set(weeks.flatMap((w) => w.days.flatMap((d) => d.entries.map((e) => e.exercise)))));
   const ids = new Map<string, string>();
@@ -108,5 +111,5 @@ export async function saveSheetPlan(input: {
     sessionsLogged += 1;
   }
 
-  return { assignmentId: assignment.id, programId: program.id, weeks: weeks.length, weeksDone: lastLoggedWeek, sessionsLogged, exercises: names.length };
+  return { assignmentId: assignment.id, programId: program.id, weeks: weeks.length, days: Math.max(0, ...weeks.map((w) => w.days.length)), weeksDone: lastLoggedWeek, sessionsLogged, exercises: names.length };
 }

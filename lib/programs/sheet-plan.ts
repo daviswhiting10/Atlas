@@ -137,6 +137,37 @@ export function planFromGrid(grid: SheetGrid): { weeks: PlanWeek[]; lastLoggedWe
   return { weeks, lastLoggedWeek };
 }
 
+/**
+ * The coach's note applied to the plan read from the sheet:
+ *  - durationWeeks: a longer block repeats the last week's prescription
+ *    (nothing logged); a shorter one drops the weeks past it.
+ *  - startAtWeek: that week and everything after it are to do, even if the
+ *    sheet has loads in them (e.g. last block's numbers). "Start fresh" (1)
+ *    logs nothing from the sheet.
+ */
+export function shapePlan(
+  plan: { weeks: PlanWeek[]; lastLoggedWeek: number },
+  ctx: { durationWeeks: number | null; startAtWeek: number | null }
+): { weeks: PlanWeek[]; lastLoggedWeek: number } {
+  let weeks = plan.weeks;
+  if (ctx.durationWeeks != null && weeks.length > 0) {
+    if (ctx.durationWeeks < weeks.length) weeks = weeks.slice(0, ctx.durationWeeks);
+    const last = weeks[weeks.length - 1];
+    while (weeks.length < ctx.durationWeeks) {
+      weeks = [
+        ...weeks,
+        { week: weeks.length + 1, days: last.days.map((d) => ({ ...d, logged: false, entries: d.entries.map((e) => ({ ...e, load: null })) })) },
+      ];
+    }
+  }
+  if (ctx.startAtWeek == null) {
+    return { weeks, lastLoggedWeek: Math.min(plan.lastLoggedWeek, weeks.length) };
+  }
+  const start = Math.min(ctx.startAtWeek, weeks.length);
+  weeks = weeks.map((w) => (w.week >= start ? { ...w, days: w.days.map((d) => ({ ...d, logged: false })) } : w));
+  return { weeks, lastLoggedWeek: start - 1 };
+}
+
 /** Week 1's start when the coach doesn't say: far enough back that the first unfilled week is this week. */
 export function inferWeekOneStart(lastLoggedWeek: number, today: Date): Date {
   const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate());

@@ -18,6 +18,8 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
   // Optional: left empty, week 1 is dated back from the weeks the sheet shows as done.
   const [date, setDate] = useState("");
+  // Optional: "4 week block, start fresh". Beats what the sheet suggests.
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(file ? { csv: file.text } : { sheetUrl: link.trim() }), ...(date ? { weekOneStart: date } : {}) }),
+        body: JSON.stringify({ ...(file ? { csv: file.text } : { sheetUrl: link.trim() }), ...(date ? { weekOneStart: date } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -41,10 +43,11 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
         return;
       }
       toast.success(
-        data.weeksDone > 0
-          ? `Read ${data.weeks} weeks. ${data.weeksDone} already done (${data.sessionsLogged} session${data.sessionsLogged === 1 ? "" : "s"} logged), picking up at week ${Math.min(data.weeksDone + 1, data.weeks)}. Check it, then assign.`
-          : `Read ${data.weeks} week${data.weeks === 1 ? "" : "s"}, ${data.exercises} exercises. Check it, then assign.`
+        `Read as ${data.readAs}.` +
+          (data.sessionsLogged > 0 ? ` ${data.sessionsLogged} done session${data.sessionsLogged === 1 ? "" : "s"} logged.` : "") +
+          " Check it, then assign."
       );
+      for (const w of (data.warnings ?? []) as string[]) toast.warning(w, { duration: 10_000 });
       router.push(`/clients/${clientId}/programs/${data.assignmentId}`);
     } catch {
       setError("Couldn't reach the server. Please try again.");
@@ -102,6 +105,19 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           }}
         />
       </div>
+
+      <label className="block text-xs font-medium text-ink-soft">
+        Notes <span className="font-normal text-ink-mute">(optional)</span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          disabled={busy}
+          rows={2}
+          maxLength={1000}
+          placeholder="e.g. 4-week block, start fresh at week 1"
+          className="mt-1 w-full resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60"
+        />
+      </label>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="text-xs font-medium text-ink-soft">

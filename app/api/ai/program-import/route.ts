@@ -3,6 +3,7 @@ import { withWorkspace } from "@/lib/api/middleware";
 import { callAIVision, MODELS, type ImageInput } from "@/lib/ai/client";
 import { buildProgramImportPrompt } from "@/lib/ai/prompts/program-import";
 import { resolveExercise } from "@/lib/programs/resolve-exercise";
+import { NO_CONTEXT, contextFromModel, contextFromText, contextWarnings, describeReadAs, mergeContext } from "@/lib/programs/plan-context";
 
 // ─── Types matching ProgramBuilder's internal state ─────────────────────────
 
@@ -25,6 +26,7 @@ type ParsedProgram = {
   description: string;
   durationWeeks: number;
   days: ParsedDay[];
+  context?: unknown;
 };
 
 const ALLOWED_TYPES = [
@@ -159,14 +161,22 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     })),
   }));
 
+  // The coach's note beats what the screenshot suggests.
+  const context = notes?.trim() ? mergeContext(contextFromText(notes), contextFromModel(parsed.context)) : NO_CONTEXT;
+  const durationWeeks = context.durationWeeks ?? Math.max(1, Math.round(parsed.durationWeeks || 1));
+
   const programState = {
     name: parsed.programName || "Imported Program",
     description: parsed.description || "",
-    durationWeeks: parsed.durationWeeks || 1,
+    durationWeeks,
     goals: [] as string[],
     conditions: [] as string[],
     days,
   };
 
-  return NextResponse.json({ program: programState });
+  return NextResponse.json({
+    program: programState,
+    readAs: describeReadAs({ weeks: durationWeeks, days: days.length }),
+    warnings: contextWarnings(context, { days: days.length }, "screenshot"),
+  });
 });

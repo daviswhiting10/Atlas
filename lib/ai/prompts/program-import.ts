@@ -1,3 +1,5 @@
+import { contextPromptSection } from "@/lib/programs/plan-context";
+
 export function buildProgramImportPrompt(imageCount: number, notes?: string) {
   const multiDay = imageCount > 1;
 
@@ -41,7 +43,9 @@ The JSON must follow this exact structure:
 ## Field rules
 - **programName**: infer a short name from the day labels and goals (e.g. "Lower Body Power Block").
 - **durationWeeks**: 1 unless the screenshots indicate a multi-week programme.
-- **days**: ${multiDay ? `one entry per screenshot — each image is a separate training day` : "one entry per training day shown"}.
+- **durationWeeks**: if the screenshot shows several week columns (Week 1, Week 2, …), the number of weeks.
+- **days**: one entry per training day shown. ${multiDay ? "Usually each image is one day, but an image can show several days: split them by their day labels." : "One image can show several days: split them by their day labels."}
+- **sets/reps when there are week columns**: use the week the client starts at (week 1 unless the coach's note says otherwise).
 - **name**: use the day label exactly as written in the screenshot (e.g. "Monday", "Thursday", "Day A"). If no label, use "Day 1", "Day 2", etc.
 - **dayOfWeek**: derive from the day label. Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6 Sun=7. If ambiguous, space days evenly starting at 1.
 - **sections**: labeled groups within a day (e.g. "Block A", "Block B", "Warmup"). If no labeled sections, use one section named "Main".
@@ -55,10 +59,12 @@ The JSON must follow this exact structure:
 ## Hard rules
 - Capture EVERY exercise shown, in the order they appear.
 - Preserve section groupings exactly as shown.
-- Do NOT invent exercises not visible in the images.`,
-    user: multiDay
-      ? `${imageCount} training day screenshots follow (one day per image, in order). Parse each image as a separate day entry. Use the day label visible in each image to set the name and dayOfWeek.${notes ? `\n\nAdditional context: ${notes}` : ""}`
-      : `Parse the workout plan in this image.${notes ? `\n\nAdditional context: ${notes}` : ""}`,
+- Do NOT invent exercises not visible in the images.${contextPromptSection(notes)}`,
+    user:
+      (notes?.trim() ? `The coach's note (follow it): ${notes.trim()}\n\n` : "") +
+      (multiDay
+        ? `${imageCount} screenshots of the plan follow, in order. Use the day labels visible in them to set each day's name and dayOfWeek.`
+        : `Parse the workout plan in this image.`),
   };
 }
 
@@ -68,7 +74,7 @@ The JSON must follow this exact structure:
  * exercise's name, notes, and every week's Sets/reps and Load cells exactly
  * as written. lib/programs/sheet-plan.ts reads them by rule.
  */
-export function buildProgramSheetPrompt(csv: string) {
+export function buildProgramSheetPrompt(csv: string, notes?: string) {
   return {
     system: `You transcribe a fitness coach's workout plan from a spreadsheet (given as CSV) into JSON. Copy cells exactly; do not interpret, convert, correct or invent anything.
 
@@ -102,7 +108,8 @@ Respond ONLY with JSON, no markdown fences, no commentary:
 - "weeks": one entry for every week column the sheet has, numbered 1, 2, 3… in order. "setsReps" and "load" are the cell text exactly as written ("2x12-15", "5 min", "4x20 yd", "12.5", "BW", "blue", "2nd to hardest. 3x"). Use "" for an empty cell. Never fill a cell in from another week.
 - If the sheet has no week columns, treat the single set of columns as week 1.
 - Skip rows that aren't exercises: titles, headers, totals, blank rows, the client's name, dates.
-- "programName": a short name from the sheet's title if it has one, otherwise "".`,
-    user: `The spreadsheet, as CSV:\n\n${csv}`,
+- "programName": a short name from the sheet's title if it has one, otherwise "".
+- Transcribe the grid exactly even when the coach's note says otherwise: the note is applied afterwards.${contextPromptSection(notes)}`,
+    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The spreadsheet, as CSV:\n\n${csv}`,
   };
 }

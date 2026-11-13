@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, ImageUp, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 /** What the import route returns: days of sections of exercises. */
 type ImportedProgram = {
@@ -140,7 +141,7 @@ export default function ProgramImportPage() {
         throw new Error(data.error ?? `Server error ${res.status}`);
       }
 
-      const { program } = (await res.json()) as { program: ImportedProgram };
+      const { program, readAs, warnings } = (await res.json()) as { program: ImportedProgram; readAs?: string; warnings?: string[] };
 
       // Save it to the library as written. From there it can be used for a
       // client as a draft, or its goals can seed a generated plan.
@@ -151,6 +152,8 @@ export default function ProgramImportPage() {
       });
       if (!save.ok) throw new Error("The program was read, but couldn't be saved. Try again.");
       const saved = (await save.json()) as { id: string };
+      if (readAs) toast.success(`Read as ${readAs}.`);
+      for (const w of warnings ?? []) toast.warning(w, { duration: 10_000 });
       router.push(`/programs/${saved.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
@@ -186,8 +189,7 @@ export default function ProgramImportPage() {
           </h1>
         </div>
         <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-          Drop one screenshot per training day — Atlas reads the day labels and builds
-          the full program week automatically.
+          Drop screenshots of the plan. Atlas reads the day labels and builds the program.
         </p>
       </div>
 
@@ -226,8 +228,8 @@ export default function ProgramImportPage() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {hasImages
-              ? "one per training day · click or drag · paste with ⌘V"
-              : "one per training day · click to browse · paste with ⌘V · PNG, JPG, WebP"}
+              ? "click or drag · paste with ⌘V"
+              : "click to browse · paste with ⌘V · PNG, JPG, WebP"}
           </p>
         </div>
         <input
@@ -259,7 +261,7 @@ export default function ProgramImportPage() {
               />
               {/* Day badge */}
               <span className="absolute bottom-1.5 left-1.5 bg-background/85 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] font-medium leading-none">
-                Day {i + 1}
+                {i + 1}
               </span>
               {/* Remove button */}
               {!loading && (
@@ -286,7 +288,7 @@ export default function ProgramImportPage() {
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. 4-week hypertrophy block, athlete has a knee restriction"
+            placeholder="e.g. 4-week block, 2 days legs, 2 days upper, start at week 1"
             rows={2}
             disabled={loading}
             className={cn(
@@ -310,7 +312,7 @@ export default function ProgramImportPage() {
           <p className="text-xs text-muted-foreground">
             {loading
               ? `Reading ${images.length} screenshot${images.length !== 1 ? "s" : ""}…`
-              : `${images.length} screenshot${images.length !== 1 ? "s" : ""} · Atlas will map each to its training day`}
+              : `${images.length} screenshot${images.length !== 1 ? "s" : ""}`}
           </p>
           <Button
             onClick={handleImport}
