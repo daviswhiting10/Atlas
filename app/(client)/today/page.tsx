@@ -12,6 +12,7 @@ import { ProgressChart } from "@/components/athlete/ProgressChart";
 import { OverallChart } from "@/components/athlete/OverallChart";
 import { overallProgress } from "@/lib/progress/overall";
 import { StatRow } from "@/components/athlete/StatRow";
+import { GoalToday } from "@/components/goals/GoalToday";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Today" };
@@ -26,6 +27,9 @@ export default async function TodayPage() {
       <div className="rise">
         {athlete.selfServe && <PendingPlan />}
         <Greeting name={athlete.firstName} />
+        <div className="mt-7">
+          <GoalToday clientId={athlete.clientId} canStart={!athlete.isGuest} />
+        </div>
         <div className="surface mt-7 p-8">
           <h2 className="text-2xl text-ink">No plan yet</h2>
           {athlete.isCoach ? (
@@ -92,6 +96,8 @@ export default async function TodayPage() {
           </Link>
         )}
       </div>
+
+      <GoalToday clientId={athlete.clientId} canStart={!athlete.isGuest} />
 
       {/* ── Up next ──────────────────────────────────────────────────── */}
       {next ? (
