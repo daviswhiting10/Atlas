@@ -32,6 +32,7 @@ model Workspace {
   milestones         Milestone[]
   auditLogs          AuditLog[]
   exerciseMedia      ExerciseMedia[]
+  goals              Goal[]
 }
 
 // ─────────────────────────────────────────────
@@ -148,6 +149,7 @@ model ClientProfile {
   exerciseCoachNotes ExerciseCoachNote[]
   measurements       Measurement[]
   milestones         Milestone[]
+  goals              Goal[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -277,37 +279,37 @@ model ExerciseChange {
 
 // Workout: used both as a standalone template (blockId=null) and as part of a Block (blockId set)
 model Workout {
-  id           String          @id @default(cuid())
+  id           String            @id @default(cuid())
   workspaceId  String
-  workspace    Workspace       @relation(fields: [workspaceId], references: [id])
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id])
   blockId      String?
-  block        Block?          @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  block        Block?            @relation(fields: [blockId], references: [id], onDelete: Cascade)
   clientId     String?
-  client       ClientProfile?  @relation(fields: [clientId], references: [id])
+  client       ClientProfile?    @relation(fields: [clientId], references: [id])
   name         String
   dayOfWeek    Int? // 1–7; null for standalone templates
   order        Int? // position within block
-  isTemplate   Boolean         @default(false)
+  isTemplate   Boolean           @default(false)
   templateName String?
   templateTags Json? // { goal, split, level, equipment }
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
   exercises    WorkoutExercise[]
 }
 
 model WorkoutExercise {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   workspaceId    String
   workoutId      String
   exerciseId     String
   order          Int
   prescribedSets Json // SetShape[]
-  notes          String?  @db.Text
+  notes          String? @db.Text
 
-  section        String?  // "warmup" | "block_a" | "block_b" | "finisher"
+  section String? // "warmup" | "block_a" | "block_b" | "finisher"
 
-  workout        Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
-  exercise       Exercise @relation(fields: [exerciseId], references: [id])
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
 
   @@index([workoutId, order])
 }
@@ -353,8 +355,8 @@ model Block {
   weeks       Int // duration in weeks
   phase       OptPhase?
 
-  program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  workouts    Workout[]
+  program  Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  workouts Workout[]
 
   @@index([programId, order])
 }
@@ -483,16 +485,16 @@ model SetLog {
   id                        String                   @id @default(cuid())
   workoutLogId              String
   workoutLog                WorkoutLog               @relation(fields: [workoutLogId], references: [id])
-  exerciseId                String?                  // which exercise this set was for
+  exerciseId                String? // which exercise this set was for
   exercise                  Exercise?                @relation(fields: [exerciseId], references: [id])
-  assignedWorkoutExerciseId String?                  // link back to the prescription
+  assignedWorkoutExerciseId String? // link back to the prescription
   assignedWorkoutExercise   AssignedWorkoutExercise? @relation(fields: [assignedWorkoutExerciseId], references: [id])
   setNumber                 Int
   weight                    Float?
-  bandColor                 String?                  // null = weighted/BW; "yellow"|"red"|"green"|"blue"|"black"|"purple"
+  bandColor                 String? // null = weighted/BW; "yellow"|"red"|"green"|"blue"|"black"|"purple"
   reps                      Int?
-  rpe                       Float?                   // per-set RPE (1–10)
-  note                      String?                  @db.Text  // per-set coach note
+  rpe                       Float? // per-set RPE (1–10)
+  note                      String?                  @db.Text // per-set coach note
   completed                 Boolean                  @default(true)
   createdAt                 DateTime                 @default(now())
 
@@ -519,15 +521,15 @@ model SessionNote {
 // ─────────────────────────────────────────────
 
 model ExerciseCoachNote {
-  id          String        @id @default(cuid())
+  id          String   @id @default(cuid())
   workspaceId String
   clientId    String
   exerciseId  String
-  note        String        @db.Text
-  createdAt   DateTime      @default(now())
+  note        String   @db.Text
+  createdAt   DateTime @default(now())
 
-  client      ClientProfile @relation(fields: [clientId], references: [id])
-  exercise    Exercise      @relation(fields: [exerciseId], references: [id])
+  client   ClientProfile @relation(fields: [clientId], references: [id])
+  exercise Exercise      @relation(fields: [exerciseId], references: [id])
 
   @@index([clientId, exerciseId])
 }
@@ -535,16 +537,16 @@ model ExerciseCoachNote {
 /// A coach's own photo or short clip of an exercise (stored in Vercel Blob).
 /// Shown in place of the library picture, to that coach and their clients only.
 model ExerciseMedia {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   workspaceId String
   exerciseId  String
   url         String
   kind        String // "image" | "video"
   sizeBytes   Int
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  exercise    Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  exercise  Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
 
   // One per exercise per coach: a new upload replaces the old one.
   @@unique([workspaceId, exerciseId])
@@ -589,13 +591,13 @@ enum PhotoAngle {
 // ─────────────────────────────────────────────
 
 model Conversation {
-  id          String    @id @default(cuid())
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
   participants Json
-  messages    Message[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model Message {
@@ -714,7 +716,7 @@ model Measurement {
   armCm           Float?
   thighCm         Float?
   painRating      Int?
-  source          String        // "manual" | "inbody" | "other"
+  source          String // "manual" | "inbody" | "other"
   notes           String?       @db.Text
   enteredByUserId String
   createdAt       DateTime      @default(now())
@@ -732,7 +734,7 @@ model Milestone {
   workspace      Workspace     @relation(fields: [workspaceId], references: [id])
   clientId       String
   client         ClientProfile @relation(fields: [clientId], references: [id])
-  type           String        // "first_session" | "session_25" | "first_pr" | etc.
+  type           String // "first_session" | "session_25" | "first_pr" | etc.
   title          String
   description    String        @db.Text
   metricValue    Float?
@@ -780,14 +782,67 @@ model AuditLog {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   actorUserId String
   actorRole   Role
-  transport   String    // "http" | "stdio"
+  transport   String // "http" | "stdio"
   tool        String
-  clientId    String?   // target ClientProfile, when applicable
-  argsHash    String    // sha256 of normalised arguments; never raw arguments
-  outcome     String    // "ok" | "validation_error" | "forbidden" | "not_found" | "rate_limited" | "error"
+  clientId    String? // target ClientProfile, when applicable
+  argsHash    String // sha256 of normalised arguments; never raw arguments
+  outcome     String // "ok" | "validation_error" | "forbidden" | "not_found" | "rate_limited" | "error"
   latencyMs   Int?
   createdAt   DateTime  @default(now())
 
   @@index([workspaceId, createdAt])
   @@index([clientId, createdAt])
+}
+
+// ── Goals (docs/goals-layer.md) ──────────────────────────────────────────────
+// A goal is a lens over a client's finished sessions: it never writes to one,
+// and a session has no link to a goal. While a goal runs, its day counter,
+// attempts and resets are worked out from sessions (lib/goals/evaluate.ts);
+// only what sessions can't tell us is stored: ticks, tags, the rules, and the
+// sealed chapter.
+
+enum GoalStatus {
+  ACTIVE
+  PAUSED // reserved
+  COMPLETED // ran its length with the rules met
+  ENDED // stopped early
+}
+
+model Goal {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  clientId    String
+  client      ClientProfile @relation(fields: [clientId], references: [id])
+  templateKey String? // "builtin:75hard"; null = built from scratch
+  name        String
+  category    String // "challenge" | "consistency" | "block" | "season"
+  rules       Json // GoalRules (lib/goals/rules.ts), copied when the goal starts
+  timeZone    String // IANA zone, fixed when the goal starts; decides where a day ends
+  startDay    String // "yyyy-mm-dd" in timeZone: day 1
+  status      GoalStatus    @default(ACTIVE)
+  startedBy   LoggedBy
+  endedAt     DateTime?
+  chapter     Json? // the sealed Chapter; null while running and during the 48-hour draft
+  checkIns    GoalCheckIn[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([clientId, status])
+}
+
+model GoalCheckIn {
+  id           String   @id @default(cuid())
+  goalId       String
+  goal         Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  ruleKey      String // which rule, or which tag ("outdoors")
+  day          String // "yyyy-mm-dd" in goal.timeZone
+  workoutLogId String? // set for a tag on a session; plain string, no foreign key: if the session goes, the tag is ignored
+  value        Float? // reserved for numbers (litres); null = "done"
+  excuse       Boolean  @default(false) // a coach forgives this rule on this day (reserved)
+  by           LoggedBy
+  note         String?
+  createdAt    DateTime @default(now())
+
+  @@index([goalId, day])
 }
