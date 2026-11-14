@@ -28,6 +28,8 @@ export default {
           | "ADMIN"
         session.user.workspaceId = token.workspaceId as string | undefined
         session.user.clientProfileId = token.clientProfileId as string | undefined
+        session.user.needsPassword = token.np === true
+        session.user.canSnoozePassword = token.snz === true
       }
       return session
     },

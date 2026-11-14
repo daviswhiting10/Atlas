@@ -40,23 +40,28 @@ model Workspace {
 // ─────────────────────────────────────────────
 
 model User {
-  id             String          @id @default(cuid())
-  name           String?
-  email          String          @unique
-  emailVerified  DateTime?
-  passwordHash   String? // scrypt; null for link-only and guest accounts
-  image          String?
-  role           Role            @default(TRAINER)
-  workspaceId    String?
-  workspace      Workspace?      @relation(fields: [workspaceId], references: [id])
-  accounts       Account[]
-  sessions       Session[]
-  trainerProfile TrainerProfile?
-  clientProfile  ClientProfile?  @relation("ClientUser")
-  sentMessages   Message[]
-  usageLogs      UsageLog[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id                  String          @id @default(cuid())
+  name                String?
+  email               String          @unique
+  emailVerified       DateTime?
+  passwordHash        String? // scrypt; null for link-only and guest accounts
+  /// When the password last changed. A session from before it is signed out (lib/auth/session-policy.ts).
+  passwordChangedAt   DateTime?
+  /// "Not now" on the set-password step: don't ask again before this.
+  passwordPromptAfter DateTime?
+  image               String?
+  role                Role            @default(TRAINER)
+  workspaceId         String?
+  workspace           Workspace?      @relation(fields: [workspaceId], references: [id])
+  accounts            Account[]
+  sessions            Session[]
+  passwordResets      PasswordReset[]
+  trainerProfile      TrainerProfile?
+  clientProfile       ClientProfile?  @relation("ClientUser")
+  sentMessages        Message[]
+  usageLogs           UsageLog[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 }
 
 model Account {
@@ -845,4 +850,31 @@ model GoalCheckIn {
   createdAt    DateTime @default(now())
 
   @@index([goalId, day])
+}
+
+// ── Sign-in safety ───────────────────────────────────────────────────────────
+
+/// A password-reset link. Only the SHA-256 of the token is stored; it works once, for 30 minutes.
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Counts of sign-in failures and email requests, shared by every server instance.
+/// The key is a keyed hash ("signin:…", "reset:…"), so no raw email or IP is stored.
+model AuthThrottle {
+  key          String    @id
+  count        Int
+  windowStart  DateTime
+  blockedUntil DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  @@index([updatedAt])
 }

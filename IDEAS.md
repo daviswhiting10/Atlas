@@ -18,6 +18,7 @@ Ideas that came up during build but weren't requested. Ask before building any o
 ## Backlog
 
 - **Seconds by hand in the quick log**: a set shows "sec" only when the plan it came from said so. Let a coach or athlete switch a set (or the whole exercise) between reps and seconds for timed work like planks, carries and holds.
+- **Verify a sending domain in Resend before inviting any client.** Email goes out from Resend's test sender (`onboarding@resend.dev`), which only delivers to the Resend account owner. Until a domain is verified (DNS records on the user's domain), invites, sign-in links and password resets reach the owner only, not clients.
 
 ## Architecture Notes
 
