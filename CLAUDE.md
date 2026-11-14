@@ -8,6 +8,9 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 - Changing production data: take a full backup (`pg_dump`, saved outside the repo, checked with `pg_restore --list`), rehearse on a branch, compare before/after counts, then apply. Stop if any count differs.
 - `prisma/seed.ts` refuses to run against production (`lib/db/production.ts`): it rewrites the exercise library and deletes exercises missing from its list.
 - Scripts in `scripts/exercise-cleanup/` refuse production unless `ALLOW_PROD=1`. Every change they make is logged in `ExerciseChange` and can be reversed with `undo.ts`.
+- **Code must never deploy ahead of the migration it reads.** Apply the migration first (backup, rehearse, compare), then push the code. This applies especially to the auth work on `auth-wip`: `lib/auth.ts` reads `AuthThrottle` on every password sign-in, so deploying it without `20261114012242_sign_in_safety` breaks sign-in.
+- **`dev-sessions` is ahead of `main`:** it has `20261114012242_sign_in_safety` applied, but `main` doesn't contain that file. Never run `prisma migrate dev` on `main` against it, because it would offer to reset the database. Do database work from `auth-wip`, or ask.
+- Read-only queries against production are allowed for counts, always in a `BEGIN READ ONLY` transaction, never printing names or emails (mask them).
 
 ### Branches (Neon project "Atlas", `mute-breeze-39649971`)
 | Branch | What it is | Keep until |
@@ -15,7 +18,10 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 | `production` | Live data | Always |
 | `dev-sessions` | Local dev and tests (`.env.local` `DATABASE_URL`). Holds a copy of real clients plus QA data, so don't expose it. | Ongoing |
 | `rehearsal-step4` | Production copy where the step 4 exercise cleanup was rehearsed | Until the user says |
+| `rehearsal-goals` | Production copy where the goals migration was rehearsed | Until the user says |
 | `dev-prod-copy` | Production as it was before the sessions migrations (rollback reference) | 2026-11-20 |
+
+Git branches: `main` (deploys); `auth-wip`, the unfinished sign-in work (local only, never merge or deploy as is); `atlas-goals` (worktree at `~/Documents/atlas-goals`, merged into `main` up to `6d661e7`).
 
 CLI: `npx --yes neonctl@2 <cmd> --project-id mute-breeze-39649971` (the user is signed in). Make a rehearsal copy with `branches create --name <name> --parent production`, then `connection-string <name> --pooled`. Never print connection strings.
 
@@ -24,6 +30,7 @@ CLI: `npx --yes neonctl@2 <cmd> --project-id mute-breeze-39649971` (the user is 
 - Make one with `/opt/homebrew/opt/libpq/bin/pg_dump --format=custom --no-owner --no-privileges` against the direct (non-pooler) URL.
 - Check it with `pg_restore --list <file>`: it must list table data for `WorkoutLog`, `SetLog`, `ClientProfile` and `Exercise`.
 - Production's URL is `PROD_DATABASE_URL` in `.env.prod-db.local` (chmod 600).
+- Production dumps so far are listed in `HANDOFF.md`. The date-fix reversal file is `session-date-fix-20261113-115227.json` in the same folder.
 - Prisma CLI reads `.env`, so run it with `DOTENV_CONFIG_PATH=.env.local` (or export `DATABASE_URL`). Run `migrate status` before `migrate deploy`.
 
 ### Undoing an exercise-cleanup batch
@@ -42,6 +49,11 @@ npx tsx scripts/exercise-cleanup/undo.ts <batch-id> --only <exercise-id>
 - A merged exercise is never deleted: it keeps `mergedIntoId` and is hidden. Use `visibleTo()` for lists and `liveExercise()` for ids (`lib/exercises/find.ts`).
 - Typed or imported names go through `findExerciseByName` (exact name, alternate names, then the same name written differently via `nameKey`).
 - Muscle groups for charts come from `lib/exercises/muscles.ts`. Conditioning and mobility are kept out of volume.
+
+## Sign-in (see HANDOFF.md, "Auth")
+- The email link stays as a fallback. Never rotate `AUTH_SECRET`: it would sign everyone out.
+- On `auth-wip`, the set-password step is switched by `STEP_DEFAULT` in `lib/auth/session-policy.ts`, and `AUTH_PASSWORD_STEP=on|off` overrides it (the kill switch).
+- Rollout: rehearse, then deploy 1 with the step off, verify the user can still sign in every way, then deploy 2 to turn it on.
 
 ## Running locally
 - `RESEND_API_KEY= AUTH_URL=http://localhost:3000 NEXTAUTH_URL=http://localhost:3000 AUTH_TRUST_HOST=true npx next dev`. With an empty Resend key, sign-in links print to the dev log.

@@ -1,160 +1,209 @@
 # Atlas handoff
 
-Last updated 2026-11-13. Read this and `CLAUDE.md` before doing anything else. The design docs for what comes next are in `docs/` (listed under "Build order").
+Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`.
 
-## Where things stand
-- **Live:** https://atlas-red-eight.vercel.app. Pushing to `main` deploys (Vercel). Commit or push only when the user asks.
-- **`main`** has everything below. The design docs from the `atlas-goals` branch were merged into it (`f39c6d2`).
-- **Production database:** schema and data are fully up to date through step 4. Nothing is mid-flight.
-- **Local dev** runs on the Neon branch `dev-sessions`, which has the same schema and step 4 batch as production plus QA data. It is never production. See `CLAUDE.md`.
-- **Untracked files:** `Untitled` is the user's own draft prompt about smoother transitions (see Backlog). Don't commit or delete it.
+## Where things stand (read before running anything)
+- **Live:** https://atlas-red-eight.vercel.app. Pushing `main` deploys it, so commit or push only when the user asks.
+- **`origin/main` = `71922ee`.** That's what's live: steps 1–4 plus the 75 Hard tracker.
+- **Local `main` is ahead of `origin/main`** and not pushed:
+  - the merge of `atlas-goals` (`lib/history/`, pure code, no screens yet)
+  - this handoff commit
 
-## The work so far: making the logged session the core of the app
+  Pushing would deploy them. That's harmless, but ask first.
+- **Branch `auth-wip` (`3d369fc`), local only:** unfinished sign-in work. **Never merge or deploy it as is** (see "Auth").
+- **Production database:** migrations up to `20261114002845_goals_75_hard`. The auth migration is **not** on production.
+- **`dev-sessions` (local dev database) already has the auth migration** `20261114012242_sign_in_safety`, but `main` doesn't contain that migration file.
+  - On `main`, `prisma migrate status` will report a migration that's applied but missing.
+  - **Never run `prisma migrate dev` on `main` against `dev-sessions`:** it would offer to reset (wipe) the database.
+  - Do database work from `auth-wip`, or ask first.
+- **Uncommitted files:**
+  - `Untitled` in the repo is the user's draft prompt about smoother transitions. Leave it.
+  - `~/Documents/atlas-goals/docs/review-and-v1-scope.md` is an uncommitted review of the four design docs, with a two-week v1 and "two decisions v1 needs from you". Read it before planning; it wasn't merged because it isn't committed.
+- **Local dev server:** may still be running on port 3000 against `dev-sessions`.
 
-**Context box fix (`8645e15`):** when importing a plan, the coach's note ("4-week block, 2 legs + 2 upper, start at week 1") is authoritative.
-- Rule-based reading wins over the model's (`lib/programs/plan-context.ts`).
-- The page shows "Read as: …" so a misread is visible before saving.
-- The sheet import got the same box.
+## The work so far: the logged session is the core
+| Step | What shipped | Commit |
+|---|---|---|
+| Context box | The coach's note on a plan import is authoritative; the page shows "Read as: …" | `8645e15` |
+| 1 | Report only | — |
+| 2 | `WorkoutLog` gains `source`, `title` and `completedAt` (the only "done"). Plan status is derived, with a CHECK that keeps LOGGED out. Production: 711 → 713 sessions, sets identical. | `31bfcdb` |
+| Timezone | A picked day is stored as noon in the viewer's timezone. 57 old midnight-UTC sessions were moved; the reversal file is in the backups folder. | `9154da9` |
+| 3 | "Log a workout" outside the plan: autocomplete, last-time prefill, typed "new" names, one save plus an on-device copy | `828abb7` |
+| 4 | Exercise library cleanup: 52 merges (hidden, reversible), 34 renames, alternate names, pictures locked, 123 imported names made private, muscles for 160 exercises. Batch `step4-production-2026-11-13`. | `ce331b5` |
+| Docs | Design docs: goals, chapters, generator v2, MCP roadmap | `f39c6d2` |
 
-**Step 1: report** (no commit). The findings:
-- Sessions (`WorkoutLog`) could already exist without a plan.
-- "Done" was stored in two places.
-- There was no off-plan logging.
-- Most exercises had no muscles.
-- Name matching created duplicates.
+## 75 Hard tracker (live since `71922ee`)
+- **Code:**
+  - `lib/goals/`: rules, the template, the evaluator, chapters, carry-in, the loader, Today view.
+  - `lib/actions/goals.ts`, `components/goals/`, `/goals/new`, `/goals/[id]`.
+  - The card on Today; chapters on Progress.
+- **Tables:** `Goal` and `GoalCheckIn`, migration `20261114002845_goals_75_hard`. A goal reads finished sessions and never writes one; it stores only ticks, outdoor tags, its rules and the sealed chapter.
+- **Quick log:** time-only workouts (a name and a time, no sets) are allowed (`a479ee2`).
+- **The user starts the goal themselves** on their phone: start day Nov 4, days before the start carried in as "before Atlas". Nov 4 is day 1; the preview shows the day number before saving. Don't create it for them.
+  - Whether they've started it yet is unknown; check production read-only if it matters.
+  - Their "My training" profile had no sessions as of Nov 13.
+- **Known gaps:**
+  - Progress totals count only sessions with sets, so a walk doesn't add to "Workouts". Step 5 should count sessions themselves.
+  - Strip state "before Atlas" is a sixth state, added on request.
 
-**Step 2: the session is the core record (`31bfcdb`, migrations `20261113120000_sessions_core` and `20261113120100_session_is_completion`):**
-- `WorkoutLog` gained:
-  - `source`: PLAN, GENERATED, MANUAL, SCREENSHOT or OFF_PLAN
-  - `title`
-  - `completedAt`: the only meaning of "done"
-- A plan workout's status is derived from its session (`lib/sessions/status.ts`). A database CHECK stops the status LOGGED from being stored.
-- Applied to production with a backup and a before/after comparison:
-  - Sessions went from 711 to 713. The 2 new ones were created for plan workouts that were marked done without a session.
-  - Sets stayed at 13,640, identical.
-  - Charts were identical for all 34 clients.
+## Auth (in progress on `auth-wip`)
+**Why:** on iOS the installed home-screen app has its own cookies, so an email link opened from Mail signs in Safari, never the app. A password typed in the app fixes it.
 
-**Timezone fix (`9154da9`):**
-- A picked day is saved as noon in the viewer's timezone: `lib/sessions/day.ts` `dayToDate`, plus the `tz` cookie.
-- Plan days stay calendar-midnight UTC.
-- 57 old sessions stored at midnight UTC were moved to noon New York, or the client's own timezone.
-  - The reversal file is in `~/Documents/atlas-backups/session-date-fix-20261113-115227.json`.
-  - Session counts per client were unchanged.
-  - Weekly counts shifted for 3 clients.
+**Workaround today:** Settings → Sign-in → Set a password, already in the app, then sign in in the installed app.
 
-**Step 3: log a workout outside the plan (`828abb7`):**
-- Entry points:
-  - Coaches: "Log a workout" on a client page.
-  - Athletes: "Log a different workout" on Today, or "Log a workout" when they have no plan.
-- On the screen:
-  - Autocomplete with shorthand.
-  - Recent exercises.
-  - Sets prefilled from last time, or 3 empty rows.
-  - Typed names saved with a "new" tag.
-  - One save, plus an on-device copy.
-- Off-plan sessions get an "Edit workout" link.
-- Files: `lib/sessions/quick-log.ts`, `lib/actions/quick-log.ts`, `components/sessions/QuickLog.tsx`.
+**Done on `auth-wip`:**
+- **Additive schema:** `User.passwordChangedAt`, `User.passwordPromptAfter`, and the `PasswordReset` and `AuthThrottle` tables. Migration `20261114012242_sign_in_safety`, applied to `dev-sessions` only.
+- **`lib/auth/throttle.ts`:** limits stored in the database so every server instance shares them. A blocked attempt answers exactly like a wrong one.
+  - Wrong password, same email + IP: 5 free, then 30 s doubling to 15 min.
+  - Wrong password, same email from anywhere: past 20 an hour, one a minute.
+  - Attempts from one IP: 50 per 15 minutes.
+  - Reset emails: 3 an hour per email, 10 per IP.
+  - Wrong current password on change: 5 free, then 1 minute doubling to 15.
+  - Never a permanent lock. Keys are keyed hashes (no raw emails or IPs).
+- **Hashing:** scrypt N=2¹⁷, r=8, p=1, 163 ms locally. Old hashes are upgraded at the next sign-in.
+- **Rules** (`lib/password-rules.ts`): 10+ characters. Refuses common and patterned passwords, and ones containing the email name. It's a short curated list; a full breach list would need a download, so ask first.
+- **Sessions:** 180 days, extended by use. The `jwt` callback re-checks the database at most every 10 minutes:
+  - it signs out a session from before a password change;
+  - it sets `needsPassword` for the set-password step.
+- **Step switch:** the step is off by default (`STEP_DEFAULT` in `lib/auth/session-policy.ts`). `AUTH_PASSWORD_STEP=on|off` overrides it.
+- **Session renewal after a change:** only the server action that changed the password can renew the session's stamp (`lib/auth/proof.ts`, an HMAC).
+- **Reset tokens** (`lib/auth/reset.ts`): 32 random bytes, only the SHA-256 stored, 30 minutes, used up when the new password is saved (not when the page opens). A new request cancels older ones.
+- **Email:** `lib/email.ts`. It prints to the dev log when `RESEND_API_KEY` is empty.
+- **Unchanged:** the email link, and `AUTH_SECRET` (never rotate it).
 
-**Step 4: exercise library cleanup (`ce331b5`, migration `20261113211700_exercise_library_cleanup`, data batch `step4-production-2026-11-13`):**
-- Matching for typed, imported and assistant names: exact name, then a saved alternate name, then the same name written differently. Code: `lib/exercises/names.ts` `nameKey`, `lib/exercises/find.ts`.
-- Changes on production:
-  - 52 duplicates merged (hidden through `mergedIntoId`, never deleted).
-  - 34 renames to short names.
-  - Old names kept as alternate names (`ExerciseAlias`).
-  - Pictures locked before renaming.
-  - 123 imported names moved from the shared library into the coach's workspace.
-  - 160 exercises given muscles: 75 from a list the coach checked, 85 from free-exercise-db.
-- Every change is in `ExerciseChange` and can be undone (see `CLAUDE.md`).
-- Production before/after matched everywhere. The coach's 963 sets all have a group now: 875 muscle group, 44 conditioning, 44 mobility (before, 803 had none).
-- Lat Pulldown is now 1,138 sets and Barbell Row 631, as the user predicted.
-- The plan and the muscle list are in `scripts/exercise-cleanup/plan.json` and `muscles.json`.
-- Muscle groups for charts are in `lib/exercises/muscles.ts`.
+**Not written yet:**
+1. **Server actions** in `lib/actions/account.ts`:
+   - Use `passwordProblem` on create, save-guest and set-password.
+   - Count wrong current passwords against the `changeUser` limit.
+   - On set: write `passwordChangedAt` and clear `passwordPromptAfter`, then `unstable_update({ pwProof: stampProof(userId, stamp) })`.
+   - `snoozePasswordStep`: 7 days, only for accounts created before `PASSWORD_REQUIRED_FROM`.
+   - `requestPasswordReset`: the same answer every time, padded to a fixed time; nothing sent to guests or unknown emails.
+   - `resetPassword`: check the rules before using up the token; afterwards clear that email's limit.
+2. **Pages:**
+   - `/forgot-password` and `/reset-password` (public).
+   - `/set-password`: signed in, with "Not now" only when allowed, and a sign-out link.
+   - A "Forgot password?" link on `/login`.
+3. **Middleware:** add the two public pages. Send page requests with `session.user.needsPassword` to `/set-password`, except `/api`, `/login`, `/error` and the step itself. Allow `/set-password` for athletes.
+4. **Break-glass script** `scripts/auth/set-password.ts`:
+   - Refuses production without `ALLOW_PROD=1`.
+   - Reads the password from a hidden prompt; the user runs it with `!` so Claude never sees it.
+   - Writes `passwordChangedAt`.
+5. **Tests:**
+   - Unit: rules, `needsRehash`, throttle maths (`afterEvent` and `blockedFor`, fake clock), `passwordStep` and `sessionCurrent`, proof, the token lifecycle.
+   - On `dev-sessions` against the app:
+     - sign-in right, wrong and with an unknown email (same answer, timing)
+     - limits kicking in
+     - reset for an existing, unknown and guest email
+     - token reuse refused; other sessions signed out after a reset
+     - **a session from before the deploy still accepted**
+     - the step, "Not now", and the kill switch
+   - Last: the user's phone.
 
-**Also:** a backlog note (`7180e15`), and `prisma/seed.ts` refusing production (`lib/db/production.ts`).
+**Rollout the user approved:**
+1. Rehearsal branch `rehearsal-auth` from production, with the same fingerprint comparison of every existing table. Note: the two new `User` columns change the whole-row hash, so compare `User` on its old columns only. Stop and show the user before production.
+2. **Deploy 1:** backup, migration, code, with the set-password step **off**. Verify: the user's current session survives, password sign-in works, the email link works, a reset email reaches them.
+3. **Deploy 2:** turn the step on (`STEP_DEFAULT = true`).
 
-## Decisions made (all by the user, 2026-11-13)
+**Rule: auth code must not deploy without its migration.** `lib/auth.ts` reads `AuthThrottle` on every password sign-in.
 
-**Sessions**
-- A session's date is the day it was performed (default today, editable), never the scheduled day.
-- The session is the only source of truth for completion; plan-workout status is derived, never stored.
-- Off-plan logging is for coaches and athletes both.
-- Quick log:
-  - new exercise names are allowed, with a "new" tag
-  - one save at the end, plus an on-device copy
-  - a brand-new exercise starts with 3 empty rows
-  - if there's a "last time", that many sets are prefilled
-- Streaks:
-  - counted in weeks, with a default target of 3 sessions/week, configurable per client
-  - the data stays daily, so a daily streak (75 Hard) can be added
-  - the per-client target isn't built yet; it goes with step 5
-- Old sessions with no timezone use the client's saved timezone, else America/New_York.
+**Decisions (user, 2026-11-14):**
+- Google accounts are offered a password, not forced.
+- Existing accounts may tap "Not now", which waits 7 days. New accounts must set one straight away.
+- Sessions last 180 days, extended by use.
+- Defer the Resend sending domain (backlog).
 
-**Exercises**
-- Short names everywhere. The exception is "Low Cable Crossover" (not "Cable Fly"; "Cable Fly" is kept as an alternate name).
-- Old names stay as alternate names, and pictures are locked before any rename.
-- Every merge is logged and reversible. Merges never cross workspaces.
-- "Assisted Pull-Up / Lat Pulldown" stays as two entries: the logs can't show it's the same movement.
-- Imported names go private to the workspace that uses them, except names another workspace uses.
-- The Nov 11 workspace (`cmwc3qx8x0000rlrlvuvbq3ql`) is test data. Leave it alone.
+**Open:** the two real coach logins with no password are `d***s@a*******.co` (created May 13) and `d************0@g****.com` (created May 15, has the My training profile). The user will say whether the first is theirs.
 
-**Muscle groups**
-- The 9 groups are Chest, Back, Shoulders, Arms, Quads, Hamstrings, Glutes & hips, Calves and Core.
-- Each set counts once, toward the group of the exercise's first main muscle.
-- Conditioning (bike, sled, ropes, treadmill) and mobility (stretches, foam rolling) are excluded from volume.
-- Specific calls: Sled Push = conditioning, Depth Drop = quads, Scapular Wall Slides = mobility.
+## Decisions so far (all by the user)
+**Sessions:**
+- A session's date is the day it was done (default today, editable).
+- The session alone decides completion.
+- Off-plan logging is for coaches and athletes.
+- The quick log allows new names with a "new" tag, has one save plus an on-device copy, and gives a new exercise 3 empty rows (or last time's sets).
+- Time-only workouts (a name and a time) are allowed.
 
-**Units and weeks**
-- lb everywhere.
-- Calendar weeks start on Monday (`mondayOf`) for the heatmap and lifetime stats.
-- A goal counts its weeks from its own start day.
+**Streaks:** weekly, default 3 sessions a week, configurable per client (the per-client setting isn't built yet). The data stays daily.
 
-**Goals** (details in `docs/goals-layer.md`):
-- Running goals are **Goals** and finished ones are **Chapters**. **Challenges** is a template category.
-- A goal reads sessions and never writes to them.
-- Athletes can start a goal on their own.
-- There is no daily job: goals close and chapters seal when they are next read.
-- No photos while a client's minor flag is set. A youth team is asked about when the group is created.
+**Exercises:**
+- Short names, except "Low Cable Crossover".
+- Old names kept as alternate names, and pictures locked before renaming.
+- Merges are logged, reversible, and never cross workspaces.
+- "Assisted Pull-Up / Lat Pulldown" stays as two entries.
+- The Nov 11 workspace is test data; leave it alone.
+- Imported names go private to the workspace that uses them.
 
-**Process**
-- Rehearse on a Neon branch, back up, compare before/after, and stop on any mismatch without fixing on the fly.
-- Show the user what changed after each step. They approve before production.
+**Muscles:**
+- 9 groups. Each set counts once, toward its first main muscle.
+- Conditioning and mobility are left out of volume.
+- Sled Push = conditioning, Depth Drop = quads, Scapular Wall Slides = mobility.
+
+**Units and weeks:** lb everywhere. Calendar weeks start Monday; a goal counts its weeks from its own start.
+
+**75 Hard:**
+- Two 45-minute workouts; the outdoor one counts as one of the two.
+- A rule added mid-run counts from today; a removed one stops from tomorrow. Past days keep their result.
+- Progress photo is a tick only.
+- A day closes at the end of the next day. After a miss, the next calendar day is day 1.
+- The chapter is a draft for 48 hours, then sealed.
+- Days before Atlas are carried in.
+- One goal at a time; guests can't start one.
+
+**Process:** branch first; backup checked with `pg_restore --list`; rehearse on a branch; compare before and after; stop on any mismatch; show the user before production.
 
 ## Build order from here
-1. **Basic 75 Hard tracker** (athlete side, the user is its first user). Follow `docs/goals-layer.md` rollout steps 1–3:
-   - pure `lib/goals/rules.ts` and `evaluate.ts` with tests (reset rule, late logs, needs-duration, UTC+13 and UTC−10)
-   - one additive migration (Goal tables, `ClientProfile.timeZone`, `ClientProfile.isMinor`), which needs the user's OK and the full backup procedure
-   - start a goal, Today check-ins, the outdoor and duration prompts
-   - check first that the user's own account has a client profile
-2. **Step 5: charts**, built from session history:
-   - PRs over time per exercise
-   - weekly volume by muscle group (`lib/exercises/muscles.ts`)
+1. **Finish auth** (above), then deploy 1, verify, deploy 2.
+2. **Step 5 charts,** built on `lib/history/` (already merged, tested, no screens yet):
+   - PRs over time
+   - weekly hard sets by muscle group
    - calendar heatmap
-   - current and longest streaks, with the per-client weekly target (default 3)
-3. **History and chapters view:** `docs/archive-and-chapters.md`, build order section 6.
-4. **Screenshot → logged session:** a photo of a finished workout becomes an off-plan session with source SCREENSHOT. It goes through `findExerciseByName`.
-5. **MCP fixes:** `docs/mcp-roadmap.md` section 5.
-   - First, `log_workout`'s date: it is still noon in the server's zone (`lib/mcp/tools/workouts.ts:229`).
-   - Next, it can't log off-plan.
-   - Then share the session writes with the app.
-6. **Generator v2:** `docs/generator-v2.md` section 7.
+   - weekly streaks with the per-client target (default 3)
+   - Count sessions themselves, so time-only workouts appear.
+3. **History and chapters view:** `docs/archive-and-chapters.md`. `lib/history/lifetime.ts` and `lib/history/timeline.ts` exist.
+4. **Screenshot → logged session:** a photo of a finished workout becomes an off-plan session (source SCREENSHOT), with names going through `findExerciseByName`.
+5. **MCP fixes:** `docs/mcp-roadmap.md` section 5. First, `log_workout`'s date is noon in the server's zone (`lib/mcp/tools/workouts.ts`). Then off-plan logging, then shared session writes.
+6. **Generator v2:** `docs/generator-v2.md`.
+
+Check `docs/review-and-v1-scope.md` (uncommitted, in the `atlas-goals` worktree) against this order first.
+
+## Design direction
+- **Feel:** paper and ink, not a dashboard. Bone background, white surfaces, near-black ink, one green (`--signal`) meaning "you trained", gold only on personal records, `--night` for dark feature surfaces.
+- **Structure:** hairlines and spacing instead of cards (like `StatRow`). Serif numbers and titles (Instrument Serif), Geist for text, mono eyebrows for dates.
+- **Words:**
+  - Fewer of them; cut anything that's noise.
+  - Plain words, and never "missed", "failed" or "lost" in athlete-facing copy.
+  - A gap is shown as quiet, not as failure.
+- **No social layer:** no feed, likes or leaderboards.
+- **Mobile first:** check at 390px.
+- **Motion:** restrained. Reduced-motion is honoured.
 
 ## Open questions
-- **Two set-less sessions** on production from a churned client added May 21 (created by the step 2 migration for workouts marked done by the coach). Real client or test data? The user hasn't answered. If they're test data, remove them on a branch first.
-- **Basic 75 Hard scope:** which rules in v1? Two workouts, one outdoors, 45 min each, diet, water, reading and a progress photo are the standard ones. Is the photo rule in or out for v1 (the minor-flag rules)?
-- **Where the coach sets a client's weekly streak target,** and whether athletes can change their own.
-- **Body measurements are still in kg** (measurement form, body progress page). Does "lb everywhere" cover body weight?
-- **Plan imports and close names:** `lib/programs/resolve-exercise.ts` step 3 still links an imported name to a library name that *contains* it ("Seated cable row" → "Seated Cable Row"). That predates step 4. Replace it with "offer close matches for the coach to pick"? That needs a review screen.
-- **Confirmed matches** (alias source "confirmed") aren't written anywhere yet. Should picking a library exercise after typing something else save an alternate name?
-- **47 imported names no one uses** are still in the shared library. Leave them or remove them?
-- **Meal photos** (`NutritionEntry.photoUrl`): covered by the minor flag? The design doc's safe default is yes.
-- **The Nov 11 test workspace:** delete it eventually?
+- Two set-less sessions on production from a churned client added May 21: real client or test data?
+- Body measurements are still entered in kg; does "lb everywhere" cover body weight?
+- Plan imports still link a name to a library name that contains it (`lib/programs/resolve-exercise.ts`, step 3). Replace that with a pick-from-close-matches screen?
+- Whether picking a library exercise after typing something else should save an alternate name.
+- 47 imported names no one uses are still in the shared library.
+- Meal photos and the minor flag (goals doc).
+- Whether the email-link form should stop revealing which addresses have accounts. Today it says links are for existing accounts.
 
 ## Backlog
 - Switch a set to seconds by hand for timed exercises (`IDEAS.md`).
-- Smoother transitions and loading states: the user's draft prompt in the untracked `Untitled` file. It asks for the 5 jankiest transitions as a list first, then a question about which to fix first.
-- Quick-log search: shorthand in the query ("db rdl") relies on the merged clean names. Searching by `nameKey`, or by alternate names written in shorthand, would make it sturdier.
-- In-app AI model ids in `lib/ai/client.ts` are old (`claude-sonnet-4-6`, `claude-haiku-4-5…`). Update them (generator v2 step 9).
-- Guest accounts are never cleaned up, and the sign-up limit is per instance (`docs/STATE.md`).
-- In-plan exercises without a picture: coaches can upload on `/exercises`.
-- `prisma/seed.ts` deletes exercises not in its list. It's guarded from production now, but should be rewritten to not delete.
-- Chart accessibility: no text alternative, and the tab pickers don't support arrow keys (`docs/STATE.md`).
+- **Verify a sending domain in Resend before inviting any client** (`IDEAS.md`). The test sender only delivers to the Resend account owner.
+- Smoother transitions and loading states: the user's prompt in `Untitled` asks for the 5 jankiest first, as a list, then which to tackle.
+- Progress totals should count time-only sessions (step 5).
+- Quick-log search should match shorthand through `nameKey` and alternate names.
+- In-app AI model ids in `lib/ai/client.ts` are out of date.
+- Guest accounts are never cleaned up; the sign-up limit in `lib/actions/account.ts` is still in memory.
+- `prisma/seed.ts` deletes exercises that aren't in its list. It's guarded from production, but should be rewritten.
+- A full common-password list for the password rules.
+- Chart accessibility (`docs/STATE.md`).
+
+## Backups and branches
+- **Backup folder:** `~/Documents/atlas-backups/` (chmod 600).
+- **Production dumps, in order:**
+  - `atlas-production-20261113-113909.dump`: before the sessions migrations
+  - `atlas-production-before-date-fix-20261113-115223.dump`
+  - `atlas-production-before-step4-20261113-162152.dump`
+  - `atlas-production-step4-apply-20261113-164259.dump`
+  - `atlas-production-goals-apply-20261113-195343.dump`
+- **Reversal file** for the date fix: `session-date-fix-20261113-115227.json`.
+- **Neon branches:** listed in `CLAUDE.md`.
