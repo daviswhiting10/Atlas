@@ -228,6 +228,9 @@ export function QuickLog({
   const remove = (key: string) => setItems((prev) => prev.filter((i) => i.key !== key));
 
   const setCount = items.reduce((n, i) => n + i.rows.filter((r) => (numOrNull(r.reps) ?? 0) > 0).length, 0);
+  // A walk or a class: no sets, just a name and a time.
+  const timeOnly = setCount === 0 && title.trim().length > 0 && (numOrNull(duration) ?? 0) > 0;
+  const canSave = setCount > 0 || timeOnly;
 
   function startOver() {
     setItems([]);
@@ -240,7 +243,7 @@ export function QuickLog({
   }
 
   async function save() {
-    if (setCount === 0 || saving) return;
+    if (!canSave || saving) return;
     setSaving(true);
     setError(null);
     const res = await saveQuickSession({
@@ -266,7 +269,7 @@ export function QuickLog({
     } catch {
       /* nothing to clear */
     }
-    toast.success(initial ? "Workout updated" : `Workout saved · ${setCount} set${setCount === 1 ? "" : "s"}`);
+    toast.success(initial ? "Workout updated" : timeOnly ? `Workout saved · ${duration} min` : `Workout saved · ${setCount} set${setCount === 1 ? "" : "s"}`);
     router.push(doneHref);
     router.refresh();
   }
@@ -441,7 +444,7 @@ export function QuickLog({
 
       {/* ── Optional details ──────────────────────────────────────────────── */}
       <button type="button" onClick={() => setMore((m) => !m)} className="press mt-6 inline-flex items-center gap-1 text-[14px] font-medium text-ink-soft hover:text-ink">
-        <ChevronDown className={cn("h-4 w-4 transition-transform", more ? "" : "-rotate-90")} /> Name, notes, duration
+        <ChevronDown className={cn("h-4 w-4 transition-transform", more ? "" : "-rotate-90")} /> {items.length === 0 ? "Just a name and a time (walk, run, class)" : "Name, notes, duration"}
       </button>
       {more && (
         <div className="mt-3 space-y-3">
@@ -464,7 +467,7 @@ export function QuickLog({
         <button
           type="button"
           onClick={save}
-          disabled={setCount === 0 || saving}
+          disabled={!canSave || saving}
           className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-ink text-lg font-semibold text-white hover:bg-ink/85 disabled:bg-ink/25"
         >
           {saving && <Loader2 className="h-5 w-5 animate-spin" />}

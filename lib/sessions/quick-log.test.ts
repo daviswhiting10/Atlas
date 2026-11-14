@@ -4,8 +4,16 @@ import { QuickSessionInput, cleanSession, describeLast, matchesTokens, prefillSe
 const base = { date: "2026-11-13", exercises: [] as unknown[] };
 
 describe("QuickSessionInput", () => {
-  it("needs at least one exercise and a real day", () => {
+  it("lets a workout with no exercises through only with a name and a time", () => {
     expect(QuickSessionInput.safeParse(base).success).toBe(false);
+    expect(QuickSessionInput.safeParse({ ...base, title: "Walk" }).success).toBe(false);
+    expect(QuickSessionInput.safeParse({ ...base, durationMin: 45 }).success).toBe(false);
+    expect(QuickSessionInput.safeParse({ ...base, title: "Walk", durationMin: 45 }).success).toBe(true);
+    expect(QuickSessionInput.safeParse({ ...base, title: "  ", durationMin: 45 }).success).toBe(false);
+    expect(cleanSession(QuickSessionInput.parse({ ...base, title: "Walk", durationMin: 45 }))).toMatchObject({ exercises: [], totalSets: 0, title: "Walk", durationMin: 45 });
+  });
+
+  it("needs a real day", () => {
     const one = { ...base, exercises: [{ exerciseId: null, name: "Sled push", sets: [{ weight: null, reps: 3, band: null }] }] };
     expect(QuickSessionInput.safeParse(one).success).toBe(true);
     expect(QuickSessionInput.safeParse({ ...one, date: "11/13/2026" }).success).toBe(false);

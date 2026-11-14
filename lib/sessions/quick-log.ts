@@ -7,35 +7,76 @@
 
 import { z } from "zod";
 
-export const QUICK_LIMITS = { exercises: 30, sets: 20, title: 80, notes: 2000, name: 120, duration: 600, weight: 2000, reps: 1000 } as const;
-export const BANDS = ["yellow", "red", "green", "blue", "black", "purple"] as const;
+export const QUICK_LIMITS = {
+  exercises: 30,
+  sets: 20,
+  title: 80,
+  notes: 2000,
+  name: 120,
+  duration: 600,
+  weight: 2000,
+  reps: 1000,
+} as const;
+export const BANDS = [
+  "yellow",
+  "red",
+  "green",
+  "blue",
+  "black",
+  "purple",
+] as const;
 
 const num = (max: number) => z.number().finite().min(0).max(max).nullable();
 
-export const QuickSessionInput = z.object({
-  /** For a coach; an athlete's own client comes from their sign-in. */
-  clientId: z.string().min(1).max(64).optional(),
-  /** Editing an off-plan session already saved. */
-  sessionId: z.string().min(1).max(64).optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  title: z.string().trim().max(QUICK_LIMITS.title).optional(),
-  notes: z.string().trim().max(QUICK_LIMITS.notes).optional(),
-  durationMin: z.number().int().min(1).max(QUICK_LIMITS.duration).nullable().optional(),
-  exercises: z
-    .array(
-      z.object({
-        /** A library exercise; null for a name typed as is (step 4 matches these). */
-        exerciseId: z.string().min(1).max(64).nullable(),
-        name: z.string().trim().min(1).max(QUICK_LIMITS.name),
-        sets: z.array(z.object({ weight: num(QUICK_LIMITS.weight), reps: num(QUICK_LIMITS.reps), band: z.enum(BANDS).nullable() })).max(QUICK_LIMITS.sets),
-      })
-    )
-    .min(1)
-    .max(QUICK_LIMITS.exercises),
-});
+export const QuickSessionInput = z
+  .object({
+    /** For a coach; an athlete's own client comes from their sign-in. */
+    clientId: z.string().min(1).max(64).optional(),
+    /** Editing an off-plan session already saved. */
+    sessionId: z.string().min(1).max(64).optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    title: z.string().trim().max(QUICK_LIMITS.title).optional(),
+    notes: z.string().trim().max(QUICK_LIMITS.notes).optional(),
+    durationMin: z
+      .number()
+      .int()
+      .min(1)
+      .max(QUICK_LIMITS.duration)
+      .nullable()
+      .optional(),
+    exercises: z
+      .array(
+        z.object({
+          /** A library exercise; null for a name typed as is (step 4 matches these). */
+          exerciseId: z.string().min(1).max(64).nullable(),
+          name: z.string().trim().min(1).max(QUICK_LIMITS.name),
+          sets: z
+            .array(
+              z.object({
+                weight: num(QUICK_LIMITS.weight),
+                reps: num(QUICK_LIMITS.reps),
+                band: z.enum(BANDS).nullable(),
+              }),
+            )
+            .max(QUICK_LIMITS.sets),
+        }),
+      )
+      .max(QUICK_LIMITS.exercises),
+  })
+  // A workout with no sets (a walk, a class) needs a name and a time instead.
+  .refine(
+    (s) =>
+      s.exercises.length > 0 ||
+      (s.durationMin != null && Boolean(s.title?.trim())),
+    { message: "Add an exercise, or a name and a time." },
+  );
 export type QuickSessionInput = z.infer<typeof QuickSessionInput>;
 
-export type QuickSet = { weight: number | null; reps: number | null; band: (typeof BANDS)[number] | null };
+export type QuickSet = {
+  weight: number | null;
+  reps: number | null;
+  band: (typeof BANDS)[number] | null;
+};
 
 /**
  * What gets saved: a set counts once it has reps (or seconds); weight is
@@ -48,7 +89,11 @@ export function cleanSession(input: QuickSessionInput) {
       name: e.name.replace(/\s+/g, " ").trim(),
       sets: e.sets
         .filter((s) => s.reps != null && s.reps > 0)
-        .map((s) => ({ weight: s.weight != null && s.weight > 0 ? round(s.weight, 2) : null, reps: Math.round(s.reps as number), band: s.band })),
+        .map((s) => ({
+          weight: s.weight != null && s.weight > 0 ? round(s.weight, 2) : null,
+          reps: Math.round(s.reps as number),
+          band: s.band,
+        })),
     }))
     .filter((e) => e.sets.length > 0);
   return {
@@ -60,11 +105,22 @@ export function cleanSession(input: QuickSessionInput) {
   };
 }
 
-const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
+const round = (n: number, places: number) =>
+  Math.round(n * 10 ** places) / 10 ** places;
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-const SHORT: Record<string, string> = { db: "dumbbell", dbs: "dumbbell", bb: "barbell", kb: "kettlebell", kbs: "kettlebell", sl: "single leg", rdl: "romanian deadlift", ohp: "overhead press", bw: "bodyweight" };
+const SHORT: Record<string, string> = {
+  db: "dumbbell",
+  dbs: "dumbbell",
+  bb: "barbell",
+  kb: "kettlebell",
+  kbs: "kettlebell",
+  sl: "single leg",
+  rdl: "romanian deadlift",
+  ohp: "overhead press",
+  bw: "bodyweight",
+};
 
 /** What the user typed, as words to find: "db ro" → ["dumbbell", "ro"]. */
 export function searchTokens(q: string): string[] {
@@ -85,7 +141,11 @@ export function matchesTokens(name: string, tokens: string[]): boolean {
 
 // ── Last time ─────────────────────────────────────────────────────────────────
 
-export type LastTime = { date: string; unit: "reps" | "secs"; sets: QuickSet[] };
+export type LastTime = {
+  date: string;
+  unit: "reps" | "secs";
+  sets: QuickSet[];
+};
 
 /** "3 × 10 @ 45 lb", "10, 8, 6 @ 45 lb", "3 × 45 s", "3 × 12 · blue band". */
 export function describeLast(last: LastTime): string {
@@ -94,10 +154,15 @@ export function describeLast(last: LastTime): string {
   const unit = last.unit === "secs" ? " s" : "";
   const reps = sets.map((s) => s.reps);
   const sameReps = reps.every((r) => r === reps[0]);
-  const count = sameReps ? `${sets.length} × ${reps[0]}${unit}` : `${reps.join(", ")}${unit}`;
-  const weights = Array.from(new Set(sets.map((s) => s.weight).filter((w): w is number => w != null)));
+  const count = sameReps
+    ? `${sets.length} × ${reps[0]}${unit}`
+    : `${reps.join(", ")}${unit}`;
+  const weights = Array.from(
+    new Set(sets.map((s) => s.weight).filter((w): w is number => w != null)),
+  );
   const bands = Array.from(new Set(sets.map((s) => s.band).filter(Boolean)));
-  if (weights.length > 0) return `${count} @ ${weights.length === 1 ? weights[0] : `${Math.min(...weights)}–${Math.max(...weights)}`} lb`;
+  if (weights.length > 0)
+    return `${count} @ ${weights.length === 1 ? weights[0] : `${Math.min(...weights)}–${Math.max(...weights)}`} lb`;
   if (bands.length > 0) return `${count} · ${bands.join("/")} band`;
   return count;
 }
@@ -105,6 +170,9 @@ export function describeLast(last: LastTime): string {
 /** The rows a new exercise starts with: last time's sets, or 3 empty ones. */
 export function prefillSets(last: LastTime | null): QuickSet[] {
   const sets = last?.sets.filter((s) => s.reps != null) ?? [];
-  if (sets.length === 0) return [0, 1, 2].map(() => ({ weight: null, reps: null, band: null }));
-  return sets.slice(0, QUICK_LIMITS.sets).map((s) => ({ weight: s.weight, reps: s.reps, band: s.band }));
+  if (sets.length === 0)
+    return [0, 1, 2].map(() => ({ weight: null, reps: null, band: null }));
+  return sets
+    .slice(0, QUICK_LIMITS.sets)
+    .map((s) => ({ weight: s.weight, reps: s.reps, band: s.band }));
 }

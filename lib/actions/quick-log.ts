@@ -176,7 +176,8 @@ export async function saveQuickSession(raw: unknown): Promise<QuickSaveResult> {
   const input = parsed.data;
   const scope = await scopeFor(input.clientId);
   const clean = cleanSession(input);
-  if (clean.totalSets === 0) return { ok: false, error: "Add reps to at least one set." };
+  // No sets is fine for a walk or a class, as long as it has a name and a time.
+  if (clean.totalSets === 0 && !(clean.title && clean.durationMin != null)) return { ok: false, error: "Add reps to at least one set, or give it a name and a time." };
 
   const date = requestDay(input.date);
   if (date.getTime() > Date.now() + 36 * 3_600_000) return { ok: false, error: "That date is in the future." };
