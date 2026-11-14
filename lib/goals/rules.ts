@@ -54,11 +54,18 @@ export type Rule = z.infer<typeof Rule>;
 export const GoalRules = z
   .object({
     length: z.object({ days: z.number().int().min(1).max(366) }),
+    /**
+     * Days from the goal's start through this day happened before Atlas: they
+     * count as met without sessions or ticks, and show as "before Atlas".
+     * Everything after comes from real sessions and ticks.
+     */
+    carriedThrough: Day.optional(),
     rules: z.array(Rule).min(1).max(20),
     onMiss: z.literal("reset"),
   })
   .superRefine((g, ctx) => {
     const keys = g.rules.map((r) => r.key);
+    // (Whether it falls between the start day and yesterday is checked when the goal starts: it needs the start day.)
     if (new Set(keys).size !== keys.length) ctx.addIssue({ code: "custom", message: "Two rules share a key." });
     for (const r of g.rules) {
       if (r.fromDay && r.toDay && r.toDay < r.fromDay) ctx.addIssue({ code: "custom", message: `"${r.label}" stops before it starts.` });

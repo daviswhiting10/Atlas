@@ -12,6 +12,7 @@
  *   while the day is open the rule reads "needs duration"; once the day
  *   closes, it doesn't count.
  * - The first missed day ends the attempt; the next calendar day is day 1.
+ * - Days "carried in" (from before Atlas) count as met with nothing to check.
  * - Rules have a span: a rule added later only judges days from its `fromDay`,
  *   so days already judged keep their result.
  *
@@ -36,6 +37,8 @@ export type DayResult = {
   excused: string[];
   /** met: every rule met · missed: a closed day with a rule unmet · pending: still open */
   state: "met" | "pending" | "missed";
+  /** From before Atlas: met without sessions or ticks. */
+  carried?: boolean;
 };
 export type Attempt = { fromDay: string; toDay: string | null; days: number; current: boolean };
 export type TodayRule = { ruleKey: string; label: string; kind: Rule["kind"]; need: number; have: number; state: RuleState; sessionIds: string[] };
@@ -94,6 +97,9 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
   }
 
   const closed = (day: string) => opts.closeAll === true || today >= addDays(day, 2);
+  // Carried-in days end at the latest the day before today: today is always real.
+  const yesterday = addDays(today, -1);
+  const carriedTo = goal.rules.carriedThrough ? (goal.rules.carriedThrough < yesterday ? goal.rules.carriedThrough : yesterday) : null;
   const needsDuration = new Set<string>();
 
   /** One rule on one day. */
@@ -131,15 +137,17 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
     const active = goal.rules.rules.filter((r) => ruleActiveOn(r, day));
     const states: Record<string, RuleState> = {};
     const excused: string[] = [];
-    for (const r of active) {
+    const carried = carriedTo != null && day <= carriedTo;
+    for (const r of carried ? [] : active) {
       const j = judge(r, day);
       states[r.key] = j.state;
       if (excusedKeys.has(`${r.key}|${day}`)) excused.push(r.key);
       if (day === today) todayRules.push({ ruleKey: r.key, label: r.label, kind: r.kind, need: j.need, have: j.have, state: j.state, sessionIds: j.sessionIds });
     }
+    if (carried) for (const r of active) states[r.key] = "met";
     const values = Object.values(states);
     const state: DayResult["state"] = values.includes("missed") ? "missed" : values.every((s) => s === "met") ? "met" : "pending";
-    periods.push({ day, rules: states, excused, state });
+    periods.push(carried ? { day, rules: states, excused, state, carried: true } : { day, rules: states, excused, state });
 
     if (state === "missed") {
       attempts.push({ fromDay: from, toDay: lastMet, days: metRun, current: false });

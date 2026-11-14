@@ -25,6 +25,13 @@ describe("75 Hard template", () => {
   });
 });
 
+describe("carried-in days", () => {
+  it("are optional and must be a real-looking day", () => {
+    expect(GoalRules.safeParse({ ...small(), carriedThrough: "2026-01-03" }).success).toBe(true);
+    expect(GoalRules.safeParse({ ...small(), carriedThrough: "yesterday" }).success).toBe(false);
+  });
+});
+
 describe("GoalRules", () => {
   it("refuses duplicate keys, backwards spans and unknown kinds", () => {
     const r = small().rules[0];

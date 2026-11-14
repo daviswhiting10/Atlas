@@ -86,4 +86,24 @@ describe("freezeChapter", () => {
     const b = freezeChapter(goal(75, "2026-01-02"), d.map((x) => sess(x)), d.map(water), new Date("2026-06-01T00:00:00Z"));
     expect({ ...a, sealedAt: "" }).toEqual({ ...b, sealedAt: "" });
   });
+
+  it("shows days from before Atlas as their own state, and leaves them out of the rule totals", () => {
+    const g = { ...goal(5, "2026-01-05"), rules: GoalRules.parse({ ...rules(5), carriedThrough: "2026-01-02" }) };
+    const d = ["2026-01-03", "2026-01-04", "2026-01-05"];
+    const c = freezeChapter(g, d.map((x) => sess(x)), d.map(water), SEALED);
+    expect(c.outcome).toBe("completed");
+    expect(c.strip.cells).toEqual(["carried", "carried", "met", "met", "met"]);
+    expect(c.carriedIn).toEqual({ from: "2026-01-01", to: "2026-01-02", days: 2 });
+    expect(c.rules).toEqual([
+      { key: "w", label: "Workout", met: 3, of: 3 },
+      { key: "water", label: "Water", met: 3, of: 3 },
+    ]);
+    expect(c.numbers).toMatchObject({ sessions: 3, activeDays: 3, bestRun: { days: 5, from: "2026-01-01", to: "2026-01-05" } });
+    expect(c.line).toBe("Completed. 5 days.");
+  });
+
+  it("has no carried-in block when nothing was carried in", () => {
+    expect(freezeChapter(goal(75, "2026-01-01"), [], [], SEALED).carriedIn).toBeNull();
+  });
 });
+

@@ -18,7 +18,8 @@ import { daysBetween } from "./days";
 import { evaluateGoal, type CheckInInput, type DayResult, type GoalInput } from "./evaluate";
 import type { GoalCategory } from "./templates";
 
-export type ChapterCell = "met" | "partial" | "rest" | "excused" | "paused";
+/** "carried" is a day from before Atlas (an addition to the doc's five states). */
+export type ChapterCell = "met" | "partial" | "rest" | "excused" | "paused" | "carried";
 
 export type Chapter = {
   v: 1;
@@ -36,6 +37,8 @@ export type Chapter = {
     activeDays: number;
     bestRun: { days: number; from: string; to: string };
   };
+  /** Days from before Atlas, counted as met without sessions; null when there were none. */
+  carriedIn: { from: string; to: string; days: number } | null;
   /** Only attempts that got somewhere (at least one day). */
   attempts: { from: string; to: string; days: number }[];
   strip: { unit: "day"; cells: ChapterCell[] };
@@ -48,6 +51,7 @@ export type ChapterSession = { id: string; date: Date; durationMin: number | nul
 const ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
 
 function cellFor(d: DayResult): ChapterCell {
+  if (d.carried) return "carried";
   const states = Object.values(d.rules);
   if (states.length === 0) return "met";
   const met = states.filter((s) => s === "met").length;
@@ -69,6 +73,7 @@ export function freezeChapter(goal: ChapterGoal, sessions: ChapterSession[], che
   const withDuration = inRange.filter((s) => s.durationMin != null);
   const best = result.attempts.reduce((b, a) => (a.days > b.days ? a : b), result.attempts[0] ?? { fromDay: startDay, toDay: startDay, days: 0, current: false });
 
+  const carried = result.periods.filter((p) => p.carried);
   const lastAttempt = result.attempts[result.attempts.length - 1];
   const line =
     outcome === "completed"
@@ -92,10 +97,12 @@ export function freezeChapter(goal: ChapterGoal, sessions: ChapterSession[], che
       activeDays: new Set(inRange.map((s) => localDay(s.date, goal.timeZone))).size,
       bestRun: { days: best.days, from: best.fromDay, to: best.toDay ?? best.fromDay },
     },
+    carriedIn: carried.length ? { from: carried[0].day, to: carried[carried.length - 1].day, days: carried.length } : null,
     attempts: result.attempts.filter((a) => a.days > 0 && a.toDay).map((a) => ({ from: a.fromDay, to: a.toDay as string, days: a.days })),
     strip: { unit: "day", cells: result.periods.map(cellFor) },
     rules: goal.rules.rules.map((r) => {
-      const judged = result.periods.filter((p) => r.key in p.rules);
+      // Totals are for days Atlas could check; carried-in days are shown separately.
+      const judged = result.periods.filter((p) => !p.carried && r.key in p.rules);
       return { key: r.key, label: r.label, met: judged.filter((p) => p.rules[r.key] === "met").length, of: judged.length };
     }),
   };

@@ -233,3 +233,53 @@ describe("75 Hard end to end", () => {
     expect(after).toMatchObject({ suggestion: "complete", completedOn: last, misses: 0, streak: { current: 75, best: 75 } });
   });
 });
+
+describe("days carried in from before Atlas", () => {
+  const carried = (days: number, through: string) => ({ startDay: "2026-01-01", timeZone: TZ, rules: GoalRules.parse({ ...hard.rules, length: { days }, carriedThrough: through }) });
+
+  it("count as met with no sessions or ticks, and today is judged for real", () => {
+    const r = evaluateGoal(carried(75, "2026-01-09"), [], [], noon("2026-01-10"));
+    expect(r.periods.slice(0, 9).every((p) => p.carried === true && p.state === "met" && Object.values(p.rules).every((s) => s === "met"))).toBe(true);
+    expect(r.periods[9]).toMatchObject({ day: "2026-01-10", state: "pending" });
+    expect(r.periods[9].carried).toBeUndefined();
+    expect(r).toMatchObject({ dayOfGoal: 10, misses: 0, attemptNumber: 1, streak: { current: 9, best: 9 } });
+    expect(r.attempts).toEqual([{ fromDay: "2026-01-01", toDay: "2026-01-09", days: 9, current: true }]);
+    expect(r.today.map((t) => t.state).every((s) => s === "open")).toBe(true);
+  });
+
+  it("are closed: nothing about them can be repaired or undone", () => {
+    const r = evaluateGoal(carried(75, "2026-01-09"), [], [], noon("2026-01-10"));
+    expect(r.needsDuration).toEqual([]);
+    expect(r.periods[8].state).toBe("met");
+  });
+
+  it("today then counts in the same attempt as a real day", () => {
+    const { sessions, checkIns } = fullDay("2026-01-10");
+    const r = evaluateGoal(carried(75, "2026-01-09"), sessions, checkIns, noon("2026-01-10"));
+    expect(r).toMatchObject({ dayOfGoal: 10, streak: { current: 10, best: 10 } });
+    expect(r.periods[9].state).toBe("met");
+  });
+
+  it("a real miss afterwards ends the attempt, and the carried days stay in the earlier one", () => {
+    const r = evaluateGoal(carried(75, "2026-01-09"), [], [], noon("2026-01-12")); // Jan 10 closed with nothing
+    expect(r.misses).toBe(1);
+    expect(r.attempts[0]).toEqual({ fromDay: "2026-01-01", toDay: "2026-01-09", days: 9, current: false });
+    expect(r.attempts[1]).toMatchObject({ fromDay: "2026-01-11", current: true });
+  });
+
+  it("can't swallow today, whatever it was given", () => {
+    const r = evaluateGoal(carried(75, "2026-01-10"), [], [], noon("2026-01-10"));
+    expect(r.periods[9].carried).toBeUndefined();
+    expect(r.periods[9].state).toBe("pending");
+    expect(r.dayOfGoal).toBe(10);
+  });
+
+  it("count toward the length: 75 days with 9 carried finishes 66 real days later", () => {
+    const real = Array.from({ length: 66 }, (_, i) => addDays("2026-01-10", i));
+    const { sessions, checkIns } = days(real);
+    const last = real[65];
+    const r = evaluateGoal(carried(75, "2026-01-09"), sessions, checkIns, noon(addDays(last, 2)));
+    expect(r).toMatchObject({ suggestion: "complete", completedOn: last, misses: 0 });
+    expect(last).toBe("2026-03-16");
+  });
+});
