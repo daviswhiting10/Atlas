@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confirmStart, previewStart } from "./preview";
+import { confirmStart, needsConfirmation, previewStart } from "./preview";
 
 describe("previewStart", () => {
   it("counts Nov 4 as day 1, so Nov 13 is day 10 with 9 days from before Atlas", () => {
@@ -37,5 +37,16 @@ describe("confirmStart (the server's check that the button told the truth)", () 
   it("still applies the start-day rules first", () => {
     expect(confirmStart("2026-11-16", "2026-11-15", 75, 1)).toEqual({ ok: false, error: "The start day can't be in the future." });
     expect(confirmStart("junk", "2026-11-15", 75, 1).ok).toBe(false);
+  });
+});
+
+describe("needsConfirmation", () => {
+  it("starting today is one tap; a back-dated start asks first", () => {
+    expect(needsConfirmation(previewStart("2026-11-15", "2026-11-15", 75))).toBe(false);
+    expect(needsConfirmation(previewStart("2026-11-14", "2026-11-15", 75))).toBe(true);
+    expect(needsConfirmation(previewStart("2026-11-04", "2026-11-15", 75))).toBe(true);
+  });
+  it("a start day that isn't allowed has nothing to confirm", () => {
+    expect(needsConfirmation(previewStart("2026-11-16", "2026-11-15", 75))).toBe(false);
   });
 });

@@ -34,3 +34,9 @@ export function confirmStart(startDay: string, today: string, length: number, sh
   }
   return preview;
 }
+
+/**
+ * Does starting need a "are you sure?" step? Only when the start day is in the past: that is the case
+ * where the day number is not the obvious 1, and where days get counted as done. Starting today is one tap.
+ */
+export const needsConfirmation = (p: StartPreview): boolean => p.ok && p.carriedDays > 0;
