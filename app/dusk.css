@@ -82,10 +82,35 @@
   --dusk-grid: radial-gradient(circle, rgba(236, 232, 225, 0.075) 1px, transparent 1.6px);
   --dusk-grid-size: 22px;
 
-  /* Motion */
-  --dusk-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dusk-quick: 140ms;
-  --dusk-breathe: 3.6s;
+  /* Glow: a dot that has just been filled */
+  --dusk-glow-fill: 0 0 0 6px rgba(236, 232, 225, 0.1), 0 0 22px 4px rgba(124, 199, 189, 0.4);
+
+  /* Motion: durations. Nothing in these screens takes longer than a page move. */
+  --dusk-instant: 90ms; /* a tap, answered */
+  --dusk-quick: 140ms; /* hover, press, colour */
+  --dusk-base: 240ms; /* a dot filling, a check appearing */
+  --dusk-slow: 420ms; /* a dot arriving */
+  --dusk-page: 380ms; /* the card becoming the goal page */
+  --dusk-count: 800ms; /* the day number counting up (the count itself is in CountUp.tsx) */
+  --dusk-breathe: 3.6s; /* today's glow */
+
+  /* Motion: the strip filling in. One dot every --dusk-stagger, never longer than --dusk-stagger-max in all. */
+  --dusk-stagger: 9ms;
+  --dusk-stagger-max: 640ms;
+
+  /* Motion: easing curves */
+  --dusk-ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* arrives fast, settles slowly: the default */
+  --dusk-ease-in: cubic-bezier(0.5, 0, 0.9, 0.4); /* leaves */
+  --dusk-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* moves from one place to another */
+  --dusk-spring: cubic-bezier(0.34, 1.3, 0.64, 1); /* a gentle spring: about 5% past, then back */
+}
+
+/* The same spring as a real one, where the browser can draw it (a damped spring, damping ratio 0.68,
+   settling in 1.4 natural periods; it passes 1 by about 5% and comes back). Older browsers keep the curve above. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --dusk-spring: linear(0, 0.066, 0.218, 0.402, 0.581, 0.736, 0.858, 0.946, 1.004, 1.037, 1.052, 1.054, 1.049, 1.04, 1.03, 1.02, 1.012, 1.006, 1.002, 0.999, 0.998, 0.997, 0.997, 0.997, 1);
+  }
 }
 
 /* ── PART 2 · Pieces ─────────────────────────────────────────────────────── */
@@ -258,7 +283,7 @@
   border-radius: 50%;
   border: 1px solid var(--dusk-line-strong);
   color: transparent;
-  transition: border-color var(--dusk-quick), background-color var(--dusk-quick), box-shadow var(--dusk-quick);
+  transition: border-color var(--dusk-instant), background-color var(--dusk-base) var(--dusk-ease), box-shadow var(--dusk-base) var(--dusk-ease), transform var(--dusk-base) var(--dusk-spring);
 }
 .dusk-check[data-state="on"] {
   border-color: var(--dusk-teal);
@@ -267,6 +292,15 @@
   box-shadow: var(--dusk-glow-done);
 }
 .dusk-check[data-state="needs"] { border-color: var(--dusk-peach); color: var(--dusk-peach); }
+/* The tick: answered on the first frame (the circle shrinks under the finger), then fills with a glow and
+   the check springs in. Only transitions, so a rule that is already done on load doesn't animate. */
+.dusk-check > svg {
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity var(--dusk-instant) var(--dusk-ease), transform var(--dusk-base) var(--dusk-spring);
+}
+.dusk-check:is([data-state="on"], [data-state="needs"]) > svg { opacity: 1; transform: none; }
+.dusk-row:active .dusk-check { transform: scale(0.9); }
 
 /* ── The field of dots: one per day ──────────────────────────────────────── */
 .dusk-dots { display: grid; grid-template-columns: repeat(var(--dusk-dots-columns, 15), minmax(0, 1fr)); }
@@ -293,12 +327,82 @@
   border: 1.5px solid var(--dusk-purple);
   box-shadow: var(--dusk-glow-today);
   animation: dusk-breathe var(--dusk-breathe) ease-in-out infinite;
+  transition: background-color var(--dusk-base) var(--dusk-ease), border-color var(--dusk-base) var(--dusk-ease);
 }
 .dusk-dot[data-today][data-state="met"]::before { border-color: var(--dusk-text); }
 .dusk-dot.is-still[data-today]::before { animation: none; box-shadow: 0 0 8px 1px rgba(168, 152, 220, 0.5); }
 @keyframes dusk-breathe {
   0%, 100% { box-shadow: var(--dusk-glow-today); }
   50% { box-shadow: var(--dusk-glow-today-high); }
+}
+
+/* Today's dot once the day is done: filled, with a quiet green glow instead of the breathing purple.
+   `data-pop` is set for a moment when a tick completes the day, and fills the dot with a soft glow. */
+.dusk-dot[data-today][data-state="met"]::before {
+  background: var(--dusk-text);
+  animation: none;
+  box-shadow: var(--dusk-glow-done);
+}
+.dusk-dot[data-today][data-pop]::before { animation: dusk-fill var(--dusk-slow) var(--dusk-spring) both; }
+@keyframes dusk-fill {
+  0% { transform: scale(0.55); background-color: transparent; box-shadow: none; }
+  50% { box-shadow: var(--dusk-glow-fill); }
+  100% { transform: none; background-color: var(--dusk-text); box-shadow: var(--dusk-glow-done); }
+}
+
+/* The strip filling in, once per visit. The page marks the strip data-reveal="pending" until it knows whether
+   this is the first view ("run": dots arrive in turn) or not ("done": drawn at once). Dots keep their space
+   the whole time, so nothing moves. If scripts never run, they appear anyway after a moment. */
+.dusk-dots[data-reveal="pending"] .dusk-dot {
+  opacity: 0;
+  animation: dusk-dot-in var(--dusk-base) var(--dusk-ease) 1.6s both;
+}
+.dusk-dots[data-reveal="run"] .dusk-dot {
+  animation: dusk-dot-in var(--dusk-slow) var(--dusk-spring) both;
+  animation-delay: min(calc(var(--i, 0) * var(--dusk-stagger)), var(--dusk-stagger-max));
+}
+@keyframes dusk-dot-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The day number counting up, once per visit. Three states, set by CountUp:
+   pending (not hydrated yet: invisible, and shown anyway after a moment if scripts never run),
+   run (the final number only holds the space; the live one on top counts), done (just the number).
+   The final number is always in the layout, so the width never changes while it counts. */
+.dusk-count { position: relative; display: inline-block; }
+.dusk-count-live { display: none; position: absolute; left: 0; top: 0; }
+.dusk-count[data-count="pending"] { opacity: 0; animation: dusk-appear var(--dusk-base) var(--dusk-ease) 1.6s forwards; }
+.dusk-count[data-count="run"] .dusk-count-final { visibility: hidden; }
+.dusk-count[data-count="run"] .dusk-count-live { display: block; }
+@keyframes dusk-appear { to { opacity: 1; } }
+
+/* Loading: the same shapes as the real thing, so nothing moves when it arrives. */
+.dusk-skeleton {
+  border-radius: var(--dusk-radius-panel);
+  background: linear-gradient(90deg, rgba(236, 232, 225, 0.05) 0%, rgba(236, 232, 225, 0.1) 50%, rgba(236, 232, 225, 0.05) 100%);
+  background-size: 200% 100%;
+  animation: dusk-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes dusk-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* The card becoming the goal page (and back): the title and the number carry across, the rest cross-fades.
+   Only while ViewTransitionLink has set data-dusk-vt on <html>, so no other navigation is touched.
+   Browsers without the View Transitions API never reach this; the link just navigates. */
+.vt-goal-title { view-transition-name: dusk-goal-title; }
+.vt-goal-counter { view-transition-name: dusk-goal-counter; }
+html[data-dusk-vt]::view-transition-group(dusk-goal-title),
+html[data-dusk-vt]::view-transition-group(dusk-goal-counter) {
+  animation-duration: var(--dusk-page);
+  animation-timing-function: var(--dusk-ease);
+}
+html[data-dusk-vt]::view-transition-old(root),
+html[data-dusk-vt]::view-transition-new(root) {
+  animation-duration: var(--dusk-base);
+  animation-timing-function: var(--dusk-ease-in-out);
 }
 
 /* Where an attempt restarted: a small peach tick above that day. */
@@ -315,7 +419,18 @@
   background: var(--dusk-peach);
 }
 
+/* Reduced motion: everything lands in its final state and stays there. (The global rule in globals.css
+   shortens durations but not delays or hidden start states, so the pieces that hide things are handled here.) */
 @media (prefers-reduced-motion: reduce) {
-  .dusk-dot[data-today]::before { animation: none; }
+  .dusk-dot[data-today]::before { animation: none !important; }
+  .dusk-dots[data-reveal] .dusk-dot { animation: none !important; opacity: 1 !important; transform: none !important; }
   .dusk-chip:active, .dusk-button:active { transform: none; }
+  .dusk-row:active .dusk-check { transform: none; }
+  .dusk-check, .dusk-check > svg { transition: none; }
+  .dusk-check > svg { transform: none; }
+  .dusk-skeleton { animation: none; }
+  .dusk-count[data-count] { animation: none !important; opacity: 1 !important; }
+  html[data-dusk-vt]::view-transition-group(*),
+  html[data-dusk-vt]::view-transition-old(*),
+  html[data-dusk-vt]::view-transition-new(*) { animation: none !important; }
 }

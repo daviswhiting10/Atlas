@@ -27,7 +27,7 @@ export function ChapterView({ goalId, chapter, sealed, sealsAt, sessions }: { go
         </h1>
         <p className="mt-3 text-[17px] leading-snug text-dusk-soft">{chapter.line}</p>
         <div className="mt-8">
-          <GoalStrip cells={chapter.strip.cells} columns={columns} restarts={restarts} />
+          <GoalStrip id={goalId} cells={chapter.strip.cells} columns={columns} restarts={restarts} />
           <StripLegend cells={chapter.strip.cells} restarted={restarts.length > 0} />
         </div>
       </section>

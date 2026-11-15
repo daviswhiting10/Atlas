@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { ChapterView } from "@/components/goals/ChapterView";
-import { AccentTitle, GoalStrip, StripLegend } from "@/components/goals/GoalStrip";
+import { GoalHero } from "@/components/goals/GoalHero";
 import { RuleEditor } from "@/components/goals/RuleEditor";
 import { getAthlete } from "@/lib/athlete/data";
 import { localDay } from "@/lib/athlete/sessions";
@@ -57,29 +57,7 @@ export default async function GoalPage({ params }: { params: { id: string } }) {
   return (
     <div className="dusk dusk-page mx-auto max-w-2xl">
       <div className="dusk-backdrop" aria-hidden />
-      {back}
-      <h1 className="dusk-title is-hero rise">
-        <AccentTitle name={goal.name} />
-      </h1>
-
-      <div className="mt-8 flex items-end gap-3">
-        <p className="dusk-counter" aria-label={`Day ${view.dayOfGoal} of ${view.length}`}>
-          {view.dayOfGoal}
-        </p>
-        <div className="pb-1" aria-hidden>
-          <p className="dusk-eyebrow">Day</p>
-          <p className="dusk-counter-of">of {view.length}</p>
-        </div>
-      </div>
-      <div className="mt-5 flex flex-wrap gap-2">
-        <span className="dusk-chip pointer-events-none">Started {format(parseISO(goal.startDay), "MMM d")}</span>
-        {view.attemptNumber > 1 && <span className="dusk-chip pointer-events-none">Attempt {view.attemptNumber}</span>}
-      </div>
-
-      <div className="mt-8">
-        <GoalStrip cells={view.cells} columns={view.length > 40 ? 25 : 15} todayIndex={view.dayOfGoal - 1} restarts={view.attemptNumber > 1 ? [0] : []} />
-        <StripLegend cells={view.cells} today restarted={view.attemptNumber > 1} />
-      </div>
+      <GoalHero view={view} startDay={goal.startDay} />
       {carried.length > 0 && (
         <p className="mt-5 text-[14px] leading-relaxed text-dusk-soft">
           {carried.length} days, {format(parseISO(carried[0].day), "MMM d")} through {format(parseISO(carried[carried.length - 1].day), "MMM d")}, happened before Atlas and count as done.

@@ -1,44 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { setSessionDuration, tagSession, tickRule } from "@/lib/actions/goals";
-import type { TodayView } from "@/lib/goals/today";
+import { useTodayLive } from "./TodayLive";
 
-type Done = { ok: boolean; error?: string };
-
-/** The day's checklist. Ticks respond at once and are put back if the save fails. */
-export function GoalChecklist({ view }: { view: TodayView }) {
-  const [, startTransition] = useTransition();
-  const [ticks, setTicks] = useState<Record<string, boolean>>({});
-  const [tags, setTags] = useState<Record<string, boolean>>({});
+/**
+ * The day's checklist. A tap shows at once and is saved in the background; if the
+ * save fails it is put back with a quiet note (state and saving: TodayLive.tsx).
+ * Must sit inside <TodayLive>.
+ */
+export function GoalChecklist() {
+  const live = useTodayLive();
   const [minutes, setMinutes] = useState<Record<string, string>>({});
+  if (!live) return null;
+  const { view, ticked, toggleTick, tagged, toggleTag, saveMinutes } = live;
 
-  const run = (call: () => Promise<Done>, undo: () => void) =>
-    startTransition(async () => {
-      const r = await call().catch(() => ({ ok: false, error: "Couldn't save that." }));
-      if (!r.ok) {
-        undo();
-        toast.error(r.error ?? "Couldn't save that.");
-      }
-    });
-
-  const ticked = (key: string, state: string, day: string) => ticks[`${day}|${key}`] ?? state === "met";
-  const toggle = (key: string, day: string, now: boolean) => {
-    setTicks((t) => ({ ...t, [`${day}|${key}`]: !now }));
-    run(() => tickRule({ goalId: view.goalId, ruleKey: key, day, on: !now }), () => setTicks((t) => ({ ...t, [`${day}|${key}`]: now })));
-  };
-  const hasTag = (sessionId: string, mark: string, had: boolean) => tags[`${sessionId}|${mark}`] ?? had;
-  const toggleTag = (sessionId: string, mark: string, now: boolean) => {
-    setTags((t) => ({ ...t, [`${sessionId}|${mark}`]: !now }));
-    run(() => tagSession({ goalId: view.goalId, sessionId, mark, on: !now }), () => setTags((t) => ({ ...t, [`${sessionId}|${mark}`]: now })));
-  };
-  const saveMinutes = (sessionId: string) => {
+  const submitMinutes = async (sessionId: string) => {
     const n = Math.round(Number(minutes[sessionId]));
-    if (!Number.isFinite(n) || n < 1 || n > 600) return toast.error("Enter the minutes, 1 to 600.");
-    run(() => setSessionDuration({ goalId: view.goalId, sessionId, minutes: n }), () => undefined);
+    if (!Number.isFinite(n) || n < 1 || n > 600) return toast("Enter the minutes, 1 to 600.", { duration: 3500 });
+    await saveMinutes(sessionId, n);
   };
 
   const Circle = ({ on, state }: { on: boolean; state?: string }) => (
@@ -58,7 +40,7 @@ export function GoalChecklist({ view }: { view: TodayView }) {
             {view.behind.items.map((it) =>
               it.kind === "check_in" ? (
                 <li key={it.key}>
-                  <button type="button" onClick={() => toggle(it.key, view.behind!.day, ticked(it.key, "open", view.behind!.day))} className="flex min-h-[44px] w-full items-center gap-3 text-left">
+                  <button type="button" onClick={() => toggleTick(it.key, view.behind!.day, ticked(it.key, "open", view.behind!.day))} className="dusk-row flex min-h-[44px] w-full items-center gap-3 text-left">
                     <Circle on={ticked(it.key, "open", view.behind!.day)} />
                     <span>{it.label}</span>
                   </button>
@@ -79,7 +61,7 @@ export function GoalChecklist({ view }: { view: TodayView }) {
             const on = ticked(r.key, r.state, view.today);
             return (
               <li key={r.key}>
-                <button type="button" onClick={() => toggle(r.key, view.today, on)} className="flex min-h-[56px] w-full items-center gap-3 py-3 text-left">
+                <button type="button" aria-pressed={on} onClick={() => toggleTick(r.key, view.today, on)} className="dusk-row flex min-h-[56px] w-full items-center gap-3 py-3 text-left">
                   <Circle on={on} />
                   <span className="text-[15px] font-medium text-dusk-text">{r.label}</span>
                 </button>
@@ -97,10 +79,10 @@ export function GoalChecklist({ view }: { view: TodayView }) {
                 </span>
               </div>
               {r.mark && (
-                <div className="ml-11 mt-2 flex flex-wrap gap-2">
+                <div className="ml-11 mt-2 flex min-h-[44px] flex-wrap items-center gap-2">
                   {view.sessions.length === 0 && <span className="text-[13px] text-ink-mute">Log a workout, then mark the one that was outdoors.</span>}
                   {view.sessions.map((s) => {
-                    const on = hasTag(s.id, r.mark!, s.tags.includes(r.mark!));
+                    const on = tagged(s.id, r.mark!, s.tags.includes(r.mark!));
                     return (
                       <button key={s.id} type="button" aria-pressed={on} onClick={() => toggleTag(s.id, r.mark!, on)} className="dusk-chip">
                         {s.title} · {on ? "Outdoors" : "Outdoors?"}
@@ -121,7 +103,7 @@ export function GoalChecklist({ view }: { view: TodayView }) {
               <span className="font-medium">{s.title} · how long?</span>
               <input inputMode="numeric" aria-label={`Minutes for ${s.title}`} value={minutes[s.id] ?? ""} onChange={(e) => setMinutes((m) => ({ ...m, [s.id]: e.target.value.replace(/\D/g, "") }))} className="dusk-input w-20 text-center tabular-nums" />
               <span className="text-ink-mute">min</span>
-              <button type="button" onClick={() => saveMinutes(s.id)} className="dusk-button">
+              <button type="button" onClick={() => submitMinutes(s.id)} className="dusk-button">
                 Save
               </button>
             </div>
