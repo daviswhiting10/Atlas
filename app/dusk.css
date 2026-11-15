@@ -304,6 +304,17 @@
 /* ── The field of dots: one per day ──────────────────────────────────────── */
 .dusk-dots { display: grid; grid-template-columns: repeat(var(--dusk-dots-columns, 15), minmax(0, 1fr)); }
 @media (min-width: 640px) { .dusk-dots { grid-template-columns: repeat(var(--dusk-dots-columns-wide, var(--dusk-dots-columns, 15)), minmax(0, 1fr)); } }
+/* The compact field (the goal card): 25 across, so 75 days is three rows. On a phone the cells are about 12px,
+   so the dots take more of each cell (72%, about 9px) and today's glow is smaller, or it would swamp its neighbours. */
+@media (max-width: 639px) {
+  .dusk-dots.is-compact {
+    --dusk-dot: 72%;
+    --dusk-glow-today: 0 0 0 2px rgba(168, 152, 220, 0.22), 0 0 9px 2px rgba(168, 152, 220, 0.5);
+    --dusk-glow-today-high: 0 0 0 2px rgba(168, 152, 220, 0.3), 0 0 12px 3px rgba(168, 152, 220, 0.62);
+    --dusk-glow-done: 0 0 8px rgba(124, 199, 189, 0.32);
+    --dusk-glow-fill: 0 0 0 3px rgba(236, 232, 225, 0.1), 0 0 12px 2px rgba(124, 199, 189, 0.4);
+  }
+}
 .dusk-dot { position: relative; display: grid; place-items: center; aspect-ratio: 1; }
 .dusk-dot::before {
   content: "";

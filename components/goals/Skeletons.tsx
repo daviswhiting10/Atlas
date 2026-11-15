@@ -8,28 +8,29 @@ import type { CSSProperties } from "react";
  */
 
 const dots = (n: number) => Array.from({ length: n }, (_, i) => <span key={i} className="dusk-dot" data-state="future" />);
-const stripStyle = { "--dusk-dots-columns": 15, "--dusk-dots-columns-wide": 25 } as CSSProperties;
+const stripStyle = { "--dusk-dots-columns": 25, "--dusk-dots-columns-wide": 25 } as CSSProperties;
+const chapterStripStyle = { "--dusk-dots-columns": 15, "--dusk-dots-columns-wide": 25 } as CSSProperties;
 
 /** The Today card while the goal loads. */
 export function GoalCardSkeleton() {
   return (
     <section className="dusk dusk-card sm:p-8" aria-busy="true" aria-label="Loading your goal">
-      <div className="pt-1.5">
-        <div className="dusk-skeleton h-[30.6px] w-40" />
-      </div>
-      <div className="mt-6 flex items-end gap-3">
-        <div className="dusk-skeleton h-[57.6px] w-[76px]" />
-        <div className="pb-1" aria-hidden>
-          <div className="dusk-skeleton h-[14px] w-8" />
-          <div className="dusk-skeleton mt-1 h-[18px] w-10" />
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+        <div className="dusk-skeleton mb-1 h-[30.6px] w-32" />
+        <div className="flex items-end gap-2">
+          <div className="dusk-skeleton h-[57.6px] w-[76px]" />
+          <div className="pb-1" aria-hidden>
+            <div className="dusk-skeleton h-[14px] w-8" />
+            <div className="dusk-skeleton mt-1 h-[18px] w-10" />
+          </div>
         </div>
       </div>
-      <div className="mt-6">
-        <div className="dusk-dots" style={stripStyle}>
+      <div className="mt-4">
+        <div className="dusk-dots is-compact" style={stripStyle}>
           {dots(75)}
         </div>
       </div>
-      <div className="mt-6">
+      <div className="mt-4">
         <ul className="divide-y divide-dusk-line">
           {/* Six rows (two workouts, four ticks): 56 each, plus the divider the real rows have. */}
           {[56, 57, 57, 57, 57, 57].map((h, i) => (
@@ -56,7 +57,7 @@ export function ChapterSkeleton() {
       <div className="-ml-2 mb-4 h-[44px]" />
       <div className="dusk-skeleton h-[45px] w-56" />
       <div className="mt-8">
-        <div className="dusk-dots" style={stripStyle}>
+        <div className="dusk-dots" style={chapterStripStyle}>
           {dots(75)}
         </div>
       </div>

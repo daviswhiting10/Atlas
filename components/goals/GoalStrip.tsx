@@ -12,10 +12,10 @@ const LABEL: Record<Cell, string> = { met: "Done", partial: "Some done", excused
  * small tick sits above a day where an attempt restarted. Styles: app/dusk.css.
  * Must sit inside `.dusk`.
  */
-export function GoalStrip({ id, cells, columns = 15, todayIndex, restarts = [] }: { id: string; cells: Cell[]; columns?: number; todayIndex?: number; restarts?: number[] }) {
+export function GoalStrip({ id, cells, columns = 15, compact = false, todayIndex, restarts = [] }: { id: string; cells: Cell[]; columns?: number; /** Use `columns` on a phone too (and slightly bigger dots): the goal card. */ compact?: boolean; todayIndex?: number; restarts?: number[] }) {
   const done = cells.filter((c) => c === "met" || c === "carried").length;
   return (
-    <StripField id={id} role="img" aria-label={`${done} days done of ${cells.length}`} className="dusk-dots" style={{ "--dusk-dots-columns": 15, "--dusk-dots-columns-wide": columns } as CSSProperties}>
+    <StripField id={id} role="img" aria-label={`${done} days done of ${cells.length}`} className={compact ? "dusk-dots is-compact" : "dusk-dots"} style={{ "--dusk-dots-columns": compact ? columns : 15, "--dusk-dots-columns-wide": columns } as CSSProperties}>
       {cells.map((c, i) => {
         const title = `Day ${i + 1} \u00b7 ${i === todayIndex ? "Today" : LABEL[c]}${restarts.includes(i) ? " \u00b7 started again here" : ""}`;
         // Today's dot follows the card's live state, so ticking the last rule fills it at once.
