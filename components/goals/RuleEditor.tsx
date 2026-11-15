@@ -22,15 +22,15 @@ export function RuleEditor({ goalId, items }: { goalId: string; items: Item[] })
 
   return (
     <div>
-      <ul className="divide-y divide-line">
+      <ul className="mt-2 divide-y divide-dusk-line">
         {items.map((it) => (
-          <li key={it.key} className="flex items-center gap-3 py-3">
+          <li key={it.key} className="flex items-center gap-3 py-2.5">
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-ink">{it.label}</span>
-              <span className="block text-[13px] text-ink-mute">{it.detail}</span>
+              <span className="block text-[15px] font-medium text-dusk-text">{it.label}</span>
+              <span className="block text-[13px] text-dusk-mute">{it.detail}</span>
             </span>
             {it.removable && (
-              <button type="button" disabled={pending} onClick={() => act(() => removeGoalRule({ goalId, key: it.key }))} className="press text-[13px] font-medium text-ink-mute hover:text-ink">
+              <button type="button" disabled={pending} onClick={() => act(() => removeGoalRule({ goalId, key: it.key }))} className="dusk-chip is-quiet -mr-2 shrink-0 text-[13px]">
                 Stop counting
               </button>
             )}
@@ -38,35 +38,35 @@ export function RuleEditor({ goalId, items }: { goalId: string; items: Item[] })
         ))}
       </ul>
       <form
-        className="mt-3 flex items-center gap-2"
+        className="mt-4 flex items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           const label = draft.trim();
           if (label) act(() => addGoalRule({ goalId, label }), () => setDraft(""));
         }}
       >
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} placeholder="Add a rule, counted from today" className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 text-[15px]" />
-        <button type="submit" disabled={pending || !draft.trim()} className="press flex h-11 items-center gap-1 rounded-xl border border-line px-3 text-[14px] font-medium text-ink-soft hover:border-ink/25 disabled:opacity-50">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} placeholder="Add a rule, counted from today" aria-label="Add a rule" className="dusk-input min-w-0 flex-1 text-[15px]" />
+        <button type="submit" disabled={pending || !draft.trim()} className="dusk-chip shrink-0">
           <Plus className="h-4 w-4" /> Add
         </button>
       </form>
 
-      <div className="mt-8 border-t border-line pt-5">
+      <div className="mt-10 border-t border-dusk-line pt-4">
         {confirmEnd ? (
-          <div className="rounded-xl bg-ink/[0.04] p-4">
-            <p className="text-[15px] font-semibold text-ink">End this goal?</p>
-            <p className="mt-1 text-[14px] text-ink-soft">It becomes a chapter. Your workouts stay as they are, and you can start it again later.</p>
-            <div className="mt-3 flex gap-2">
-              <button type="button" disabled={pending} onClick={() => act(() => endGoal({ goalId }))} className="press h-11 rounded-xl bg-ink px-5 text-[14px] font-semibold text-white">
+          <div className="dusk-panel">
+            <p className="text-[15px] font-medium text-dusk-text">End this goal?</p>
+            <p className="mt-1 text-[14px] leading-relaxed text-dusk-soft">It becomes a chapter. Your workouts stay as they are, and you can start it again later.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={pending} onClick={() => act(() => endGoal({ goalId }))} className="dusk-button">
                 End it
               </button>
-              <button type="button" onClick={() => setConfirmEnd(false)} className="press h-11 rounded-xl border border-line px-5 text-[14px] font-medium text-ink-soft">
+              <button type="button" onClick={() => setConfirmEnd(false)} className="dusk-chip">
                 Keep going
               </button>
             </div>
           </div>
         ) : (
-          <button type="button" onClick={() => setConfirmEnd(true)} className="press text-[14px] font-medium text-ink-mute hover:text-ink">
+          <button type="button" onClick={() => setConfirmEnd(true)} className="dusk-chip is-quiet -ml-2">
             End this goal
           </button>
         )}

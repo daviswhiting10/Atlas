@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { ChapterView } from "@/components/goals/ChapterView";
-import { GoalStrip, StripLegend } from "@/components/goals/GoalStrip";
+import { AccentTitle, GoalStrip, StripLegend } from "@/components/goals/GoalStrip";
 import { RuleEditor } from "@/components/goals/RuleEditor";
 import { getAthlete } from "@/lib/athlete/data";
 import { localDay } from "@/lib/athlete/sessions";
@@ -22,14 +22,15 @@ export default async function GoalPage({ params }: { params: { id: string } }) {
   const { goal, result } = loaded;
 
   const back = (
-    <Link href="/today" className="press mb-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+    <Link href="/today" className="dusk-chip is-quiet -ml-2 mb-4">
       <ArrowLeft className="h-4 w-4" /> Today
     </Link>
   );
 
   if (goal.status !== "ACTIVE" && loaded.chapter) {
     return (
-      <div>
+      <div className="dusk dusk-page">
+        <div className="dusk-backdrop" aria-hidden />
         {back}
         <ChapterView goalId={goal.id} chapter={loaded.chapter} sealed={loaded.sealed} sealsAt={loaded.sealsAt} sessions={loaded.sessions} />
       </div>
@@ -51,42 +52,58 @@ export default async function GoalPage({ params }: { params: { id: string } }) {
     });
   const carried = result.periods.filter((p) => p.carried);
 
-  return (
-    <div className="mx-auto max-w-2xl">
-      {back}
-      <p className="eyebrow">{goal.name}</p>
-      <h1 className="rise mt-1 text-5xl leading-none text-ink">
-        Day {view.dayOfGoal} <span className="text-2xl text-ink-mute">of {view.length}</span>
-      </h1>
-      <p className="mt-3 text-[14px] text-ink-mute">Started {format(parseISO(goal.startDay), "MMM d")}</p>
+  const attempts = result.attempts.filter((a) => a.days > 0);
 
-      <div className="mt-6">
-        <GoalStrip cells={view.cells} columns={view.length > 40 ? 25 : 15} />
-        <StripLegend cells={view.cells} />
+  return (
+    <div className="dusk dusk-page mx-auto max-w-2xl">
+      <div className="dusk-backdrop" aria-hidden />
+      {back}
+      <h1 className="dusk-title is-hero rise">
+        <AccentTitle name={goal.name} />
+      </h1>
+
+      <div className="mt-8 flex items-end gap-3">
+        <p className="dusk-counter" aria-label={`Day ${view.dayOfGoal} of ${view.length}`}>
+          {view.dayOfGoal}
+        </p>
+        <div className="pb-1" aria-hidden>
+          <p className="dusk-eyebrow">Day</p>
+          <p className="dusk-counter-of">of {view.length}</p>
+        </div>
+      </div>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <span className="dusk-chip pointer-events-none">Started {format(parseISO(goal.startDay), "MMM d")}</span>
+        {view.attemptNumber > 1 && <span className="dusk-chip pointer-events-none">Attempt {view.attemptNumber}</span>}
+      </div>
+
+      <div className="mt-8">
+        <GoalStrip cells={view.cells} columns={view.length > 40 ? 25 : 15} todayIndex={view.dayOfGoal - 1} restarts={view.attemptNumber > 1 ? [0] : []} />
+        <StripLegend cells={view.cells} today restarted={view.attemptNumber > 1} />
       </div>
       {carried.length > 0 && (
-        <p className="mt-4 text-[14px] text-ink-soft">
+        <p className="mt-5 text-[14px] leading-relaxed text-dusk-soft">
           {carried.length} days, {format(parseISO(carried[0].day), "MMM d")} through {format(parseISO(carried[carried.length - 1].day), "MMM d")}, happened before Atlas and count as done.
         </p>
       )}
 
-      {result.attempts.filter((a) => a.days > 0).length > 1 && (
-        <section className="mt-8">
-          <h2 className="text-xl text-ink">Attempts</h2>
-          <ul className="mt-2 text-[14px] text-ink-soft">
-            {result.attempts
-              .filter((a) => a.days > 0)
-              .map((a) => (
-                <li key={a.fromDay}>
-                  {format(parseISO(a.fromDay), "MMM d")} · {a.days} days{a.current ? " so far" : ""}
-                </li>
-              ))}
+      {attempts.length > 1 && (
+        <section className="mt-12">
+          <h2 className="dusk-heading">Attempts</h2>
+          <ul className="mt-3 divide-y divide-dusk-line text-[14px] text-dusk-soft">
+            {attempts.map((a) => (
+              <li key={a.fromDay} className="flex items-center justify-between py-3">
+                <span>{format(parseISO(a.fromDay), "MMM d")}</span>
+                <span className="tabular-nums text-dusk-text">
+                  {a.days} days{a.current ? " so far" : ""}
+                </span>
+              </li>
+            ))}
           </ul>
         </section>
       )}
 
-      <section className="mt-8">
-        <h2 className="text-xl text-ink">Rules</h2>
+      <section className="mt-12">
+        <h2 className="dusk-heading">Rules</h2>
         <RuleEditor goalId={goal.id} items={items} />
       </section>
     </div>

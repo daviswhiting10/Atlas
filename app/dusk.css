@@ -1,0 +1,321 @@
+/* ══ Dusk ════════════════════════════════════════════════════════════════════
+   The dark design language: near-black, soft off-white, a faint dot grid,
+   and three muted accents used only as glows and highlights.
+
+   PART 1 is the tokens. A restyle is a change to part 1 alone.
+   PART 2 is the handful of shared pieces built from them (.dusk-*).
+
+   Anything inside `.dusk` is dark. It also re-points the older tokens
+   (--ink, --line, --paper, …) so existing components read correctly there.
+   Tailwind sees the colours as `dusk-*` (tailwind.config.ts).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── PART 1 · Tokens ─────────────────────────────────────────────────────── */
+:root {
+  /* Colour: surfaces */
+  --dusk-bg: #0a0a0d; /* the page */
+  --dusk-surface: #111116; /* a card on the page */
+  --dusk-raised: #1a1a21; /* something on a card */
+
+  /* Colour: text. Contrast on bg / surface / raised:
+     text 16.2 / 15.4 / 14.2 · soft 10.0 / 9.5 / 8.8 · mute 6.5 / 6.2 / 5.7 (AA needs 4.5) */
+  --dusk-text: #ece8e1;
+  --dusk-soft: #bcb8b1;
+  --dusk-mute: #96929b;
+
+  /* Colour: lines */
+  --dusk-line: rgba(236, 232, 225, 0.12);
+  --dusk-line-strong: rgba(236, 232, 225, 0.38); /* outlines of things you tap: 3.2:1 on surface (needs 3) */
+  --dusk-dot-future: rgba(236, 232, 225, 0.24); /* a day still to come: quiet on purpose */
+
+  /* Colour: accents. Glows, rings and small marks only; never a large fill. */
+  --dusk-purple: #a898dc; /* today */
+  --dusk-teal: #7cc7bd; /* done */
+  --dusk-peach: #ebb59a; /* needs you: still open, restarted */
+
+  /* Colour: the one bright thing on a screen */
+  --dusk-button: #f6f3ee;
+  --dusk-button-text: #0a0a0d;
+
+  /* Type: families (loaded with next/font in app/layout.tsx) */
+  --dusk-font-title: var(--font-display), Georgia, serif;
+  --dusk-font-ui: var(--font-body), system-ui, sans-serif;
+
+  /* Type: scale */
+  --dusk-type-eyebrow: 11px;
+  --dusk-type-small: 13px;
+  --dusk-type-body: 15px;
+  --dusk-type-title: 30px; /* serif, on a card */
+  --dusk-type-hero: 44px; /* serif, top of a page */
+  --dusk-type-counter: 64px; /* the big sans number */
+
+  /* Spacing: one 4px step */
+  --dusk-space-1: 4px;
+  --dusk-space-2: 8px;
+  --dusk-space-3: 12px;
+  --dusk-space-4: 16px;
+  --dusk-space-5: 24px;
+  --dusk-space-6: 32px;
+  --dusk-space-7: 48px;
+
+  /* Radii */
+  --dusk-radius-pill: 999px;
+  --dusk-radius-card: 28px;
+  --dusk-radius-panel: 18px;
+
+  /* Sizes */
+  --dusk-tap: 44px; /* the smallest thing you can tap */
+  --dusk-dot: 58%; /* a day's dot, as a share of its cell */
+  --dusk-dot-quiet: 22%; /* a day still to come */
+
+  /* Glows */
+  --dusk-glow-today: 0 0 0 4px rgba(168, 152, 220, 0.16), 0 0 18px 3px rgba(168, 152, 220, 0.5);
+  --dusk-glow-today-high: 0 0 0 5px rgba(168, 152, 220, 0.22), 0 0 26px 6px rgba(168, 152, 220, 0.62);
+  --dusk-glow-done: 0 0 14px rgba(124, 199, 189, 0.32);
+  --dusk-glow-lift: 0 10px 28px -14px rgba(236, 232, 225, 0.45);
+  --dusk-wash:
+    radial-gradient(60% 50% at 100% 0%, rgba(168, 152, 220, 0.13), transparent 70%),
+    radial-gradient(55% 45% at 0% 100%, rgba(124, 199, 189, 0.09), transparent 70%),
+    radial-gradient(40% 30% at 85% 100%, rgba(235, 181, 154, 0.06), transparent 70%);
+
+  /* Texture: the dot grid */
+  --dusk-grid: radial-gradient(circle, rgba(236, 232, 225, 0.075) 1px, transparent 1.6px);
+  --dusk-grid-size: 22px;
+
+  /* Motion */
+  --dusk-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dusk-quick: 140ms;
+  --dusk-breathe: 3.6s;
+}
+
+/* ── PART 2 · Pieces ─────────────────────────────────────────────────────── */
+
+/* The scope. Older tokens are re-pointed so existing components fit in. */
+.dusk,
+.app-ui:has(.dusk-page) {
+  --bone: var(--dusk-bg);
+  --paper: var(--dusk-surface);
+  --ink: var(--dusk-text);
+  --ink-soft: var(--dusk-soft);
+  --ink-mute: var(--dusk-mute);
+  --line: var(--dusk-line);
+  --signal: var(--dusk-teal);
+  --signal-deep: var(--dusk-teal);
+  --night: var(--dusk-raised);
+  color: var(--dusk-text);
+  color-scheme: dark;
+}
+
+/* A dark card on any page. */
+.dusk-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--dusk-radius-card);
+  border: 1px solid var(--dusk-line);
+  background: var(--dusk-wash), var(--dusk-surface);
+  padding: var(--dusk-space-5);
+}
+.dusk-card::before,
+.dusk-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--dusk-grid);
+  background-size: var(--dusk-grid-size) var(--dusk-grid-size);
+  pointer-events: none;
+}
+
+/* A whole dark page: the backdrop sits behind the content, and the app's
+   own bars go dark with it. */
+.dusk-page { position: relative; z-index: 1; }
+.dusk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--dusk-wash), var(--dusk-bg);
+  pointer-events: none;
+}
+.app-ui:has(.dusk-page) { background: var(--dusk-bg); }
+.app-ui:has(.dusk-page) > main { position: relative; z-index: 1; }
+.app-ui:has(.dusk-page) :is(header, nav, a).bg-white,
+.app-ui:has(.dusk-page) :is(header, nav, a)[class*="bg-white/"] {
+  background-color: color-mix(in srgb, var(--dusk-surface) 88%, transparent);
+}
+.app-ui:has(.dusk-page) .bg-ink.text-white { color: var(--dusk-button-text); }
+
+/* Type */
+.dusk .dusk-title {
+  font-family: var(--dusk-font-title);
+  font-weight: 400;
+  font-size: var(--dusk-type-title);
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  color: var(--dusk-text);
+}
+.dusk .dusk-title.is-hero { font-size: var(--dusk-type-hero); }
+.dusk .dusk-title em { font-style: italic; color: var(--dusk-text); }
+.dusk .dusk-heading {
+  font-family: var(--dusk-font-title);
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+.dusk-eyebrow {
+  font-family: var(--dusk-font-ui);
+  font-size: var(--dusk-type-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dusk-mute);
+}
+.dusk-counter {
+  font-family: var(--dusk-font-ui);
+  font-size: var(--dusk-type-counter);
+  font-weight: 300;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  color: var(--dusk-text);
+}
+.dusk-counter-of {
+  font-family: var(--dusk-font-ui);
+  font-size: var(--dusk-type-body);
+  color: var(--dusk-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chips and buttons: pills, with a soft lift on tap. */
+.dusk-chip,
+.dusk-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dusk-space-2);
+  min-height: var(--dusk-tap);
+  min-width: var(--dusk-tap);
+  padding: 0 var(--dusk-space-4);
+  border-radius: var(--dusk-radius-pill);
+  font-family: var(--dusk-font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: transform var(--dusk-quick) var(--dusk-ease), box-shadow var(--dusk-quick) var(--dusk-ease), border-color var(--dusk-quick), background-color var(--dusk-quick), color var(--dusk-quick);
+}
+.dusk-chip {
+  border: 1px solid var(--dusk-line-strong);
+  background: transparent;
+  color: var(--dusk-soft);
+}
+.dusk-chip:hover { border-color: var(--dusk-soft); color: var(--dusk-text); }
+.dusk-chip[aria-pressed="true"] {
+  border-color: var(--dusk-teal);
+  color: var(--dusk-text);
+  background: color-mix(in srgb, var(--dusk-teal) 12%, transparent);
+  box-shadow: var(--dusk-glow-done);
+}
+.dusk-chip.is-quiet { border-color: transparent; padding: 0 var(--dusk-space-2); color: var(--dusk-mute); }
+.dusk-chip.is-quiet:hover { color: var(--dusk-text); }
+.dusk-button {
+  background: var(--dusk-button);
+  color: var(--dusk-button-text);
+  font-weight: 600;
+  padding: 0 var(--dusk-space-5);
+}
+.dusk-chip:active,
+.dusk-button:active { transform: translateY(-1px); box-shadow: var(--dusk-glow-lift); }
+.dusk-chip:disabled,
+.dusk-button:disabled { opacity: 0.45; }
+.dusk :is(a, button, input):focus-visible { outline: 2px solid var(--dusk-purple); outline-offset: 2px; }
+
+.dusk-input {
+  min-height: var(--dusk-tap);
+  border-radius: var(--dusk-radius-pill);
+  border: 1px solid var(--dusk-line-strong);
+  background: var(--dusk-raised);
+  color: var(--dusk-text);
+  padding: 0 var(--dusk-space-4);
+}
+.dusk-input::placeholder { color: var(--dusk-mute); }
+
+/* A quiet inset panel (yesterday still open, a confirm). */
+.dusk-panel {
+  border-radius: var(--dusk-radius-panel);
+  border: 1px solid var(--dusk-line);
+  background: color-mix(in srgb, var(--dusk-raised) 70%, transparent);
+  padding: var(--dusk-space-4);
+}
+
+/* The checklist's circle. */
+.dusk-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--dusk-line-strong);
+  color: transparent;
+  transition: border-color var(--dusk-quick), background-color var(--dusk-quick), box-shadow var(--dusk-quick);
+}
+.dusk-check[data-state="on"] {
+  border-color: var(--dusk-teal);
+  background: color-mix(in srgb, var(--dusk-teal) 14%, transparent);
+  color: var(--dusk-teal);
+  box-shadow: var(--dusk-glow-done);
+}
+.dusk-check[data-state="needs"] { border-color: var(--dusk-peach); color: var(--dusk-peach); }
+
+/* ── The field of dots: one per day ──────────────────────────────────────── */
+.dusk-dots { display: grid; grid-template-columns: repeat(var(--dusk-dots-columns, 15), minmax(0, 1fr)); }
+@media (min-width: 640px) { .dusk-dots { grid-template-columns: repeat(var(--dusk-dots-columns-wide, var(--dusk-dots-columns, 15)), minmax(0, 1fr)); } }
+.dusk-dot { position: relative; display: grid; place-items: center; aspect-ratio: 1; }
+.dusk-dot::before {
+  content: "";
+  width: var(--dusk-dot);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.dusk-dot[data-state="met"]::before { background: var(--dusk-text); }
+.dusk-dot[data-state="carried"]::before { background: color-mix(in srgb, var(--dusk-mute) 62%, transparent); } /* before Atlas: grey */
+.dusk-dot[data-state="partial"]::before { background: color-mix(in srgb, var(--dusk-text) 42%, transparent); }
+.dusk-dot[data-state="excused"]::before { border: 1.5px solid var(--dusk-teal); }
+.dusk-dot[data-state="open"]::before { border: 1.5px solid var(--dusk-peach); }
+.dusk-dot[data-state="rest"]::before { border: 1px solid var(--dusk-line-strong); }
+.dusk-dot[data-state="paused"]::before { border: 1px dashed var(--dusk-line-strong); }
+.dusk-dot[data-state="future"]::before { width: var(--dusk-dot-quiet); background: var(--dusk-dot-future); }
+
+/* Today: a soft purple glow that breathes. */
+.dusk-dot[data-today]::before {
+  border: 1.5px solid var(--dusk-purple);
+  box-shadow: var(--dusk-glow-today);
+  animation: dusk-breathe var(--dusk-breathe) ease-in-out infinite;
+}
+.dusk-dot[data-today][data-state="met"]::before { border-color: var(--dusk-text); }
+.dusk-dot.is-still[data-today]::before { animation: none; box-shadow: 0 0 8px 1px rgba(168, 152, 220, 0.5); }
+@keyframes dusk-breathe {
+  0%, 100% { box-shadow: var(--dusk-glow-today); }
+  50% { box-shadow: var(--dusk-glow-today-high); }
+}
+
+/* Where an attempt restarted: a small peach tick above that day. */
+.dusk-dot[data-restart]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1.5px;
+  height: 16%;
+  min-height: 3px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--dusk-peach);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dusk-dot[data-today]::before { animation: none; }
+  .dusk-chip:active, .dusk-button:active { transform: none; }
+}

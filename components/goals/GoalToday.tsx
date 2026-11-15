@@ -3,7 +3,7 @@ import { ArrowRight, Plus } from "lucide-react";
 import { activeGoalId, loadGoal } from "@/lib/goals/data";
 import { todayView } from "@/lib/goals/today";
 import { GoalChecklist } from "./GoalChecklist";
-import { GoalStrip } from "./GoalStrip";
+import { AccentTitle, GoalStrip } from "./GoalStrip";
 
 /** The goal card on Today, or a quiet link to start one. */
 export async function GoalToday({ clientId, canStart }: { clientId: string; canStart: boolean }) {
@@ -29,28 +29,36 @@ export async function GoalToday({ clientId, canStart }: { clientId: string; canS
 
   const view = todayView(loaded);
   return (
-    <section className="surface rise rise-1 p-5 sm:p-7">
+    <section className="dusk dusk-card rise rise-1 sm:p-8">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="eyebrow">{view.name}</p>
-          <h2 className="mt-1 text-4xl leading-none text-ink">
-            Day {view.dayOfGoal} <span className="text-xl text-ink-mute">of {view.length}</span>
-          </h2>
-          {view.attemptNumber > 1 && (
-            <p className="mt-2 text-[13px] text-ink-mute">
-              Attempt {view.attemptNumber}
-              {view.earlierBest ? ` · earlier best ${view.earlierBest} days` : ""}
-            </p>
-          )}
-        </div>
-        <Link href={`/goals/${view.goalId}`} className="press inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-ink hover:text-ink-soft">
+        <h2 className="dusk-title pt-1.5">
+          <AccentTitle name={view.name} />
+        </h2>
+        <Link href={`/goals/${view.goalId}`} className="dusk-chip shrink-0">
           Details <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <div className="mt-5">
-        <GoalStrip cells={view.cells} columns={view.length > 40 ? 25 : 15} />
+
+      <div className="mt-6 flex items-end gap-3">
+        <p className="dusk-counter" aria-label={`Day ${view.dayOfGoal} of ${view.length}`}>
+          {view.dayOfGoal}
+        </p>
+        <div className="pb-1" aria-hidden>
+          <p className="dusk-eyebrow">Day</p>
+          <p className="dusk-counter-of">of {view.length}</p>
+        </div>
       </div>
-      <div className="mt-5">
+      {view.attemptNumber > 1 && (
+        <p className="mt-3 text-[13px] text-dusk-mute">
+          Attempt {view.attemptNumber}
+          {view.earlierBest ? ` · earlier best ${view.earlierBest} days` : ""}
+        </p>
+      )}
+
+      <div className="mt-6">
+        <GoalStrip cells={view.cells} columns={view.length > 40 ? 25 : 15} todayIndex={view.dayOfGoal - 1} restarts={view.attemptNumber > 1 ? [0] : []} />
+      </div>
+      <div className="mt-6">
         <GoalChecklist view={view} />
       </div>
     </section>

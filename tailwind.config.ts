@@ -92,6 +92,19 @@ const config: Config = {
         signal: "var(--signal)",
         "signal-deep": "var(--signal-deep)",
         night: "var(--night)",
+        // Dusk: the dark design language. Values live in app/dusk.css.
+        dusk: {
+          bg: "var(--dusk-bg)",
+          surface: "var(--dusk-surface)",
+          raised: "var(--dusk-raised)",
+          text: "var(--dusk-text)",
+          soft: "var(--dusk-soft)",
+          mute: "var(--dusk-mute)",
+          line: "var(--dusk-line)",
+          purple: "var(--dusk-purple)",
+          teal: "var(--dusk-teal)",
+          peach: "var(--dusk-peach)",
+        },
       }),
       borderRadius: {
         lg: "var(--radius)",

@@ -1,42 +1,69 @@
-import { cn } from "@/lib/utils";
+import type { CSSProperties } from "react";
 import type { ChapterCell } from "@/lib/goals/chapter";
 import type { StripCell } from "@/lib/goals/today";
 
 type Cell = StripCell | ChapterCell;
 
-const STYLE: Record<Cell, string> = {
-  met: "bg-signal",
-  partial: "bg-signal/45",
-  excused: "bg-signal/45",
-  rest: "border border-ink/25",
-  paused: "border border-dashed border-ink/25",
-  carried: "bg-ink/20",
-  open: "border-2 border-ink",
-  future: "bg-ink/[0.06]",
-};
 const LABEL: Record<Cell, string> = { met: "Done", partial: "Some done", excused: "Excused", rest: "Nothing done", paused: "Paused", carried: "Before Atlas", open: "Open", future: "Still to come" };
 
-/** One dot per day, 15 across. */
-export function GoalStrip({ cells, dark = false, columns = 15 }: { cells: Cell[]; dark?: boolean; columns?: number }) {
+/**
+ * A field of dots, one per day. Today glows; days before Atlas are grey; a
+ * small tick sits above a day where an attempt restarted. Styles: app/dusk.css.
+ * Must sit inside `.dusk`.
+ */
+export function GoalStrip({ cells, columns = 15, todayIndex, restarts = [] }: { cells: Cell[]; columns?: number; todayIndex?: number; restarts?: number[] }) {
+  const done = cells.filter((c) => c === "met" || c === "carried").length;
   return (
-    <div role="img" aria-label={`${cells.filter((c) => c === "met").length} days done of ${cells.length}`} className={cn("grid gap-1.5", "grid-cols-[repeat(15,minmax(0,1fr))]", columns > 15 && "sm:grid-cols-[repeat(25,minmax(0,1fr))]")}>
+    <div role="img" aria-label={`${done} days done of ${cells.length}`} className="dusk-dots" style={{ "--dusk-dots-columns": 15, "--dusk-dots-columns-wide": columns } as CSSProperties}>
       {cells.map((c, i) => (
-        <span key={i} title={`Day ${i + 1} · ${LABEL[c]}`} className={cn("aspect-square rounded-full", STYLE[c], dark && c === "met" && "bg-white", dark && c === "carried" && "bg-white/30", dark && (c === "rest" || c === "open") && "border-white/45", dark && c === "future" && "bg-white/10", dark && c === "partial" && "bg-white/55")} />
+        <span
+          key={i}
+          className="dusk-dot"
+          data-state={c}
+          data-today={i === todayIndex ? "" : undefined}
+          data-restart={restarts.includes(i) ? "" : undefined}
+          title={`Day ${i + 1} · ${i === todayIndex ? "Today" : LABEL[c]}${restarts.includes(i) ? " · started again here" : ""}`}
+        />
       ))}
     </div>
   );
 }
 
-export function StripLegend({ cells, dark = false }: { cells: Cell[]; dark?: boolean }) {
+export function StripLegend({ cells, today = false, restarted = false }: { cells: Cell[]; today?: boolean; restarted?: boolean }) {
   const used = (["met", "partial", "excused", "carried", "rest", "open"] as Cell[]).filter((k) => cells.includes(k));
   return (
-    <ul className={cn("mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]", dark ? "text-white/55" : "text-ink-mute")}>
+    <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-dusk-mute">
       {used.map((k) => (
-        <li key={k} className="flex items-center gap-1.5">
-          <span className={cn("inline-block h-2.5 w-2.5 rounded-full", STYLE[k], dark && k === "met" && "bg-white", dark && k === "carried" && "bg-white/30", dark && (k === "rest" || k === "open") && "border-white/45", dark && k === "partial" && "bg-white/55")} />
+        <li key={k} className="flex items-center gap-1">
+          <span className="dusk-dot h-4 w-4" data-state={k} />
           {LABEL[k]}
         </li>
       ))}
+      {today && (
+        <li className="flex items-center gap-1">
+          <span className="dusk-dot is-still h-4 w-4" data-state="open" data-today="" />
+          Today
+        </li>
+      )}
+      {restarted && (
+        <li className="flex items-center gap-1">
+          <span className="dusk-dot h-4 w-4" data-state="future" data-restart="" />
+          Started again
+        </li>
+      )}
     </ul>
+  );
+}
+
+/** A goal's name with its last word in italics: "75 Hard" becomes 75 <em>Hard</em>. */
+export function AccentTitle({ name }: { name: string }) {
+  const words = name.trim().split(/\s+/);
+  const last = words.pop();
+  return (
+    <>
+      {words.join(" ")}
+      {words.length > 0 && " "}
+      <em>{last}</em>
+    </>
   );
 }
