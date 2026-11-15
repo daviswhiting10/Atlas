@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Check, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { setSessionDuration, tagSession, tickRule } from "@/lib/actions/goals";
 import type { TodayView } from "@/lib/goals/today";
 
@@ -43,27 +42,29 @@ export function GoalChecklist({ view }: { view: TodayView }) {
   };
 
   const Circle = ({ on, state }: { on: boolean; state?: string }) => (
-    <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", on ? "bg-signal text-white" : state === "needs_duration" ? "border-2 border-signal/60 text-signal" : "border border-ink/20 text-transparent")}>
-      <Check className="h-4 w-4" strokeWidth={3} />
+    <span className="dusk-check" data-state={on ? "on" : state === "needs_duration" ? "needs" : "off"}>
+      <Check className="h-4 w-4" strokeWidth={2.5} />
     </span>
   );
 
   return (
     <div>
       {view.behind && (
-        <div className="mb-4 rounded-xl bg-ink/[0.04] px-4 py-3 text-[14px] text-ink-soft">
-          <p className="font-medium text-ink">Yesterday is still open</p>
-          <ul className="mt-1.5 space-y-1">
+        <div className="dusk-panel mb-4 text-[14px] text-dusk-soft">
+          <p className="flex items-center gap-2 font-medium text-dusk-text">
+            <span className="h-1.5 w-1.5 rounded-full bg-dusk-peach" aria-hidden /> Yesterday is still open
+          </p>
+          <ul className="mt-1">
             {view.behind.items.map((it) =>
               it.kind === "check_in" ? (
                 <li key={it.key}>
-                  <button type="button" onClick={() => toggle(it.key, view.behind!.day, ticked(it.key, "open", view.behind!.day))} className="press flex w-full items-center gap-2 text-left">
+                  <button type="button" onClick={() => toggle(it.key, view.behind!.day, ticked(it.key, "open", view.behind!.day))} className="flex min-h-[44px] w-full items-center gap-3 text-left">
                     <Circle on={ticked(it.key, "open", view.behind!.day)} />
                     <span>{it.label}</span>
                   </button>
                 </li>
               ) : (
-                <li key={it.key} className="flex items-center gap-2">
+                <li key={it.key} className="flex min-h-[44px] items-center gap-3">
                   <span className="h-8 w-8 shrink-0" /> <span>{it.label}: log it for yesterday.</span>
                 </li>
               )
@@ -72,15 +73,15 @@ export function GoalChecklist({ view }: { view: TodayView }) {
         </div>
       )}
 
-      <ul className="divide-y divide-line">
+      <ul className="divide-y divide-dusk-line">
         {view.rules.map((r) => {
           if (r.kind === "check_in") {
             const on = ticked(r.key, r.state, view.today);
             return (
               <li key={r.key}>
-                <button type="button" onClick={() => toggle(r.key, view.today, on)} className="press flex w-full items-center gap-3 py-3 text-left">
+                <button type="button" onClick={() => toggle(r.key, view.today, on)} className="flex min-h-[56px] w-full items-center gap-3 py-3 text-left">
                   <Circle on={on} />
-                  <span className="text-[15px] font-semibold text-ink">{r.label}</span>
+                  <span className="text-[15px] font-medium text-dusk-text">{r.label}</span>
                 </button>
               </li>
             );
@@ -90,8 +91,8 @@ export function GoalChecklist({ view }: { view: TodayView }) {
             <li key={r.key} className="py-3">
               <div className="flex items-center gap-3">
                 <Circle on={met} state={r.state} />
-                <span className="min-w-0 flex-1 text-[15px] font-semibold text-ink">{r.label}</span>
-                <span className="text-[13px] text-ink-mute">
+                <span className="min-w-0 flex-1 text-[15px] font-medium text-dusk-text">{r.label}</span>
+                <span className="text-[13px] tabular-nums text-dusk-mute">
                   {r.have} of {r.need}
                 </span>
               </div>
@@ -101,7 +102,7 @@ export function GoalChecklist({ view }: { view: TodayView }) {
                   {view.sessions.map((s) => {
                     const on = hasTag(s.id, r.mark!, s.tags.includes(r.mark!));
                     return (
-                      <button key={s.id} type="button" onClick={() => toggleTag(s.id, r.mark!, on)} className={cn("press rounded-full border px-3 py-1.5 text-[13px] font-medium", on ? "border-signal bg-signal text-white" : "border-line bg-white text-ink-soft hover:border-ink/25")}>
+                      <button key={s.id} type="button" aria-pressed={on} onClick={() => toggleTag(s.id, r.mark!, on)} className="dusk-chip">
                         {s.title} · {on ? "Outdoors" : "Outdoors?"}
                       </button>
                     );
@@ -114,13 +115,13 @@ export function GoalChecklist({ view }: { view: TodayView }) {
       </ul>
 
       {view.needsDuration.length > 0 && (
-        <div className="mt-2 space-y-2 rounded-xl bg-signal/[0.07] px-4 py-3">
+        <div className="dusk-panel mt-3 space-y-3">
           {view.needsDuration.map((s) => (
-            <div key={s.id} className="flex flex-wrap items-center gap-2 text-[14px] text-ink">
+            <div key={s.id} className="flex flex-wrap items-center gap-2 text-[14px] text-dusk-text">
               <span className="font-medium">{s.title} · how long?</span>
-              <input inputMode="numeric" aria-label={`Minutes for ${s.title}`} value={minutes[s.id] ?? ""} onChange={(e) => setMinutes((m) => ({ ...m, [s.id]: e.target.value.replace(/\D/g, "") }))} className="h-9 w-16 rounded-lg border border-line bg-white px-2 text-center" />
+              <input inputMode="numeric" aria-label={`Minutes for ${s.title}`} value={minutes[s.id] ?? ""} onChange={(e) => setMinutes((m) => ({ ...m, [s.id]: e.target.value.replace(/\D/g, "") }))} className="dusk-input w-20 text-center tabular-nums" />
               <span className="text-ink-mute">min</span>
-              <button type="button" onClick={() => saveMinutes(s.id)} className="press h-9 rounded-lg bg-ink px-3 text-[13px] font-semibold text-white">
+              <button type="button" onClick={() => saveMinutes(s.id)} className="dusk-button">
                 Save
               </button>
             </div>
@@ -128,7 +129,7 @@ export function GoalChecklist({ view }: { view: TodayView }) {
         </div>
       )}
 
-      <Link href="/workouts/new" className="press mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+      <Link href="/workouts/new" className="dusk-button mt-5 w-full sm:w-auto">
         <Plus className="h-4 w-4" /> Log a workout
       </Link>
     </div>

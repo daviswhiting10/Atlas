@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import "./dusk.css";
 import { Toaster } from "@/components/ui/sonner";
 
 const geist = localFont({

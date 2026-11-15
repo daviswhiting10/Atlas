@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import type { Chapter } from "@/lib/goals/chapter";
 import type { GoalSession } from "@/lib/goals/data";
 import { StatRow } from "@/components/athlete/StatRow";
-import { GoalStrip, StripLegend } from "./GoalStrip";
+import { AccentTitle, GoalStrip, StripLegend } from "./GoalStrip";
 import { SealButton } from "./SealButton";
 
 const d = (day: string, withYear = false) => format(parseISO(day), withYear ? "MMM d, yyyy" : "MMM d");
@@ -12,18 +12,23 @@ export function ChapterView({ goalId, chapter, sealed, sealsAt, sessions }: { go
   const longest = Math.max(1, ...chapter.attempts.map((a) => a.days));
   const inRange = sessions.filter((s) => s.day >= chapter.range.startDay && s.day <= chapter.range.endDay);
   const columns = chapter.strip.cells.length > 40 ? 25 : 15;
+  // Where each later attempt began, as a position on the strip.
+  const dayIndex = (day: string) => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${chapter.range.startDay}T00:00:00Z`)) / 86_400_000);
+  const restarts = chapter.attempts.slice(1).map((a) => dayIndex(a.from));
 
   return (
     <div className="space-y-10">
-      <section className="surface-night rise p-6 sm:p-10">
-        <p className="font-mono text-[12px] uppercase tracking-[0.09em] text-white/55">
+      <section className="dusk-card rise sm:p-10">
+        <p className="dusk-eyebrow">
           {d(chapter.range.startDay)} – {d(chapter.range.endDay, true)}
         </p>
-        <h1 className="mt-3 text-5xl leading-none sm:text-6xl">{chapter.name}</h1>
-        <p className="mt-3 text-xl text-white/75">{chapter.line}</p>
+        <h1 className="dusk-title is-hero mt-3">
+          <AccentTitle name={chapter.name} />
+        </h1>
+        <p className="mt-3 text-[17px] leading-snug text-dusk-soft">{chapter.line}</p>
         <div className="mt-8">
-          <GoalStrip cells={chapter.strip.cells} dark columns={columns} />
-          <StripLegend cells={chapter.strip.cells} dark />
+          <GoalStrip cells={chapter.strip.cells} columns={columns} restarts={restarts} />
+          <StripLegend cells={chapter.strip.cells} restarted={restarts.length > 0} />
         </div>
       </section>
 
@@ -48,12 +53,12 @@ export function ChapterView({ goalId, chapter, sealed, sealsAt, sessions }: { go
       )}
 
       <section>
-        <h2 className="text-xl text-ink">What it took</h2>
+        <h2 className="dusk-heading">What it took</h2>
         <ul className="mt-3 divide-y divide-line">
           {chapter.rules.map((r) => (
             <li key={r.key} className="py-3">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[15px] font-semibold text-ink">{r.label}</span>
+                <span className="text-[15px] font-medium text-dusk-text">{r.label}</span>
                 <span className="text-[13px] text-ink-mute">{r.of > 0 ? `${r.met} of ${r.of}` : "before Atlas only"}</span>
               </div>
               {r.of > 0 && (
@@ -68,7 +73,7 @@ export function ChapterView({ goalId, chapter, sealed, sealsAt, sessions }: { go
 
       {chapter.attempts.length > 1 && (
         <section>
-          <h2 className="text-xl text-ink">Attempts</h2>
+          <h2 className="dusk-heading">Attempts</h2>
           <ul className="mt-3 space-y-2.5">
             {chapter.attempts.map((a, i) => (
               <li key={a.from} className="flex items-center gap-3">
@@ -83,7 +88,7 @@ export function ChapterView({ goalId, chapter, sealed, sealsAt, sessions }: { go
       )}
 
       <details className="text-[14px]">
-        <summary className="cursor-pointer text-[15px] font-semibold text-ink">The {inRange.length} workouts</summary>
+        <summary className="cursor-pointer text-[15px] font-medium text-dusk-text">The {inRange.length} workouts</summary>
         <p className="mt-2 text-[13px] text-ink-mute">As they are now. If something was edited after this was sealed, it can differ from the numbers above.</p>
         <ul className="mt-2 divide-y divide-line">
           {inRange.map((s) => (
