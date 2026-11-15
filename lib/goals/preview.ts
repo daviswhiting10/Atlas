@@ -18,3 +18,19 @@ export function previewStart(startDay: string, today: string, length: number): S
   if (carriedDays >= length) return { ok: false, error: `That's ${carriedDays + 1} days ago: past the ${length} days this goal runs.` };
   return { ok: true, carriedDays, dayOfGoal: carriedDays + 1 };
 }
+
+/**
+ * The server's check before a goal starts: the day number the form showed
+ * must be the one this start day gives now. A mismatch means the form sent
+ * a different day than it displayed (a date wheel committing late), or the
+ * day turned over in between. Either way, nothing is saved and the person
+ * looks again.
+ */
+export function confirmStart(startDay: string, today: string, length: number, shownDay: number): StartPreview {
+  const preview = previewStart(startDay, today, length);
+  if (!preview.ok) return preview;
+  if (preview.dayOfGoal !== shownDay) {
+    return { ok: false, error: `That start day makes today Day ${preview.dayOfGoal}, not Day ${shownDay}. Check the start day and tap Start again.` };
+  }
+  return preview;
+}

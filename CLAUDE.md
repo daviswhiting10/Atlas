@@ -8,8 +8,8 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 - Changing production data: take a full backup (`pg_dump`, saved outside the repo, checked with `pg_restore --list`), rehearse on a branch, compare before/after counts, then apply. Stop if any count differs.
 - `prisma/seed.ts` refuses to run against production (`lib/db/production.ts`): it rewrites the exercise library and deletes exercises missing from its list.
 - Scripts in `scripts/exercise-cleanup/` refuse production unless `ALLOW_PROD=1`. Every change they make is logged in `ExerciseChange` and can be reversed with `undo.ts`.
-- **Code must never deploy ahead of the migration it reads.** Apply the migration first (backup, rehearse, compare), then push the code. This applies especially to the auth work on `auth-wip`: `lib/auth.ts` reads `AuthThrottle` on every password sign-in, so deploying it without `20261114012242_sign_in_safety` breaks sign-in.
-- **`dev-sessions` is ahead of `main`:** it has `20261114012242_sign_in_safety` applied, but `main` doesn't contain that file. Never run `prisma migrate dev` on `main` against it, because it would offer to reset the database. Do database work from `auth-wip`, or ask.
+- **Code must never deploy ahead of the migration it reads.** Apply the migration first (backup, rehearse, compare), then push the code. The auth migration `20261114012242_sign_in_safety` is now on production (2026-11-14), and the code that reads it is on `main`.
+- `dev-sessions` and production both have `20261114012242_sign_in_safety`, and `main` has its file since the auth merge (2026-11-15).
 - Read-only queries against production are allowed for counts, always in a `BEGIN READ ONLY` transaction, never printing names or emails (mask them).
 
 ### Branches (Neon project "Atlas", `mute-breeze-39649971`)
@@ -19,9 +19,11 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 | `dev-sessions` | Local dev and tests (`.env.local` `DATABASE_URL`). Holds a copy of real clients plus QA data, so don't expose it. | Ongoing |
 | `rehearsal-step4` | Production copy where the step 4 exercise cleanup was rehearsed | Until the user says |
 | `rehearsal-goals` | Production copy where the goals migration was rehearsed | Until the user says |
+| `rehearsal-auth` | Production copy (2026-11-14) with `20261114012242_sign_in_safety` applied; every existing table matched | Until the user says |
 | `dev-prod-copy` | Production as it was before the sessions migrations (rollback reference) | 2026-11-20 |
+| `rehearsal-goal-start` | Production copy where the 75 Hard start-day fix was rehearsed (2026-11-15) | 2026-11-20 |
 
-Git branches: `main` (deploys); `auth-wip`, the unfinished sign-in work (local only, never merge or deploy as is); `atlas-goals` (worktree at `~/Documents/atlas-goals`, merged into `main` up to `6d661e7`).
+Git branches: `main` (deploys); `auth-wip`, the sign-in work (merged into `main` 2026-11-15); `atlas-goals` (worktree at `~/Documents/atlas-goals`, merged into `main` up to `8754384`, the design pass).
 
 CLI: `npx --yes neonctl@2 <cmd> --project-id mute-breeze-39649971` (the user is signed in). Make a rehearsal copy with `branches create --name <name> --parent production`, then `connection-string <name> --pooled`. Never print connection strings.
 
@@ -52,7 +54,7 @@ npx tsx scripts/exercise-cleanup/undo.ts <batch-id> --only <exercise-id>
 
 ## Sign-in (see HANDOFF.md, "Auth")
 - The email link stays as a fallback. Never rotate `AUTH_SECRET`: it would sign everyone out.
-- On `auth-wip`, the set-password step is switched by `STEP_DEFAULT` in `lib/auth/session-policy.ts`, and `AUTH_PASSWORD_STEP=on|off` overrides it (the kill switch).
+- The set-password step is switched by `STEP_DEFAULT` in `lib/auth/session-policy.ts`, and `AUTH_PASSWORD_STEP=on|off` overrides it (the kill switch).
 - Rollout: rehearse, then deploy 1 with the step off, verify the user can still sign in every way, then deploy 2 to turn it on.
 
 ## Running locally

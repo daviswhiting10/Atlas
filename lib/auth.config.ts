@@ -1,9 +1,13 @@
 import type { NextAuthConfig } from "next-auth"
+import { SESSION_MAX_AGE_S, SESSION_UPDATE_AGE_S } from "./auth/session-policy"
 
 // Edge-safe config — no providers, no Node.js imports.
 // Providers live in lib/auth.ts (Node.js only).
 export default {
   providers: [],
+  // Signed in for 180 days, renewed as the app is used. It lives here, not only in
+  // lib/auth.ts, so anything that re-signs the cookie uses the same lifetime.
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_S, updateAge: SESSION_UPDATE_AGE_S },
   pages: {
     signIn: "/login",
     verifyRequest: "/login?verify=1",
@@ -28,6 +32,8 @@ export default {
           | "ADMIN"
         session.user.workspaceId = token.workspaceId as string | undefined
         session.user.clientProfileId = token.clientProfileId as string | undefined
+        session.user.needsPassword = token.np === true
+        session.user.canSnoozePassword = token.snz === true
       }
       return session
     },

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, Loader2, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import { lastTime, quickLogStart, saveQuickSession, searchQuickExercises, type QuickExercise } from "@/lib/actions/quick-log";
 import { describeLast, prefillSets, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
 
@@ -246,10 +248,12 @@ export function QuickLog({
     if (!canSave || saving) return;
     setSaving(true);
     setError(null);
+    // The day the field shows now, not one from an earlier render (lib/day-field.ts).
+    const day = dayFrom(dateRef, date);
     const res = await saveQuickSession({
       clientId,
       sessionId: initial?.id,
-      date,
+      date: day,
       title: title.trim() || undefined,
       notes: notes.trim() || undefined,
       durationMin: numOrNull(duration) ? Math.round(numOrNull(duration)!) : null,
@@ -269,7 +273,7 @@ export function QuickLog({
     } catch {
       /* nothing to clear */
     }
-    toast.success(initial ? "Workout updated" : timeOnly ? `Workout saved · ${duration} min` : `Workout saved · ${setCount} set${setCount === 1 ? "" : "s"}`);
+    toast.success(`${initial ? "Workout updated" : timeOnly ? `Workout saved · ${duration} min` : `Workout saved · ${setCount} set${setCount === 1 ? "" : "s"}`} · ${dateLabel(day)}`);
     router.push(doneHref);
     router.refresh();
   }
@@ -288,12 +292,11 @@ export function QuickLog({
           className="press relative inline-flex h-9 items-center gap-1 rounded-full bg-ink/5 px-3.5 text-sm font-semibold text-ink"
         >
           {dateLabel(date)} <ChevronDown className="h-3.5 w-3.5" />
-          <input
+          <DayInput
             ref={dateRef}
-            type="date"
             value={date}
             max={today()}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
+            onDay={(d) => d && setDate(d)}
             aria-label="Day of the workout"
             className="pointer-events-none absolute inset-0 opacity-0"
             tabIndex={-1}

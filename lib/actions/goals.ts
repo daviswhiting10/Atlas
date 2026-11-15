@@ -20,7 +20,7 @@ import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { dayToDate } from "@/lib/sessions/day";
 import { addDays } from "@/lib/goals/days";
 import { sealNow } from "@/lib/goals/data";
-import { previewStart } from "@/lib/goals/preview";
+import { confirmStart } from "@/lib/goals/preview";
 import { WorkoutMinutes } from "@/lib/goals/rows";
 import { DAY, GoalRules, addCheckInRule, removeRule, ruleActiveOn } from "@/lib/goals/rules";
 import { templateByKey } from "@/lib/goals/templates";
@@ -61,13 +61,15 @@ const refresh = (goalId?: string) => {
 const StartInput = z.object({
   templateKey: z.string().max(40),
   startDay: Day,
+  /** The day number the form showed on its Start button; the server refuses if the start day gives another. */
+  shownDay: z.number().int().min(1).max(366),
   /** Template rules switched off before starting. */
   drop: z.array(Key).max(20).default([]),
   /** Extra daily ticks, by label. */
   add: z.array(z.string().trim().min(1).max(60)).max(10).default([]),
 });
 
-export async function startGoal(raw: unknown): Promise<Result<{ goalId: string }>> {
+export async function startGoal(raw: unknown): Promise<Result<{ goalId: string; dayOfGoal: number }>> {
   const { clientId, workspaceId, by } = await me();
   const parsed = StartInput.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Something in that doesn't look right." };
@@ -77,7 +79,7 @@ export async function startGoal(raw: unknown): Promise<Result<{ goalId: string }
 
   const timeZone = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
   const today = localDay(new Date(), timeZone);
-  const preview = previewStart(input.startDay, today, template.rules.length.days);
+  const preview = confirmStart(input.startDay, today, template.rules.length.days, input.shownDay);
   if (!preview.ok) return preview;
 
   if (await prisma.goal.findFirst({ where: { clientId, status: "ACTIVE" }, select: { id: true } })) return { ok: false, error: "You already have a goal running." };
@@ -98,7 +100,7 @@ export async function startGoal(raw: unknown): Promise<Result<{ goalId: string }
     select: { id: true },
   });
   refresh();
-  return { ok: true, goalId: goal.id };
+  return { ok: true, goalId: goal.id, dayOfGoal: preview.dayOfGoal };
 }
 
 const TickInput = z.object({ goalId: Id, ruleKey: Key, day: Day, on: z.boolean() });

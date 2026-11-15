@@ -77,6 +77,11 @@ export default function LoginPage() {
               <button type="submit" disabled={loading} className={primary}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
               </button>
+              <div className="text-right">
+                <Link href="/forgot-password" className="text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
             </form>
           ) : (
             <form onSubmit={sendLink} className="mt-3 space-y-3">

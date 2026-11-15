@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, ChevronDown, Loader2, Sparkles } from "lucide-react";
@@ -95,6 +97,7 @@ export function CoachPlanForm({
   const clientId = fixedClientId ?? ownClientId;
   const [more, setMore] = useState(false);
   const [startDate, setStartDate] = useState(today());
+  const startRef = useRef<HTMLInputElement>(null);
   const [goalText, setGoalText] = useState("");
   const [goals, setGoals] = useState<string[]>(initialTags?.goals.filter((g) => COACH_GOALS[g]) ?? []);
   const [modifiers, setModifiers] = useState<string[]>(initialTags?.conditions.filter((c) => COACH_MODIFIERS[c]) ?? []);
@@ -118,7 +121,7 @@ export function CoachPlanForm({
   function generate() {
     if (!clientId) return void toast.error("Choose who the plan is for.");
     start(async () => {
-      const res = await generateDraftPlan({ clientId, prefs, startDate });
+      const res = await generateDraftPlan({ clientId, prefs, startDate: dayFrom(startRef, startDate) });
       if (!res.ok) return void toast.error(res.error);
       router.push(`/clients/${clientId}/programs/${res.assignmentId}`);
     });
@@ -149,7 +152,7 @@ export function CoachPlanForm({
           )}
           <label className="block sm:max-w-[200px]">
             <span className="eyebrow">Starts</span>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
+            <DayInput ref={startRef} value={startDate} onDay={setStartDate} className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
           </label>
         </div>
 

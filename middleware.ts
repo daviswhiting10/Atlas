@@ -1,48 +1,59 @@
-import NextAuth from "next-auth";
-import authConfig from "./lib/auth.config";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { decide, mergeCookieHeader, needsRecheck, type RouteUser } from "./lib/auth/route-policy";
 
-const { auth } = NextAuth(authConfig);
+/**
+ * Reads the session cookie, and every 10 minutes has the server re-check it
+ * against the database (password changed since? password still to set?).
+ *
+ * The re-check runs in /api/auth/session, the one place that both reads the
+ * database and saves the cookie: pages can't save cookies, and middleware
+ * can't reach the database. Its new cookie goes to the browser and to the
+ * page rendered for this same request.
+ */
+export default async function middleware(req: NextRequest) {
+  // Same choices Auth.js makes: AUTH_URL (if set) decides the cookie's name, and the secret falls back to NEXTAUTH_SECRET.
+  const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+  const secure = (authUrl ? new URL(authUrl).protocol : req.nextUrl.protocol) === "https:";
+  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const token = await getToken({ req, secret, secureCookie: secure }).catch(() => null);
 
-/** Pages anyone can see without signing in. */
-const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents"];
-/** Public pages a signed-in visitor may also read, whatever their role. */
-const SHARED_PATHS = ["/agents", "/error"];
-/** The athlete app. Coaches use it too, for their own training ("My training"). */
-const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you"];
+  let user: RouteUser = token ? { role: String(token.role ?? "TRAINER"), needsPassword: token.np === true } : null;
+  let setCookies: string[] = [];
 
-const matches = (path: string, list: string[]) =>
-  list.some((p) => path === p || path.startsWith(p + "/"));
-
-export default auth((req) => {
-  const path = req.nextUrl.pathname;
-  const user = req.auth?.user;
-  const isApi = path.startsWith("/api/");
-  const go = (to: string) => NextResponse.redirect(new URL(to, req.url));
-
-  if (!user) {
-    if (matches(path, PUBLIC_PATHS)) return NextResponse.next();
-    if (isApi) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    return go("/login");
+  if (token && needsRecheck(token.chk, Date.now())) {
+    try {
+      const res = await fetch(new URL("/api/auth/session", req.nextUrl.origin), {
+        headers: { cookie: req.headers.get("cookie") ?? "" },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const session = (await res.json()) as { user?: { role?: string; needsPassword?: boolean } } | null;
+        setCookies = res.headers.getSetCookie();
+        user = session?.user ? { role: String(session.user.role ?? "TRAINER"), needsPassword: session.user.needsPassword === true } : null;
+      }
+    } catch (err) {
+      // Can't reach the server: go on with the cookie as it is, and try again next request.
+      console.error("[middleware] session re-check failed", err);
+    }
   }
 
-  if (matches(path, SHARED_PATHS)) return NextResponse.next();
-
-  const isAthlete = user.role === "CLIENT";
-  const home = isAthlete ? "/today" : "/log";
-
-  // Signed-in visitors skip the marketing and sign-in pages.
-  if (path === "/" || path === "/login" || path === "/start") return go(home);
-
-  if (isAthlete) {
-    // The athlete app talks to the server through server actions and /api/mcp;
-    // every other API route belongs to the coach dashboard.
-    if (isApi) return path === "/api/mcp" ? NextResponse.next() : NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    if (!matches(path, ATHLETE_PATHS)) return go(home);
+  const decision = decide(req.nextUrl.pathname, user);
+  let response: NextResponse;
+  if (decision.kind === "redirect") {
+    response = NextResponse.redirect(new URL(decision.to, req.url));
+  } else if (decision.kind === "json") {
+    response = NextResponse.json({ error: decision.error }, { status: decision.status });
+  } else if (setCookies.length) {
+    const headers = new Headers(req.headers);
+    headers.set("cookie", mergeCookieHeader(req.headers.get("cookie") ?? "", setCookies));
+    response = NextResponse.next({ request: { headers } });
+  } else {
+    response = NextResponse.next();
   }
-
-  return NextResponse.next();
-});
+  for (const c of setCookies) response.headers.append("set-cookie", c);
+  return response;
+}
 
 export const config = {
   // Skip Next internals, the auth API, and a named list of static files.

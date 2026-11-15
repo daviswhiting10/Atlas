@@ -114,7 +114,7 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<"set" | "changed" | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -130,7 +130,7 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
     setOpen(false);
     setCurrent("");
     setPassword("");
-    setDone(true);
+    setDone(has ? "changed" : "set");
   }
 
   return (
@@ -140,7 +140,7 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
           <p className="text-[17px] font-semibold text-ink">{has ? "Password" : "Set a password"}</p>
           <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">
             {done
-              ? "Saved. Sign in any time with your email and this password."
+              ? `Saved. Sign in any time with your email and this password.${done === "changed" ? " Other devices were signed out." : ""}`
               : has
                 ? `You sign in as ${email} with a password.`
                 : `So you can sign in as ${email} any time, without waiting for an email link.`}

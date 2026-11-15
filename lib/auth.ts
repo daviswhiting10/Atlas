@@ -5,8 +5,11 @@ import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
-import { createGuest, createOAuthAthlete } from "@/lib/guest"
-import { Email as EmailAddress, rateLimiter, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
+import { GUEST_EMAIL_DOMAIN, createGuest, createOAuthAthlete } from "@/lib/guest"
+import { Email as EmailAddress, hashPassword, needsRehash, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
+import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle"
+import { RECHECK_MS, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
+import { proofOk } from "@/lib/auth/proof"
 
 const baseAdapter = PrismaAdapter(prisma)
 
@@ -37,15 +40,9 @@ const adapter = {
   },
 }
 
-// Sign-in attempts: per address (stops guessing one account's password) and
-// per connection (stops one visitor trying many addresses).
-const perEmail = rateLimiter(10, 15 * 60_000)
-const perIp = rateLimiter(30, 15 * 60_000)
-
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
   adapter,
-  // Signed in for 90 days, renewed as the app is used: regular users don't sign in again.
-  session: { strategy: "jwt", maxAge: 90 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
+  // Session lifetime (180 days, renewed by use) comes from authConfig.
   ...authConfig,
   providers: [
     // Google: an existing account with the same (Google-verified) email is
@@ -65,18 +62,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = typeof credentials?.password === "string" ? credentials.password.slice(0, 200) : ""
         if (!parsed.success || !password) return null
         const email = parsed.data
-        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
-        if (!perEmail(email) || !perIp(ip)) return null
+        const ip = ipFrom(request.headers)
+        // Limits are shared by every server instance (lib/auth/throttle.ts). A blocked attempt
+        // looks exactly like a wrong password: same answer, and the hash is still computed.
+        const keys = { emailIp: throttleKey("signinEmailIp", email, ip), email: throttleKey("signinEmail", email), ip: throttleKey("signinIp", ip) }
+        const waits = await Promise.all([waitFor(keys.emailIp), waitFor(keys.email), waitFor(keys.ip)])
+        await record(keys.ip, POLICIES.signinIp)
+        if (waits.some((w) => w > 0)) {
+          await verifyAgainstDecoy(password)
+          return null
+        }
 
         const user = await prisma.user.findUnique({
           where: { email },
           select: { id: true, name: true, email: true, role: true, workspaceId: true, passwordHash: true },
         })
-        if (!user?.passwordHash) {
-          await verifyAgainstDecoy(password)
+        const ok = user?.passwordHash ? await verifyPassword(password, user.passwordHash) : (await verifyAgainstDecoy(password), false)
+        if (!user || !ok) {
+          await Promise.all([record(keys.emailIp, POLICIES.signinEmailIp), record(keys.email, POLICIES.signinEmail)])
           return null
         }
-        if (!(await verifyPassword(password, user.passwordHash))) return null
+        await clear(keys.emailIp)
+        // Hashes made with older, weaker settings are upgraded now that we have the password.
+        if (needsRehash(user.passwordHash)) {
+          await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } }).catch((err) => console.error("[rehash]", err))
+        }
         return { id: user.id, name: user.name, email: user.email, role: user.role, workspaceId: user.workspaceId }
       },
     }),
@@ -146,7 +156,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Brand-new database: let the first person in so they can bootstrap it.
       return (await prisma.user.count()) === 0
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // On sign-in user is populated; on subsequent requests only token exists.
       // In both cases, if workspaceId is missing, fetch it from the DB.
       // token.sub is Auth.js default user ID field; token.id is our custom field
@@ -181,6 +191,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             token.clientProfileId = cp?.id ?? undefined
           }
         }
+      }
+
+      // Password state, checked at sign-in and then at most every 10 minutes (not on every request):
+      // - a session from before the password last changed is signed out (null clears the cookie);
+      // - whether this account still has to set a password (the set-password step).
+      const now = Date.now()
+      const signingIn = Boolean(user)
+      const lastCheck = typeof token.chk === "number" ? token.chk : 0
+      if (userId && (signingIn || trigger === "update" || now - lastCheck > RECHECK_MS)) {
+        const u = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true, passwordHash: true, createdAt: true, passwordChangedAt: true, passwordPromptAfter: true, accounts: { where: { provider: "google" }, select: { id: true }, take: 1 } },
+        })
+        if (!u) return null
+        const stamp = u.passwordChangedAt?.getTime() ?? 0
+        const proof = (session as { pwProof?: unknown } | undefined)?.pwProof
+        if (signingIn || (trigger === "update" && proofOk(userId, stamp, proof))) token.pwc = stamp
+        else if (!sessionCurrent(typeof token.pwc === "number" ? token.pwc : undefined, u.passwordChangedAt)) return null
+        const step = passwordStep(
+          { email: u.email, hasPassword: u.passwordHash != null, createdAt: u.createdAt, passwordPromptAfter: u.passwordPromptAfter, googleLinked: u.accounts.length > 0 },
+          new Date(now),
+          passwordStepEnabled(),
+          GUEST_EMAIL_DOMAIN
+        )
+        token.np = step.needs
+        token.snz = step.canSnooze
+        token.chk = now
       }
       return token
     },
