@@ -3,13 +3,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { createOptimisticFlags, stillOverridden, type OptimisticFlags, type SaveResult } from "@/lib/goals/optimistic";
+import { rowsMeetRule, settlePending, workoutRows, type PendingWorkout, type WorkoutRow } from "@/lib/goals/rows";
 import type { TodayView } from "@/lib/goals/today";
+
+export type LogResult = SaveResult & { sessionId?: string };
 
 /** The saves the card makes. The page passes the real server actions; a preview can pass fakes. */
 export type GoalActions = {
   tickRule(raw: unknown): Promise<SaveResult>;
   tagSession(raw: unknown): Promise<SaveResult>;
-  setSessionDuration(raw: unknown): Promise<SaveResult>;
+  logWorkout(raw: unknown): Promise<LogResult>;
+  setWorkoutMinutes(raw: unknown): Promise<SaveResult>;
+  removeWorkout(raw: unknown): Promise<SaveResult>;
   addGoalRule(raw: unknown): Promise<SaveResult>;
   removeGoalRule(raw: unknown): Promise<SaveResult>;
   endGoal(raw: unknown): Promise<SaveResult>;
@@ -22,7 +27,14 @@ type Live = {
   toggleTick(key: string, day: string, now: boolean): void;
   tagged(sessionId: string, mark: string, had: boolean): boolean;
   toggleTag(sessionId: string, mark: string, now: boolean): void;
-  saveMinutes(sessionId: string, minutes: number): Promise<boolean>;
+  /** The day's workout rows (empty when the goal has no workout rule). */
+  rows: WorkoutRow[];
+  /** One tap on an empty row: log "Workout, N min" in the background. */
+  logWorkout(outdoors: boolean): void;
+  /** Change the minutes on a saved workout. */
+  editMinutes(sessionId: string, minutes: number): void;
+  /** Remove a workout that has no sets (a quiet "Remove" in the minutes editor). */
+  removeRow(sessionId: string): void;
   /** Every rule for today is done (counting taps not yet saved). */
   dayDone: boolean;
 };
@@ -35,17 +47,27 @@ export const useTodayLive = () => useContext(Ctx);
 const tickKey = (day: string, rule: string) => `tick|${day}|${rule}`;
 const tagKey = (sessionId: string, mark: string) => `tag|${sessionId}|${mark}`;
 
+/** A short note at the top: no red, nothing to dismiss. */
+const quiet = (message: string) => toast(message, { duration: 3500 });
+
 /**
- * Holds what the Today card shows while saves are in flight, so the circle, the
- * day's dot and the checklist all agree on the tap. The saving logic is
- * lib/goals/optimistic.ts; this is the React around it.
+ * Holds what the Today card shows while saves are in flight, so the circles, the workout rows, the
+ * day's dot and the checklist all agree on a tap. Ticks and tags go through lib/goals/optimistic.ts;
+ * the workout rows' rules are lib/goals/rows.ts. This is the React around them.
  */
 export function TodayLive({ view, actions, children }: { view: TodayView; actions: GoalActions; children: ReactNode }) {
   const [over, setOver] = useState<Record<string, boolean>>({});
+  const [pending, setPending] = useState<PendingWorkout[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [minutesOver, setMinutesOver] = useState<Record<string, number>>({});
   const viewRef = useRef(view);
   viewRef.current = view;
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
+  /** Workouts whose Undo was tapped before their save returned: removed the moment their id is known. */
+  const undone = useRef(new Set<string>());
+  /** The real session id of each workout whose save has returned, by its local id. */
+  const savedAs = useRef(new Map<string, string>());
 
   const flagsRef = useRef<OptimisticFlags | null>(null);
   if (flagsRef.current === null) {
@@ -60,14 +82,13 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
         const [kind, a, b] = key.split("|");
         const v = viewRef.current;
         const what = kind === "tick" ? v.rules.find((r) => r.key === b)?.label : v.sessions.find((s) => s.id === a)?.title;
-        // Quiet on purpose: a plain note at the top, no red, nothing to dismiss.
-        toast(error ?? `${what ?? "That"} didn't save, so it's back as it was.`, { duration: 3500 });
+        quiet(error ?? `${what ?? "That"} didn't save, so it's back as it was.`);
       },
     });
   }
   const flags = flagsRef.current;
 
-  // When fresh data arrives, forget overrides the server now agrees with.
+  // When fresh data arrives, forget what the server now agrees with.
   useEffect(() => {
     const server: Record<string, boolean | undefined> = {};
     for (const r of view.rules) if (r.kind === "check_in") server[tickKey(view.today, r.key)] = r.state === "met";
@@ -77,20 +98,115 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
       const next = stillOverridden(o, server, (k) => flags.busy(k));
       return Object.keys(next).length === Object.keys(o).length ? o : next;
     });
+    const ids = view.sessions.map((s) => s.id);
+    setPending((p) => {
+      const next = settlePending(p, ids);
+      return next.length === p.length ? p : next;
+    });
+    // A removed workout is gone from the server's list once it has been removed; edited minutes are settled once the server shows them.
+    setRemoved((r) => {
+      const next = r.filter((id) => ids.includes(id));
+      return next.length === r.length ? r : next;
+    });
+    setMinutesOver((o) => {
+      const next = Object.fromEntries(Object.entries(o).filter(([id, m]) => view.sessions.find((s) => s.id === id)?.minutes !== m));
+      return Object.keys(next).length === Object.keys(o).length ? o : next;
+    });
   }, [view, flags]);
 
   const ticked = useCallback((key: string, state: string, day: string) => over[tickKey(day, key)] ?? state === "met", [over]);
   const toggleTick = useCallback((key: string, day: string, now: boolean) => flags.set(tickKey(day, key), !now, now), [flags]);
   const tagged = useCallback((sessionId: string, mark: string, had: boolean) => over[tagKey(sessionId, mark)] ?? had, [over]);
   const toggleTag = useCallback((sessionId: string, mark: string, now: boolean) => flags.set(tagKey(sessionId, mark), !now, now), [flags]);
-  const saveMinutes = useCallback(async (sessionId: string, minutes: number) => {
-    const r = await actionsRef.current.setSessionDuration({ goalId: viewRef.current.goalId, sessionId, minutes }).catch(() => ({ ok: false, error: undefined }) as SaveResult);
-    if (!r.ok) toast(r.error ?? "That didn't save. Try again.", { duration: 3500 });
-    return r.ok;
+
+  // ── Workouts ─────────────────────────────────────────────────────────────
+
+  /** Take a saved workout off the card, then remove it. If that fails it comes back, with a note. */
+  const takeOff = useCallback(
+    async (sessionId: string, tempId: string | null) => {
+      setRemoved((r) => [...r, sessionId]);
+      const r = await actionsRef.current.removeWorkout({ goalId: viewRef.current.goalId, sessionId }).catch(() => ({ ok: false, error: undefined }) as SaveResult);
+      if (r.ok) return;
+      setRemoved((x) => x.filter((id) => id !== sessionId));
+      if (tempId) {
+        undone.current.delete(tempId);
+        setPending((p) => p.map((x) => (x.tempId === tempId ? { ...x, undone: false } : x)));
+      }
+      quiet(r.error ?? "That didn't come off, so it's back as it was.");
+    },
+    []
+  );
+
+  const undo = useCallback(
+    (tempId: string) => {
+      undone.current.add(tempId);
+      setPending((p) => p.map((x) => (x.tempId === tempId ? { ...x, undone: true } : x)));
+      const sessionId = savedAs.current.get(tempId);
+      if (sessionId) void takeOff(sessionId, tempId); // its save has returned: remove it now (otherwise the save's own handler does)
+    },
+    [takeOff]
+  );
+
+  const logWorkout = useCallback(
+    (outdoors: boolean) => {
+      const w = viewRef.current.workout;
+      if (!w) return;
+      const tempId = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const minutes = w.defaultMinutes;
+      setPending((p) => [...p, { tempId, minutes, outdoors, sessionId: null, undone: false }]);
+      actionsRef.current
+        .logWorkout({ goalId: viewRef.current.goalId, minutes, outdoors })
+        .catch(() => ({ ok: false }) as LogResult)
+        .then((r) => {
+          if (!r.ok || !r.sessionId) {
+            setPending((p) => p.filter((x) => x.tempId !== tempId));
+            undone.current.delete(tempId);
+            quiet(r.error ?? "That workout didn't save, so it's back as it was.");
+            return;
+          }
+          const sessionId = r.sessionId;
+          savedAs.current.set(tempId, sessionId);
+          setPending((p) => p.map((x) => (x.tempId === tempId ? { ...x, sessionId } : x)));
+          if (undone.current.has(tempId)) {
+            void takeOff(sessionId, tempId); // Undo was tapped while it was saving
+            return;
+          }
+          toast(`Workout logged · ${minutes} min`, { duration: 6000, action: { label: "Undo", onClick: () => undo(tempId) } });
+        });
+    },
+    [takeOff, undo]
+  );
+
+  const editMinutes = useCallback((sessionId: string, minutes: number) => {
+    setMinutesOver((o) => ({ ...o, [sessionId]: minutes }));
+    actionsRef.current
+      .setWorkoutMinutes({ goalId: viewRef.current.goalId, sessionId, minutes })
+      .catch(() => ({ ok: false, error: undefined }) as SaveResult)
+      .then((r) => {
+        if (r.ok) return;
+        setMinutesOver((o) => Object.fromEntries(Object.entries(o).filter(([id]) => id !== sessionId)));
+        quiet(r.error ?? "The minutes didn't save, so they're back as they were.");
+      });
   }, []);
 
-  const dayDone = view.rules.every((r) => (r.kind === "check_in" ? (over[tickKey(view.today, r.key)] ?? r.state === "met") : r.state === "met"));
+  const removeRow = useCallback((sessionId: string) => void takeOff(sessionId, null), [takeOff]);
 
-  const value = useMemo<Live>(() => ({ view, ticked, toggleTick, tagged, toggleTag, saveMinutes, dayDone }), [view, ticked, toggleTick, tagged, toggleTag, saveMinutes, dayDone]);
+  const w = view.workout;
+  const rows = useMemo(() => (w ? workoutRows({ need: w.need, sessions: view.sessions, mark: w.mark, pending, removed, minutesOver }) : []), [w, view.sessions, pending, removed, minutesOver]);
+
+  const dayDone = useMemo(() => {
+    const hasTag = (r: Extract<WorkoutRow, { kind: "workout" }>, mark: string) => (r.sessionId ? (over[tagKey(r.sessionId, mark)] ?? r.tags.includes(mark)) : r.tags.includes(mark));
+    return view.rules.every((r) => {
+      if (r.kind === "check_in") return over[tickKey(view.today, r.key)] ?? r.state === "met";
+      if (!w) return r.state === "met";
+      // A workout rule is met by the rows as they are now, or (if nothing has been taken off) by what the server already says.
+      return rowsMeetRule({ need: r.need, mark: r.mark, minMinutes: r.minMinutes }, rows, hasTag) || (r.state === "met" && removed.length === 0 && Object.keys(minutesOver).length === 0);
+    });
+  }, [view, over, rows, w, removed, minutesOver]);
+
+  const value = useMemo<Live>(
+    () => ({ view, ticked, toggleTick, tagged, toggleTag, rows, logWorkout, editMinutes, removeRow, dayDone }),
+    [view, ticked, toggleTick, tagged, toggleTag, rows, logWorkout, editMinutes, removeRow, dayDone]
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

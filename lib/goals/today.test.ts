@@ -46,3 +46,22 @@ describe("todayView: days from before Atlas", () => {
     expect(todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW).manage.carried).toBeNull();
   });
 });
+
+describe("todayView: the workout slots", () => {
+  it("75 Hard: two workouts a day, 45 minutes by default, with the outdoors tag", () => {
+    const v = todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW);
+    expect(v.workout).toEqual({ ruleKey: "workouts", need: 2, defaultMinutes: 45, mark: "outdoors" });
+    expect(v.rules.find((r) => r.key === "workouts")?.minMinutes).toBe(45);
+    expect(v.rules.find((r) => r.key === "water")?.minMinutes).toBeNull();
+  });
+
+  it("a goal with no plain per-day sessions rule has no workout rows", () => {
+    const rules = GoalRules.parse({ length: { days: 30 }, onMiss: "reset", rules: [{ key: "water", label: "Water", kind: "check_in", per: "day", value: "done" }] });
+    expect(todayView(loaded(rules, "2026-11-15"), NOW).workout).toBeNull();
+  });
+
+  it("without a minimum, the default is still 45 minutes", () => {
+    const rules = GoalRules.parse({ length: { days: 30 }, onMiss: "reset", rules: [{ key: "move", label: "One workout", kind: "sessions", per: "day", min: 1 }] });
+    expect(todayView(loaded(rules, "2026-11-15"), NOW).workout).toEqual({ ruleKey: "move", need: 1, defaultMinutes: 45, mark: null });
+  });
+});

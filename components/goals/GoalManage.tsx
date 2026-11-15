@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import { ChevronDown } from "lucide-react";
 import type { TodayView } from "@/lib/goals/today";
@@ -8,17 +8,20 @@ import { RuleEditor } from "./RuleEditor";
 import type { GoalActions } from "./TodayLive";
 
 /**
- * The bottom of the goal card, closed until it is wanted: change the rules, or end the goal.
- * No animation: opening it is a decision, not a moment.
+ * The foot of the goal card: whatever `lead` is (the link to log a workout with sets), and a toggle for the
+ * closed "Rules & end goal" area. No animation: opening it is a decision, not a moment.
  */
-export function GoalManage({ goalId, manage, actions }: { goalId: string; manage: TodayView["manage"]; actions: Pick<GoalActions, "addGoalRule" | "removeGoalRule" | "endGoal"> }) {
+export function GoalManage({ goalId, manage, actions, lead }: { goalId: string; manage: TodayView["manage"]; actions: Pick<GoalActions, "addGoalRule" | "removeGoalRule" | "endGoal">; lead?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   return (
     <div className="mt-3">
-      <button type="button" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)} className="dusk-chip is-quiet -ml-2">
-        Rules &amp; end goal <ChevronDown className={open ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {lead}
+        <button type="button" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)} className="dusk-chip is-quiet">
+          Rules &amp; end goal <ChevronDown className={open ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
+        </button>
+      </div>
       {open && (
         <div id={panel} className="mt-2">
           {manage.carried && (

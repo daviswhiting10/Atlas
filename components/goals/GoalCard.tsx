@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import type { TodayView } from "@/lib/goals/today";
 import { CountUp } from "./CountUp";
 import { GoalChecklist } from "./GoalChecklist";
@@ -7,7 +9,8 @@ import { TodayLive, type GoalActions } from "./TodayLive";
 
 /**
  * The goal card on Today, from plain data: the whole goal in one place. Title, day number,
- * the strip, a checklist where every row is tappable, and a closed "Rules & end goal" area.
+ * the strip, a checklist where every row is tappable (workouts in one tap), a link to log a workout
+ * with sets, and a closed "Rules & end goal" area.
  * GoalToday loads the data and passes the real saves; a preview can pass fakes.
  * The loading shape of this card is GoalCardSkeleton (Skeletons.tsx): change one, change the other.
  */
@@ -41,7 +44,16 @@ export function GoalCard({ view, actions }: { view: TodayView; actions: GoalActi
         <div className="mt-6">
           <GoalChecklist />
         </div>
-        <GoalManage goalId={view.goalId} manage={view.manage} actions={actions} />
+        <GoalManage
+          goalId={view.goalId}
+          manage={view.manage}
+          actions={actions}
+          lead={
+            <Link href="/workouts/new" className="dusk-chip">
+              <Plus className="h-4 w-4" /> Log with sets
+            </Link>
+          }
+        />
       </section>
     </TodayLive>
   );

@@ -19,9 +19,14 @@ export type TodayView = {
   attemptNumber: number;
   /** The longest earlier attempt, when this isn't the first. */
   earlierBest: number | null;
-  rules: Array<{ key: string; label: string; kind: "sessions" | "check_in"; state: RuleState; have: number; need: number; mark: string | null }>;
+  rules: Array<{ key: string; label: string; kind: "sessions" | "check_in"; state: RuleState; have: number; need: number; mark: string | null; minMinutes: number | null }>;
+  /**
+   * The day's workout slots: the goal's plain "sessions per day" rule (two workouts a day for 75 Hard).
+   * Null when the goal has none, and then there are no workout rows.
+   */
+  workout: { ruleKey: string; need: number; defaultMinutes: number; mark: string | null } | null;
   /** Today's finished sessions, with the tags each carries. */
-  sessions: Array<{ id: string; title: string; minutes: number | null; tags: string[] }>;
+  sessions: Array<{ id: string; title: string; minutes: number | null; tags: string[]; sets: number }>;
   marks: string[];
   needsDuration: Array<{ id: string; title: string }>;
   /** Yesterday, while it can still be filled in. */
@@ -52,6 +57,9 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
       ? Object.entries(yesterday.rules).filter(([, s]) => s !== "met").flatMap(([key]) => { const r = ruleOf(key); return r ? [{ key, label: r.label, kind: r.kind }] : []; })
       : [];
 
+  const primary = goal.rules.rules
+    .flatMap((r) => (r.kind === "sessions" && r.per === "day" && !r.where.mark && ruleActiveOn(r, today) ? [r] : []))
+    .sort((a, b) => b.min - a.min)[0];
   const carried = result.periods.filter((p) => p.carried);
   const current = result.attempts.find((a) => a.current);
   const cells: StripCell[] = [];
@@ -70,8 +78,9 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
     length: result.length,
     attemptNumber: result.attemptNumber,
     earlierBest: earlier.length ? Math.max(...earlier.map((a) => a.days)) : null,
-    rules: result.today.map((t) => ({ key: t.ruleKey, label: t.label, kind: t.kind, state: t.state, have: t.have, need: t.need, mark: (ruleOf(t.ruleKey) as { where?: { mark?: string } } | undefined)?.where?.mark ?? null })),
-    sessions: l.sessions.filter((s) => s.day === today).map((s) => ({ id: s.id, title: title(s), minutes: s.durationMin, tags: tags.get(s.id) ?? [] })),
+    rules: result.today.map((t) => ({ key: t.ruleKey, label: t.label, kind: t.kind, state: t.state, have: t.have, need: t.need, mark: (ruleOf(t.ruleKey) as { where?: { mark?: string } } | undefined)?.where?.mark ?? null, minMinutes: (ruleOf(t.ruleKey) as { where?: { minMinutes?: number } } | undefined)?.where?.minMinutes ?? null })),
+    workout: primary ? { ruleKey: primary.key, need: primary.min, defaultMinutes: primary.where.minMinutes ?? 45, mark: marks[0] ?? null } : null,
+    sessions: l.sessions.filter((s) => s.day === today).map((s) => ({ id: s.id, title: title(s), minutes: s.durationMin, tags: tags.get(s.id) ?? [], sets: s.sets })),
     marks,
     needsDuration: l.sessions.filter((s) => result.needsDuration.includes(s.id)).map((s) => ({ id: s.id, title: title(s) })),
     behind: behindItems.length ? { day: addDays(today, -1), items: behindItems } : null,

@@ -3,8 +3,8 @@
 /**
  * Goals, from the athlete's side (a client, or a coach in My training).
  * Every write derives the person from the session and re-checks that the goal
- * is theirs. A goal only ever writes its own rows, with one exception: the
- * "how long was it?" answer fills in a session's missing duration.
+ * is theirs. A goal writes its own rows, plus the one-tap "Workout, 45 min" sessions the
+ * workout rows log (a finished session with a name and a time and no sets) and the minutes on them.
  */
 
 import { cookies } from "next/headers";
@@ -16,9 +16,12 @@ import { athleteIdentity } from "@/lib/athlete/identity";
 import { TZ_COOKIE } from "@/lib/athlete/data";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
+import { checkSessionMilestones } from "@/lib/progress/milestones";
+import { dayToDate } from "@/lib/sessions/day";
 import { addDays } from "@/lib/goals/days";
 import { sealNow } from "@/lib/goals/data";
 import { previewStart } from "@/lib/goals/preview";
+import { WorkoutMinutes } from "@/lib/goals/rows";
 import { DAY, GoalRules, addCheckInRule, removeRule, ruleActiveOn } from "@/lib/goals/rules";
 import { templateByKey } from "@/lib/goals/templates";
 
@@ -151,15 +154,64 @@ export async function tagSession(raw: unknown): Promise<Result> {
   return { ok: true };
 }
 
-const DurationInput = z.object({ goalId: Id.optional(), sessionId: Id, minutes: z.number().int().min(1).max(600) });
+const LogWorkoutInput = z.object({ goalId: Id, minutes: WorkoutMinutes, outdoors: z.boolean().default(false), day: Day.optional() });
 
-/** "How long was it?": fills in a finished session's missing duration. Never overwrites one that's there. */
-export async function setSessionDuration(raw: unknown): Promise<Result> {
+/**
+ * One tap on an empty workout row: log "Workout, N min" as a finished session with no sets, on
+ * the goal's today (or a day that can still be changed), optionally tagged (outdoors) in the same step.
+ */
+export async function logWorkout(raw: unknown): Promise<Result<{ sessionId: string }>> {
+  const { clientId, workspaceId, by } = await me();
+  const input = LogWorkoutInput.parse(raw);
+  const { goal, rules, today } = await ownActiveGoal(input.goalId, clientId);
+  const day = input.day ?? today;
+  const blocked = editable(day, today, goal.startDay, rules.carriedThrough);
+  if (blocked) return { ok: false, error: blocked };
+  const mark = input.outdoors ? rules.rules.flatMap((r) => (r.kind === "sessions" && r.where.mark ? [r.where.mark] : []))[0] : undefined;
+  if (input.outdoors && !mark) return { ok: false, error: "This goal doesn't use that tag." };
+
+  const session = await prisma.workoutLog.create({
+    data: { clientId, source: "OFF_PLAN", title: "Workout", date: dayToDate(day, goal.timeZone), completedAt: new Date(), durationMin: input.minutes, trainerSeen: by === "TRAINER" },
+    select: { id: true },
+  });
+  if (mark) await prisma.goalCheckIn.create({ data: { goalId: goal.id, ruleKey: mark, day, workoutLogId: session.id, by } });
+  await prisma.clientProfile.update({ where: { id: clientId }, data: { lastContactAt: new Date() } });
+  checkSessionMilestones(workspaceId, clientId).catch((err: unknown) => console.error("[milestones] session check:", err));
+  refresh(goal.id);
+  return { ok: true, sessionId: session.id };
+}
+
+/** Where a workout of this client's sits on the goal's calendar, or why it can't be changed any more. */
+async function changeableWorkout(goalId: string, sessionId: string, clientId: string, extra: Prisma.WorkoutLogWhereInput = {}) {
+  const { goal, rules, today } = await ownActiveGoal(goalId, clientId);
+  const s = await prisma.workoutLog.findFirst({ where: { id: Id.parse(sessionId), clientId, completedAt: { not: null }, ...extra }, select: { id: true, date: true } });
+  if (!s) return { ok: false as const, error: "That workout isn't there." };
+  const blocked = editable(localDay(s.date, goal.timeZone), today, goal.startDay, rules.carriedThrough);
+  return blocked ? { ok: false as const, error: blocked } : { ok: true as const, goal, session: s };
+}
+
+/** Change the minutes on one of today's (or yesterday's) workouts, or fill them in when a workout had none. */
+export async function setWorkoutMinutes(raw: unknown): Promise<Result> {
   const { clientId } = await me();
-  const input = DurationInput.parse(raw);
-  const done = await prisma.workoutLog.updateMany({ where: { id: input.sessionId, clientId, completedAt: { not: null }, durationMin: null }, data: { durationMin: input.minutes } });
-  if (done.count === 0) return { ok: false, error: "That workout already has a time, or isn't there." };
-  refresh(input.goalId);
+  const input = z.object({ goalId: Id, sessionId: Id, minutes: WorkoutMinutes }).parse(raw);
+  const found = await changeableWorkout(input.goalId, input.sessionId, clientId);
+  if (!found.ok) return found;
+  await prisma.workoutLog.update({ where: { id: found.session.id }, data: { durationMin: input.minutes } });
+  refresh(found.goal.id);
+  return { ok: true };
+}
+
+/**
+ * Undo or remove a one-tap workout. Only a workout with no sets can go (nothing is lost): one
+ * logged by hand with sets is edited, not removed, from here. Its tags go with it.
+ */
+export async function removeWorkout(raw: unknown): Promise<Result> {
+  const { clientId } = await me();
+  const input = z.object({ goalId: Id, sessionId: Id }).parse(raw);
+  const found = await changeableWorkout(input.goalId, input.sessionId, clientId, { source: "OFF_PLAN", sets: { none: {} } });
+  if (!found.ok) return found.error === "That workout isn't there." ? { ok: false, error: "That workout can't be removed here." } : found;
+  await prisma.$transaction([prisma.goalCheckIn.deleteMany({ where: { workoutLogId: found.session.id } }), prisma.workoutLog.delete({ where: { id: found.session.id } })]);
+  refresh(found.goal.id);
   return { ok: true };
 }
 

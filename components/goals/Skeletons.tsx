@@ -15,7 +15,7 @@ export function GoalCardSkeleton() {
   return (
     <section className="dusk dusk-card sm:p-8" aria-busy="true" aria-label="Loading your goal">
       <div className="pt-1.5">
-        <div className="dusk-skeleton h-[31px] w-40" />
+        <div className="dusk-skeleton h-[30.6px] w-40" />
       </div>
       <div className="mt-6 flex items-end gap-3">
         <div className="dusk-skeleton h-[57.6px] w-[76px]" />
@@ -31,17 +31,19 @@ export function GoalCardSkeleton() {
       </div>
       <div className="mt-6">
         <ul className="divide-y divide-dusk-line">
-          {/* The real rows: a workout row is 56; the one with the tag chips is 56 + 8 + a 44 row, plus its divider; check-ins are 56 plus a divider. */}
-          {[56, 56 + 8 + 44 + 1, 57, 57, 57, 57].map((h, i) => (
-            <li key={i} style={{ height: h }} className="flex items-start pt-3">
+          {/* Six rows (two workouts, four ticks): 56 each, plus the divider the real rows have. */}
+          {[56, 57, 57, 57, 57, 57].map((h, i) => (
+            <li key={i} style={{ height: h }} className="flex items-center">
               <div className="dusk-skeleton h-8 w-8 !rounded-full" />
-              <div className="dusk-skeleton ml-3 mt-[6px] h-5 w-44" />
+              <div className="dusk-skeleton ml-3 h-5 w-44" />
             </li>
           ))}
         </ul>
-        <div className="dusk-skeleton mt-5 h-[44px] w-full !rounded-full sm:w-44" />
       </div>
-      <div className="dusk-skeleton mt-3 h-[44px] w-44 !rounded-full" />
+      <div className="mt-3 flex gap-2">
+        <div className="dusk-skeleton h-[44px] w-36 !rounded-full" />
+        <div className="dusk-skeleton h-[44px] w-40 !rounded-full" />
+      </div>
     </section>
   );
 }

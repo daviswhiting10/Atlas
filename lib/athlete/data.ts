@@ -21,7 +21,8 @@ import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/li
 import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
 export type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
-import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf, weekStreak } from "./sessions";
+import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf } from "./sessions";
+import { finishedTotals } from "./totals";
 
 /** Upper bound on sets per exercise in one workout. */
 export const MAX_SETS = 20;
@@ -172,7 +173,8 @@ export async function loadProgress({
   timeZone: string;
 }): Promise<ProgressData> {
   const tz = timeZone;
-  const sets = await prisma.setLog.findMany({
+  // The sets for the charts, and the finished sessions for the headline numbers (a session with no sets still counts).
+  const setsQuery = prisma.setLog.findMany({
     where: { workoutLog: { clientId, client: { workspaceId } }, exerciseId: { not: null } },
     orderBy: { createdAt: "asc" },
     select: {
@@ -185,6 +187,8 @@ export async function loadProgress({
       exercise: { select: { name: true, slug: true, primaryMuscles: true } },
     },
   });
+  const finishedQuery = prisma.workoutLog.findMany({ where: { clientId, client: { workspaceId }, completedAt: { not: null } }, select: { id: true, date: true, completedAt: true } });
+  const [sets, finished] = await Promise.all([setsQuery, finishedQuery]);
 
   // exercise → session → sets
   const byExercise = new Map<
@@ -289,18 +293,18 @@ export async function loadProgress({
     }
   }
 
-  const streak = weekStreak(weeks);
+  const headline = finishedTotals(finished, tz, localDay(new Date(), tz));
 
   return {
     exercises,
     weeks: weeks.slice(-12),
     totals: {
-      sessions: sessionDates.size,
+      sessions: headline.sessions,
       volume: Math.round(totalVolume),
       sets: totalSets,
       prs: prCount,
-      streak,
-      since: sessionDates.size > 0 ? localDay(new Date(Math.min(...Array.from(sessionDates.values()).map((d) => d.getTime()))), tz) : null,
+      streak: headline.streak,
+      since: headline.since,
     },
     recentPRs: recentPRs.slice(0, 12),
     stalled,
