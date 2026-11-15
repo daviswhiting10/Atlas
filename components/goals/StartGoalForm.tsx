@@ -3,16 +3,20 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { startGoal } from "@/lib/actions/goals";
 import { addDays } from "@/lib/goals/days";
 import { previewStart } from "@/lib/goals/preview";
+import { AccentTitle } from "./GoalStrip";
 
 type Template = { key: string; name: string; blurb: string; length: number; rules: Array<{ key: string; label: string }> };
 
-/** Pick the rules, say when it started, see the day number, then start. */
+/**
+ * Pick the rules, say when it started, see the day number, then start.
+ * Dusk styling (app/dusk.css): the same dark card, ticks and pills as the Today card.
+ * Must sit inside `.dusk`.
+ */
 export function StartGoalForm({ template, today }: { template: Template; today: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -38,77 +42,85 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
       router.push("/today");
     });
 
-  return (
-    <div className="surface p-6 sm:p-8">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-3xl text-ink">{template.name}</h2>
-        <span className="text-sm text-ink-mute">{template.length} days</span>
-      </div>
-      <p className="mt-1 text-[15px] text-ink-soft">{template.blurb}</p>
+  const Tick = ({ on }: { on: boolean }) => (
+    <span className="dusk-check" data-state={on ? "on" : "off"}>
+      <Check className="h-4 w-4" strokeWidth={2.5} />
+    </span>
+  );
 
-      <p className="eyebrow mt-6">Every day</p>
-      <ul className="mt-2 divide-y divide-line">
+  return (
+    <section className="dusk dusk-card sm:p-8">
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="dusk-title pt-1.5">
+          <AccentTitle name={template.name} />
+        </h2>
+        <span className="dusk-chip pointer-events-none shrink-0">{template.length} days</span>
+      </div>
+      <p className="mt-3 text-[15px] leading-relaxed text-dusk-soft">{template.blurb}</p>
+
+      <p className="dusk-eyebrow mt-8">Every day</p>
+      <ul className="mt-2 divide-y divide-dusk-line">
         {template.rules.map((r) => {
           const on = !dropped.includes(r.key);
           return (
             <li key={r.key}>
-              <button type="button" onClick={() => setDropped(on ? [...dropped, r.key] : dropped.filter((k) => k !== r.key))} className="press flex w-full items-center gap-3 py-3 text-left" aria-pressed={on}>
-                <span className={cn("flex h-6 w-6 items-center justify-center rounded-md border text-[13px]", on ? "border-signal bg-signal text-white" : "border-ink/25 text-transparent")}>✓</span>
-                <span className={cn("text-[15px]", on ? "font-semibold text-ink" : "text-ink-mute line-through")}>{r.label}</span>
+              <button type="button" onClick={() => setDropped(on ? [...dropped, r.key] : dropped.filter((k) => k !== r.key))} className="dusk-row flex min-h-[56px] w-full items-center gap-3 py-3 text-left" aria-pressed={on}>
+                <Tick on={on} />
+                <span className={on ? "text-[15px] font-medium text-dusk-text" : "text-[15px] text-dusk-mute line-through"}>{r.label}</span>
               </button>
             </li>
           );
         })}
         {added.map((label) => (
-          <li key={label} className="flex items-center gap-3 py-3">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md border border-signal bg-signal text-[13px] text-white">✓</span>
-            <span className="flex-1 text-[15px] font-semibold text-ink">{label}</span>
-            <button type="button" aria-label={`Remove ${label}`} onClick={() => setAdded(added.filter((a) => a !== label))} className="press text-ink-mute hover:text-ink">
+          <li key={label} className="flex min-h-[56px] items-center gap-3 py-2">
+            <Tick on />
+            <span className="min-w-0 flex-1 break-words text-[15px] font-medium text-dusk-text">{label}</span>
+            <button type="button" aria-label={`Remove ${label}`} onClick={() => setAdded(added.filter((a) => a !== label))} className="dusk-chip is-quiet shrink-0">
               <X className="h-4 w-4" />
             </button>
           </li>
         ))}
       </ul>
       <form
-        className="mt-2 flex items-center gap-2"
+        className="mt-3 flex items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           addRule();
         }}
       >
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} placeholder="Add a rule, like “No alcohol”" className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 text-[15px]" />
-        <button type="submit" className="press flex h-11 items-center gap-1 rounded-xl border border-line px-3 text-[14px] font-medium text-ink-soft hover:border-ink/25">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} aria-label="Add a rule" placeholder="e.g. No alcohol" className="dusk-input min-w-0 flex-1 text-[15px]" />
+        <button type="submit" className="dusk-chip shrink-0">
           <Plus className="h-4 w-4" /> Add
         </button>
       </form>
 
-      <label className="eyebrow mt-6 block" htmlFor="start-day">
+      <label className="dusk-eyebrow mt-8 block" htmlFor="start-day">
         Start day
       </label>
-      <input id="start-day" type="date" value={startDay} max={today} onChange={(e) => setStartDay(e.target.value)} className="mt-2 h-11 rounded-xl border border-line bg-white px-3 text-[15px]" />
+      <input id="start-day" type="date" value={startDay} max={today} onChange={(e) => setStartDay(e.target.value)} className="dusk-input mt-2 text-[15px]" />
 
-      <div className="mt-5 rounded-xl bg-ink/[0.04] px-4 py-3.5" aria-live="polite">
+      <div className="dusk-panel mt-5" aria-live="polite">
         {preview.ok ? (
           <>
-            <p className="text-[17px] font-semibold text-ink">
+            <p className="text-[17px] font-medium text-dusk-text">
               Today is Day {preview.dayOfGoal} of {template.length}
             </p>
             {preview.carriedDays > 0 ? (
-              <p className="mt-1 text-[14px] text-ink-soft">
+              <p className="mt-1 text-[14px] leading-relaxed text-dusk-soft">
                 {preview.carriedDays} day{preview.carriedDays === 1 ? "" : "s"}, {format(parseISO(startDay), "MMM d")} through {format(parseISO(addDays(today, -1)), "MMM d")}, happened before Atlas. They count as done and show as “before Atlas”. From today, workouts and ticks are checked for real.
               </p>
             ) : (
-              <p className="mt-1 text-[14px] text-ink-soft">Starting today. Workouts and ticks are checked from now on.</p>
+              <p className="mt-1 text-[14px] leading-relaxed text-dusk-soft">Starting today. Workouts and ticks are checked from now on.</p>
             )}
           </>
         ) : (
-          <p className="text-[14px] text-ink-soft">{preview.error}</p>
+          <p className="text-[14px] text-dusk-soft">{preview.error}</p>
         )}
       </div>
 
-      <button type="button" disabled={!canStart} onClick={start} className="press mt-5 h-14 w-full rounded-xl bg-ink text-base font-semibold text-white disabled:bg-ink/25">
+      <button type="button" disabled={!canStart} onClick={start} className="dusk-button mt-5 min-h-[56px] w-full text-[16px]">
         {pending ? "Starting…" : preview.ok ? `Start ${template.name} at day ${preview.dayOfGoal}` : `Start ${template.name}`}
       </button>
-    </div>
+    </section>
   );
 }
