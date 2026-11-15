@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { ArrowRight } from "lucide-react";
 import { activeGoalId, loadGoal } from "@/lib/goals/data";
 import { todayView } from "@/lib/goals/today";
-import { setSessionDuration, tagSession, tickRule } from "@/lib/actions/goals";
+import { addGoalRule, endGoal, removeGoalRule, setSessionDuration, tagSession, tickRule } from "@/lib/actions/goals";
 import { GoalCard } from "./GoalCard";
 import { GoalCardSkeleton } from "./Skeletons";
 import { StartLink } from "./StartLink";
@@ -40,5 +40,5 @@ async function LoadedGoal({ id, clientId, canStart }: { id: string; clientId: st
       </div>
     );
   }
-  return <GoalCard view={todayView(loaded)} actions={{ tickRule, tagSession, setSessionDuration }} />;
+  return <GoalCard view={todayView(loaded)} actions={{ tickRule, tagSession, setSessionDuration, addGoalRule, removeGoalRule, endGoal }} />;
 }

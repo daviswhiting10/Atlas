@@ -10,6 +10,9 @@ export type GoalActions = {
   tickRule(raw: unknown): Promise<SaveResult>;
   tagSession(raw: unknown): Promise<SaveResult>;
   setSessionDuration(raw: unknown): Promise<SaveResult>;
+  addGoalRule(raw: unknown): Promise<SaveResult>;
+  removeGoalRule(raw: unknown): Promise<SaveResult>;
+  endGoal(raw: unknown): Promise<SaveResult>;
 };
 
 type Live = {

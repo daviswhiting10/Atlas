@@ -3,12 +3,12 @@
 import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { addGoalRule, endGoal, removeGoalRule } from "@/lib/actions/goals";
+import type { GoalActions } from "./TodayLive";
 
-type Item = { key: string; label: string; detail: string; removable: boolean };
+type Item = { key: string; label: string; removable: boolean };
 
-/** Add or remove a rule on a running goal, and end it. Added rules count from today; removed ones stop tomorrow. */
-export function RuleEditor({ goalId, items }: { goalId: string; items: Item[] }) {
+/** Add or stop counting a rule on a running goal, and end it. Added rules count from today; stopped ones stop tomorrow. */
+export function RuleEditor({ goalId, items, actions }: { goalId: string; items: Item[]; actions: Pick<GoalActions, "addGoalRule" | "removeGoalRule" | "endGoal"> }) {
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState("");
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -22,15 +22,12 @@ export function RuleEditor({ goalId, items }: { goalId: string; items: Item[] })
 
   return (
     <div>
-      <ul className="mt-2 divide-y divide-dusk-line">
+      <ul className="divide-y divide-dusk-line">
         {items.map((it) => (
-          <li key={it.key} className="flex items-center gap-3 py-2.5">
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-medium text-dusk-text">{it.label}</span>
-              <span className="block text-[13px] text-dusk-mute">{it.detail}</span>
-            </span>
+          <li key={it.key} className="flex min-h-[48px] items-center gap-3 py-1">
+            <span className="min-w-0 flex-1 text-[15px] font-medium text-dusk-text">{it.label}</span>
             {it.removable && (
-              <button type="button" disabled={pending} onClick={() => act(() => removeGoalRule({ goalId, key: it.key }))} className="dusk-chip is-quiet -mr-2 shrink-0 text-[13px]">
+              <button type="button" disabled={pending} onClick={() => act(() => actions.removeGoalRule({ goalId, key: it.key }))} className="dusk-chip is-quiet -mr-2 shrink-0 text-[13px]">
                 Stop counting
               </button>
             )}
@@ -38,26 +35,26 @@ export function RuleEditor({ goalId, items }: { goalId: string; items: Item[] })
         ))}
       </ul>
       <form
-        className="mt-4 flex items-center gap-2"
+        className="mt-3 flex items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           const label = draft.trim();
-          if (label) act(() => addGoalRule({ goalId, label }), () => setDraft(""));
+          if (label) act(() => actions.addGoalRule({ goalId, label }), () => setDraft(""));
         }}
       >
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} placeholder="Add a rule, counted from today" aria-label="Add a rule" className="dusk-input min-w-0 flex-1 text-[15px]" />
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} placeholder="New rule, from today" aria-label="Add a rule" className="dusk-input min-w-0 flex-1 text-[15px]" />
         <button type="submit" disabled={pending || !draft.trim()} className="dusk-chip shrink-0">
           <Plus className="h-4 w-4" /> Add
         </button>
       </form>
 
-      <div className="mt-10 border-t border-dusk-line pt-4">
+      <div className="mt-6 border-t border-dusk-line pt-3">
         {confirmEnd ? (
           <div className="dusk-panel">
             <p className="text-[15px] font-medium text-dusk-text">End this goal?</p>
             <p className="mt-1 text-[14px] leading-relaxed text-dusk-soft">It becomes a chapter. Your workouts stay as they are, and you can start it again later.</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" disabled={pending} onClick={() => act(() => endGoal({ goalId }))} className="dusk-button">
+              <button type="button" disabled={pending} onClick={() => act(() => actions.endGoal({ goalId }))} className="dusk-button">
                 End it
               </button>
               <button type="button" onClick={() => setConfirmEnd(false)} className="dusk-chip">

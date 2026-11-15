@@ -4,6 +4,7 @@
 
 import { localDay } from "@/lib/athlete/sessions";
 import { addDays } from "./days";
+import { ruleActiveOn } from "./rules";
 import type { LoadedGoal } from "./data";
 import type { RuleState } from "./evaluate";
 
@@ -26,6 +27,13 @@ export type TodayView = {
   /** Yesterday, while it can still be filled in. */
   behind: { day: string; items: Array<{ key: string; label: string; kind: "sessions" | "check_in" }> } | null;
   cells: StripCell[];
+  /** The collapsed "Rules & end goal" area. */
+  manage: {
+    /** Every rule still running (or set to stop later), and whether it can be stopped now. */
+    rules: Array<{ key: string; label: string; removable: boolean }>;
+    /** Days from before Atlas that count as done, when the goal was started back-dated. */
+    carried: { days: number; from: string; to: string } | null;
+  };
 };
 
 export function todayView(l: LoadedGoal, now = new Date()): TodayView {
@@ -44,6 +52,7 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
       ? Object.entries(yesterday.rules).filter(([, s]) => s !== "met").flatMap(([key]) => { const r = ruleOf(key); return r ? [{ key, label: r.label, kind: r.kind }] : []; })
       : [];
 
+  const carried = result.periods.filter((p) => p.carried);
   const current = result.attempts.find((a) => a.current);
   const cells: StripCell[] = [];
   for (const p of result.periods) {
@@ -67,5 +76,9 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
     needsDuration: l.sessions.filter((s) => result.needsDuration.includes(s.id)).map((s) => ({ id: s.id, title: title(s) })),
     behind: behindItems.length ? { day: addDays(today, -1), items: behindItems } : null,
     cells,
+    manage: {
+      rules: goal.rules.rules.filter((r) => !r.toDay || r.toDay >= today).map((r) => ({ key: r.key, label: r.label, removable: !r.toDay && ruleActiveOn(r, addDays(today, 1)) })),
+      carried: carried.length ? { days: carried.length, from: carried[0].day, to: carried[carried.length - 1].day } : null,
+    },
   };
 }

@@ -1,5 +1,5 @@
-import { GoalPageSkeleton } from "@/components/goals/Skeletons";
+import { ChapterSkeleton } from "@/components/goals/Skeletons";
 
 export default function Loading() {
-  return <GoalPageSkeleton />;
+  return <ChapterSkeleton />;
 }

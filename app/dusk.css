@@ -90,7 +90,6 @@
   --dusk-quick: 140ms; /* hover, press, colour */
   --dusk-base: 240ms; /* a dot filling, a check appearing */
   --dusk-slow: 420ms; /* a dot arriving */
-  --dusk-page: 380ms; /* the card becoming the goal page */
   --dusk-count: 800ms; /* the day number counting up (the count itself is in CountUp.tsx) */
   --dusk-breathe: 3.6s; /* today's glow */
 
@@ -389,22 +388,6 @@
   to { background-position: -200% 0; }
 }
 
-/* The card becoming the goal page (and back): the title and the number carry across, the rest cross-fades.
-   Only while ViewTransitionLink has set data-dusk-vt on <html>, so no other navigation is touched.
-   Browsers without the View Transitions API never reach this; the link just navigates. */
-.vt-goal-title { view-transition-name: dusk-goal-title; }
-.vt-goal-counter { view-transition-name: dusk-goal-counter; }
-html[data-dusk-vt]::view-transition-group(dusk-goal-title),
-html[data-dusk-vt]::view-transition-group(dusk-goal-counter) {
-  animation-duration: var(--dusk-page);
-  animation-timing-function: var(--dusk-ease);
-}
-html[data-dusk-vt]::view-transition-old(root),
-html[data-dusk-vt]::view-transition-new(root) {
-  animation-duration: var(--dusk-base);
-  animation-timing-function: var(--dusk-ease-in-out);
-}
-
 /* Where an attempt restarted: a small peach tick above that day. */
 .dusk-dot[data-restart]::after {
   content: "";
@@ -430,7 +413,4 @@ html[data-dusk-vt]::view-transition-new(root) {
   .dusk-check > svg { transform: none; }
   .dusk-skeleton { animation: none; }
   .dusk-count[data-count] { animation: none !important; opacity: 1 !important; }
-  html[data-dusk-vt]::view-transition-group(*),
-  html[data-dusk-vt]::view-transition-old(*),
-  html[data-dusk-vt]::view-transition-new(*) { animation: none !important; }
 }
