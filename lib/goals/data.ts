@@ -60,7 +60,8 @@ async function finishedSessions(clientId: string, startDay: string, endedAt: Dat
   const to = endedAt ? new Date(endedAt.getTime() + 36 * HOUR) : null;
   const rows = await prisma.workoutLog.findMany({
     where: { clientId, completedAt: { not: null }, date: { gte: from, ...(to ? { lte: to } : {}) } },
-    orderBy: { date: "asc" },
+    // Workouts logged in one tap share a day (and a time of noon), so the order they were logged in breaks the tie: the card's rows must not swap places.
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     select: { id: true, date: true, title: true, durationMin: true, _count: { select: { sets: true } } },
   });
   return rows.map((s) => ({ id: s.id, date: s.date, day: "", title: s.title, durationMin: s.durationMin, sets: s._count.sets }));
