@@ -30,7 +30,12 @@ export type TodayView = {
   marks: string[];
   needsDuration: Array<{ id: string; title: string }>;
   /** Yesterday, while it can still be filled in. */
-  behind: { day: string; items: Array<{ key: string; label: string; kind: "sessions" | "check_in" }> } | null;
+  behind: {
+    day: string;
+    items: Array<{ key: string; label: string; kind: "sessions" | "check_in" }>;
+    /** Yesterday's finished workouts, for its workout rows (the same slots as today's). Null when the goal has no workout slots. */
+    workout: { sessions: Array<{ id: string; title: string; minutes: number | null; tags: string[]; sets: number }> } | null;
+  } | null;
   cells: StripCell[];
   /** The collapsed "Rules & end goal" area. */
   manage: {
@@ -51,7 +56,8 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
   for (const c of l.checkIns) if (c.workoutLogId) tags.set(c.workoutLogId, [...(tags.get(c.workoutLogId) ?? []), c.ruleKey]);
   const title = (s: { title: string | null }) => s.title?.trim() || "Workout";
 
-  const yesterday = result.periods.find((p) => p.day === addDays(today, -1));
+  const yesterdayDay = addDays(today, -1);
+  const yesterday = result.periods.find((p) => p.day === yesterdayDay);
   const behindItems =
     yesterday && !yesterday.carried && yesterday.state === "pending"
       ? Object.entries(yesterday.rules).filter(([, s]) => s !== "met").flatMap(([key]) => { const r = ruleOf(key); return r ? [{ key, label: r.label, kind: r.kind }] : []; })
@@ -83,7 +89,13 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
     sessions: l.sessions.filter((s) => s.day === today).map((s) => ({ id: s.id, title: title(s), minutes: s.durationMin, tags: tags.get(s.id) ?? [], sets: s.sets })),
     marks,
     needsDuration: l.sessions.filter((s) => result.needsDuration.includes(s.id)).map((s) => ({ id: s.id, title: title(s) })),
-    behind: behindItems.length ? { day: addDays(today, -1), items: behindItems } : null,
+    behind: behindItems.length
+      ? {
+          day: yesterdayDay,
+          items: behindItems,
+          workout: primary ? { sessions: l.sessions.filter((s) => s.day === yesterdayDay).map((s) => ({ id: s.id, title: title(s), minutes: s.durationMin, tags: tags.get(s.id) ?? [], sets: s.sets })) } : null,
+        }
+      : null,
     cells,
     manage: {
       rules: goal.rules.rules.filter((r) => !r.toDay || r.toDay >= today).map((r) => ({ key: r.key, label: r.label, removable: !r.toDay && ruleActiveOn(r, addDays(today, 1)) })),

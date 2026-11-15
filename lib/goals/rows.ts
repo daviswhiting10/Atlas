@@ -20,6 +20,8 @@ export const WorkoutMinutes = z.number().int().min(1).max(600);
 export type PendingWorkout = {
   /** Known before the save returns. */
   tempId: string;
+  /** The day it was logged for: today, or yesterday while that is still open. */
+  day: string;
   minutes: number;
   outdoors: boolean;
   /** The real session's id once the save has returned. */

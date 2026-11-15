@@ -21,7 +21,9 @@ export function GoalChecklist() {
           <p className="flex items-center gap-2 font-medium text-dusk-text">
             <span className="h-1.5 w-1.5 rounded-full bg-dusk-peach" aria-hidden /> Yesterday is still open
           </p>
-          <ul className="mt-1">
+          <ul className="mt-1 divide-y divide-dusk-line">
+            {/* Yesterday's workouts are the same one-tap rows as today's (dated to yesterday), while a workout rule is still open. */}
+            {view.behind.workout && view.behind.items.some((i) => i.kind === "sessions") && <WorkoutRows which="yesterday" />}
             {view.behind.items.map((it) =>
               it.kind === "check_in" ? (
                 <li key={it.key}>
@@ -30,7 +32,7 @@ export function GoalChecklist() {
                     <span>{it.label}</span>
                   </button>
                 </li>
-              ) : (
+              ) : view.behind!.workout ? null : (
                 <li key={it.key} className="flex min-h-[44px] items-center gap-3">
                   <span className="h-8 w-8 shrink-0" /> <span>{it.label}: log it for yesterday.</span>
                 </li>

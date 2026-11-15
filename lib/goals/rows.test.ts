@@ -3,7 +3,7 @@ import { WorkoutMinutes, rowsMeetRule, settlePending, workoutRows, type PendingW
 
 const base: RowsInput = { need: 2, sessions: [], mark: "outdoors", pending: [], removed: [], minutesOver: {} };
 const session = (id: string, minutes: number | null, tags: string[] = [], sets = 0) => ({ id, title: "Workout", minutes, tags, sets });
-const pending = (over: Partial<PendingWorkout> = {}): PendingWorkout => ({ tempId: "t1", minutes: 45, outdoors: false, sessionId: null, undone: false, ...over });
+const pending = (over: Partial<PendingWorkout> = {}): PendingWorkout => ({ tempId: "t1", day: "2026-11-15", minutes: 45, outdoors: false, sessionId: null, undone: false, ...over });
 const kinds = (rows: ReturnType<typeof workoutRows>) => rows.map((r) => r.kind);
 
 describe("workoutRows", () => {

@@ -27,10 +27,10 @@ type Live = {
   toggleTick(key: string, day: string, now: boolean): void;
   tagged(sessionId: string, mark: string, had: boolean): boolean;
   toggleTag(sessionId: string, mark: string, now: boolean): void;
-  /** The day's workout rows (empty when the goal has no workout rule). */
-  rows: WorkoutRow[];
-  /** One tap on an empty row: log "Workout, N min" in the background. */
-  logWorkout(outdoors: boolean): void;
+  /** The workout rows for today, and for yesterday while it is still open (both empty when the goal has no workout slots). */
+  rows: { today: WorkoutRow[]; yesterday: WorkoutRow[] };
+  /** One tap on an empty row: log "Workout, N min" in the background, for today or for yesterday. */
+  logWorkout(outdoors: boolean, which?: "today" | "yesterday"): void;
   /** Change the minutes on a saved workout. */
   editMinutes(sessionId: string, minutes: number): void;
   /** Remove a workout that has no sets (a quiet "Remove" in the minutes editor). */
@@ -98,7 +98,7 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
       const next = stillOverridden(o, server, (k) => flags.busy(k));
       return Object.keys(next).length === Object.keys(o).length ? o : next;
     });
-    const ids = view.sessions.map((s) => s.id);
+    const ids = [...view.sessions, ...(view.behind?.workout?.sessions ?? [])].map((s) => s.id);
     setPending((p) => {
       const next = settlePending(p, ids);
       return next.length === p.length ? p : next;
@@ -148,14 +148,16 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
   );
 
   const logWorkout = useCallback(
-    (outdoors: boolean) => {
-      const w = viewRef.current.workout;
-      if (!w) return;
+    (outdoors: boolean, which: "today" | "yesterday" = "today") => {
+      const v = viewRef.current;
+      const w = v.workout;
+      const day = which === "yesterday" ? v.behind?.day : v.today;
+      if (!w || !day) return;
       const tempId = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
       const minutes = w.defaultMinutes;
-      setPending((p) => [...p, { tempId, minutes, outdoors, sessionId: null, undone: false }]);
+      setPending((p) => [...p, { tempId, day, minutes, outdoors, sessionId: null, undone: false }]);
       actionsRef.current
-        .logWorkout({ goalId: viewRef.current.goalId, minutes, outdoors })
+        .logWorkout({ goalId: v.goalId, minutes, outdoors, ...(which === "yesterday" ? { day } : {}) })
         .catch(() => ({ ok: false }) as LogResult)
         .then((r) => {
           if (!r.ok || !r.sessionId) {
@@ -171,7 +173,7 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
             void takeOff(sessionId, tempId); // Undo was tapped while it was saving
             return;
           }
-          toast(`Workout logged · ${minutes} min`, { duration: 6000, action: { label: "Undo", onClick: () => undo(tempId) } });
+          toast(`Workout logged${which === "yesterday" ? " for yesterday" : ""} · ${minutes} min`, { duration: 6000, action: { label: "Undo", onClick: () => undo(tempId) } });
         });
     },
     [takeOff, undo]
@@ -192,7 +194,14 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
   const removeRow = useCallback((sessionId: string) => void takeOff(sessionId, null), [takeOff]);
 
   const w = view.workout;
-  const rows = useMemo(() => (w ? workoutRows({ need: w.need, sessions: view.sessions, mark: w.mark, pending, removed, minutesOver }) : []), [w, view.sessions, pending, removed, minutesOver]);
+  const rows = useMemo(() => {
+    if (!w) return { today: [], yesterday: [] };
+    const yesterday = view.behind?.workout && view.behind.items.some((i) => i.kind === "sessions") ? view.behind : null;
+    return {
+      today: workoutRows({ need: w.need, sessions: view.sessions, mark: w.mark, pending: pending.filter((p) => p.day === view.today), removed, minutesOver }),
+      yesterday: yesterday ? workoutRows({ need: w.need, sessions: yesterday.workout?.sessions ?? [], mark: w.mark, pending: pending.filter((p) => p.day === yesterday.day), removed, minutesOver }) : [],
+    };
+  }, [w, view, pending, removed, minutesOver]);
 
   const dayDone = useMemo(() => {
     const hasTag = (r: Extract<WorkoutRow, { kind: "workout" }>, mark: string) => (r.sessionId ? (over[tagKey(r.sessionId, mark)] ?? r.tags.includes(mark)) : r.tags.includes(mark));
@@ -200,7 +209,7 @@ export function TodayLive({ view, actions, children }: { view: TodayView; action
       if (r.kind === "check_in") return over[tickKey(view.today, r.key)] ?? r.state === "met";
       if (!w) return r.state === "met";
       // A workout rule is met by the rows as they are now, or (if nothing has been taken off) by what the server already says.
-      return rowsMeetRule({ need: r.need, mark: r.mark, minMinutes: r.minMinutes }, rows, hasTag) || (r.state === "met" && removed.length === 0 && Object.keys(minutesOver).length === 0);
+      return rowsMeetRule({ need: r.need, mark: r.mark, minMinutes: r.minMinutes }, rows.today, hasTag) || (r.state === "met" && removed.length === 0 && Object.keys(minutesOver).length === 0);
     });
   }, [view, over, rows, w, removed, minutesOver]);
 
