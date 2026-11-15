@@ -8,7 +8,7 @@ import authConfig from "./auth.config"
 import { GUEST_EMAIL_DOMAIN, createGuest, createOAuthAthlete } from "@/lib/guest"
 import { Email as EmailAddress, hashPassword, needsRehash, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
 import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle"
-import { RECHECK_MS, SESSION_MAX_AGE_S, SESSION_UPDATE_AGE_S, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
+import { RECHECK_MS, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
 import { proofOk } from "@/lib/auth/proof"
 
 const baseAdapter = PrismaAdapter(prisma)
@@ -42,8 +42,7 @@ const adapter = {
 
 export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
   adapter,
-  // Signed in for 180 days, renewed as the app is used: the installed app stays signed in.
-  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_S, updateAge: SESSION_UPDATE_AGE_S },
+  // Session lifetime (180 days, renewed by use) comes from authConfig.
   ...authConfig,
   providers: [
     // Google: an existing account with the same (Google-verified) email is

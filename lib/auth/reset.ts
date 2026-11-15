@@ -29,9 +29,9 @@ export async function peekReset(token: string, now = new Date()) {
   return r;
 }
 
-/** Use the token up. True only for the one caller that got there first. */
-export async function consumeReset(id: string, now = new Date()): Promise<boolean> {
-  const done = await prisma.passwordReset.updateMany({ where: { id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } });
+/** Use the token up. True only for the one caller that got there first. Pass a transaction to use it up together with the password change. */
+export async function consumeReset(id: string, now = new Date(), db: Pick<typeof prisma, "passwordReset"> = prisma): Promise<boolean> {
+  const done = await db.passwordReset.updateMany({ where: { id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } });
   return done.count === 1;
 }
 

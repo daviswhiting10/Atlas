@@ -10,12 +10,12 @@ Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`
   - this handoff commit
 
   Pushing would deploy them. That's harmless, but ask first.
-- **Branch `auth-wip` (`3d369fc`), local only:** unfinished sign-in work. **Never merge or deploy it as is** (see "Auth").
-- **Production database:** migrations up to `20261114002845_goals_75_hard`. The auth migration is **not** on production.
-- **`dev-sessions` (local dev database) already has the auth migration** `20261114012242_sign_in_safety`, but `main` doesn't contain that migration file.
+- **Branch `auth-wip`:** merged into `main` on 2026-11-15 (see "Auth"). Nothing left on it.
+- **Production database:** migrations up to `20261114012242_sign_in_safety` (the auth migration, applied 2026-11-14 with the user's OK, before any auth code). The live code doesn't read the new columns or tables yet. That's harmless because they're additive: nullable columns and two empty tables.
+- **`dev-sessions` and production both have the auth migration** `20261114012242_sign_in_safety`, and `main` has its file since the auth merge.
   - On `main`, `prisma migrate status` will report a migration that's applied but missing.
   - **Never run `prisma migrate dev` on `main` against `dev-sessions`:** it would offer to reset (wipe) the database.
-  - Do database work from `auth-wip`, or ask first.
+  - Database work can be done from `main` again.
 - **Uncommitted files:**
   - `Untitled` in the repo is the user's draft prompt about smoother transitions. Leave it.
   - `~/Documents/atlas-goals/docs/review-and-v1-scope.md` is an uncommitted review of the four design docs, with a two-week v1 and "two decisions v1 needs from you". Read it before planning; it wasn't merged because it isn't committed.
@@ -46,7 +46,7 @@ Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`
   - Progress totals count only sessions with sets, so a walk doesn't add to "Workouts". Step 5 should count sessions themselves.
   - Strip state "before Atlas" is a sixth state, added on request.
 
-## Auth (in progress on `auth-wip`)
+## Auth (deploy 1 live; deploy 2, the set-password step, not yet)
 **Why:** on iOS the installed home-screen app has its own cookies, so an email link opened from Mail signs in Safari, never the app. A password typed in the app fixes it.
 
 **Workaround today:** Settings → Sign-in → Set a password, already in the app, then sign in in the installed app.
@@ -71,33 +71,19 @@ Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 - **Email:** `lib/email.ts`. It prints to the dev log when `RESEND_API_KEY` is empty.
 - **Unchanged:** the email link, and `AUTH_SECRET` (never rotate it).
 
-**Not written yet:**
-1. **Server actions** in `lib/actions/account.ts`:
-   - Use `passwordProblem` on create, save-guest and set-password.
-   - Count wrong current passwords against the `changeUser` limit.
-   - On set: write `passwordChangedAt` and clear `passwordPromptAfter`, then `unstable_update({ pwProof: stampProof(userId, stamp) })`.
-   - `snoozePasswordStep`: 7 days, only for accounts created before `PASSWORD_REQUIRED_FROM`.
-   - `requestPasswordReset`: the same answer every time, padded to a fixed time; nothing sent to guests or unknown emails.
-   - `resetPassword`: check the rules before using up the token; afterwards clear that email's limit.
-2. **Pages:**
-   - `/forgot-password` and `/reset-password` (public).
-   - `/set-password`: signed in, with "Not now" only when allowed, and a sign-out link.
-   - A "Forgot password?" link on `/login`.
-3. **Middleware:** add the two public pages. Send page requests with `session.user.needsPassword` to `/set-password`, except `/api`, `/login`, `/error` and the step itself. Allow `/set-password` for athletes.
-4. **Break-glass script** `scripts/auth/set-password.ts`:
-   - Refuses production without `ALLOW_PROD=1`.
-   - Reads the password from a hidden prompt; the user runs it with `!` so Claude never sees it.
-   - Writes `passwordChangedAt`.
-5. **Tests:**
-   - Unit: rules, `needsRehash`, throttle maths (`afterEvent` and `blockedFor`, fake clock), `passwordStep` and `sessionCurrent`, proof, the token lifecycle.
-   - On `dev-sessions` against the app:
-     - sign-in right, wrong and with an unknown email (same answer, timing)
-     - limits kicking in
-     - reset for an existing, unknown and guest email
-     - token reuse refused; other sessions signed out after a reset
-     - **a session from before the deploy still accepted**
-     - the step, "Not now", and the kill switch
-   - Last: the user's phone.
+**Finished 2026-11-14, merged into `main` and deployed 2026-11-15 with the set-password step off (deploy 1):**
+- **Server actions** (`lib/actions/account.ts`): `passwordProblem` on create, save-guest and set; the `changeUser` limit on a wrong current password; changing a password writes the stamp (signing out other devices) and renews the caller's session with a proof, while a first password leaves other devices signed in (user's decision, 2026-11-14); `snoozePasswordStep`; `requestPasswordReset` (same answer, padded to 1.5 s, nothing sent to guests or unknown emails); `resetPassword` (rules before the token is used; token and password saved in one transaction; that email's limits cleared).
+- **Pages:** `/forgot-password`, `/reset-password` (no referrer), `/set-password` ("Not now" only when allowed, sign-out link), and "Forgot password?" on `/login`. Forms are in `components/auth/password-forms.tsx`.
+- **Middleware rewritten** (`middleware.ts`, rules in `lib/auth/route-policy.ts`). Two bugs in the earlier design, both confirmed in the next-auth source:
+  - Middleware re-signed the cookie with Auth.js's default 30 days, because `session` settings lived only in `lib/auth.ts`. They're now in `lib/auth.config.ts`.
+  - The 10-minute database re-check never saved: server components can't set cookies, and middleware ran only the light callback. So `needsPassword` never reached middleware, and a device signed in before a password change would loop between `/login` and home. Now the middleware decodes the cookie itself, and when its check is over 10 minutes old it calls `/api/auth/session` (which re-checks and saves) and passes the new cookie both to the browser and to the page for that same request.
+  - The kill switch reaches a session already held at the step at its next check (≤ 10 minutes).
+- **Break-glass:** `scripts/auth/set-password.ts [--prod] <email>`. It reads the password from `/dev/tty` with echo off. If `!` in Claude Code has no terminal, it says so; then run it in a Terminal window.
+- **Tests:** unit tests for every auth module plus the actions (`lib/auth/*.test.ts`, `lib/actions/account.test.ts`, in-memory DB in `lib/auth/test-db.ts`). 637 pass. All the app checks above passed against a production build on `dev-sessions`. Their QA accounts were removed afterwards.
+- **Rehearsal:** `rehearsal-auth` done. All 38 existing tables match on row count and hash (`User` on its old columns), plus 2 new empty tables and 1 migration record. On production as copied: 31 users, 4 link-only accounts (3 coaches, 1 client) that deploy 2 would ask, all old enough for "Not now".
+- **Deploy 1, part 1 done (2026-11-14):** backup `atlas-production-before-auth-20261114-071525.dump` (39 tables of data, checked), then `migrate deploy`. All 38 existing tables matched before and after (and matched the rehearsal copy), plus 2 new empty tables and 1 migration record.
+- **Deploy 1, part 2 (2026-11-15):** the code was merged into `main` and pushed. The break-glass script was tested beforehand in a pseudo-terminal on `dev-sessions`: it sets the password, writes the stamp, refuses a common or mistyped password, and refuses production without `ALLOW_PROD=1`.
+- **Left:** the user sets a first password in Settings → Sign-in and signs in inside the home-screen app. Then deploy 2: `STEP_DEFAULT = true` (or `AUTH_PASSWORD_STEP=on` in Vercel).
 
 **Rollout the user approved:**
 1. Rehearsal branch `rehearsal-auth` from production, with the same fingerprint comparison of every existing table. Note: the two new `User` columns change the whole-row hash, so compare `User` on its old columns only. Stop and show the user before production.
@@ -205,5 +191,6 @@ Check `docs/review-and-v1-scope.md` (uncommitted, in the `atlas-goals` worktree)
   - `atlas-production-before-step4-20261113-162152.dump`
   - `atlas-production-step4-apply-20261113-164259.dump`
   - `atlas-production-goals-apply-20261113-195343.dump`
+  - `atlas-production-before-auth-20261114-071525.dump`: before the auth migration
 - **Reversal file** for the date fix: `session-date-fix-20261113-115227.json`.
 - **Neon branches:** listed in `CLAUDE.md`.
