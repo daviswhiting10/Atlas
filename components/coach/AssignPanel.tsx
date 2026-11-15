@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Send, Trash2 } from "lucide-react";
@@ -10,12 +12,13 @@ import { assignDraftPlan, discardDraftPlan } from "@/lib/actions/coach-plan";
 export function AssignPanel({ clientId, clientName, assignmentId, startDate, hasLivePlan }: { clientId: string; clientName: string; assignmentId: string; startDate: string; hasLivePlan: boolean }) {
   const router = useRouter();
   const [date, setDate] = useState(startDate);
+  const dateRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   function assign() {
     start(async () => {
-      const res = await assignDraftPlan({ clientId, assignmentId, startDate: date });
+      const res = await assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date) });
       if (!res.ok) return void toast.error(res.error);
       toast.success(`Assigned to ${clientName}`);
       router.refresh();
@@ -40,10 +43,10 @@ export function AssignPanel({ clientId, clientName, assignmentId, startDate, has
       </p>
       <label className="mt-4 block">
         <span className="eyebrow">Starts</span>
-        <input
-          type="date"
+        <DayInput
+          ref={dateRef}
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onDay={setDate}
           className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40"
         />
       </label>

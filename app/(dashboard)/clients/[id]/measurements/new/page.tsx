@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -79,6 +81,7 @@ export default function NewMeasurementPage() {
 
   // Form fields
   const [measuredAt, setMeasuredAt] = useState(today);
+  const measuredRef = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState<"manual" | "inbody" | "other">("manual");
   const [bodyWeightKg, setBodyWeightKg] = useState("");
   const [bodyFatPct, setBodyFatPct] = useState("");
@@ -102,7 +105,7 @@ export default function NewMeasurementPage() {
     try {
       await saveMeasurement({
         clientId,
-        measuredAt,
+        measuredAt: dayFrom(measuredRef, measuredAt),
         source,
         bodyWeightKg: num(bodyWeightKg),
         bodyFatPct: num(bodyFatPct),
@@ -171,11 +174,11 @@ export default function NewMeasurementPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Date</label>
-            <Input
-              type="date"
+            <DayInput
+              ref={measuredRef}
               value={measuredAt}
-              onChange={(e) => setMeasuredAt(e.target.value)}
-              className="h-9"
+              onDay={setMeasuredAt}
+              className="h-9 w-full min-w-0 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2.5 font-body text-base text-[var(--ink)] outline-none focus-visible:border-[var(--blue)] focus-visible:ring-3 focus-visible:ring-[var(--blue)]/20 md:text-sm"
             />
           </div>
           <div>

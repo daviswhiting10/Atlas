@@ -192,5 +192,6 @@ Check `docs/review-and-v1-scope.md` (uncommitted, in the `atlas-goals` worktree)
   - `atlas-production-step4-apply-20261113-164259.dump`
   - `atlas-production-goals-apply-20261113-195343.dump`
   - `atlas-production-before-auth-20261114-071525.dump`: before the auth migration
+  - `atlas-production-before-goal-start-fix-20261115-082729.dump`: before the user's 75 Hard was moved to start Nov 4 (Day 12 on Nov 15). Undo with `goal-start-fix-20261115-reverse.sql`; the old row is in `goal-start-fix-20261115-before.json`.
 - **Reversal file** for the date fix: `session-date-fix-20261113-115227.json`.
 - **Neon branches:** listed in `CLAUDE.md`.

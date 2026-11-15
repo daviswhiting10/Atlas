@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { startGoal } from "@/lib/actions/goals";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import { addDays } from "@/lib/goals/days";
 import { previewStart } from "@/lib/goals/preview";
 
@@ -31,10 +33,18 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
     setDraft("");
   };
 
+  const dayRef = useRef<HTMLInputElement>(null);
   const start = () =>
     startTransition(async () => {
-      const r = await startGoal({ templateKey: template.key, startDay, drop: dropped, add: added }).catch(() => ({ ok: false as const, error: "Couldn't start it." }));
-      if (!r.ok) return void toast.error(r.error);
+      // The day the field shows now, and the day number the button showed: the server refuses if they disagree.
+      const day = dayFrom(dayRef, startDay);
+      const shownDay = preview.ok ? preview.dayOfGoal : 0;
+      const r = await startGoal({ templateKey: template.key, startDay: day, shownDay, drop: dropped, add: added }).catch(() => ({ ok: false as const, error: "Couldn't start it." }));
+      if (!r.ok) {
+        if (day !== startDay) setStartDay(day);
+        return void toast.error(r.error);
+      }
+      toast.success(`${template.name} started · Day ${r.dayOfGoal}`);
       router.push("/today");
     });
 
@@ -85,7 +95,7 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
       <label className="eyebrow mt-6 block" htmlFor="start-day">
         Start day
       </label>
-      <input id="start-day" type="date" value={startDay} max={today} onChange={(e) => setStartDay(e.target.value)} className="mt-2 h-11 rounded-xl border border-line bg-white px-3 text-[15px]" />
+      <DayInput ref={dayRef} id="start-day" value={startDay} max={today} onDay={setStartDay} className="mt-2 h-11 rounded-xl border border-line bg-white px-3 text-[15px]" />
 
       <div className="mt-5 rounded-xl bg-ink/[0.04] px-4 py-3.5" aria-live="polite">
         {preview.ok ? (

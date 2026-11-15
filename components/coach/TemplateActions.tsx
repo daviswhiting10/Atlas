@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -15,13 +17,14 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
   const router = useRouter();
   const [clientId, setClientId] = useState("");
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const dateRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   function useAsWritten() {
     if (!clientId) return void toast.error("Choose who it's for.");
     start(async () => {
-      const res = await draftFromTemplate({ programId, clientId, startDate: date });
+      const res = await draftFromTemplate({ programId, clientId, startDate: dayFrom(dateRef, date) });
       if (!res.ok) return void toast.error(res.error);
       router.push(`/clients/${clientId}/programs/${res.assignmentId}`);
     });
@@ -29,7 +32,7 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
 
   function useForMe() {
     start(async () => {
-      const res = await startMyProgram({ programId, startDate: date });
+      const res = await startMyProgram({ programId, startDate: dayFrom(dateRef, date) });
       if (!res.ok) return void toast.error(res.error);
       toast.success("It's your plan now");
       router.push("/today");
@@ -68,7 +71,7 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
             </option>
           ))}
         </select>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Start date" className="mt-2 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
+        <DayInput ref={dateRef} value={date} onDay={setDate} aria-label="Start date" className="mt-2 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
         <button type="button" onClick={useAsWritten} disabled={pending || !clientId} className="press mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40">
           {pending && <Loader2 className="h-4 w-4 animate-spin" />} Create draft
         </button>

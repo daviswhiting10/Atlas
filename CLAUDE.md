@@ -21,6 +21,7 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 | `rehearsal-goals` | Production copy where the goals migration was rehearsed | Until the user says |
 | `rehearsal-auth` | Production copy (2026-11-14) with `20261114012242_sign_in_safety` applied; every existing table matched | Until the user says |
 | `dev-prod-copy` | Production as it was before the sessions migrations (rollback reference) | 2026-11-20 |
+| `rehearsal-goal-start` | Production copy where the 75 Hard start-day fix was rehearsed (2026-11-15) | 2026-11-20 |
 
 Git branches: `main` (deploys); `auth-wip`, the sign-in work (merged into `main` 2026-11-15); `atlas-goals` (worktree at `~/Documents/atlas-goals`, merged into `main` up to `8754384`, the design pass).
 

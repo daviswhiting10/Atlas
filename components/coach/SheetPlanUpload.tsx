@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import { useRouter } from "next/navigation";
 import { FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +20,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
   // Optional: left empty, week 1 is dated back from the weeks the sheet shows as done.
   const [date, setDate] = useState("");
+  const dateRef = useRef<HTMLInputElement>(null);
   // Optional: "4 week block, start fresh". Beats what the sheet suggests.
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,11 +33,13 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       return;
     }
     setBusy(true);
+    // Optional: an empty field means "not given".
+    const weekOne = dayFrom(dateRef, date, { allowEmpty: true });
     try {
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(file ? { csv: file.text } : { sheetUrl: link.trim() }), ...(date ? { weekOneStart: date } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) }),
+        body: JSON.stringify({ ...(file ? { csv: file.text } : { sheetUrl: link.trim() }), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -122,7 +127,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="text-xs font-medium text-ink-soft">
           Week 1 started <span className="font-normal text-ink-mute">(optional)</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} className={cn(field, "mt-1 sm:w-44")} />
+          <DayInput ref={dateRef} value={date} onDay={setDate} disabled={busy} className={cn(field, "mt-1 sm:w-44")} />
         </label>
         <button type="button" onClick={read} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-70">
           {busy ? (

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { DayInput } from "@/components/ui/day-input";
+import { dayFrom } from "@/lib/day-field";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ImageUp, Loader2 } from "lucide-react";
@@ -18,13 +20,14 @@ export function OwnProgramPicker({ programs, hasPlan = false, className }: { pro
   const router = useRouter();
   const [programId, setProgramId] = useState("");
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const dateRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const groups = Array.from(new Set(programs.map((p) => p.category)));
 
   async function start() {
     if (!programId) return;
     setBusy(true);
-    const res = await startMyProgram({ programId, startDate: date });
+    const res = await startMyProgram({ programId, startDate: dayFrom(dateRef, date) });
     if (!res.ok) {
       setBusy(false);
       toast.error(res.error);
@@ -59,7 +62,7 @@ export function OwnProgramPicker({ programs, hasPlan = false, className }: { pro
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <label className="flex items-center gap-3 text-sm text-ink-soft">
                 Starts
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={cn(field, "h-11")} />
+                <DayInput ref={dateRef} value={date} onDay={setDate} className={cn(field, "h-11")} />
               </label>
               <button type="button" onClick={start} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start this program"}
