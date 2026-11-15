@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import type { Prefs } from "@/lib/plan/generator";
 import { PlanWizard } from "./PlanWizard";
 import { SignOutButton } from "./SignOutButton";
 
-/** Profile actions. Changing goals stays out of the way until it is asked for. */
-export function GoalsPanel({ prefs, canRebuild, isGuest, initiallyOpen }: { prefs: Prefs; canRebuild: boolean; isGuest: boolean; initiallyOpen: boolean }) {
+/**
+ * Profile actions. Changing goals (and, for a coach, picking one of their own programs)
+ * stays out of the way until it is asked for.
+ */
+export function GoalsPanel({ prefs, canRebuild, isGuest, initiallyOpen, extra }: { prefs: Prefs; canRebuild: boolean; isGuest: boolean; initiallyOpen: boolean; extra?: ReactNode }) {
   const [open, setOpen] = useState(initiallyOpen && canRebuild);
 
   return (
@@ -18,7 +21,7 @@ export function GoalsPanel({ prefs, canRebuild, isGuest, initiallyOpen }: { pref
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="press flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 sm:flex-none"
+            className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 sm:w-auto"
           >
             {open ? <X className="h-4 w-4" /> : <SlidersHorizontal className="h-4 w-4" />}
             {open ? "Close" : "Change goals"}
@@ -32,6 +35,7 @@ export function GoalsPanel({ prefs, canRebuild, isGuest, initiallyOpen }: { pref
       {open && (
         <section className="fade-in rule mt-8 pt-8">
           <PlanWizard mode="rebuild" initial={prefs} />
+          {extra && <div className="rule mt-8 pt-8">{extra}</div>}
         </section>
       )}
     </>
