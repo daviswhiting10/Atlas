@@ -162,7 +162,7 @@ export function CoachPlanForm({
             onChange={(e) => setGoalText(e.target.value.slice(0, GOAL_TEXT_MAX))}
             rows={2}
             placeholder="e.g. Lose 20 lb, bad left knee"
-            className="w-full resize-none rounded-lg border border-line-strong bg-dusk-raised p-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute/60 focus:border-ink/40"
+            className="w-full resize-none rounded-lg border border-line-strong bg-dusk-raised p-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute focus:border-ink/40"
           />
           <p className="mt-1.5 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
             {resolved.understood.length > 0 && (

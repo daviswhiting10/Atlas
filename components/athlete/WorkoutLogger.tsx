@@ -63,7 +63,7 @@ function Stepper({
           aria-label={label}
           onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
           onFocus={(e) => e.target.select()}
-          className="tnum w-full bg-transparent text-center text-lg font-semibold leading-none text-ink outline-none [appearance:textfield] placeholder:text-ink-mute/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="tnum w-full bg-transparent text-center text-lg font-semibold leading-none text-ink outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
       </label>

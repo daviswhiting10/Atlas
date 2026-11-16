@@ -16,7 +16,7 @@ export async function signInWithPassword(email: string, password: string): Promi
 }
 
 export const inputClass =
-  "h-[52px] w-full rounded-2xl border border-line-strong bg-dusk-raised px-4 text-[16px] text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:shadow-[0_0_0_3px_rgba(124,199,189,0.18)]";
+  "h-[52px] w-full rounded-2xl border border-line-strong bg-dusk-raised px-4 text-[16px] text-ink outline-none transition-shadow placeholder:text-ink-mute focus:border-signal focus:shadow-[0_0_0_3px_rgba(124,199,189,0.18)]";
 
 /** Email + password fields, shared by sign-up, sign-in and saving a guest account. */
 export function CredentialFields({

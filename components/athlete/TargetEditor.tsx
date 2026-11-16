@@ -19,7 +19,7 @@ function Field({ label, value, onChange, step = 1, min = 1, max = 999, placehold
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(Number(e.target.value), 0), max))}
         onFocus={(e) => e.target.select()}
-        className="h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-mute/60 focus:border-ink/40"
+        className="h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/40"
       />
     </label>
   );
