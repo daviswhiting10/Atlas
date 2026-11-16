@@ -46,13 +46,13 @@ export function ConnectTabs({ options }: { options: ConnectOption[] }) {
       </div>
 
       <div className="relative mt-5 rounded-xl bg-night">
-        <pre className="overflow-x-auto p-5 pr-24 font-mono text-[13px] leading-relaxed text-white/90">
+        <pre className="overflow-x-auto p-5 pr-24 font-mono text-[13px] leading-relaxed text-ink">
           <code>{current.code}</code>
         </pre>
         <button
           type="button"
           onClick={copy}
-          className="press absolute right-3 top-3 flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 text-xs font-medium text-white/80 hover:bg-white/10"
+          className="press absolute right-3 top-3 flex h-8 items-center gap-1.5 rounded-md border border-line bg-ink/5 px-2.5 text-xs font-medium text-ink hover:bg-ink/10"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? "Copied" : "Copy"}

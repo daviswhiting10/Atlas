@@ -75,9 +75,11 @@ function LighterWeeksSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
         aria-labelledby="lighter-weeks-label"
         onClick={toggle}
         disabled={pending}
-        className={cn("press relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60", value ? "bg-signal" : "bg-ink/15")}
+        className="press relative h-11 w-12 shrink-0 disabled:opacity-60"
       >
-        <span className={cn("absolute left-0 top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform", value ? "translate-x-[22px]" : "translate-x-0.5")} />
+        {/* The track is 28px tall; the button around it is 44px, so it is easy to hit. */}
+        <span aria-hidden className={cn("absolute inset-x-0 top-2 h-7 rounded-full transition-colors", value ? "bg-signal" : "bg-ink/15")} />
+        <span aria-hidden className={cn("absolute left-0 top-2.5 h-6 w-6 rounded-full bg-dusk-button shadow-sm transition-transform", value ? "translate-x-[22px]" : "translate-x-0.5")} />
       </button>
     </div>
   );
@@ -118,7 +120,7 @@ function NoteField({ value, placeholder, label, onSave }: { value: string | null
         rows={2}
         maxLength={2000}
         placeholder={placeholder}
-        className="mt-1.5 w-full resize-y rounded-lg border border-line bg-white px-3 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute/70 focus:border-ink/40"
+        className="mt-1.5 w-full resize-y rounded-lg border border-line-strong bg-dusk-raised px-3 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute focus:border-ink/40"
       />
     </label>
   );
@@ -186,13 +188,13 @@ function WorkoutCard({
   return (
     <div className={cn("surface overflow-hidden", isNext && "border-ink/30")}>
       <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3.5 p-4 text-left sm:p-5">
-        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", logged ? "bg-signal text-white" : "bg-ink/5 text-ink-mute")}>
+        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", logged ? "bg-signal text-bone" : "bg-ink/5 text-ink-mute")}>
           {logged ? <Check className="h-5 w-5" strokeWidth={3} /> : skipped ? <SkipForward className="h-4 w-4" /> : <Dumbbell className="h-4 w-4" />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className={cn("truncate text-base font-semibold", skipped ? "text-ink-mute line-through" : "text-ink")}>{w.name}</span>
-            {isNext && <span className="shrink-0 rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Up next</span>}
+            {isNext && <span className="shrink-0 rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bone">Up next</span>}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-[13px] text-ink-mute">
             {logged ? "Logged" : skipped ? "Skipped" : `${w.exercises.length} exercise${w.exercises.length === 1 ? "" : "s"}`}
@@ -220,14 +222,14 @@ function WorkoutCard({
                   <li key={e.aweId} className="py-2">
                     <div className="flex items-center gap-2">
                       <span className="w-4 shrink-0 text-[13px] text-ink-mute">{i + 1}</span>
-                      <ExerciseThumb picture={e.picture} name={e.name} className="h-9 w-9" />
+                      <ExerciseThumb picture={e.picture} name={e.name} className="h-11 w-11" />
                       <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{e.name}</span>
                       <button
                         type="button"
                         onClick={() => setEditing(editing === e.aweId ? null : e.aweId)}
                         aria-expanded={editing === e.aweId}
                         aria-label={`Edit target for ${e.name}`}
-                        className="press shrink-0 rounded-md px-2 py-1 text-[14px] text-ink-soft underline decoration-line decoration-dotted underline-offset-4 hover:bg-ink/5 hover:text-ink"
+                        className="press shrink-0 rounded-md px-2 py-1 text-[14px] max-md:min-h-11 text-ink-soft underline decoration-line decoration-dotted underline-offset-4 hover:bg-ink/5 hover:text-ink"
                       >
                         {e.sets} × {e.reps}
                         {e.weight != null ? ` @ ${e.weight} lb` : ""}
@@ -245,7 +247,7 @@ function WorkoutCard({
                         onClick={() => change(() => actions.removeExercise({ aweId: e.aweId, workoutId: w.id }), `${e.name} removed`)}
                         disabled={pending}
                         aria-label={`Remove ${e.name}`}
-                        className="press flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-ink/5 hover:text-ink"
+                        className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-ink/5 hover:text-ink md:h-7 md:w-7"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -279,7 +281,7 @@ function WorkoutCard({
             type="button"
             onClick={() => setPicker({ mode: "add" })}
             disabled={pending}
-            className="press mt-2 flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink"
+            className="press mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink"
           >
             <Plus className="h-4 w-4" /> Add an exercise
           </button>
@@ -300,14 +302,14 @@ function WorkoutCard({
                 href={workoutHref(w.id)}
                 className={cn(
                   "press flex h-11 min-w-[11rem] flex-1 items-center justify-center gap-2 rounded-lg px-4 text-[15px] font-semibold",
-                  logged ? "border border-line bg-white text-ink hover:border-ink/20" : "bg-ink text-white hover:bg-ink/85"
+                  logged ? "border border-line bg-paper text-ink hover:border-ink/20" : "bg-dusk-button text-dusk-button-text hover:bg-dusk-button/85"
                 )}
               >
                 {logged ? "Review workout" : startLabel} <ArrowRight className="h-4 w-4" />
               </Link>
             )}
             {!logged && actions.setSkipped && (
-              <button type="button" onClick={toggleSkip} disabled={pending} className="press flex h-11 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-[15px] font-medium text-ink-soft hover:border-ink/20 disabled:opacity-60">
+              <button type="button" onClick={toggleSkip} disabled={pending} className="press flex h-11 items-center justify-center gap-2 rounded-lg border border-line bg-paper px-4 text-[15px] font-medium text-ink-soft hover:border-ink/20 disabled:opacity-60">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : skipped ? <RotateCcw className="h-4 w-4" /> : <SkipForward className="h-4 w-4" />}
                 {skipped ? "Restore" : "Skip"}
               </button>
@@ -315,7 +317,7 @@ function WorkoutCard({
             {confirmRemove ? (
               <span className="flex items-center gap-2 text-sm">
                 <span className="text-ink-soft">{logged ? "Remove? Logged sets stay in your history." : "Remove this workout?"}</span>
-                <button type="button" onClick={() => change(() => actions.removeWorkout(w.id), `${w.name} removed`)} disabled={pending} className="press h-9 rounded-lg bg-ink px-3 font-semibold text-white">
+                <button type="button" onClick={() => change(() => actions.removeWorkout(w.id), `${w.name} removed`)} disabled={pending} className="press h-9 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text">
                   Remove
                 </button>
                 <button type="button" onClick={() => setConfirmRemove(false)} className="press h-9 rounded-lg px-2 font-medium text-ink-soft">
@@ -387,12 +389,12 @@ function AddWorkout({ week, workouts, actions }: { week: number; workouts: Worko
             maxLength={60}
             placeholder="Extra session"
             autoFocus
-            className="h-11 rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none placeholder:text-ink-mute/70 focus:border-ink/40"
+            className="h-11 rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none placeholder:text-ink-mute focus:border-ink/40"
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="eyebrow">Start from</span>
-          <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-11 rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40">
+          <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-11 rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40">
             <option value="">Empty — I&apos;ll add exercises</option>
             {workouts.map((w) => (
               <option key={w.id} value={w.id}>
@@ -406,7 +408,7 @@ function AddWorkout({ week, workouts, actions }: { week: number; workouts: Worko
         <button type="button" onClick={() => setOpen(false)} className="press h-10 rounded-lg px-3 text-sm font-medium text-ink-soft hover:text-ink">
           Cancel
         </button>
-        <button type="button" onClick={add} disabled={pending} className="press flex h-10 items-center gap-1.5 rounded-lg bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85 disabled:opacity-50">
+        <button type="button" onClick={add} disabled={pending} className="press flex h-10 items-center gap-1.5 rounded-lg bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-50">
           {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Add workout
         </button>
       </div>
@@ -491,15 +493,15 @@ export function PlanView({
               onClick={() => setWeek(n)}
               className={cn(
                 "press relative flex h-[58px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl border text-center",
-                selected ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/20"
+                selected ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink hover:border-ink/20"
               )}
             >
-              <span className={cn("text-[10px] font-medium uppercase tracking-wide", selected ? "text-white/60" : "text-ink-mute")}>Wk</span>
+              <span className={cn("text-[10px] font-medium uppercase tracking-wide", selected ? "text-dusk-button-text/70" : "text-ink-mute")}>Wk</span>
               <span className="text-lg font-semibold leading-tight">{n}</span>
               {done ? (
-                <span className={cn("absolute bottom-1.5 h-1 w-1 rounded-full", selected ? "bg-white" : "bg-signal")} />
+                <span className={cn("absolute bottom-1.5 h-1 w-1 rounded-full", selected ? "bg-dusk-button-text" : "bg-signal")} />
               ) : n === plan.currentWeek ? (
-                <span className={cn("absolute bottom-1.5 h-1 w-3 rounded-full", selected ? "bg-white" : "bg-signal")} />
+                <span className={cn("absolute bottom-1.5 h-1 w-3 rounded-full", selected ? "bg-dusk-button-text" : "bg-signal")} />
               ) : null}
             </button>
           );

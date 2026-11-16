@@ -44,7 +44,7 @@ export default async function PlanPage() {
         {athlete.selfServe ? (
           <>
             <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it lays out your next 12 weeks.</p>
-            <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
+            <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
               Build my plan <ArrowRight className="h-4 w-4" />
             </Link>
           </>
@@ -77,7 +77,7 @@ export default async function PlanPage() {
           {chips.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {chips.map((c) => (
-                <span key={c} className="rounded-full border border-line bg-white px-3 py-1 text-[13px] font-medium text-ink-soft">
+                <span key={c} className="rounded-full border border-line bg-paper px-3 py-1 text-[13px] font-medium text-ink-soft">
                   {c}
                 </span>
               ))}
@@ -85,7 +85,7 @@ export default async function PlanPage() {
           )}
         </div>
         {athlete.selfServe && (
-          <Link href="/you?goals=1" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
+          <Link href="/you?goals=1" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
             <SlidersHorizontal className="h-4 w-4" /> Change goals
           </Link>
         )}

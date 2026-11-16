@@ -35,12 +35,12 @@ function Choice({
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        "press flex w-full items-center gap-4 rounded-2xl border bg-white p-4 text-left",
+        "press flex w-full items-center gap-4 rounded-2xl border bg-paper p-4 text-left",
         selected ? "border-signal" : "border-line hover:border-ink/20"
       )}
     >
       {Icon && (
-        <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors", selected ? "bg-signal text-white" : "bg-ink/5 text-ink-soft")}>
+        <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors", selected ? "bg-signal text-bone" : "bg-ink/5 text-ink-soft")}>
           <Icon className="h-5 w-5" />
         </span>
       )}
@@ -48,7 +48,7 @@ function Choice({
         <span className="block text-[15px] font-semibold text-ink">{title}</span>
         {blurb && <span className="mt-0.5 block text-[13px] leading-snug text-ink-mute">{blurb}</span>}
       </span>
-      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors", selected ? "border-signal bg-signal text-white" : "border-line")}>
+      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors", selected ? "border-signal bg-signal text-bone" : "border-line")}>
         {selected && <Check className="h-3 w-3" strokeWidth={3.5} />}
       </span>
     </button>
@@ -63,7 +63,7 @@ function Pill({ selected, onClick, children }: { selected: boolean; onClick: () 
       aria-pressed={selected}
       className={cn(
         "press tnum h-12 flex-1 rounded-xl border text-[15px] font-semibold",
-        selected ? "border-signal bg-signal text-white" : "border-line bg-white text-ink hover:border-ink/20"
+        selected ? "border-signal bg-signal text-bone" : "border-line bg-paper text-ink hover:border-ink/20"
       )}
     >
       {children}
@@ -162,7 +162,7 @@ export function PlanWizard({
               rows={3}
               maxLength={GOAL_TEXT_MAX}
               placeholder="e.g. Build bigger glutes and legs, but my knees are a bit dodgy"
-              className="w-full resize-none rounded-2xl border border-line bg-white p-4 text-[17px] leading-relaxed text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:shadow-[0_0_0_3px_rgba(30,107,78,0.18)]"
+              className="w-full resize-none rounded-2xl border border-line-strong bg-dusk-raised p-4 text-[17px] leading-relaxed text-ink outline-none transition-shadow placeholder:text-ink-mute focus:border-signal focus:shadow-[0_0_0_3px_rgba(124,199,189,0.18)]"
             />
           </label>
           <p className="mt-2 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
@@ -187,8 +187,8 @@ export function PlanWizard({
                   aria-pressed={selected}
                   onClick={() => set("goal", g)}
                   className={cn(
-                    "press flex items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 text-left text-[15px] font-semibold",
-                    selected ? "border-signal text-ink shadow-[0_0_0_3px_rgba(30,107,78,0.18)]" : "border-line text-ink-soft hover:border-ink/20"
+                    "press flex items-center gap-2.5 rounded-xl border bg-paper px-3 py-2.5 text-left text-[15px] font-semibold",
+                    selected ? "border-signal text-ink shadow-[0_0_0_3px_rgba(124,199,189,0.18)]" : "border-line text-ink-soft hover:border-ink/20"
                   )}
                 >
                   <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-signal" : "text-ink-mute")} />
@@ -352,7 +352,7 @@ export function PlanWizard({
                 type="button"
                 onClick={() => setStep((s) => s - 1)}
                 disabled={busy}
-                className="press flex h-[52px] items-center gap-2 rounded-2xl border border-line bg-white px-5 text-[15px] font-medium text-ink-soft hover:border-ink/20"
+                className="press flex h-[52px] items-center gap-2 rounded-2xl border border-line bg-paper px-5 text-[15px] font-medium text-ink-soft hover:border-ink/20"
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>
@@ -362,7 +362,7 @@ export function PlanWizard({
               form={last && mode === "signup" ? "create-account" : undefined}
               onClick={last && mode === "signup" ? undefined : () => (last ? submit() : setStep((s) => s + 1))}
               disabled={busy}
-              className="press flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60"
+              className="press flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
