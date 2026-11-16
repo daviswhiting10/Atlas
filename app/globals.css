@@ -18,50 +18,13 @@
   }
 }
 
-/* ── Aura blobs ────────────────────────────────────────────────────────────
-   Two large blurred circles behind all content. Fixed, z-index -1.
-   Spec: TL 900×900 rgba(30,107,78,0.22) blur 80px, 22s anim
-         BR 1100×1100 rgba(123,167,255,0.20) blur 80px, 28s anim       */
-.aura {
-  position: fixed;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: 50%;
-  filter: blur(80px);
-  will-change: transform;
-}
-.aura-tl {
-  width: 900px;
-  height: 900px;
-  top: -300px;
-  left: -200px;
-  background: rgba(30, 107, 78, 0.22);
-  animation: aura-tl 22s ease-in-out infinite alternate;
-}
-.aura-br {
-  width: 1100px;
-  height: 1100px;
-  bottom: -350px;
-  right: -250px;
-  background: rgba(123, 167, 255, 0.20);
-  animation: aura-br 28s ease-in-out infinite alternate;
-}
-@keyframes aura-tl {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(80px, 80px); }
-}
-@keyframes aura-br {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(-80px, -80px); }
-}
-
 /* ── Card hover lift — apply .card-lift to any card for the effect ─────── */
 .card-lift {
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 32px -24px rgba(11, 15, 26, 0.35);
+  box-shadow: 0 16px 32px -24px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Mobile: replace hover lifts with active press scale ───────────────── */
@@ -97,98 +60,65 @@
 }
 
 @layer base {
+  /* ── Dusk is the only palette ──────────────────────────────────────────────
+     The values live in app/dusk.css. The names below are the older ones (bone, paper, ink,
+     signal, blue …), kept as aliases so every existing class (bg-bone, text-ink, border-line,
+     text-signal …) reads dark without a rewrite. There is no light mode and no .dark class.
+     Teal is the one accent. Purple and peach are used sparingly (today, needs you). */
   :root {
-    /* ── Atlas design-system tokens (spec-exact values) ──────── */
-    --bone:       #F5F3EE;            /* page background         */
-    --paper:      #FFFFFF;            /* card / surface          */
-    --ink:        #0B0F1A;            /* primary text            */
-    --ink-soft:   #3A4255;            /* secondary text          */
-    --ink-mute:   #6B7280;            /* tertiary / labels       */
-    --line:       rgba(11,15,26,0.08);/* borders                 */
-    --blue:       #1E6B4E;            /* legacy name for --signal */
-    --blue-deep:  #154D38;            /* legacy name for --signal-deep */
-    --blue-soft:  #8DBBA6;            /* soft signal tint        */
-    --success:    #1F7A4D;            /* green states            */
-    --warn:       #B45309;            /* amber / at-risk states  */
-    --gold:       #C98A1B;            /* personal records only   */
-    --signal:     #1E6B4E;            /* progress + active state */
-    --signal-deep:#154D38;            /* signal, pressed         */
-    --night:      #0B0F1A;            /* dark feature surfaces   */
+    color-scheme: dark;
+
+    --bone:       var(--dusk-bg);                   /* the page                          */
+    --paper:      var(--dusk-surface);              /* a card on the page                */
+    --ink:        var(--dusk-text);                 /* primary text                      */
+    --ink-soft:   var(--dusk-soft);                 /* secondary text                    */
+    --ink-mute:   var(--dusk-mute);                 /* tertiary text, labels             */
+    --line:       var(--dusk-line);                 /* borders                           */
+    --blue:       var(--dusk-teal);                 /* the accent (this name was green)  */
+    --blue-deep:  var(--dusk-teal);
+    --blue-soft:  rgba(124, 199, 189, 0.5);         /* soft accent tint                  */
+    --success:    var(--dusk-teal);                 /* done                              */
+    --warn:       var(--dusk-peach);                /* needs you                         */
+    --gold:       var(--dusk-peach);                /* personal records                  */
+    --signal:     var(--dusk-teal);                 /* progress + active state           */
+    --signal-deep:var(--dusk-teal);
+    --night:      var(--dusk-raised);               /* a raised surface                  */
 
     /* ── Shadcn token remaps ─────────────────────────────────── */
-    --background:            var(--bone);
-    --foreground:            var(--ink);
-    --card:                  var(--paper);
-    --card-foreground:       var(--ink);
-    --popover:               var(--paper);
-    --popover-foreground:    var(--ink);
-    --primary:               var(--blue);
-    --primary-foreground:    #FFFFFF;
-    --secondary:             rgba(30,107,78,0.07);
-    --secondary-foreground:  var(--blue-deep);
-    --muted:                 rgba(11,15,26,0.04);
-    --muted-foreground:      var(--ink-mute);
-    --accent:                rgba(30,107,78,0.07);
-    --accent-foreground:     var(--blue-deep);
-    --destructive:           #C8341A;
-    --destructive-foreground:#FFFFFF;
-    --border:                var(--line);
-    --input:                 var(--line);
-    --ring:                  var(--blue);
+    --background:            var(--dusk-bg);
+    --foreground:            var(--dusk-text);
+    --card:                  var(--dusk-surface);
+    --card-foreground:       var(--dusk-text);
+    --popover:               var(--dusk-raised);
+    --popover-foreground:    var(--dusk-text);
+    --primary:               var(--dusk-button);          /* the one bright button */
+    --primary-foreground:    var(--dusk-button-text);
+    --secondary:             rgba(236, 232, 225, 0.07);
+    --secondary-foreground:  var(--dusk-text);
+    --muted:                 rgba(236, 232, 225, 0.05);
+    --muted-foreground:      var(--dusk-mute);
+    --accent:                rgba(124, 199, 189, 0.12);
+    --accent-foreground:     var(--dusk-teal);
+    --destructive:           #f2877a;                     /* 8.1:1 on the page */
+    --destructive-foreground:#0a0a0d;
+    --border:                var(--dusk-line);
+    --input:                 var(--dusk-line-strong);     /* the outline of a field: 3.2:1 */
+    --ring:                  var(--dusk-teal);
     --radius:                0.5rem;
 
-    /* ── Sidebar always dark ─────────────────────────────────── */
-    --sidebar:                    #07090F;
-    --sidebar-foreground:         #B0B4BF;
-    --sidebar-primary:            var(--blue);
-    --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent:             #0F1218;
-    --sidebar-accent-foreground:  #E4E6EC;
-    --sidebar-border:             rgba(255,255,255,0.06);
-    --sidebar-ring:               var(--blue);
+    /* ── Sidebar (shadcn) ────────────────────────────────────── */
+    --sidebar:                    var(--dusk-bg);
+    --sidebar-foreground:         var(--dusk-soft);
+    --sidebar-primary:            var(--dusk-teal);
+    --sidebar-primary-foreground: var(--dusk-button-text);
+    --sidebar-accent:             var(--dusk-raised);
+    --sidebar-accent-foreground:  var(--dusk-text);
+    --sidebar-border:             var(--dusk-line);
+    --sidebar-ring:               var(--dusk-teal);
   }
 
-  .dark {
-    --bone:       #0C0E14;
-    --paper:      #131620;
-    --ink:        #EEF0F5;
-    --ink-soft:   #A0A8BC;
-    --ink-mute:   #5A6278;
-    --line:       rgba(238,240,245,0.08);
-    --blue:       #3E9A72;
-    --blue-deep:  #1E6B4E;
-    --blue-soft:  #8DBBA6;
-    --success:    #26A461;
-    --warn:       #D17A2C;
-
-    --background:            var(--bone);
-    --foreground:            var(--ink);
-    --card:                  var(--paper);
-    --card-foreground:       var(--ink);
-    --popover:               var(--paper);
-    --popover-foreground:    var(--ink);
-    --primary:               var(--blue);
-    --primary-foreground:    #FFFFFF;
-    --secondary:             rgba(30,107,78,0.10);
-    --secondary-foreground:  #8DBBA6;
-    --muted:                 rgba(238,240,245,0.05);
-    --muted-foreground:      var(--ink-mute);
-    --accent:                rgba(30,107,78,0.10);
-    --accent-foreground:     #8DBBA6;
-    --destructive:           #E05A40;
-    --destructive-foreground:#FFFFFF;
-    --border:                var(--line);
-    --input:                 var(--line);
-    --ring:                  var(--blue);
-
-    --sidebar:                    #07090F;
-    --sidebar-foreground:         #B0B4BF;
-    --sidebar-primary:            var(--blue);
-    --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent:             #0F1218;
-    --sidebar-accent-foreground:  #E4E6EC;
-    --sidebar-border:             rgba(255,255,255,0.06);
-    --sidebar-ring:               var(--blue);
+  html {
+    background-color: var(--dusk-bg);
   }
 
   body {
@@ -235,7 +165,7 @@
 /* Dark feature surface: flat ink, no gradient, no glow. */
 .surface-night {
   border-radius: 16px;
-  color: #fff;
+  color: var(--dusk-text);
   background: var(--night);
 }
 
@@ -288,7 +218,7 @@
 /* Skeleton shimmer */
 .skeleton {
   border-radius: 14px;
-  background: linear-gradient(90deg, rgba(11, 15, 26, 0.05) 0%, rgba(11, 15, 26, 0.09) 50%, rgba(11, 15, 26, 0.05) 100%);
+  background: linear-gradient(90deg, rgba(236, 232, 225, 0.05) 0%, rgba(236, 232, 225, 0.1) 50%, rgba(236, 232, 225, 0.05) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }

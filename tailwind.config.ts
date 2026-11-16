@@ -104,6 +104,11 @@ const config: Config = {
           purple: "var(--dusk-purple)",
           teal: "var(--dusk-teal)",
           peach: "var(--dusk-peach)",
+          // The one bright button on a screen, and the text on it.
+          button: "var(--dusk-button)",
+          "button-text": "var(--dusk-button-text)",
+          // The outline of something you tap.
+          "line-strong": "var(--dusk-line-strong)",
         },
       }),
       borderRadius: {

@@ -22,7 +22,7 @@ type Props = {
   data: HeroDataPoint[];
   label: string; // "Body Weight (kg)" | "Strength Composite (%)" | etc.
   unit: string;  // "kg" | "%" | "lb"
-  color: string; // Tailwind CSS hex color string, e.g. "#10b981"
+  color: string; // any CSS colour, e.g. "var(--signal)"
   goalValue?: number | null;
   goalLabel?: string;
   animationDuration?: number;

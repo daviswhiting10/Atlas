@@ -51,7 +51,7 @@ function CustomTooltip({
   );
 }
 
-export function WeightTrendChart({ data, color = "#10b981", height = 200 }: Props) {
+export function WeightTrendChart({ data, color = "var(--signal)", height = 200 }: Props) {
   if (data.length === 0) return null;
 
   return (

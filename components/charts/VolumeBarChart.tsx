@@ -49,7 +49,7 @@ function CustomTooltip({
   );
 }
 
-export function VolumeBarChart({ data, color = "#6366f1", height = 160 }: Props) {
+export function VolumeBarChart({ data, color = "var(--signal)", height = 160 }: Props) {
   if (data.length === 0) return null;
 
   const maxVol = Math.max(...data.map((d) => d.totalKg));

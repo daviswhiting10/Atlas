@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   description:
     "Tell Atlas your goal and it builds a 12-week plan, tells you exactly what to lift each session, and charts your progress as you log.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Atlas" },
+  appleWebApp: { capable: true, statusBarStyle: "black", title: "Atlas" },
   icons: { apple: "/icons/icon-180.png" },
   openGraph: {
     title: "Atlas — training that adapts to you",
@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#F5F3EE",
+  themeColor: "#0a0a0d",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}>
       <body className="antialiased font-body">
         {children}
-        <Toaster richColors position="top-center" />
+        <Toaster position="top-center" />
       </body>
     </html>
   );
