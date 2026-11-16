@@ -311,7 +311,7 @@ export default function ClientsPage() {
                       onClick={() => setConfirming(client.id)}
                       aria-label={`Delete ${client.fullName}`}
                       title="Delete client"
-                      className="press mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-destructive/10 hover:text-destructive"
+                      className="press mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

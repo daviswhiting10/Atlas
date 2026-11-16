@@ -27,9 +27,9 @@ type Result = { row: number; name: string; outcome: "created" | "updated" | "fai
 const GOAL_LABEL: Record<string, string> = { weight_loss: "Weight loss", hypertrophy: "Hypertrophy", pain_mgmt: "Pain management", performance: "Performance", general: "General fitness" };
 const STATUS_LABEL: Record<ClientStatus, string> = { ACTIVE: "Active", PROSPECT: "Prospect", AT_RISK: "At risk", CHURNED: "Churned" };
 
-const primary = "press flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40";
-const secondary = "press flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-[15px] font-semibold text-ink hover:border-ink/25";
-const select = "h-10 w-full rounded-lg border border-line bg-white px-2.5 text-[14px] text-ink outline-none focus:border-ink/40";
+const primary = "press flex h-11 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40";
+const secondary = "press flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-paper px-5 text-[15px] font-semibold text-ink hover:border-ink/25";
+const select = "h-10 w-full rounded-lg border border-line bg-paper px-2.5 text-[14px] text-ink outline-none focus:border-ink/40";
 
 export default function ImportClientsPage() {
   const [step, setStep] = useState<"upload" | "map" | "preview" | "done">("upload");
@@ -167,7 +167,7 @@ export default function ImportClientsPage() {
             }}
             className={cn(
               "flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors",
-              dragging ? "border-signal bg-signal/5" : "border-line bg-white hover:border-ink/25"
+              dragging ? "border-signal bg-signal/5" : "border-line bg-paper hover:border-ink/25"
             )}
           >
             <Upload className="h-7 w-7 text-ink-mute" />
@@ -279,7 +279,7 @@ export default function ImportClientsPage() {
               { label: "Skipped", value: skipped.length + dupes.filter((d) => choices[d.row] === "skip").length },
               { label: "Possible duplicates", value: dupes.length },
             ].map((s) => (
-              <div key={s.label} className="bg-white p-4">
+              <div key={s.label} className="bg-paper p-4">
                 <p className="eyebrow">{s.label}</p>
                 <p className="mt-1 text-3xl font-semibold text-ink">{s.value}</p>
               </div>
@@ -303,7 +303,7 @@ export default function ImportClientsPage() {
                         {d.phone ? ` · ${d.phone}` : ""}
                       </p>
                     </div>
-                    <div className="flex shrink-0 rounded-lg border border-line bg-white p-0.5" role="radiogroup" aria-label={`Row ${d.row}`}>
+                    <div className="flex shrink-0 rounded-lg border border-line bg-paper p-0.5" role="radiogroup" aria-label={`Row ${d.row}`}>
                       {(
                         [
                           ["merge", "Fill in existing"],
@@ -317,7 +317,7 @@ export default function ImportClientsPage() {
                           role="radio"
                           aria-checked={choices[d.row] === value}
                           onClick={() => setChoices((c) => ({ ...c, [d.row]: value }))}
-                          className={cn("press rounded-md px-3 py-1.5 text-[13px] font-medium", choices[d.row] === value ? "bg-ink text-white" : "text-ink-soft hover:text-ink")}
+                          className={cn("press rounded-md px-3 py-1.5 text-[13px] font-medium", choices[d.row] === value ? "bg-dusk-button text-dusk-button-text" : "text-ink-soft hover:text-ink")}
                         >
                           {label}
                         </button>
@@ -404,7 +404,7 @@ export default function ImportClientsPage() {
             return (
               <>
                 <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-signal text-white">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-signal text-bone">
                     <Check className="h-5 w-5" strokeWidth={3} />
                   </span>
                   <div>

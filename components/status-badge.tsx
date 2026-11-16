@@ -1,33 +1,17 @@
 type ClientStatus = "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
 
+/** A badge is a tint of one Dusk colour: its outline and wash at a fraction, its text at full strength. */
+const tone = (color: string) => ({ border: `color-mix(in srgb, ${color} 35%, transparent)`, bg: `color-mix(in srgb, ${color} 10%, transparent)`, color });
+const quietTone = { border: "var(--line)", bg: "color-mix(in srgb, var(--ink) 4%, transparent)" };
+
 const config: Record<
   ClientStatus,
   { label: string; border: string; bg: string; color: string }
 > = {
-  PROSPECT: {
-    label: "Prospect",
-    border: "var(--line)",
-    bg: "rgba(11,15,26,0.04)",
-    color: "var(--ink-soft)",
-  },
-  ACTIVE: {
-    label: "Active",
-    border: "var(--line)",
-    bg: "var(--paper)",
-    color: "var(--signal)",
-  },
-  AT_RISK: {
-    label: "At Risk",
-    border: "rgba(180,83,9,0.30)",
-    bg: "rgba(180,83,9,0.07)",
-    color: "var(--warn)",
-  },
-  CHURNED: {
-    label: "Churned",
-    border: "rgba(200,52,26,0.30)",
-    bg: "rgba(200,52,26,0.06)",
-    color: "var(--destructive)",
-  },
+  PROSPECT: { label: "Prospect", ...quietTone, color: "var(--ink-soft)" },
+  ACTIVE: { label: "Active", ...tone("var(--dusk-teal)") },
+  AT_RISK: { label: "At Risk", ...tone("var(--dusk-peach)") },
+  CHURNED: { label: "Churned", ...tone("var(--destructive)") },
 };
 
 export function StatusBadge({ status }: { status: ClientStatus }) {
@@ -52,42 +36,12 @@ const leadConfig: Record<
   LeadStatus,
   { label: string; border: string; bg: string; color: string }
 > = {
-  NEW: {
-    label: "New",
-    border: "rgba(30,107,78,0.30)",
-    bg: "rgba(30,107,78,0.07)",
-    color: "var(--blue)",
-  },
-  CONTACTED: {
-    label: "Contacted",
-    border: "rgba(109,40,217,0.30)",
-    bg: "rgba(109,40,217,0.06)",
-    color: "#6D28D9",
-  },
-  REPLIED: {
-    label: "Replied",
-    border: "rgba(67,56,202,0.30)",
-    bg: "rgba(67,56,202,0.06)",
-    color: "#4338CA",
-  },
-  BOOKED: {
-    label: "Booked",
-    border: "rgba(180,83,9,0.30)",
-    bg: "rgba(180,83,9,0.07)",
-    color: "var(--warn)",
-  },
-  CONVERTED: {
-    label: "Converted",
-    border: "rgba(31,122,77,0.30)",
-    bg: "rgba(31,122,77,0.07)",
-    color: "var(--success)",
-  },
-  DEAD: {
-    label: "Dead",
-    border: "var(--line)",
-    bg: "rgba(11,15,26,0.04)",
-    color: "var(--ink-mute)",
-  },
+  NEW: { label: "New", ...tone("var(--dusk-teal)") },
+  CONTACTED: { label: "Contacted", ...tone("var(--dusk-purple)") },
+  REPLIED: { label: "Replied", ...tone("var(--dusk-purple)") },
+  BOOKED: { label: "Booked", ...tone("var(--dusk-peach)") },
+  CONVERTED: { label: "Converted", ...tone("var(--dusk-teal)") },
+  DEAD: { label: "Dead", ...quietTone, color: "var(--ink-mute)" },
 };
 
 export function LeadStatusBadge({ status }: { status: string }) {
