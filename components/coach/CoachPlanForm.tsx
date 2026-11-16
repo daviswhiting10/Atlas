@@ -37,7 +37,7 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
       onClick={onClick}
       className={cn(
         "press flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium",
-        on ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:border-ink/25 hover:text-ink"
+        on ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
       )}
     >
       {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
@@ -58,7 +58,7 @@ function Segment<T extends string | number>({ value, options, onChange, label }:
           onClick={() => onChange(o.value)}
           className={cn(
             "press min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-semibold",
-            o.value === value ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:border-ink/25 hover:text-ink"
+            o.value === value ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
           )}
         >
           {o.label}
@@ -139,7 +139,7 @@ export function CoachPlanForm({
             <select
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
-              className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40"
+              className="mt-1.5 h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40"
             >
               <option value="">Choose a client</option>
               {clients.map((c) => (
@@ -152,7 +152,7 @@ export function CoachPlanForm({
           )}
           <label className="block sm:max-w-[200px]">
             <span className="eyebrow">Starts</span>
-            <DayInput ref={startRef} value={startDate} onDay={setStartDate} className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
+            <DayInput ref={startRef} value={startDate} onDay={setStartDate} className="mt-1.5 h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
           </label>
         </div>
 
@@ -162,7 +162,7 @@ export function CoachPlanForm({
             onChange={(e) => setGoalText(e.target.value.slice(0, GOAL_TEXT_MAX))}
             rows={2}
             placeholder="e.g. Lose 20 lb, bad left knee"
-            className="w-full resize-none rounded-lg border border-line bg-white p-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute/60 focus:border-ink/40"
+            className="w-full resize-none rounded-lg border border-line-strong bg-dusk-raised p-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute/60 focus:border-ink/40"
           />
           <p className="mt-1.5 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
             {resolved.understood.length > 0 && (
@@ -244,7 +244,7 @@ export function CoachPlanForm({
             type="button"
             onClick={generate}
             disabled={pending || !clientId}
-            className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40"
+            className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40"
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {client ? `Generate a draft for ${client.fullName.split(" ")[0]}` : "Generate a draft"}

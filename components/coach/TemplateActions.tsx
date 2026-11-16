@@ -63,7 +63,7 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
       <div className="surface p-5">
         <p className="eyebrow">Use for a client</p>
         <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">Exactly as written, as a draft you can edit before assigning.</p>
-        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40">
+        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40">
           <option value="">Choose a client</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
@@ -71,13 +71,13 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
             </option>
           ))}
         </select>
-        <DayInput ref={dateRef} value={date} onDay={setDate} aria-label="Start date" className="mt-2 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
-        <button type="button" onClick={useAsWritten} disabled={pending || !clientId} className="press mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40">
+        <DayInput ref={dateRef} value={date} onDay={setDate} aria-label="Start date" className="mt-2 h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40" />
+        <button type="button" onClick={useAsWritten} disabled={pending || !clientId} className="press mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40">
           {pending && <Loader2 className="h-4 w-4 animate-spin" />} Create draft
         </button>
       </div>
 
-      <button type="button" onClick={useForMe} disabled={pending} className="press flex w-full items-start gap-3 rounded-[14px] border border-line bg-white p-4 text-left hover:border-ink/25 disabled:opacity-60">
+      <button type="button" onClick={useForMe} disabled={pending} className="press flex w-full items-start gap-3 rounded-[14px] border border-line bg-paper p-4 text-left hover:border-ink/25 disabled:opacity-60">
         <Activity className="mt-0.5 h-4 w-4 shrink-0 text-signal" />
         <span>
           <span className="block text-[15px] font-semibold text-ink">Use for my training</span>
@@ -85,7 +85,7 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
         </span>
       </button>
 
-      <Link href={`/programs/new?from=${programId}`} className="press flex items-start gap-3 rounded-[14px] border border-line bg-white p-4 hover:border-ink/25">
+      <Link href={`/programs/new?from=${programId}`} className="press flex items-start gap-3 rounded-[14px] border border-line bg-paper p-4 hover:border-ink/25">
         <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-signal" />
         <span>
           <span className="block text-[15px] font-semibold text-ink">Generate from these goals</span>
@@ -100,7 +100,7 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
         {confirmDelete ? (
           <span className="flex items-center gap-1.5 text-sm">
             <span className="text-ink-soft">{assigned > 0 ? `Clients' plans made from it stay.` : "Delete it?"}</span>
-            <button type="button" onClick={remove} disabled={pending} className="press rounded-lg bg-ink px-3 py-1.5 font-semibold text-white">
+            <button type="button" onClick={remove} disabled={pending} className="press rounded-lg bg-dusk-button px-3 py-1.5 font-semibold text-dusk-button-text">
               Delete
             </button>
             <button type="button" onClick={() => setConfirmDelete(false)} className="press rounded-lg px-2 py-1.5 font-medium text-ink-soft">

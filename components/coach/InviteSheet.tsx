@@ -56,13 +56,13 @@ export function InviteSheet({ name, invite, onClose }: { name: string; invite: I
           )}
         </p>
 
-        <div className="mt-4 rounded-xl border border-line bg-white p-3">
+        <div className="mt-4 rounded-xl border border-line bg-paper p-3">
           <p className="break-all font-mono text-[12px] leading-relaxed text-ink-soft">{invite.link}</p>
         </div>
         <button
           type="button"
           onClick={copy}
-          className="press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85"
+          className="press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85"
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied" : "Copy link"}

@@ -60,7 +60,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
     }
   }
 
-  const field = "h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60";
+  const field = "h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60";
 
   return (
     <div className="space-y-3">
@@ -120,7 +120,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           rows={2}
           maxLength={1000}
           placeholder="e.g. 4-week block, start fresh at week 1"
-          className="mt-1 w-full resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60"
+          className="mt-1 w-full resize-none rounded-lg border border-line-strong bg-dusk-raised px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60"
         />
       </label>
 
@@ -129,7 +129,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           Week 1 started <span className="font-normal text-ink-mute">(optional)</span>
           <DayInput ref={dateRef} value={date} onDay={setDate} disabled={busy} className={cn(field, "mt-1 sm:w-44")} />
         </label>
-        <button type="button" onClick={read} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-70">
+        <button type="button" onClick={read} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70">
           {busy ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" /> Reading the plan…

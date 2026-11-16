@@ -27,7 +27,7 @@ export function CategorySelect({ programId, value }: { programId: string; value:
             }
           });
         }}
-        className="h-9 rounded-lg border border-line bg-white px-2.5 text-sm font-medium text-ink outline-none focus:border-ink/40 disabled:opacity-60"
+        className="h-9 rounded-lg border border-line-strong bg-dusk-raised px-2.5 text-sm font-medium text-ink outline-none focus:border-ink/40 disabled:opacity-60"
       >
         {!current && <option value="">Choose…</option>}
         {CATEGORIES.map((c) => (

@@ -38,13 +38,13 @@ export default async function ProgramsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/programs/import" className="press flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/25">
+          <Link href="/programs/import" className="press flex h-11 items-center gap-2 rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/25">
             <ImageUp className="h-4 w-4" /> Import from photos
           </Link>
-          <Link href="/programs/idea" className="press flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/25">
+          <Link href="/programs/idea" className="press flex h-11 items-center gap-2 rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/25">
             <Lightbulb className="h-4 w-4" /> Program idea
           </Link>
-          <Link href="/programs/new" className="press flex h-11 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85">
+          <Link href="/programs/new" className="press flex h-11 items-center gap-2 rounded-xl bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85">
             <Plus className="h-4 w-4" /> Plan for a client
           </Link>
         </div>

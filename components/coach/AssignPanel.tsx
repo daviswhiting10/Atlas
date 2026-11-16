@@ -47,14 +47,14 @@ export function AssignPanel({ clientId, clientName, assignmentId, startDate, has
           ref={dateRef}
           value={date}
           onDay={setDate}
-          className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink outline-none focus:border-ink/40"
+          className="mt-1.5 h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40"
         />
       </label>
       <button
         type="button"
         onClick={assign}
         disabled={pending || !date}
-        className="press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-50"
+        className="press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-50"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Assign to {clientName.split(" ")[0]}
       </button>
@@ -65,7 +65,7 @@ export function AssignPanel({ clientId, clientName, assignmentId, startDate, has
             <button type="button" onClick={() => setConfirmDiscard(false)} className="press h-9 rounded-lg px-3 font-medium text-ink-soft">
               Keep
             </button>
-            <button type="button" onClick={discard} disabled={pending} className="press h-9 rounded-lg bg-ink px-3 font-semibold text-white">
+            <button type="button" onClick={discard} disabled={pending} className="press h-9 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text">
               Discard
             </button>
           </span>

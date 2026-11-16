@@ -38,7 +38,7 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
 
   return (
     <div className="space-y-4">
-      {!uploadsEnabled && <p className="rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink-soft">Uploads aren&rsquo;t set up yet: the storage token is missing.</p>}
+      {!uploadsEnabled && <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm text-ink-soft">Uploads aren&rsquo;t set up yet: the storage token is missing.</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
@@ -52,13 +52,13 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
                 setFilter(t.id);
                 setQuery("");
               }}
-              className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink")}
+              className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-dusk-button text-dusk-button-text shadow-sm" : "text-ink-soft hover:text-ink")}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-line bg-white px-3 focus-within:border-ink/40">
+        <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-line bg-paper px-3 focus-within:border-ink/40">
           <Search className="h-4 w-4 shrink-0 text-ink-mute" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find an exercise" aria-label="Find an exercise" className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-mute" />
         </label>
@@ -67,7 +67,7 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
       {shown.length === 0 ? (
         <p className="rule pt-4 text-[15px] text-ink-soft">{query ? `No exercise called “${query}”.` : filter === "missing" ? "Every exercise in your plans has a picture." : "Nothing here yet."}</p>
       ) : (
-        <ul className="divide-y divide-line rounded-2xl border border-line bg-white">
+        <ul className="divide-y divide-line rounded-2xl border border-line bg-paper">
           {shown.map((r) => (
             <li key={r.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-3">
