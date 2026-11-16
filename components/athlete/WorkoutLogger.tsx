@@ -47,11 +47,11 @@ function Stepper({
     onChange(unit === "lb" ? Math.min(next, MAX_WEIGHT_LB) : next);
   };
   return (
-    <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-white transition-colors", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line")}>
-      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press flex h-full w-10 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
+    <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised transition-colors", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
+      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press flex h-full w-11 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
         <Minus className="h-4 w-4" />
       </button>
-      <label className="flex min-w-0 flex-1 flex-col items-center">
+      <label className="flex min-w-0 flex-1 flex-col items-center justify-center self-stretch">
         <input
           type="number"
           inputMode="decimal"
@@ -67,7 +67,7 @@ function Stepper({
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
       </label>
-      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press flex h-full w-10 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
+      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press flex h-full w-11 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
         <Plus className="h-4 w-4" />
       </button>
     </div>
@@ -354,7 +354,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     const recordList = Object.entries(records);
     return (
       <div className="rise mx-auto max-w-xl pt-6 text-center md:pt-12">
-        <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-white">
+        <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
         <h1 className="mt-6 font-display text-5xl text-ink">{data.name}, done.</h1>
@@ -393,10 +393,10 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Link href="/progress" className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-ink text-base font-semibold text-white hover:bg-ink/85">
+          <Link href="/progress" className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-dusk-button text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85">
             <TrendingUp className="h-4 w-4" /> See your progress
           </Link>
-          <Link href="/today" className="press flex h-14 flex-1 items-center justify-center rounded-2xl border border-line bg-white text-base font-semibold text-ink hover:border-ink/20">
+          <Link href="/today" className="press flex h-14 flex-1 items-center justify-center rounded-2xl border border-line bg-paper text-base font-semibold text-ink hover:border-ink/20">
             Back to today
           </Link>
         </div>
@@ -409,7 +409,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 -mx-4 border-b border-line bg-bone/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-8 sm:px-8 md:top-16">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => router.push("/today")} aria-label="Back to today" className="press -ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+          <button type="button" onClick={() => router.push("/today")} aria-label="Back to today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
@@ -425,7 +425,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             type="button"
             onClick={finish}
             disabled={finishing || doneCount === 0}
-            className="press flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85 disabled:opacity-30"
+            className="press flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-30"
           >
             {finishing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finish"}
           </button>
@@ -452,20 +452,20 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 onClick={() => setIndex(i)}
                 className={cn(
                   "press flex shrink-0 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left lg:w-full",
-                  active ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/20"
+                  active ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink hover:border-ink/20"
                 )}
               >
                 <span
                   className={cn(
                     "tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                    done ? "bg-signal text-white" : active ? "bg-white/15 text-white" : "bg-ink/5 text-ink-mute"
+                    done ? "bg-signal text-bone" : active ? "bg-ink/15 text-bone" : "bg-ink/5 text-ink-mute"
                   )}
                 >
                   {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
                 </span>
                 <span className="min-w-0">
                   <span className="block max-w-[150px] truncate text-sm font-semibold lg:max-w-none">{e.name}</span>
-                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-white/60" : "text-ink-mute")}>
+                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-dusk-button-text/70" : "text-ink-mute")}>
                     {count}/{listOf(e).length} sets
                   </span>
                 </span>
@@ -485,7 +485,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         {/* ── Current exercise ───────────────────────────────────────── */}
         <div key={exercise.aweId} className="fade-in min-w-0 space-y-4">
           {index === 0 && data.note && (
-            <p className="rounded-xl border border-line bg-white px-4 py-3 text-sm leading-relaxed text-ink-soft">
+            <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink-soft">
               <span className="eyebrow mr-2">Note</span>
               {data.note}
             </p>
@@ -500,7 +500,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             <h1 className="mt-1 font-display text-4xl leading-tight text-ink sm:text-5xl">{exercise.name}</h1>
             <ExercisePicture picture={exercise.picture} name={exercise.name} className="mt-3 max-w-sm" />
             <div className="mt-2 flex flex-wrap gap-1 text-sm">
-              <button type="button" onClick={() => setPicker("swap")} disabled={busy} className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
+              <button type="button" onClick={() => setPicker("swap")} disabled={busy} className="press flex items-center gap-1.5 min-h-11 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
                 <Repeat2 className="h-4 w-4" /> Swap
               </button>
               <button
@@ -508,7 +508,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 onClick={() => setEditingTarget(!editingTarget)}
                 aria-expanded={editingTarget}
                 disabled={busy}
-                className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
+                className="press flex items-center gap-1.5 min-h-11 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
               >
                 <SlidersHorizontal className="h-4 w-4" /> Change target
               </button>
@@ -522,17 +522,17 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                       setConfirmRemove(false);
                       change(() => planRemoveExercise({ aweId: exercise.aweId, workoutId: data.id }), `${exercise.name} removed`);
                     }}
-                    className="press rounded-lg bg-ink px-2.5 py-1.5 font-semibold text-white"
+                    className="press min-h-11 rounded-lg bg-dusk-button px-2.5 py-1.5 font-semibold text-dusk-button-text"
                   >
                     Remove
                   </button>
-                  <button type="button" onClick={() => setConfirmRemove(false)} className="press rounded-lg px-2 py-1.5 font-medium text-ink-soft">
+                  <button type="button" onClick={() => setConfirmRemove(false)} className="press min-h-11 rounded-lg px-2 py-1.5 font-medium text-ink-soft">
                     Keep
                   </button>
                 </span>
               ) : (
                 data.exercises.length > 1 && (
-                  <button type="button" onClick={() => setConfirmRemove(true)} disabled={busy} className="press flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-ink-mute hover:bg-ink/5 hover:text-ink">
+                  <button type="button" onClick={() => setConfirmRemove(true)} disabled={busy} className="press flex items-center gap-1.5 min-h-11 rounded-lg px-2.5 py-1.5 font-medium text-ink-mute hover:bg-ink/5 hover:text-ink">
                     <Trash2 className="h-4 w-4" /> Remove
                   </button>
                 )
@@ -563,7 +563,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           {/* Target */}
           <div className="surface p-4 sm:p-5">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal text-white">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal text-bone">
                 <TrendingUp className="h-4 w-4" />
               </span>
               <div className="min-w-0">
@@ -615,7 +615,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                         aria-label={s.done ? `Set ${s.setNumber} done — tap to undo` : `Mark set ${s.setNumber} done`}
                         className={cn(
                           "press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border",
-                          s.done ? "border-signal bg-signal text-white" : "border-line bg-white text-ink-mute hover:border-signal hover:text-signal"
+                          s.done ? "border-signal bg-signal text-bone" : "border-line bg-paper text-ink-mute hover:border-signal hover:text-signal"
                         )}
                       >
                         <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
@@ -638,7 +638,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           {/* Next / finish */}
           <div className="flex gap-2">
             {index > 0 && (
-              <button type="button" onClick={() => setIndex(index - 1)} aria-label="Previous exercise" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-line bg-white text-ink-soft hover:border-ink/20">
+              <button type="button" onClick={() => setIndex(index - 1)} aria-label="Previous exercise" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-line bg-paper text-ink-soft hover:border-ink/20">
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
@@ -647,7 +647,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 type="button"
                 onClick={finish}
                 disabled={finishing || doneCount === 0}
-                className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-ink text-base font-semibold text-white hover:bg-ink/85 disabled:opacity-40"
+                className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-dusk-button text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40"
               >
                 {finishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <>{data.status === "LOGGED" ? "Save changes" : "Finish workout"} <Check className="h-5 w-5" strokeWidth={3} /></>}
               </button>
@@ -657,7 +657,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 onClick={() => setIndex(index + 1)}
                 className={cn(
                   "press flex h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl px-4 text-base font-semibold",
-                  exerciseDone(exercise) ? "bg-ink text-white hover:bg-ink/85" : "border border-line bg-white text-ink hover:border-ink/20"
+                  exerciseDone(exercise) ? "bg-dusk-button text-dusk-button-text hover:bg-dusk-button/85" : "border border-line bg-paper text-ink hover:border-ink/20"
                 )}
               >
                 <span className="truncate">Next: {nextExercise?.name}</span> <ArrowRight className="h-5 w-5 shrink-0" />
@@ -698,16 +698,16 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {/* ── Rest timer ───────────────────────────────────────────────── */}
       {rest && (
         <div className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
-          <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full bg-night py-2 pl-5 pr-2 text-white shadow-[0_20px_40px_-16px_rgba(11,15,26,0.7)]">
+          <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full bg-night py-2 pl-5 pr-2 text-ink shadow-[0_20px_40px_-16px_rgba(0,0,0,0.7)]">
             <div className="absolute inset-y-0 left-0 bg-signal/35 transition-[width] duration-500 ease-linear" style={{ width: `${Math.max(0, Math.min(100, (restLeft / rest.total) * 100))}%` }} />
-            <Timer className="relative h-4 w-4 text-white/70" />
-            <p className="relative flex-1 text-sm text-white/70">
-              Rest <span className="tnum ml-1 text-xl font-semibold text-white">{clock(restLeft)}</span>
+            <Timer className="relative h-4 w-4 text-ink-soft" />
+            <p className="relative flex-1 text-sm text-ink-soft">
+              Rest <span className="tnum ml-1 text-xl font-semibold text-ink">{clock(restLeft)}</span>
             </p>
-            <button type="button" onClick={() => setRest({ endsAt: rest.endsAt + 15000, total: rest.total + 15 })} className="press tnum relative h-10 rounded-full bg-white/10 px-3.5 text-sm font-semibold hover:bg-white/20">
+            <button type="button" onClick={() => setRest({ endsAt: rest.endsAt + 15000, total: rest.total + 15 })} className="press tnum relative h-11 rounded-full bg-ink/10 px-3.5 text-sm font-semibold hover:bg-ink/20">
               +15s
             </button>
-            <button type="button" onClick={() => setRest(null)} className="press relative h-10 rounded-full bg-white px-4 text-sm font-semibold text-ink">
+            <button type="button" onClick={() => setRest(null)} className="press relative h-11 rounded-full bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text">
               Skip
             </button>
           </div>
@@ -746,7 +746,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 <p className="eyebrow">Week {data.week}</p>
                 <h2 className="font-display text-3xl text-ink">Switch workout</h2>
               </div>
-              <button type="button" onClick={() => setSwitching(false)} aria-label="Close" className="press flex h-10 w-10 items-center justify-center rounded-full bg-ink/5 text-ink-soft">
+              <button type="button" onClick={() => setSwitching(false)} aria-label="Close" className="press flex h-11 w-11 items-center justify-center rounded-full bg-ink/5 text-ink-soft">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -759,9 +759,9 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                       href={`/workouts/${w.id}`}
                       onClick={() => setSwitching(false)}
                       aria-current={here ? "page" : undefined}
-                      className={cn("press flex items-center gap-3 rounded-2xl border bg-white p-3.5", here ? "border-ink" : "border-line hover:border-ink/20")}
+                      className={cn("press flex items-center gap-3 rounded-2xl border bg-paper p-3.5", here ? "border-ink" : "border-line hover:border-ink/20")}
                     >
-                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", w.status === "LOGGED" ? "bg-signal text-white" : "bg-ink/5 text-ink-mute")}>
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", w.status === "LOGGED" ? "bg-signal text-bone" : "bg-ink/5 text-ink-mute")}>
                         {w.status === "LOGGED" ? <Check className="h-4 w-4" strokeWidth={3} /> : <ArrowRight className="h-4 w-4" />}
                       </span>
                       <span className="min-w-0 flex-1">

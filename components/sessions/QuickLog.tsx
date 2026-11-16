@@ -278,18 +278,18 @@ export function QuickLog({
     router.refresh();
   }
 
-  const field = "h-11 w-full rounded-lg border border-line bg-white px-3 text-[16px] text-ink outline-none focus:border-ink/40";
+  const field = "h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[16px] text-ink outline-none focus:border-ink/40";
 
   return (
     <div className="mx-auto max-w-xl pb-6">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-ink-mute hover:text-ink">
+        <Link href={backHref} className="inline-flex min-h-11 items-center gap-1 text-sm text-ink-mute hover:text-ink">
           <ArrowLeft className="h-4 w-4" /> {backLabel}
         </Link>
         <button
           type="button"
           onClick={() => (dateRef.current?.showPicker ? dateRef.current.showPicker() : dateRef.current?.focus())}
-          className="press relative inline-flex h-9 items-center gap-1 rounded-full bg-ink/5 px-3.5 text-sm font-semibold text-ink"
+          className="press relative inline-flex h-11 items-center gap-1 rounded-full bg-ink/5 px-3.5 text-sm font-semibold text-ink"
         >
           {dateLabel(date)} <ChevronDown className="h-3.5 w-3.5" />
           <DayInput
@@ -317,12 +317,12 @@ export function QuickLog({
       {/* ── Exercises ─────────────────────────────────────────────────────── */}
       <div className="mt-5 space-y-3">
         {items.map((i) => (
-          <section key={i.key} className="rounded-2xl border border-line bg-white p-4">
+          <section key={i.key} className="rounded-2xl border border-line bg-paper p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-[17px] font-semibold leading-snug text-ink">
                   {i.name}
-                  {i.isNew && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[11px] font-semibold text-amber-800">new</span>}
+                  {i.isNew && <span className="ml-2 rounded-full bg-dusk-peach/15 px-2 py-0.5 align-middle text-[11px] font-semibold text-dusk-peach">new</span>}
                 </h2>
                 {i.last !== "" && (
                   <p className="mt-0.5 text-[13px] text-ink-mute">
@@ -408,13 +408,13 @@ export function QuickLog({
       </div>
 
       {typed.length >= 2 ? (
-        <ul className="mt-1 overflow-hidden rounded-xl border border-line bg-white">
+        <ul className="mt-1 overflow-hidden rounded-xl border border-line bg-paper">
           {shownResults.map((r) => (
             <li key={r.id}>
               <button type="button" onClick={() => add(r)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[15px] text-ink hover:bg-ink/[0.03]">
                 <span className="min-w-0 truncate">
                   {r.name}
-                  {r.isNew && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">new</span>}
+                  {r.isNew && <span className="ml-2 rounded-full bg-dusk-peach/15 px-2 py-0.5 text-[11px] font-semibold text-dusk-peach">new</span>}
                 </span>
                 {r.times > 0 && <span className="shrink-0 text-[12px] text-ink-mute">done {r.times}×</span>}
               </button>
@@ -436,7 +436,7 @@ export function QuickLog({
               {recent
                 .filter((r) => !added.has(r.id))
                 .map((r) => (
-                  <button key={r.id} type="button" onClick={() => add(r)} className="press rounded-full border border-line bg-white px-3.5 py-2 text-[14px] font-medium text-ink hover:border-ink/25">
+                  <button key={r.id} type="button" onClick={() => add(r)} className="press min-h-11 rounded-full border border-line-strong bg-paper px-3.5 py-2 text-[14px] font-medium text-ink hover:border-ink/25">
                     {r.name}
                   </button>
                 ))}
@@ -446,7 +446,7 @@ export function QuickLog({
       )}
 
       {/* ── Optional details ──────────────────────────────────────────────── */}
-      <button type="button" onClick={() => setMore((m) => !m)} className="press mt-6 inline-flex items-center gap-1 text-[14px] font-medium text-ink-soft hover:text-ink">
+      <button type="button" onClick={() => setMore((m) => !m)} className="press mt-6 inline-flex min-h-11 items-center gap-1 text-[14px] font-medium text-ink-soft hover:text-ink">
         <ChevronDown className={cn("h-4 w-4 transition-transform", more ? "" : "-rotate-90")} /> {items.length === 0 ? "Just a name and a time (walk, run, class)" : "Name, notes, duration"}
       </button>
       {more && (
@@ -471,7 +471,7 @@ export function QuickLog({
           type="button"
           onClick={save}
           disabled={!canSave || saving}
-          className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-ink text-lg font-semibold text-white hover:bg-ink/85 disabled:bg-ink/25"
+          className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:bg-ink/15 disabled:text-ink-mute"
         >
           {saving && <Loader2 className="h-5 w-5 animate-spin" />}
           {initial ? "Save changes" : "Save workout"}
