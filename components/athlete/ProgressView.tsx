@@ -36,7 +36,7 @@ function ExerciseSearch({ exercises, value, onChange }: { exercises: ExercisePro
 
   return (
     <div className="relative">
-      <div className="flex h-12 items-center gap-2 rounded-xl border border-line bg-white px-3.5 focus-within:border-ink/40">
+      <div className="flex h-12 items-center gap-2 rounded-xl border border-line bg-paper px-3.5 focus-within:border-ink/40">
         <Search className="h-4 w-4 shrink-0 text-ink-mute" />
         <input
           ref={inputRef}
@@ -59,16 +59,16 @@ function ExerciseSearch({ exercises, value, onChange }: { exercises: ExercisePro
             if (e.key === "Escape") inputRef.current?.blur();
           }}
           placeholder={`Look at one exercise (${exercises.length})`}
-          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-mute"
+          className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-mute"
         />
         {selected && !open && (
-          <button type="button" onClick={() => onChange(null)} aria-label="Clear" className="press flex h-7 w-7 items-center justify-center rounded-full text-ink-mute hover:bg-ink/5 hover:text-ink">
+          <button type="button" onClick={() => onChange(null)} aria-label="Clear" className="press -mr-2.5 flex h-11 w-11 items-center justify-center rounded-full text-ink-mute hover:bg-ink/5 hover:text-ink">
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
       {open && (
-        <ul id="exercise-options" role="listbox" className="absolute inset-x-0 top-[52px] z-20 max-h-80 overflow-y-auto rounded-xl border border-line bg-white p-1 shadow-lg">
+        <ul id="exercise-options" role="listbox" className="absolute inset-x-0 top-[52px] z-20 max-h-80 overflow-y-auto rounded-xl border border-line bg-paper p-1 shadow-lg">
           {matches.length === 0 ? (
             <li className="px-3 py-2.5 text-sm text-ink-mute">No exercise matches &ldquo;{query}&rdquo;</li>
           ) : (
@@ -141,7 +141,7 @@ export function ProgressView({
     return (
       <div className="rise rise-1">
         <ProgressChart series={[]} metric={goalMetric} loaded height={260} legend={false} />
-        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
+        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-bone hover:bg-ink/85">
           {emptyAction.label} <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -204,7 +204,7 @@ export function ProgressView({
                   {metric === goalMetric ? " · the number your goal is measured by" : ""}
                 </p>
               </div>
-              <div className="flex self-start rounded-lg border border-line bg-white p-0.5 sm:self-auto" role="radiogroup" aria-label="Metric">
+              <div className="flex self-start rounded-lg border border-line bg-paper p-0.5 sm:self-auto" role="radiogroup" aria-label="Metric">
                 {ORDER.map((m) => {
                   const disabled = !exercise.loaded && (m === "weight" || m === "e1rm");
                   const active = m === metric;
@@ -218,7 +218,7 @@ export function ProgressView({
                       onClick={() => setChosen(m)}
                       className={cn(
                         "press whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-medium",
-                        active ? "bg-ink text-white" : "text-ink-mute hover:text-ink",
+                        active ? "bg-ink text-bone" : "text-ink-mute hover:text-ink",
                         disabled && "opacity-30"
                       )}
                     >
@@ -278,7 +278,7 @@ export function ProgressView({
 
             {exercise.target && (
               <div className="surface mt-6 flex items-start gap-3 p-4">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-white">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-bone">
                   <TrendingUp className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">

@@ -19,8 +19,8 @@ type Row = {
 };
 
 const INK_MUTE = "var(--ink-mute)";
-const GRID = "rgba(11,15,26,0.07)";
-const DELOAD = "rgba(11,15,26,0.22)";
+const GRID = "color-mix(in srgb, var(--ink) 7%, transparent)";
+const DELOAD = "color-mix(in srgb, var(--ink) 22%, transparent)";
 
 function ChartTooltip({
   active,
@@ -38,7 +38,7 @@ function ChartTooltip({
   const v = row.ghost ? row.proj : row.value;
   if (v == null) return null;
   return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2 shadow-md">
+    <div className="rounded-lg border border-line bg-paper px-3 py-2 shadow-md">
       <p className="text-[11px] text-ink-mute">{row.ghost ? "Next target" : row.date ? format(parseISO(row.date), "EEE, MMM d") : ""}</p>
       <p className="text-sm font-semibold text-ink">
         {formatValue(v, metric)} <span className="font-normal text-ink-mute">{unit}</span>
@@ -59,7 +59,7 @@ function Dot(props: { cx?: number; cy?: number; payload?: Row }) {
   if (payload.deload) {
     return (
       <g>
-        <circle cx={cx} cy={cy} r={3} fill="#B9BAB9" />
+        <circle cx={cx} cy={cy} r={3} fill="var(--ink-mute)" />
         <text x={cx} y={cy + 15} textAnchor="middle" fontSize={10} fill={INK_MUTE}>
           Deload
         </text>
@@ -209,7 +209,7 @@ export const ProgressChart = memo(function ProgressChart({
             />
             <Tooltip
               content={<ChartTooltip metric={metric} unit={unit} />}
-              cursor={bars ? { fill: "rgba(11,15,26,0.04)" } : { stroke: "rgba(11,15,26,0.2)", strokeDasharray: "3 3" }}
+              cursor={bars ? { fill: "color-mix(in srgb, var(--ink) 4%, transparent)" } : { stroke: "color-mix(in srgb, var(--ink) 20%, transparent)", strokeDasharray: "3 3" }}
             />
             {bars ? (
               <Bar dataKey="value" radius={[2, 2, 0, 0]} maxBarSize={30} animationDuration={700}>
