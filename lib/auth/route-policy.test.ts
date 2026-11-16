@@ -34,6 +34,21 @@ describe("decide: signed in", () => {
     expect(decide("/api/mcp", athlete)).toEqual(next);
     expect(decide("/api/clients", athlete)).toEqual({ kind: "json", status: 403, error: "Forbidden" });
   });
+  it("lets both roles open goals: Start a goal and a goal's chapter", () => {
+    for (const u of [coach, athlete]) for (const p of ["/goals/new", "/goals/clx9abc123", "/goals"]) expect(decide(p, u)).toEqual(next);
+  });
+  it("opens goals and nothing else to athletes: look-alikes, the coach side and every API stay closed", () => {
+    for (const p of ["/goalsx", "/goals-admin", "/goal", "/clients", "/clients/abc/goals", "/programs", "/log", "/inbox", "/exercises", "/intake", "/settings", "/sessions", "/leads", "/outreach"]) {
+      expect(decide(p, athlete)).toEqual(go("/today"));
+    }
+    expect(decide("/api/goals", athlete)).toEqual({ kind: "json", status: 403, error: "Forbidden" });
+    expect(decide("/api/clients", athlete)).toEqual({ kind: "json", status: 403, error: "Forbidden" });
+    expect(decide("/api/mcp", athlete)).toEqual(next);
+  });
+  it("is unchanged for a signed-out visitor: goals still need sign-in", () => {
+    expect(decide("/goals/new", null)).toEqual(go("/login"));
+    expect(decide("/goals/clx9abc123", null)).toEqual(go("/login"));
+  });
   it("sends anyone who doesn't need the step away from /set-password", () => {
     expect(decide("/set-password", coach)).toEqual(go("/log"));
     expect(decide("/set-password", athlete)).toEqual(go("/today"));
@@ -46,7 +61,7 @@ describe("decide: the set-password step", () => {
 
   it("sends every page to /set-password, for either role", () => {
     for (const u of [coachStep, athleteStep]) {
-      for (const p of ["/", "/login", "/today", "/log", "/clients/abc", "/you/settings"]) expect(decide(p, u)).toEqual(go("/set-password"));
+      for (const p of ["/", "/login", "/today", "/log", "/clients/abc", "/you/settings", "/goals/new"]) expect(decide(p, u)).toEqual(go("/set-password"));
     }
   });
   it("lets the step itself through, for athletes too", () => {
