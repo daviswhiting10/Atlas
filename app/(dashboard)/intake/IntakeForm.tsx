@@ -16,7 +16,7 @@ const PLACEHOLDER = `A few sentences in your own words. Worth covering:
 · How many days a week, and what equipment they have
 · Sleep, stress, work: anything that affects recovery`;
 
-const field = "w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-ink outline-none focus:border-ink/40";
+const field = "w-full rounded-xl border border-line-strong bg-dusk-raised px-3.5 text-[15px] text-ink outline-none focus:border-ink/40";
 
 export function IntakeForm({
   clients,
@@ -96,7 +96,7 @@ export function IntakeForm({
               onClick={() => setTag(c.tag)}
               className={cn(
                 "press rounded-full border px-4 py-2 text-sm font-medium",
-                tag === c.tag ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:border-ink/25 hover:text-ink"
+                tag === c.tag ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
               )}
             >
               {c.label}
@@ -116,7 +116,7 @@ export function IntakeForm({
           rows={8}
           maxLength={8000}
           placeholder={PLACEHOLDER}
-          className={cn(field, "mt-2 resize-y py-3 leading-relaxed placeholder:text-ink-mute/80")}
+          className={cn(field, "mt-2 resize-y py-3 leading-relaxed placeholder:text-ink-mute")}
         />
       </section>
 
@@ -149,7 +149,7 @@ export function IntakeForm({
         )}
       </section>
 
-      <button type="submit" disabled={!ready || saving} className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40">
+      <button type="submit" disabled={!ready || saving} className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save intake"}
       </button>
     </form>
