@@ -39,11 +39,11 @@ export function CoachNav({ name }: { name: string }) {
     <>
       <header className="sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 sm:px-8 md:h-16">
-          <Link href="/log" aria-label="Atlas home" className="shrink-0">
+          <Link href="/log" aria-label="Atlas home" className="flex min-h-11 shrink-0 items-center">
             <Logo />
           </Link>
 
-          <nav className="no-scrollbar hidden min-w-0 items-center gap-1 overflow-x-auto rounded-full border border-line bg-white/80 p-1 md:flex" aria-label="Main">
+          <nav className="no-scrollbar hidden min-w-0 items-center gap-1 overflow-x-auto rounded-full border border-line bg-paper/80 p-1 md:flex" aria-label="Main">
             {ITEMS.map(({ href, label }) => (
               <Link
                 key={href}
@@ -51,7 +51,7 @@ export function CoachNav({ name }: { name: string }) {
                 aria-current={isActive(href) ? "page" : undefined}
                 className={cn(
                   "press whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium",
-                  isActive(href) ? "bg-ink text-white" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
+                  isActive(href) ? "bg-dusk-button text-dusk-button-text" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
                 )}
               >
                 {label}
@@ -62,7 +62,7 @@ export function CoachNav({ name }: { name: string }) {
           <div className="flex shrink-0 items-center gap-1">
             <Link
               href={MY_TRAINING.href}
-              className="press mr-1 hidden h-9 items-center gap-1.5 rounded-full bg-signal px-3.5 text-sm font-semibold text-white hover:bg-signal/90 md:flex"
+              className="press mr-1 hidden h-9 items-center gap-1.5 rounded-full bg-signal px-3.5 text-sm font-semibold text-bone hover:bg-signal/90 md:flex"
             >
               <Activity className="h-4 w-4" /> My training
             </Link>
@@ -76,14 +76,14 @@ export function CoachNav({ name }: { name: string }) {
             <button type="button" onClick={signOut} aria-label="Sign out" className="press hidden h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5 hover:text-ink md:flex">
               <LogOut className="h-[18px] w-[18px]" />
             </button>
-            <span className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" title={name}>
+            <span className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-ink/10 text-sm font-semibold text-ink" title={name}>
               {name.charAt(0).toUpperCase()}
             </span>
           </div>
         </div>
       </header>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/90 backdrop-blur-xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="mx-auto flex max-w-md">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = isActive(href);
