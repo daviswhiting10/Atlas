@@ -12,7 +12,7 @@ import { addDays } from "@/lib/goals/days";
 import { needsConfirmation, previewStart } from "@/lib/goals/preview";
 import { AccentTitle } from "./GoalStrip";
 
-type Template = { key: string; name: string; blurb: string; /** Who made the challenge. */ credit: string; length: number; /** What the diet says unless the person writes their own. */ diet: string };
+type Template = { key: string; name: string; blurb: string; length: number; /** What the diet says unless the person writes their own. */ diet: string };
 
 /**
  * Start a goal. What matters is on screen first: which day number today would be (big, like the card's),
@@ -69,7 +69,6 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
       <h2 className="dusk-title">
         <AccentTitle name={template.name} />
       </h2>
-      <p className="dusk-eyebrow mt-2">{template.credit}</p>
       <p className="mt-2 text-[15px] leading-relaxed text-dusk-soft">{template.blurb}</p>
 
       {/* The day number: the one thing to check before starting. */}

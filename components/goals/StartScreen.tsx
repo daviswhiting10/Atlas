@@ -16,7 +16,7 @@ export function StartScreen({ today }: { today: string }) {
         <ArrowLeft className="h-4 w-4" /> Today
       </Link>
       <h1 className="sr-only">Start a goal</h1>
-      <StartGoalForm template={{ key: t.key, name: t.name, blurb: t.blurb, credit: t.credit, length: t.rules.length.days, diet: DEFAULT_DIET }} today={today} />
+      <StartGoalForm template={{ key: t.key, name: t.name, blurb: t.blurb, length: t.rules.length.days, diet: DEFAULT_DIET }} today={today} />
     </div>
   );
 }

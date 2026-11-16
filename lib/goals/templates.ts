@@ -10,7 +10,7 @@ import { GoalRules } from "./rules";
 
 export type GoalCategory = "challenge" | "consistency" | "block" | "season";
 
-export type Template = { key: string; name: string; category: GoalCategory; blurb: string; /** Who made the challenge, shown with it. */ credit: string; rules: GoalRules };
+export type Template = { key: string; name: string; category: GoalCategory; blurb: string; rules: GoalRules };
 
 /** The rule whose wording the person writes. */
 export const DIET_KEY = "diet";
@@ -23,7 +23,6 @@ export const SEVENTY_FIVE_HARD: Template = {
   name: "75 Hard",
   category: "challenge",
   blurb: "Every day. A missed day starts over at day 1.",
-  credit: "75 Hard by Andy Frisella",
   rules: GoalRules.parse({
     length: { days: 75 },
     onMiss: "reset",

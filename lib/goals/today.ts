@@ -5,7 +5,7 @@
 import { localDay } from "@/lib/athlete/sessions";
 import { addDays } from "./days";
 import { ruleActiveOn } from "./rules";
-import { DEFAULT_DIET, DIET_KEY, templateByKey } from "./templates";
+import { DEFAULT_DIET, DIET_KEY } from "./templates";
 import type { LoadedGoal } from "./data";
 import type { RuleState } from "./evaluate";
 
@@ -42,8 +42,6 @@ export type TodayView = {
   manage: {
     /** What the diet rule says, or null when the goal has no diet rule. */
     diet: string | null;
-    /** Who made the challenge, when it is a built-in one. */
-    credit: string | null;
     /** Days from before Atlas that count as done, when the goal was started back-dated. */
     carried: { days: number; from: string; to: string } | null;
   };
@@ -108,7 +106,6 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
         const d = goal.rules.rules.find((r) => r.key === DIET_KEY && r.kind === "check_in");
         return d ? detailOf({ key: d.key, kind: d.kind, detail: (d as { detail?: string }).detail }) : null;
       })(),
-      credit: templateByKey(goal.templateKey)?.credit ?? null,
       carried: carried.length ? { days: carried.length, from: carried[0].day, to: carried[carried.length - 1].day } : null,
     },
   };

@@ -38,9 +38,6 @@ describe("todayView: the diet, the one thing a person writes", () => {
     expect(todayView(loaded(rules, "2026-11-15"), NOW).manage.diet).toBeNull();
   });
 
-  it("credits the challenge", () => {
-    expect(todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW).manage.credit).toBe("75 Hard by Andy Frisella");
-  });
 });
 
 describe("todayView: days from before Atlas", () => {

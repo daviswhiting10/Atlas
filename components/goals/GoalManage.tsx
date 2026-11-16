@@ -30,7 +30,6 @@ export function GoalManage({ goalId, manage, actions, lead }: { goalId: string; 
             </p>
           )}
           <GoalSettings goalId={goalId} diet={manage.diet} actions={actions} />
-          {manage.credit && <p className="mt-4 text-[12px] text-dusk-mute">{manage.credit}</p>}
         </div>
       )}
     </div>
