@@ -29,7 +29,7 @@ export function NewPlanChooser({
   const first = client?.fullName.split(" ")[0];
 
   const choices = [
-    { value: "upload" as const, icon: FileSpreadsheet, title: "Upload my plan", body: "From your Google Sheet or a CSV, with the weeks already done." },
+    { value: "upload" as const, icon: FileSpreadsheet, title: "Import from a spreadsheet", body: "An .xlsx, a CSV or a Google Sheet, with the weeks already done." },
     { value: "build" as const, icon: Sparkles, title: "Build one with Atlas", body: "From their goal: a 4-week plan you can edit." },
   ];
 

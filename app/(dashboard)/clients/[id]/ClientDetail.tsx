@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useContentFade } from "@/hooks/use-content-fade";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -31,6 +31,7 @@ import {
   CalendarDays,
   MoreHorizontal,
   Plus,
+  FileSpreadsheet,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -143,11 +144,24 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
   const [loading, setLoading] = useState(true);
   const [invite, setInvite] = useState<InviteResult | null>(null);
   // ?tab=plan opens the Plan view (the log page links there when there's no plan);
-  // ?tab=sessions opens Sessions (after logging a workout).
+  // ?tab=sessions opens Sessions (after logging a workout); ?tab=import opens Plan with the importer open.
   const [view, setView] = useState<View>(() => {
     const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+    if (tab === "import") return "plan";
     return tab === "plan" || tab === "sessions" ? tab : "progress";
   });
+  // The spreadsheet importer on the Plan tab: always open when there's no plan, otherwise on request.
+  // ?tab=import opens it.
+  const [importOpen, setImportOpen] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "import"
+  );
+  const importRef = useRef<HTMLDivElement>(null);
+  function openImport() {
+    setView("plan");
+    setImportOpen(true);
+    // After the Plan tab renders.
+    requestAnimationFrame(() => importRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -363,7 +377,7 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
       {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
 
       {/* ── Log first; everything else one tap away ─────────────────────── */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Link
           href={`/clients/${client.id}/log`}
           className="press flex h-14 items-center justify-center gap-2.5 rounded-2xl bg-dusk-button px-8 text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:min-w-[260px]"
@@ -373,12 +387,22 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
         </Link>
         <Link
           href={`/clients/${client.id}/log-workout`}
-          className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
+          className="press flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
         >
           <Plus className="h-4 w-4" />
           Log a workout
         </Link>
-        <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
+        <button
+          type="button"
+          onClick={openImport}
+          className="press flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Import plan from spreadsheet
+        </button>
+      </div>
+      <div className="mb-6">
+        <div role="tablist" className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
           {views.map((v) => (
             <button
               key={v.id}
@@ -470,26 +494,36 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
 
       {view === "plan" && (
         <div className="fade-in">
-          {client.programAssignments.length === 0 ? (
-            <Card className="mb-4">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Upload plan</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <SheetPlanUpload clientId={client.id} firstName={firstName} />
-              </CardContent>
-            </Card>
-          ) : (
-            <details className="group mb-4 rounded-xl border bg-card">
-              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium">
-                Upload a new plan
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="border-t px-4 pb-4 pt-3">
-                <SheetPlanUpload clientId={client.id} firstName={firstName} />
-              </div>
-            </details>
-          )}
+          <div ref={importRef} className="scroll-mt-4">
+            {client.programAssignments.length === 0 ? (
+              <Card className="mb-4">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Import plan from spreadsheet</CardTitle>
+                  <p className="text-sm text-muted-foreground">{firstName} has no plan yet. Bring in the one you already use, or build one with Atlas below.</p>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <SheetPlanUpload clientId={client.id} firstName={firstName} />
+                </CardContent>
+              </Card>
+            ) : (
+              <details
+                open={importOpen}
+                onToggle={(e) => setImportOpen((e.currentTarget as HTMLDetailsElement).open)}
+                className="group mb-4 rounded-xl border bg-card"
+              >
+                <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold">
+                  <span className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                    Import plan from spreadsheet
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t px-4 pb-4 pt-3">
+                  <SheetPlanUpload clientId={client.id} firstName={firstName} />
+                </div>
+              </details>
+            )}
+          </div>
 
           <div className="mb-3 flex justify-end">
             <Link href={`/programs/new?client=${client.id}`} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>

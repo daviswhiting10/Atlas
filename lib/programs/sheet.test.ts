@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 vi.hoisted(() => { process.env.DATABASE_URL ??= "postgresql://test:test@localhost:5432/test"; });
 import { describe, expect, it } from "vitest";
-import { parseSheetLink, tidyCsv } from "./sheet";
+import { NOT_SHARED, fetchSheetCsv, parseSheetLink, tidyCsv } from "./sheet";
 
 const ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-xyz";
 
@@ -49,5 +49,58 @@ describe("gym shorthand", async () => {
     expect(expandShorthand("BB RDL")).toBe("Barbell Romanian Deadlift");
     // Whole words only: "Dbl" or "Bobby" are left alone.
     expect(expandShorthand("Dbl unders")).toBe("Dbl unders");
+  });
+});
+
+describe("fetchSheetCsv", () => {
+  const link = parseSheetLink(`https://docs.google.com/spreadsheets/d/${ID}/edit#gid=0`)!;
+  /** A fake fetch that answers each address from a table and records what was asked for. */
+  function fake(routes: Record<string, () => Response>) {
+    const asked: string[] = [];
+    const fn = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      asked.push(url);
+      expect(init?.redirect).toBe("manual");
+      const route = routes[url];
+      if (!route) throw new Error(`unexpected fetch ${url}`);
+      return route();
+    }) as typeof fetch;
+    return { fn, asked };
+  }
+  const redirect = (to: string) => () => new Response(null, { status: 307, headers: { location: to } });
+
+  it("follows Google's redirect to googleusercontent and reads the CSV", async () => {
+    const f = fake({
+      [link.exportUrl]: redirect("https://doc-0s-sheets.googleusercontent.com/export/abc"),
+      "https://doc-0s-sheets.googleusercontent.com/export/abc": () => new Response("Day 1,Squat", { headers: { "content-type": "text/csv" } }),
+    });
+    await expect(fetchSheetCsv(link, f.fn)).resolves.toBe("Day 1,Squat");
+    expect(f.asked).toHaveLength(2);
+  });
+
+  it("treats a sign-in page or any other host as not shared, without fetching it", async () => {
+    for (const to of ["https://accounts.google.com/ServiceLogin?continue=x", "https://evil.example/x", "http://doc.googleusercontent.com/x", "https://googleusercontent.com.evil.example/x"]) {
+      const f = fake({ [link.exportUrl]: redirect(to) });
+      await expect(fetchSheetCsv(link, f.fn), to).rejects.toThrow(NOT_SHARED);
+      expect(f.asked).toEqual([link.exportUrl]);
+    }
+  });
+
+  it("treats an HTML answer or an error as not shared", async () => {
+    const html = fake({ [link.exportUrl]: () => new Response("<html>", { headers: { "content-type": "text/html; charset=utf-8" } }) });
+    await expect(fetchSheetCsv(link, html.fn)).rejects.toThrow(NOT_SHARED);
+    const gone = fake({ [link.exportUrl]: () => new Response("", { status: 404 }) });
+    await expect(fetchSheetCsv(link, gone.fn)).rejects.toThrow(NOT_SHARED);
+  });
+
+  it("stops after a few redirects", async () => {
+    const loop = fake({ [link.exportUrl]: redirect(link.exportUrl) });
+    await expect(fetchSheetCsv(link, loop.fn)).rejects.toThrow(NOT_SHARED);
+    expect(loop.asked).toHaveLength(4);
+  });
+
+  it("refuses a sheet too big to be a plan", async () => {
+    const big = fake({ [link.exportUrl]: () => new Response("x".repeat(2_000_001), { headers: { "content-type": "text/csv" } }) });
+    await expect(fetchSheetCsv(link, big.fn)).rejects.toThrow(/too big/);
   });
 });

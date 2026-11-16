@@ -29,14 +29,14 @@ const perWorkspace = rateLimiter(20, 60 * 60_000);
 
 /**
  * A client's plan from the coach's own spreadsheet: read it (Google Sheets
- * link or CSV), save it to the coach's library, and open it for this client
+ * link, or CSV the browser made from an .xlsx or .csv), save it to the coach's library, and open it for this client
  * as a draft to check and assign.
  */
 export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, userId }, { params }) => {
   const { id } = await params;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success || (!parsed.data.sheetUrl && !parsed.data.csv)) {
-    return NextResponse.json({ error: "Paste a Google Sheets link or choose a CSV file." }, { status: 400 });
+    return NextResponse.json({ error: "Drop an .xlsx or .csv file, or paste a Google Sheets link." }, { status: 400 });
   }
 
   const client = await prisma.clientProfile.findFirst({ where: { id, workspaceId, deletedAt: null, ...ROSTER }, select: { id: true, fullName: true, primaryGoal: true } });

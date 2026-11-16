@@ -29,23 +29,70 @@ export function parseSheetLink(raw: string): SheetLink | null {
 
 export class SheetError extends Error {}
 
-/** The sheet's CSV, or a SheetError saying what the coach should do. */
-export async function fetchSheetCsv(link: SheetLink): Promise<string> {
-  let res: Response;
-  try {
-    res = await fetch(link.exportUrl, { redirect: "follow", signal: AbortSignal.timeout(15_000), headers: { Accept: "text/csv" } });
-  } catch {
-    throw new SheetError("Couldn't reach Google Sheets. Try again, or upload the sheet as a CSV file.");
+/** What a coach is told when Google won't hand the sheet over. */
+export const NOT_SHARED =
+  'That sheet isn\'t shared by link. Share it as "Anyone with the link", or download it (File → Download → .xlsx) and drop the file here.';
+
+/** Hosts the export may come from (Google redirects the export to googleusercontent.com). */
+function isGoogleHost(host: string): boolean {
+  return host === "docs.google.com" || host.endsWith(".googleusercontent.com");
+}
+
+/** Biggest export read. A plan is a few KB; this stops a huge sheet from filling memory. */
+const MAX_EXPORT_BYTES = 2_000_000;
+
+/**
+ * The sheet's CSV, or a SheetError saying what the coach should do.
+ * Redirects are followed by hand, at most 3, and only to Google's own hosts.
+ * A redirect anywhere else (a sign-in page included) means the sheet isn't shared by link.
+ */
+export async function fetchSheetCsv(link: SheetLink, fetcher: typeof fetch = fetch): Promise<string> {
+  let url = link.exportUrl;
+  let res: Response | null = null;
+  for (let hop = 0; hop <= 3; hop++) {
+    try {
+      res = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(15_000), headers: { Accept: "text/csv" } });
+    } catch {
+      throw new SheetError("Couldn't reach Google Sheets. Try again, or download the sheet as .xlsx and drop the file here.");
+    }
+    if (res.status < 300 || res.status >= 400) break;
+    const next = res.headers.get("location");
+    let nextUrl: URL;
+    try {
+      nextUrl = new URL(next ?? "", url);
+    } catch {
+      throw new SheetError(NOT_SHARED);
+    }
+    if (nextUrl.protocol !== "https:" || !isGoogleHost(nextUrl.hostname)) throw new SheetError(NOT_SHARED);
+    url = nextUrl.toString();
+    res = null;
   }
-  const finalHost = new URL(res.url).hostname;
-  const fromGoogle = finalHost === "docs.google.com" || finalHost.endsWith(".googleusercontent.com");
+  if (!res) throw new SheetError(NOT_SHARED);
   const type = res.headers.get("content-type") ?? "";
-  if (!fromGoogle || !res.ok || type.includes("text/html")) {
-    throw new SheetError('That sheet isn\'t shared. In Google Sheets, click Share → General access → "Anyone with the link" (Viewer), then try again.');
-  }
-  const text = await res.text();
+  if (!res.ok || type.includes("text/html")) throw new SheetError(NOT_SHARED);
+  if (Number(res.headers.get("content-length") ?? 0) > MAX_EXPORT_BYTES) throw new SheetError("That sheet is too big for a plan. Download just the plan's tab as .xlsx and drop it here.");
+  const text = await readCapped(res, MAX_EXPORT_BYTES);
+  if (text == null) throw new SheetError("That sheet is too big for a plan. Download just the plan's tab as .xlsx and drop it here.");
   if (!text.trim()) throw new SheetError("That sheet is empty.");
   return text;
+}
+
+async function readCapped(res: Response, max: number): Promise<string | null> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 /** Drop empty rows and trailing empty cells, and cap the size sent to the model. */

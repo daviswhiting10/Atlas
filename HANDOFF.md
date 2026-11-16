@@ -30,6 +30,7 @@ Last updated 2026-11-15. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 | Step | What shipped | Commit |
 |---|---|---|
 | Context box | The coach's note on a plan import is authoritative; the page shows "Read as: …" | `8645e15` |
+| Sheet import | "Import plan from spreadsheet" on every client page (opens the Plan tab's importer; `?tab=import` too). Drop or choose .xlsx/.csv (.xlsx read in the browser by `lib/programs/xlsx.ts`, so the server only sees CSV), or a Google link shared by link (redirects checked hop by hop, Google hosts only). | this commit |
 | 1 | Report only | — |
 | 2 | `WorkoutLog` gains `source`, `title` and `completedAt` (the only "done"). Plan status is derived, with a CHECK that keeps LOGGED out. Production: 711 → 713 sessions, sets identical. | `31bfcdb` |
 | Timezone | A picked day is stored as noon in the viewer's timezone. 57 old midnight-UTC sessions were moved; the reversal file is in the backups folder. | `9154da9` |
