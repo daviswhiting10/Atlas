@@ -15,7 +15,7 @@ I give credit when it's earned and honest feedback when it isn't.
 I don't say "You've got this!" or use jargon clients won't know.`;
 
 const field =
-  "mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-mute/70 focus:border-ink/40 disabled:bg-ink/5 disabled:text-ink-mute";
+  "mt-1.5 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-mute focus:border-ink/40 disabled:bg-ink/5 disabled:text-ink-mute";
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState<Profile | null>(null);
@@ -104,7 +104,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={saving || !dirty}
-            className="press flex h-11 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-40"
+            className="press flex h-11 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? "Saving…" : "Save"}
