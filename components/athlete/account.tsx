@@ -16,7 +16,7 @@ export async function signInWithPassword(email: string, password: string): Promi
 }
 
 export const inputClass =
-  "h-[52px] w-full rounded-2xl border border-line bg-white px-4 text-[16px] text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:shadow-[0_0_0_3px_rgba(30,107,78,0.18)]";
+  "h-[52px] w-full rounded-2xl border border-line-strong bg-dusk-raised px-4 text-[16px] text-ink outline-none transition-shadow placeholder:text-ink-mute/60 focus:border-signal focus:shadow-[0_0_0_3px_rgba(124,199,189,0.18)]";
 
 /** Email + password fields, shared by sign-up, sign-in and saving a guest account. */
 export function CredentialFields({
@@ -95,7 +95,7 @@ export function SaveAccountPanel({ className }: { className?: string }) {
             {error}
           </p>
         )}
-        <button type="submit" disabled={busy} className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60">
+        <button type="submit" disabled={busy} className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save my account"}
         </button>
       </form>
@@ -134,7 +134,7 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
   }
 
   return (
-    <section className={cn("rounded-2xl border border-line bg-white p-5", className)}>
+    <section className={cn("rounded-2xl border border-line bg-paper p-5", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[17px] font-semibold text-ink">{has ? "Password" : "Set a password"}</p>
@@ -147,7 +147,7 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
           </p>
         </div>
         {has && !open && (
-          <button type="button" onClick={() => setOpen(true)} className="press shrink-0 text-sm font-semibold text-signal hover:underline">
+          <button type="button" onClick={() => setOpen(true)} className="press -my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 text-sm font-semibold text-signal hover:underline">
             Change
           </button>
         )}
@@ -186,11 +186,11 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
           )}
           <div className="flex gap-2">
             {has && (
-              <button type="button" onClick={() => setOpen(false)} className="press h-12 flex-1 rounded-2xl border border-line bg-white text-[15px] font-semibold text-ink-soft hover:border-ink/20">
+              <button type="button" onClick={() => setOpen(false)} className="press h-12 flex-1 rounded-2xl border border-line bg-paper text-[15px] font-semibold text-ink-soft hover:border-ink/20">
                 Cancel
               </button>
             )}
-            <button type="submit" disabled={busy} className="press flex h-12 flex-[2] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60">
+            <button type="submit" disabled={busy} className="press flex h-12 flex-[2] items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save password"}
             </button>
           </div>
@@ -234,7 +234,7 @@ export function GoogleButton({ callbackUrl, label = "Continue with Google", befo
         await signIn("google", { callbackUrl });
       }}
       className={cn(
-        "press flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl border border-line bg-white text-[15px] font-semibold text-ink hover:border-ink/25 disabled:opacity-60",
+        "press flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl border border-line bg-paper text-[15px] font-semibold text-ink hover:border-ink/25 disabled:opacity-60",
         className
       )}
     >

@@ -29,7 +29,7 @@ export function YouScreen({
 
       {/* A demo account is sample data; a guest's own plan is worth keeping. */}
       {athlete.isDemo && (
-        <Link href="/agents#demo" className="press mt-6 flex items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4 hover:border-ink/20">
+        <Link href="/agents#demo" className="press mt-6 flex items-center justify-between gap-3 rounded-2xl border border-line bg-paper p-4 hover:border-ink/20">
           <span className="min-w-0">
             <span className="block text-[15px] font-semibold text-ink">Watch an AI assistant use this data</span>
             <span className="block text-[13px] text-ink-mute">How Claude reads Alex&apos;s plan, spots stalls and logs a workout, safely.</span>

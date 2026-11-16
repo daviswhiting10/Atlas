@@ -19,7 +19,7 @@ function Field({ label, value, onChange, step = 1, min = 1, max = 999, placehold
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(Number(e.target.value), 0), max))}
         onFocus={(e) => e.target.select()}
-        className="h-11 w-full rounded-lg border border-line bg-white px-3 text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-mute/60 focus:border-ink/40"
+        className="h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-mute/60 focus:border-ink/40"
       />
     </label>
   );
@@ -64,7 +64,7 @@ export function TargetEditor({
         <button type="button" onClick={onCancel} className="press h-9 rounded-lg px-3 text-sm font-medium text-ink-soft hover:text-ink">
           Cancel
         </button>
-        <button type="button" onClick={save} disabled={!valid || saving} className="press flex h-9 items-center gap-1.5 rounded-lg bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85 disabled:opacity-40">
+        <button type="button" onClick={save} disabled={!valid || saving} className="press flex h-9 items-center gap-1.5 rounded-lg bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save target
         </button>
       </div>

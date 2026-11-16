@@ -21,7 +21,7 @@ export function GoalsPanel({ prefs, canRebuild, isGuest, initiallyOpen, extra }:
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 sm:w-auto"
+            className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:w-auto"
           >
             {open ? <X className="h-4 w-4" /> : <SlidersHorizontal className="h-4 w-4" />}
             {open ? "Close" : "Change goals"}

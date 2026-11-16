@@ -38,7 +38,7 @@ export function OwnProgramPicker({ programs, hasPlan = false, className }: { pro
     router.refresh();
   }
 
-  const field = "h-12 rounded-xl border border-line bg-white px-3.5 text-[15px] text-ink outline-none focus:border-ink/40";
+  const field = "h-12 rounded-xl border border-line-strong bg-dusk-raised px-3.5 text-[15px] text-ink outline-none focus:border-ink/40";
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -64,7 +64,7 @@ export function OwnProgramPicker({ programs, hasPlan = false, className }: { pro
                 Starts
                 <DayInput ref={dateRef} value={date} onDay={setDate} className={cn(field, "h-11")} />
               </label>
-              <button type="button" onClick={start} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60">
+              <button type="button" onClick={start} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start this program"}
               </button>
             </div>
