@@ -275,7 +275,7 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
           {/* Avatar */}
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-base font-semibold text-white md:h-14 md:w-14 md:text-lg">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink/10 text-base font-semibold text-ink md:h-14 md:w-14 md:text-lg">
             {getInitials(client.fullName)}
           </div>
           {/* Name + meta */}
@@ -366,14 +366,14 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link
           href={`/clients/${client.id}/log`}
-          className="press flex h-14 items-center justify-center gap-2.5 rounded-2xl bg-ink px-8 text-lg font-semibold text-white hover:bg-ink/85 sm:min-w-[260px]"
+          className="press flex h-14 items-center justify-center gap-2.5 rounded-2xl bg-dusk-button px-8 text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:min-w-[260px]"
         >
           <ClipboardList className="h-5 w-5" />
           Log session
         </Link>
         <Link
           href={`/clients/${client.id}/log-workout`}
-          className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-white px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
+          className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
         >
           <Plus className="h-4 w-4" />
           Log a workout
@@ -388,7 +388,7 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
               onClick={() => setView(v.id)}
               className={cn(
                 "press h-12 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors",
-                view === v.id ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
+                view === v.id ? "bg-dusk-button text-dusk-button-text shadow-sm" : "text-ink-soft hover:text-ink"
               )}
             >
               {v.label}

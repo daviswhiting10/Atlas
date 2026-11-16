@@ -30,7 +30,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
         <>
           <div className="mb-4 flex items-baseline justify-between gap-3">
             <p className="eyebrow">Progress</p>
-            <Link href={`/clients/${client.id}/progress`} className="press inline-flex items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink">
+            <Link href={`/clients/${client.id}/progress`} className="press inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink">
               Body &amp; milestones <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>

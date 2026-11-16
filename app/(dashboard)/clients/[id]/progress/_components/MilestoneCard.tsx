@@ -29,26 +29,26 @@ type AccentStyle = { border: string; bg: string; color: string };
 function getMilestoneAccent(type: string): AccentStyle {
   // Success (weight loss milestones)
   const successAccent: AccentStyle = {
-    border: "rgba(31,122,77,0.30)",
-    bg: "rgba(31,122,77,0.07)",
+    border: "color-mix(in srgb, var(--dusk-teal) 30%, transparent)",
+    bg: "color-mix(in srgb, var(--dusk-teal) 7%, transparent)",
     color: "var(--success)",
   };
   // Blue (strength / session milestones)
   const blueAccent: AccentStyle = {
-    border: "rgba(30,107,78,0.30)",
-    bg: "rgba(30,107,78,0.07)",
+    border: "color-mix(in srgb, var(--dusk-teal) 30%, transparent)",
+    bg: "color-mix(in srgb, var(--dusk-teal) 7%, transparent)",
     color: "var(--blue)",
   };
   // Warn (plate milestones)
   const warnAccent: AccentStyle = {
-    border: "rgba(180,83,9,0.30)",
-    bg: "rgba(180,83,9,0.07)",
+    border: "color-mix(in srgb, var(--dusk-peach) 30%, transparent)",
+    bg: "color-mix(in srgb, var(--dusk-peach) 7%, transparent)",
     color: "var(--warn)",
   };
   // Neutral
   const neutralAccent: AccentStyle = {
     border: "var(--line)",
-    bg: "rgba(11,15,26,0.04)",
+    bg: "color-mix(in srgb, var(--ink) 4%, transparent)",
     color: "var(--ink-soft)",
   };
 

@@ -35,7 +35,7 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
 
   return (
     <div>
-      <Link href="/programs" className="press -ml-1 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-ink-soft hover:text-ink">
+      <Link href="/programs" className="press -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-ink-soft hover:text-ink">
         <ArrowLeft className="h-4 w-4" /> Programs
       </Link>
 
@@ -49,7 +49,7 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
         {chips.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {chips.map((c) => (
-              <span key={c} className="rounded-full border border-line bg-white px-3 py-1 text-[13px] font-medium text-ink-soft">
+              <span key={c} className="rounded-full border border-line bg-paper px-3 py-1 text-[13px] font-medium text-ink-soft">
                 {c}
               </span>
             ))}

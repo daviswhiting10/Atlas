@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<ClientStatus, string> = { ACTIVE: "Active", PROSPECT:
 
 const primary = "press flex h-11 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40";
 const secondary = "press flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-paper px-5 text-[15px] font-semibold text-ink hover:border-ink/25";
-const select = "h-10 w-full rounded-lg border border-line bg-paper px-2.5 text-[14px] text-ink outline-none focus:border-ink/40";
+const select = "h-10 w-full rounded-lg border border-line-strong bg-dusk-raised px-2.5 text-[14px] text-ink outline-none focus:border-ink/40";
 
 export default function ImportClientsPage() {
   const [step, setStep] = useState<"upload" | "map" | "preview" | "done">("upload");

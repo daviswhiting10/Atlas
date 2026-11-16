@@ -87,7 +87,7 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
         {chips.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {chips.map((c) => (
-              <span key={c} className="rounded-full border border-line bg-white px-3 py-1 text-[13px] font-medium text-ink-soft">
+              <span key={c} className="rounded-full border border-line bg-paper px-3 py-1 text-[13px] font-medium text-ink-soft">
                 {c}
               </span>
             ))}

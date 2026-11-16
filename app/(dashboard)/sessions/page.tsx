@@ -231,8 +231,8 @@ export default function SessionsPage() {
             <div
               className="rounded-[18px] p-4"
               style={{
-                border: "1px solid rgba(31,122,77,0.25)",
-                background: "rgba(31,122,77,0.05)",
+                border: "1px solid color-mix(in srgb, var(--dusk-teal) 25%, transparent)",
+                background: "color-mix(in srgb, var(--dusk-teal) 5%, transparent)",
               }}
             >
               <p
@@ -255,8 +255,8 @@ export default function SessionsPage() {
             <div
               className="rounded-[18px] p-4"
               style={{
-                border: "1px solid rgba(180,83,9,0.25)",
-                background: "rgba(180,83,9,0.05)",
+                border: "1px solid color-mix(in srgb, var(--dusk-peach) 25%, transparent)",
+                background: "color-mix(in srgb, var(--dusk-peach) 5%, transparent)",
               }}
             >
               <p

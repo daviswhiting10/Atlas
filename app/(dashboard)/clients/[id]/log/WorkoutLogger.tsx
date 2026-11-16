@@ -924,7 +924,7 @@ export default function WorkoutLogger({
           className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
           style={{ background: "var(--blue)" }}
         >
-          <Check className="w-6 h-6 text-white" strokeWidth={3} />
+          <Check className="w-6 h-6 text-dusk-button-text" strokeWidth={3} />
         </div>
         <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--blue)" }}>
           Session complete
@@ -1287,7 +1287,7 @@ export default function WorkoutLogger({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div
-                        className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                        className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-ink shrink-0"
                         style={{ background: "var(--blue)" }}
                       >
                         {exI + 1}
@@ -1417,7 +1417,7 @@ function ExerciseHeader({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
-            className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+            className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-ink shrink-0"
             style={{ background: "var(--blue)" }}
           >
             {index}
@@ -1444,7 +1444,7 @@ function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; o
       aria-expanded={open}
       className={cn(
         "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
-        open ? "border-ink bg-ink text-white" : "border-border text-muted-foreground hover:text-foreground"
+        open ? "border-ink bg-dusk-button text-dusk-button-text" : "border-border text-muted-foreground hover:text-foreground"
       )}
     >
       {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
@@ -1661,7 +1661,7 @@ function MobileSetRow({
           className={cn(
             "h-11 rounded-lg border flex items-center justify-center transition-colors touch-manipulation",
             entry.completed
-              ? "bg-[var(--success)] border-[var(--success)] text-white"
+              ? "bg-[var(--success)] border-[var(--success)] text-dusk-button-text"
               : "border-border text-muted-foreground active:bg-muted"
           )}
         >
@@ -1722,7 +1722,7 @@ function MobileSetRow({
               style={{ backgroundColor: hex }}
             >
               {entry.bandColor === id && (
-                <Check className="w-3.5 h-3.5 text-white drop-shadow" strokeWidth={3} />
+                <Check className="w-3.5 h-3.5 text-ink drop-shadow" strokeWidth={3} />
               )}
             </button>
           ))}
@@ -1815,8 +1815,8 @@ function DesktopSetRow({
           }}
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors",
-            entry.isBodyweight ? "border-[rgba(31,122,77,0.30)] text-[var(--success)] bg-[rgba(31,122,77,0.07)]" :
-            entry.isBand ? "border-[rgba(30,107,78,0.30)] text-[var(--blue-deep)] bg-[rgba(30,107,78,0.07)]" :
+            entry.isBodyweight ? "border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] text-[var(--success)] bg-[color-mix(in_srgb,var(--dusk-teal)_7%,transparent)]" :
+            entry.isBand ? "border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] text-[var(--blue-deep)] bg-[color-mix(in_srgb,var(--dusk-teal)_7%,transparent)]" :
             "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >
@@ -1831,7 +1831,7 @@ function DesktopSetRow({
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors font-medium",
             entry.isSeconds
-              ? "border-[rgba(30,107,78,0.30)] text-[var(--blue-deep)] bg-[rgba(30,107,78,0.07)] hover:bg-[rgba(30,107,78,0.12)]"
+              ? "border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] text-[var(--blue-deep)] bg-[color-mix(in_srgb,var(--dusk-teal)_7%,transparent)] hover:bg-[color-mix(in_srgb,var(--dusk-teal)_12%,transparent)]"
               : "border-border text-muted-foreground hover:border-muted-foreground"
           )}
         >
@@ -1865,8 +1865,8 @@ function DesktopSetRow({
           className={cn(
             "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
             entry.completed
-              ? "bg-[var(--success)] border-[var(--success)] text-white"
-              : "border-border text-muted-foreground hover:border-[rgba(31,122,77,0.30)] hover:text-[var(--success)]"
+              ? "bg-[var(--success)] border-[var(--success)] text-dusk-button-text"
+              : "border-border text-muted-foreground hover:border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] hover:text-[var(--success)]"
           )}
         >
           {entry.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}

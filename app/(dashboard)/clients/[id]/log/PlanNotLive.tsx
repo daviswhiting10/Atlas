@@ -38,7 +38,7 @@ export function PlanNotLive({
 
   return (
     <div className="mx-auto max-w-md px-5 pt-10">
-      <Link href={`/clients/${clientId}`} className="mb-8 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href={`/clients/${clientId}`} className="mb-8 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> {firstName}
       </Link>
       {draft ? (
@@ -49,15 +49,15 @@ export function PlanNotLive({
             type="button"
             onClick={makeLive}
             disabled={busy}
-            className="press mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-ink text-lg font-semibold text-white hover:bg-ink/85 disabled:opacity-70"
+            className="press mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70"
           >
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
             Make it live and log
           </button>
-          <Link href={`/clients/${clientId}/programs/${draft.id}`} className="mt-3 block text-center text-sm text-muted-foreground hover:text-foreground">
+          <Link href={`/clients/${clientId}/programs/${draft.id}`} className="mt-3 flex min-h-11 items-center justify-center text-sm text-muted-foreground hover:text-foreground">
             Check it first
           </Link>
-          <Link href={`/clients/${clientId}/log-workout`} className="mt-2 block text-center text-sm text-muted-foreground hover:text-foreground">
+          <Link href={`/clients/${clientId}/log-workout`} className="mt-2 flex min-h-11 items-center justify-center text-sm text-muted-foreground hover:text-foreground">
             Log a workout without a plan
           </Link>
         </>
@@ -66,11 +66,11 @@ export function PlanNotLive({
           <h1 className="text-2xl text-ink">No plan yet</h1>
           <Link
             href={`/clients/${clientId}?tab=plan`}
-            className="press mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-ink text-lg font-semibold text-white hover:bg-ink/85"
+            className="press mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85"
           >
             Add {firstName}&rsquo;s plan
           </Link>
-          <Link href={`/clients/${clientId}/log-workout`} className="mt-3 block text-center text-sm text-muted-foreground hover:text-foreground">
+          <Link href={`/clients/${clientId}/log-workout`} className="mt-3 flex min-h-11 items-center justify-center text-sm text-muted-foreground hover:text-foreground">
             Log a workout without a plan
           </Link>
         </>

@@ -210,7 +210,7 @@ export default function ProgramImportPage() {
       >
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ background: "rgba(30,107,78,0.08)" }}
+          style={{ background: "color-mix(in srgb, var(--dusk-teal) 8%, transparent)" }}
         >
           {hasImages ? (
             <Plus className="w-5 h-5" style={{ color: "var(--blue)" }} />

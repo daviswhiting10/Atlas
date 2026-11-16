@@ -160,7 +160,7 @@ export default function NewMeasurementPage() {
           className={cn(
             "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
             inbodyMode
-              ? "bg-[rgba(30,107,78,0.08)] text-[var(--blue)] border-[rgba(30,107,78,0.30)]"
+              ? "bg-[color-mix(in_srgb,var(--dusk-teal)_8%,transparent)] text-[var(--blue)] border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)]"
               : "border-[var(--line)] text-[var(--ink-mute)] hover:border-[var(--ink-soft)]"
           )}
         >
