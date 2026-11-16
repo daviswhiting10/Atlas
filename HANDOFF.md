@@ -1,24 +1,29 @@
 # Atlas handoff
 
-Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`.
+Last updated 2026-11-15. Read this, then `CLAUDE.md`. Design docs are in `docs/`.
 
 ## Where things stand (read before running anything)
 - **Live:** https://atlas-red-eight.vercel.app. Pushing `main` deploys it, so commit or push only when the user asks.
-- **`origin/main` = `71922ee`.** That's what's live: steps 1–4 plus the 75 Hard tracker.
-- **Local `main` is ahead of `origin/main`** and not pushed:
-  - the merge of `atlas-goals` (`lib/history/`, pure code, no screens yet)
-  - this handoff commit
-
-  Pushing would deploy them. That's harmless, but ask first.
+- **`origin/main` = `0dc0cd4`,** and that's what's live. On top of steps 1–4 and 75 Hard:
+  - `lib/history/` (pure code, no screens yet);
+  - the Dusk design pass;
+  - auth deploy 1 (`ff73030`, set-password step off);
+  - the date-field fix (`9a78a02`);
+  - W2's simplification pass (`0dc0cd4`: one-tap workout rows, no separate page for a running goal, a simpler Today, Progress and You).
+- **Rollback point** for the last deploy: `9a78a02`.
+- **Local `main`** may be ahead with docs commits (this one included). Pushing deploys them; ask first.
 - **Branch `auth-wip`:** merged into `main` on 2026-11-15 (see "Auth"). Nothing left on it.
 - **Production database:** migrations up to `20261114012242_sign_in_safety` (the auth migration, applied 2026-11-14 with the user's OK, before any auth code). The live code doesn't read the new columns or tables yet. That's harmless because they're additive: nullable columns and two empty tables.
 - **`dev-sessions` and production both have the auth migration** `20261114012242_sign_in_safety`, and `main` has its file since the auth merge.
   - On `main`, `prisma migrate status` will report a migration that's applied but missing.
   - **Never run `prisma migrate dev` on `main` against `dev-sessions`:** it would offer to reset (wipe) the database.
   - Database work can be done from `main` again.
-- **Uncommitted files:**
-  - `Untitled` in the repo is the user's draft prompt about smoother transitions. Leave it.
-  - `~/Documents/atlas-goals/docs/review-and-v1-scope.md` is an uncommitted review of the four design docs, with a two-week v1 and "two decisions v1 needs from you". Read it before planning; it wasn't merged because it isn't committed.
+- **Uncommitted files:** `Untitled` in the repo is the user's draft prompt about smoother transitions. Leave it.
+- **Design docs** now on `main`:
+  - `docs/review-and-v1-scope.md` (the review of the first four docs);
+  - `docs/screenshot-to-session.md`;
+  - `docs/training-types.md` (see "Training types" below).
+- **The user's 75 Hard is live on production:** started Nov 4, Nov 4–14 carried in, Day 12 on Nov 15. It was moved from a mistaken Nov 15 start on 2026-11-15 (backup and undo file under "Backups and branches").
 - **Local dev server:** may still be running on port 3000 against `dev-sessions`.
 
 ## The work so far: the logged session is the core
@@ -100,6 +105,52 @@ Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 
 **Open:** the two real coach logins with no password are `d***s@a*******.co` (created May 13) and `d************0@g****.com` (created May 15, has the My training profile). The user will say whether the first is theirs.
 
+## Training types (designed 2026-11-15, not built)
+**Design:** `docs/training-types.md`.
+- Anyone picks a well-known challenge or workout type and logs it with an interface that fits.
+- **Four built interfaces:**
+  - **checklist:** the 75 Hard card;
+  - **sets:** the logger and Log a workout;
+  - **scored:** for time, AMRAP or load;
+  - **endurance:** distance and time.
+- **A template is only data:** its sessions, schedule, scoring and which interface logs each session. The AI fills in a strict format (choices from fixed lists, numbers, short plain-text labels). It never writes UI or code.
+- **One history:** every result is an ordinary session. Records are derived, as for lifts, so the heatmap, chapters and timeline read one place.
+- **Schema (additive):**
+  - `WorkoutLog`: template, session, benchmark, variant, score, a sortable `scoreValue`, capped; and activity, `distanceM`, `elapsedSec`, `elevationM`;
+  - `SetLog`: `seconds`, `distanceM`;
+  - `ClientProfile.distanceUnit`;
+  - a `TrainingTemplate` table (immutable versions; replaces the planned `GoalTemplate`);
+  - `Goal.plan`.
+- **Starter library:** 75 Hard, Murph, Fran, Cindy, Cooper 12-minute test, 5 km time trial, Couch to 5 km, half marathon, marathon, 5×5 strength.
+
+**Decisions (user, 2026-11-15):**
+- **Units:** miles by default, a profile setting, stored in metres.
+- **75 Hard stays strict:** a workout counts only if its recorded duration is 45+ minutes. Durations are rounded down.
+- **Gold:** benchmark records are gold on the heatmap.
+- **Training limits:**
+  - coaches can raise them for their own clients, up to a hard ceiling, with every override logged on the template version and in `AuditLog`;
+  - athletes and the AI can't.
+- **"Not medical advice":** every plan and challenge preview carries the line.
+
+**Its build order** (each slice is migration-first: backup, rehearse, compare, apply, then code):
+1. **Week 1, scored benchmarks:**
+   - Murph, Fran and Cindy as built-ins, plus the scored interface;
+   - benchmark history and records (`lib/history/benchmarks.ts`);
+   - "Log a benchmark" next to Log a workout.
+
+   No AI, no plans. Needs no other step first.
+2. **Week 2, endurance:**
+   - the endurance columns and `distanceUnit`;
+   - the endurance interface;
+   - the 5 km time trial and Cooper test.
+3. **Week 3, templates and plans:**
+   - `TrainingTemplate` and `draftTemplate` (match a built-in first, then Sonnet 5.5 with validation);
+   - Couch to 5 km (explicit schedule);
+   - then the progression expander and the half and full marathon;
+   - the new goal rule kinds (`scheduled`, `weekly_total`, `benchmark`);
+   - coach limit overrides.
+4. **Later:** the MCP tools (`find_templates`, `draft_template`, `log_session` with scores), and the generator v2 hookup (planned runs become fixed days).
+
 ## Decisions so far (all by the user)
 **Sessions:**
 - A session's date is the day it was done (default today, editable).
@@ -137,7 +188,7 @@ Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 **Process:** branch first; backup checked with `pg_restore --list`; rehearse on a branch; compare before and after; stop on any mismatch; show the user before production.
 
 ## Build order from here
-1. **Finish auth** (above), then deploy 1, verify, deploy 2.
+1. **Finish auth:** deploy 1 is live. Left: the user sets a password and signs in inside the home-screen app; then deploy 2 (the set-password step on).
 2. **Step 5 charts,** built on `lib/history/` (already merged, tested, no screens yet):
    - PRs over time
    - weekly hard sets by muscle group
@@ -148,8 +199,12 @@ Last updated 2026-11-14. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 4. **Screenshot → logged session:** a photo of a finished workout becomes an off-plan session (source SCREENSHOT), with names going through `findExerciseByName`.
 5. **MCP fixes:** `docs/mcp-roadmap.md` section 5. First, `log_workout`'s date is noon in the server's zone (`lib/mcp/tools/workouts.ts`). Then off-plan logging, then shared session writes.
 6. **Generator v2:** `docs/generator-v2.md`.
+7. **Training types:** `docs/training-types.md`, in the three slices under "Training types".
+   - Slice 1 (scored benchmarks) depends on nothing above, so it can move earlier if the user wants.
+   - Its heatmap gold needs step 2's heatmap.
+   - Its plans should land before generator v2 treats planned runs as fixed days.
 
-Check `docs/review-and-v1-scope.md` (uncommitted, in the `atlas-goals` worktree) against this order first.
+Check this order against `docs/review-and-v1-scope.md` before planning.
 
 ## Design direction
 - **Feel:** paper and ink, not a dashboard. Bone background, white surfaces, near-black ink, one green (`--signal`) meaning "you trained", gold only on personal records, `--night` for dark feature surfaces.
