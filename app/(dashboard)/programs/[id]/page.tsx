@@ -11,6 +11,7 @@ import { repLabel } from "@/lib/plan/overview";
 import { TemplateActions } from "@/components/coach/TemplateActions";
 import { CategorySelect } from "@/components/coach/CategorySelect";
 import { categoryLabel, categoryOf } from "@/lib/programs/categories";
+import { ExerciseName } from "@/components/ExerciseName";
 
 export const metadata: Metadata = { title: "Library program" };
 
@@ -80,7 +81,7 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
                         return (
                           <li key={e.id} className="flex items-baseline gap-3 py-2 text-[15px]">
                             <span className="w-4 shrink-0 text-[13px] text-ink-mute">{i + 1}</span>
-                            <span className="min-w-0 flex-1 truncate text-ink">{displayName(null, e.exercise.name)}</span>
+                            <ExerciseName name={displayName(null, e.exercise.name)} className="flex-1 text-ink" />
                             {e.section && <span className="hidden shrink-0 text-xs text-ink-mute sm:block">{e.section}</span>}
                             <span className="shrink-0 text-ink-soft">
                               {sets.length} × {repLabel(sets)}

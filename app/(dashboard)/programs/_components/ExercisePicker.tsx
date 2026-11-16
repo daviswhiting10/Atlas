@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { ExerciseName } from "@/components/ExerciseName";
 
 export type ExerciseOption = {
   id: string;
@@ -124,7 +125,7 @@ export function ExercisePicker({ onSelect, placeholder = "Search exercises..." }
                 className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center justify-between gap-2"
                 onMouseDown={(e) => { e.preventDefault(); select(ex); }}
               >
-                <span className="truncate">{ex.name}</span>
+                <ExerciseName name={ex.name} inControl />
               </button>
             ))}
             {!loading && (

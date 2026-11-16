@@ -13,6 +13,7 @@ import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { ExercisePicker } from "./ExercisePicker";
 import { TargetEditor, type TargetValues } from "./TargetEditor";
 import { cn } from "@/lib/utils";
+import { ExerciseName } from "@/components/ExerciseName";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -223,7 +224,7 @@ function WorkoutCard({
                     <div className="flex items-center gap-2">
                       <span className="w-4 shrink-0 text-[13px] text-ink-mute">{i + 1}</span>
                       <ExerciseThumb picture={e.picture} name={e.name} className="h-11 w-11" />
-                      <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{e.name}</span>
+                      <ExerciseName name={e.name} className="flex-1 text-[15px] leading-snug text-ink" />
                       <button
                         type="button"
                         onClick={() => setEditing(editing === e.aweId ? null : e.aweId)}

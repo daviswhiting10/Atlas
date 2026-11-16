@@ -40,6 +40,7 @@ import {
 import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
+import { ExerciseName } from "@/components/ExerciseName";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1064,7 +1065,7 @@ export default function WorkoutLogger({
                 <button
                   type="button"
                   onClick={() => toggleBlock(bi)}
-                  className="w-full text-left text-xs text-muted-foreground px-1 pb-1 truncate touch-manipulation"
+                  className="w-full text-left text-xs text-muted-foreground px-1 pb-1 line-clamp-2 break-words touch-manipulation"
                 >
                   {block.exIndices.map((exI) => exercises[exI].name).join(" · ")}
                 </button>
@@ -1293,7 +1294,7 @@ export default function WorkoutLogger({
                         {exI + 1}
                       </div>
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
-                      <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
+                      <CardTitle className="text-sm font-semibold leading-tight min-w-0"><ExerciseName name={ex.name} /></CardTitle>
                     </div>
                     <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                   </div>
@@ -1423,7 +1424,7 @@ function ExerciseHeader({
             {index}
           </div>
           <ExerciseThumb picture={ex.picture} name={ex.name} className="h-10 w-10" />
-          <h3 className="font-display text-sm leading-tight truncate min-w-0">{ex.name}</h3>
+          <ExerciseName as="h3" name={ex.name} className="font-display text-sm leading-tight" />
         </div>
         <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} />
       </div>

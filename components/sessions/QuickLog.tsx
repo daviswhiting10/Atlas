@@ -10,6 +10,7 @@ import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
 import { lastTime, quickLogStart, saveQuickSession, searchQuickExercises, type QuickExercise } from "@/lib/actions/quick-log";
 import { describeLast, prefillSets, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
+import { ExerciseName } from "@/components/ExerciseName";
 
 type Row = { weight: string; reps: string; band: QuickSet["band"] };
 type Item = {
@@ -412,8 +413,8 @@ export function QuickLog({
           {shownResults.map((r) => (
             <li key={r.id}>
               <button type="button" onClick={() => add(r)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[15px] text-ink hover:bg-ink/[0.03]">
-                <span className="min-w-0 truncate">
-                  {r.name}
+                <span className="min-w-0">
+                  <ExerciseName name={r.name} inControl className="inline" />
                   {r.isNew && <span className="ml-2 rounded-full bg-dusk-peach/15 px-2 py-0.5 text-[11px] font-semibold text-dusk-peach">new</span>}
                 </span>
                 {r.times > 0 && <span className="shrink-0 text-[12px] text-ink-mute">done {r.times}×</span>}
