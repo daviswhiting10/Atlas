@@ -10,10 +10,10 @@ export default function StartPage() {
   return (
     <div className="min-h-screen bg-bone">
       <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
-        <Link href="/" aria-label="Atlas home">
+        <Link href="/" aria-label="Atlas home" className="flex min-h-11 items-center">
           <Logo />
         </Link>
-        <Link href="/login" className="press rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink">
+        <Link href="/login" className="press inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-ink-soft hover:text-ink">
           Sign in
         </Link>
       </header>

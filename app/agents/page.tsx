@@ -67,7 +67,7 @@ export default function AgentsPage() {
           <Link href="/agents" aria-current="page" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink sm:block">
             For AI assistants
           </Link>
-          <Link href="/start" className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink/85">
+          <Link href="/start" className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-bone hover:bg-ink/85">
             Get started
           </Link>
         </nav>
@@ -85,10 +85,10 @@ export default function AgentsPage() {
               the session, through the same rules the app itself uses.
             </p>
             <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-              <a href="#demo" className="press flex h-12 items-center justify-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-white hover:bg-ink/85">
+              <a href="#demo" className="press flex h-12 items-center justify-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
                 <Play className="h-4 w-4 fill-current" /> Watch the demo
               </a>
-              <a href="#tools" className="press flex h-12 items-center justify-center rounded-xl border border-line bg-white px-6 text-[15px] font-semibold text-ink hover:border-ink/25">
+              <a href="#tools" className="press flex h-12 items-center justify-center rounded-xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25">
                 See the {TOOLS.length} tools
               </a>
             </div>
@@ -138,7 +138,7 @@ export default function AgentsPage() {
         </section>
 
         {/* ── Guarantees ───────────────────────────────────────────────── */}
-        <section className="border-y border-line bg-white/60">
+        <section className="border-y border-line bg-paper/60">
           <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
             <h2 className="text-3xl text-ink sm:text-4xl">Built to be trusted with someone&apos;s data.</h2>
             <p className="mt-3 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
@@ -180,7 +180,7 @@ export default function AgentsPage() {
         </section>
 
         {/* ── Connect ──────────────────────────────────────────────────── */}
-        <section id="connect" className="scroll-mt-8 border-t border-line bg-white/60">
+        <section id="connect" className="scroll-mt-8 border-t border-line bg-paper/60">
           <div className="mx-auto max-w-4xl px-5 py-16 sm:px-8 sm:py-20">
             <h2 className="text-3xl text-ink sm:text-4xl">Connect in one step.</h2>
             <p className="mt-3 max-w-2xl text-[16px] leading-relaxed text-ink-soft">

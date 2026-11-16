@@ -44,10 +44,10 @@ export default function LandingPage() {
           <Link href="/agents" className="press hidden rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink sm:block">
             For AI assistants
           </Link>
-          <Link href="/login" className="press rounded-full px-3 py-2 text-sm font-medium text-ink-soft hover:text-ink">
+          <Link href="/login" className="press inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-ink-soft hover:text-ink">
             Sign in
           </Link>
-          <Link href="/start" className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink/85">
+          <Link href="/start" className="press inline-flex min-h-11 items-center rounded-full bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85">
             Get started
           </Link>
         </nav>
@@ -57,7 +57,7 @@ export default function LandingPage() {
         {/* ── Hero ─────────────────────────────────────────────────────── */}
         <section className="grid items-center gap-12 pb-16 pt-8 sm:pt-14 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-24">
           <div>
-            <p className="rise eyebrow inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-1.5 backdrop-blur">
+            <p className="rise eyebrow inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-signal" /> Strength training, made obvious
             </p>
             <h1 className="rise rise-1 mt-5 font-display text-[46px] leading-[1.02] text-ink sm:text-[68px]">
@@ -70,11 +70,11 @@ export default function LandingPage() {
             <div className="rise rise-3 mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/start"
-                className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-ink px-7 text-base font-semibold text-white hover:bg-ink/85"
+                className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85"
               >
                 Build my plan <ArrowRight className="h-4 w-4" />
               </Link>
-              <DemoButton className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-white px-7 text-base font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
+              <DemoButton className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-7 text-base font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
                 <Play className="h-4 w-4 fill-current" /> Explore a live demo
               </DemoButton>
             </div>
@@ -83,7 +83,7 @@ export default function LandingPage() {
             </p>
             <Link
               href="/agents#demo"
-              className="rise rise-4 press mt-5 inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:border-ink/25"
+              className="rise rise-4 press mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-paper/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:border-ink/25"
             >
               <Sparkles className="h-4 w-4 text-signal" /> Watch an AI assistant use Atlas <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -94,25 +94,25 @@ export default function LandingPage() {
             <div className="surface-night p-6 sm:p-7">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/55">Bench Press · Est. 1RM</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-mute">Bench Press · Est. 1RM</p>
                   <p className="tnum mt-1.5 font-display text-5xl">
-                    218 <span className="font-body text-base font-medium text-white/55">lb</span>
+                    218 <span className="font-body text-base font-medium text-ink-mute">lb</span>
                   </p>
                 </div>
-                <span className="tnum rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-[#8EE3B0]">+17% in 8 weeks</span>
+                <span className="tnum rounded-full bg-ink/10 px-3 py-1.5 text-sm font-semibold text-dusk-teal">+17% in 8 weeks</span>
               </div>
               <svg viewBox="0 0 440 220" className="mt-4 w-full" aria-hidden="true">
                 {[60, 110, 160].map((y) => (
-                  <line key={y} x1="20" x2="420" y1={y} y2={y} stroke="rgba(255,255,255,0.08)" />
+                  <line key={y} x1="20" x2="420" y1={y} y2={y} stroke="var(--dusk-line)" />
                 ))}
-                <path d={LINE} pathLength={1} fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="draw" />
+                <path d={LINE} pathLength={1} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="draw" />
                 {POINTS.map(([x, y], i) => (
                   <g key={x} className="fade-in" style={{ animationDelay: `${500 + i * 220}ms` }}>
-                    <circle cx={x} cy={y} r={PRS.includes(i) ? 5 : 3.5} fill={PRS.includes(i) ? "#C98A1B" : "#0B0F1A"} stroke="#fff" strokeWidth="2" />
+                    <circle cx={x} cy={y} r={PRS.includes(i) ? 5 : 3.5} fill={PRS.includes(i) ? "var(--dusk-peach)" : "var(--dusk-bg)"} stroke="var(--ink)" strokeWidth="2" />
                   </g>
                 ))}
               </svg>
-              <div className="mt-1 flex justify-between text-[11px] text-white/45">
+              <div className="mt-1 flex justify-between text-[11px] text-ink-mute">
                 <span>Week 1</span>
                 <span>Week 4</span>
                 <span>Week 8</span>
@@ -163,10 +163,10 @@ export default function LandingPage() {
         <section className="surface-night mb-12 px-6 py-12 text-center sm:px-12 sm:py-16">
           <h2 className="mx-auto max-w-2xl font-display text-4xl leading-tight sm:text-5xl">Your first workout is ready in thirty seconds.</h2>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/start" className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-7 text-base font-semibold text-ink hover:bg-white/90 sm:w-auto">
+            <Link href="/start" className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:w-auto">
               Build my plan <ArrowRight className="h-4 w-4" />
             </Link>
-            <DemoButton className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 px-7 text-base font-semibold text-white hover:bg-white/10 disabled:opacity-60 sm:w-auto">
+            <DemoButton className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-line px-7 text-base font-semibold text-ink hover:bg-ink/10 disabled:opacity-60 sm:w-auto">
               <Play className="h-4 w-4 fill-current" /> Explore a live demo
             </DemoButton>
           </div>
