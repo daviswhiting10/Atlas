@@ -36,7 +36,7 @@ function ExerciseSearch({ exercises, value, onChange }: { exercises: ExercisePro
 
   return (
     <div className="relative">
-      <div className="flex h-12 items-center gap-2 rounded-xl border border-line bg-paper px-3.5 focus-within:border-ink/40">
+      <div className="flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-dusk-raised px-3.5 focus-within:border-ink/40">
         <Search className="h-4 w-4 shrink-0 text-ink-mute" />
         <input
           ref={inputRef}
