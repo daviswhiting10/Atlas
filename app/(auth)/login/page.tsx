@@ -8,7 +8,7 @@ import { DemoButton } from "@/components/athlete/guest";
 import { CredentialFields, GoogleButton, inputClass, signInWithPassword } from "@/components/athlete/account";
 
 const primary =
-  "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60";
+  "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"password" | "link">("password");
@@ -45,7 +45,7 @@ export default function LoginPage() {
 
   return (
     <div className="w-full max-w-sm px-6 py-10">
-      <Link href="/" aria-label="Atlas home" className="inline-block">
+      <Link href="/" aria-label="Atlas home" className="inline-flex min-h-11 items-center">
         <Logo />
       </Link>
 
@@ -78,7 +78,7 @@ export default function LoginPage() {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
               </button>
               <div className="text-right">
-                <Link href="/forgot-password" className="text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline">
+                <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -106,7 +106,7 @@ export default function LoginPage() {
               setMode(mode === "password" ? "link" : "password");
               setError(null);
             }}
-            className="mt-4 text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+            className="mt-4 min-h-11 text-left text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline"
           >
             {mode === "password" ? "Coach or invited client? Get a sign-in link instead" : "Sign in with a password instead"}
           </button>
@@ -119,7 +119,7 @@ export default function LoginPage() {
             <Link href="/start" className={primary}>
               Create an account <ArrowRight className="h-4 w-4" />
             </Link>
-            <DemoButton className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white text-[15px] font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
+            <DemoButton className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper text-[15px] font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
               <Play className="h-4 w-4 fill-current" /> Explore a live demo
             </DemoButton>
             <p className="text-center text-[13px] text-ink-mute">Answer a few questions and your plan is ready in under a minute.</p>

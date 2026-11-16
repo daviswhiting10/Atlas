@@ -34,14 +34,14 @@ function ErrorContent() {
             const { signOut } = await import("next-auth/react");
             await signOut({ callbackUrl: `${window.location.origin}/login` });
           }}
-          className="inline-block w-full rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+          className="inline-block min-h-11 w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
           Sign out
         </button>
       ) : (
       <Link
         href="/login"
-        className="inline-block w-full rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+        className="inline-block min-h-11 w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
       >
         Request a new link
       </Link>

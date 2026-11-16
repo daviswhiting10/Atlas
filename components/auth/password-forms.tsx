@@ -8,8 +8,8 @@ import { inputClass, signInWithPassword } from "@/components/athlete/account";
 import { PASSWORD_MIN } from "@/lib/password-rules";
 
 const primary =
-  "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-white hover:bg-ink/85 disabled:opacity-60";
-const quiet = "text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline";
+  "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60";
+const quiet = "inline-flex min-h-11 items-center text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline";
 
 function Problem({ text }: { text: string | null }) {
   if (!text) return null;
@@ -64,7 +64,7 @@ export function ForgotPasswordForm() {
         <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
           If <strong className="font-semibold text-ink">{email}</strong> has an Atlas account, a link to choose a new password is on its way. It works for 30 minutes.
         </p>
-        <Link href="/login" className={`mt-5 inline-block ${quiet}`}>
+        <Link href="/login" className={`mt-5 ${quiet}`}>
           Back to sign in
         </Link>
       </div>
@@ -85,7 +85,7 @@ export function ForgotPasswordForm() {
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Email me a link"}
         </button>
       </form>
-      <Link href="/login" className={`mt-4 inline-block ${quiet}`}>
+      <Link href="/login" className={`mt-4 ${quiet}`}>
         Back to sign in
       </Link>
     </div>
