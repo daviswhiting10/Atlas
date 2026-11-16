@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QuickSessionInput, cleanSession, describeLast, matchesTokens, prefillSets, searchTokens } from "./quick-log";
+import { QuickSessionInput, cleanSession, describeLast, describeLogged, matchesTokens, prefillSets, searchTokens } from "./quick-log";
 
 const base = { date: "2026-11-13", exercises: [] as unknown[] };
 
@@ -77,5 +77,12 @@ describe("last time", () => {
     expect(prefillSets(null)).toEqual([s(null), s(null), s(null)]);
     expect(prefillSets({ date: "2026-11-06", unit: "reps", sets: [s(10, 45), s(8, 50)] })).toEqual([s(10, 45), s(8, 50)]);
     expect(prefillSets({ date: "2026-11-06", unit: "reps", sets: [s(null, 45)] })).toHaveLength(3);
+  });
+
+  it("sums up an exercise being logged in the same words, counting only sets with reps", () => {
+    expect(describeLogged([s(10, 135), s(10, 135), s(10, 135)], "reps")).toBe("3 × 10 @ 135 lb");
+    expect(describeLogged([s(10, 135), s(null, 135), s(0, 135)], "reps")).toBe("1 × 10 @ 135 lb");
+    expect(describeLogged([s(30), s(30)], "secs")).toBe("2 × 30 s");
+    expect(describeLogged([s(null), s(null)], "reps")).toBe("");
   });
 });

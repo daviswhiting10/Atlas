@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Loader2, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Loader2, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
 import { lastTime, quickLogStart, saveQuickSession, searchQuickExercises, type QuickExercise } from "@/lib/actions/quick-log";
-import { describeLast, prefillSets, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
+import { describeLast, describeLogged, prefillSets, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
 import { ExerciseName } from "@/components/ExerciseName";
 
 type Row = { weight: string; reps: string; band: QuickSet["band"] };
@@ -46,6 +46,8 @@ const numOrNull = (s: string) => {
 };
 let keySeq = 0;
 const newKey = () => `q${Date.now().toString(36)}${(keySeq++).toString(36)}`;
+/** "3 × 10 @ 135 lb" from what's typed so far; "" when no set has reps yet. */
+const summaryOf = (i: Item) => describeLogged(i.rows.map((r) => ({ weight: numOrNull(r.weight), reps: numOrNull(r.reps), band: r.band })), i.unit);
 
 /** What a form holds, for "has anything changed?": no keys, lookups or loading state. */
 function content(d: Draft): string {
@@ -106,6 +108,11 @@ export function QuickLog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
+  // One exercise is open at a time; the rest are one-line summaries. A saved
+  // session being edited opens with every exercise summed up.
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const barRef = useRef<HTMLOListElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   // Until the saved copy has been read, nothing may be written over it.
@@ -126,6 +133,7 @@ export function QuickLog({
         if (Array.isArray(d.items) && content(d) !== baseline.current) {
           setDate(d.date || today());
           setItems(d.items.map((i) => ({ ...i, loading: false })));
+          setOpenKey(d.items.at(-1)?.key ?? null);
           setTitle(d.title ?? "");
           setNotes(d.notes ?? "");
           setDuration(d.duration ?? "");
@@ -189,6 +197,8 @@ export function QuickLog({
         ...prev,
         { key, exerciseId: ex.id, name: ex.name, isNew: ex.id == null || Boolean(ex.isNew), last: null, unit: "reps", loading: ex.id != null, touched: false, rows: prefillSets(null).map(toRow) },
       ]);
+      // Starting the next exercise folds the one before it into its summary.
+      setOpenKey(key);
       setQuery("");
       setResults([]);
       searchRef.current?.focus();
@@ -230,6 +240,26 @@ export function QuickLog({
   const removeRow = (key: string, r: number) => update(key, (i) => ({ ...i, touched: true, rows: i.rows.filter((_, k) => k !== r) }));
   const remove = (key: string) => setItems((prev) => prev.filter((i) => i.key !== key));
 
+  // The jump bar keeps the open exercise's chip in view.
+  useEffect(() => {
+    const bar = barRef.current;
+    const chip = bar?.querySelector<HTMLElement>("[aria-current=true]");
+    if (bar && chip) bar.scrollTo({ left: chip.offsetLeft - 16, behavior: "smooth" });
+  }, [openKey, items.length]);
+
+  /** Open one exercise (folding the open one) and bring it into view under the jump bar. */
+  function openItem(key: string) {
+    setOpenKey(key);
+    window.requestAnimationFrame(() => sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  function toSearch() {
+    setOpenKey(null);
+    window.requestAnimationFrame(() => {
+      searchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      searchRef.current?.focus({ preventScroll: true });
+    });
+  }
+
   const setCount = items.reduce((n, i) => n + i.rows.filter((r) => (numOrNull(r.reps) ?? 0) > 0).length, 0);
   // A walk or a class: no sets, just a name and a time.
   const timeOnly = setCount === 0 && title.trim().length > 0 && (numOrNull(duration) ?? 0) > 0;
@@ -242,6 +272,7 @@ export function QuickLog({
     setDuration("");
     setDate(today());
     setRestored(false);
+    setOpenKey(null);
     searchRef.current?.focus();
   }
 
@@ -315,13 +346,65 @@ export function QuickLog({
         </p>
       )}
 
+      {/* ── Jump bar: every exercise, one tap away ─────────────────────────── */}
+      {items.length >= 2 && (
+        <nav aria-label="Exercises in this workout" className="sticky top-0 z-10 -mx-4 mt-4 border-b border-line bg-bone/90 px-4 py-2 backdrop-blur-xl md:top-16">
+          <ol ref={barRef} className="no-scrollbar relative flex gap-2 overflow-x-auto">
+            {items.map((i, n) => {
+              const done = summaryOf(i) !== "";
+              const open = i.key === openKey;
+              return (
+                <li key={i.key} className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openItem(i.key)}
+                    aria-current={open ? "true" : undefined}
+                    className={cn(
+                      "press flex min-h-11 items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3.5 text-left text-[14px] font-semibold",
+                      open ? "border-ink/60 bg-dusk-raised text-ink" : "border-line bg-paper text-ink-soft hover:text-ink"
+                    )}
+                  >
+                    <span className={cn("tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px]", done ? "bg-signal/20 text-signal" : "bg-ink/10 text-ink-soft")}>
+                      {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : n + 1}
+                    </span>
+                    <ExerciseName name={i.name} inControl className="max-w-[180px] leading-tight" />
+                  </button>
+                </li>
+              );
+            })}
+            <li className="shrink-0">
+              <button type="button" onClick={toSearch} aria-label="Add an exercise" className="press flex min-h-11 items-center gap-1 rounded-full border border-dashed border-line-strong px-3.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+                <Plus className="h-4 w-4" /> Add
+              </button>
+            </li>
+          </ol>
+        </nav>
+      )}
+
       {/* ── Exercises ─────────────────────────────────────────────────────── */}
       <div className="mt-5 space-y-3">
-        {items.map((i) => (
-          <section key={i.key} className="rounded-2xl border border-line bg-paper p-4">
+        {items.map((i) => {
+          const summary = summaryOf(i);
+          if (i.key !== openKey)
+            return (
+              <section key={i.key} ref={(el) => void (sectionRefs.current[i.key] = el)} className="scroll-mt-24 rounded-2xl border border-line bg-paper">
+                <button type="button" onClick={() => openItem(i.key)} aria-expanded={false} className="press flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left">
+                  <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", summary ? "bg-signal/20 text-signal" : "bg-ink/10 text-ink-mute")}>
+                    {summary ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                    <ExerciseName name={i.name} inControl className="text-[16px] font-semibold leading-snug text-ink" />
+                    <span className="tnum shrink-0 text-[15px] text-ink-soft">{summary || "No sets yet"}</span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
+                </button>
+              </section>
+            );
+          return (
+          <section key={i.key} ref={(el) => void (sectionRefs.current[i.key] = el)} className="scroll-mt-24 rounded-2xl border border-line-strong bg-paper p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-[17px] font-semibold leading-snug text-ink">
+                <h2 className="text-[17px] font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
                   {i.name}
                   {i.isNew && <span className="ml-2 rounded-full bg-dusk-peach/15 px-2 py-0.5 align-middle text-[11px] font-semibold text-dusk-peach">new</span>}
                 </h2>
@@ -385,11 +468,17 @@ export function QuickLog({
                 </div>
               ))}
             </div>
-            <button type="button" onClick={() => addRow(i.key)} className="press mt-2 inline-flex items-center gap-1 text-[14px] font-medium text-ink-soft hover:text-ink">
-              <Plus className="h-3.5 w-3.5" /> set
-            </button>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <button type="button" onClick={() => addRow(i.key)} className="press inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-ink-soft hover:text-ink">
+                <Plus className="h-4 w-4" /> set
+              </button>
+              <button type="button" onClick={() => setOpenKey(null)} className="press inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong px-4 text-[15px] font-semibold text-ink hover:border-ink/40">
+                <Check className="h-4 w-4" strokeWidth={2.5} /> Done
+              </button>
+            </div>
           </section>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Add exercise ──────────────────────────────────────────────────── */}
