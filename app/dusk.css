@@ -152,7 +152,7 @@
 }
 
 /* A whole dark page: the backdrop sits behind the content, and the app's
-   own bars go dark with it. */
+   own bars are dark with it (the whole app is dark now; this is just the backdrop). */
 .dusk-page { position: relative; z-index: 1; }
 .dusk-backdrop {
   position: fixed;
@@ -163,11 +163,6 @@
 }
 .app-ui:has(.dusk-page) { background: var(--dusk-bg); }
 .app-ui:has(.dusk-page) > main { position: relative; z-index: 1; }
-.app-ui:has(.dusk-page) :is(header, nav, a).bg-white,
-.app-ui:has(.dusk-page) :is(header, nav, a)[class*="bg-white/"] {
-  background-color: color-mix(in srgb, var(--dusk-surface) 88%, transparent);
-}
-.app-ui:has(.dusk-page) .bg-ink.text-white { color: var(--dusk-button-text); }
 
 /* Type */
 .dusk .dusk-title {
