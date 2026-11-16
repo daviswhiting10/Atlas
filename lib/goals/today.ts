@@ -5,6 +5,7 @@
 import { localDay } from "@/lib/athlete/sessions";
 import { addDays } from "./days";
 import { ruleActiveOn } from "./rules";
+import { DEFAULT_DIET, DIET_KEY } from "./templates";
 import type { LoadedGoal } from "./data";
 import type { RuleState } from "./evaluate";
 
@@ -19,7 +20,7 @@ export type TodayView = {
   attemptNumber: number;
   /** The longest earlier attempt, when this isn't the first. */
   earlierBest: number | null;
-  rules: Array<{ key: string; label: string; kind: "sessions" | "check_in"; state: RuleState; have: number; need: number; mark: string | null; minMinutes: number | null }>;
+  rules: Array<{ key: string; label: string; kind: "sessions" | "check_in"; state: RuleState; have: number; need: number; mark: string | null; minMinutes: number | null; /** The line the person wrote under the rule (the diet), if the rule has one. */ detail: string | null }>;
   /**
    * The day's workout slots: the goal's plain "sessions per day" rule (two workouts a day for 75 Hard).
    * Null when the goal has none, and then there are no workout rows.
@@ -37,14 +38,17 @@ export type TodayView = {
     workout: { sessions: Array<{ id: string; title: string; minutes: number | null; tags: string[]; sets: number }> } | null;
   } | null;
   cells: StripCell[];
-  /** The collapsed "Rules & end goal" area. */
+  /** The collapsed "Diet & end goal" area. The rules themselves are fixed (the challenge's own); only the diet's wording is the person's. */
   manage: {
-    /** Every rule still running (or set to stop later), and whether it can be stopped now. */
-    rules: Array<{ key: string; label: string; removable: boolean }>;
+    /** What the diet rule says, or null when the goal has no diet rule. */
+    diet: string | null;
     /** Days from before Atlas that count as done, when the goal was started back-dated. */
     carried: { days: number; from: string; to: string } | null;
   };
 };
+
+/** What a rule's line says: the person's own words, or the template's default for the diet. */
+const detailOf = (r: { key: string; kind: string; detail?: string }): string | null => (r.kind === "check_in" ? (r.detail ?? (r.key === DIET_KEY ? DEFAULT_DIET : null)) : null);
 
 export function todayView(l: LoadedGoal, now = new Date()): TodayView {
   const { goal, result } = l;
@@ -84,7 +88,7 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
     length: result.length,
     attemptNumber: result.attemptNumber,
     earlierBest: earlier.length ? Math.max(...earlier.map((a) => a.days)) : null,
-    rules: result.today.map((t) => ({ key: t.ruleKey, label: t.label, kind: t.kind, state: t.state, have: t.have, need: t.need, mark: (ruleOf(t.ruleKey) as { where?: { mark?: string } } | undefined)?.where?.mark ?? null, minMinutes: (ruleOf(t.ruleKey) as { where?: { minMinutes?: number } } | undefined)?.where?.minMinutes ?? null })),
+    rules: result.today.map((t) => ({ key: t.ruleKey, label: t.label, kind: t.kind, state: t.state, have: t.have, need: t.need, mark: (ruleOf(t.ruleKey) as { where?: { mark?: string } } | undefined)?.where?.mark ?? null, minMinutes: (ruleOf(t.ruleKey) as { where?: { minMinutes?: number } } | undefined)?.where?.minMinutes ?? null, detail: detailOf({ key: t.ruleKey, kind: t.kind, detail: (ruleOf(t.ruleKey) as { detail?: string } | undefined)?.detail }) })),
     workout: primary ? { ruleKey: primary.key, need: primary.min, defaultMinutes: primary.where.minMinutes ?? 45, mark: marks[0] ?? null } : null,
     sessions: l.sessions.filter((s) => s.day === today).map((s) => ({ id: s.id, title: title(s), minutes: s.durationMin, tags: tags.get(s.id) ?? [], sets: s.sets })),
     marks,
@@ -98,7 +102,10 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
       : null,
     cells,
     manage: {
-      rules: goal.rules.rules.filter((r) => !r.toDay || r.toDay >= today).map((r) => ({ key: r.key, label: r.label, removable: !r.toDay && ruleActiveOn(r, addDays(today, 1)) })),
+      diet: (() => {
+        const d = goal.rules.rules.find((r) => r.key === DIET_KEY && r.kind === "check_in");
+        return d ? detailOf({ key: d.key, kind: d.kind, detail: (d as { detail?: string }).detail }) : null;
+      })(),
       carried: carried.length ? { days: carried.length, from: carried[0].day, to: carried[carried.length - 1].day } : null,
     },
   };

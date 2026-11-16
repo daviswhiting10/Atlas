@@ -4,14 +4,14 @@ import { useId, useState, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import { ChevronDown } from "lucide-react";
 import type { TodayView } from "@/lib/goals/today";
-import { RuleEditor } from "./RuleEditor";
+import { GoalSettings } from "./GoalSettings";
 import type { GoalActions } from "./TodayLive";
 
 /**
  * The foot of the goal card: whatever `lead` is (the link to log a workout with sets), and a toggle for the
- * closed "Rules & end goal" area. No animation: opening it is a decision, not a moment.
+ * closed "Diet & end goal" area. No animation: opening it is a decision, not a moment.
  */
-export function GoalManage({ goalId, manage, actions, lead }: { goalId: string; manage: TodayView["manage"]; actions: Pick<GoalActions, "addGoalRule" | "removeGoalRule" | "endGoal">; lead?: ReactNode }) {
+export function GoalManage({ goalId, manage, actions, lead }: { goalId: string; manage: TodayView["manage"]; actions: Pick<GoalActions, "setDiet" | "endGoal">; lead?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   return (
@@ -19,7 +19,7 @@ export function GoalManage({ goalId, manage, actions, lead }: { goalId: string; 
       <div className="flex flex-wrap items-center gap-2">
         {lead}
         <button type="button" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)} className="dusk-chip is-quiet">
-          Rules &amp; end goal <ChevronDown className={open ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
+          {manage.diet != null ? "Diet & end goal" : "End goal"} <ChevronDown className={open ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
         </button>
       </div>
       {open && (
@@ -29,7 +29,7 @@ export function GoalManage({ goalId, manage, actions, lead }: { goalId: string; 
               {manage.carried.days} days, {format(parseISO(manage.carried.from), "MMM d")} through {format(parseISO(manage.carried.to), "MMM d")}, happened before Atlas and count as done.
             </p>
           )}
-          <RuleEditor goalId={goalId} items={manage.rules} actions={actions} />
+          <GoalSettings goalId={goalId} diet={manage.diet} actions={actions} />
         </div>
       )}
     </div>

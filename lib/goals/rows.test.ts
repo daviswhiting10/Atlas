@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WorkoutMinutes, rowsMeetRule, settlePending, workoutRows, type PendingWorkout, type RowsInput } from "./rows";
 
-const base: RowsInput = { need: 2, sessions: [], mark: "outdoors", pending: [], removed: [], minutesOver: {} };
+const base: RowsInput = { need: 2, sessions: [], mark: "outdoors", pending: [], removed: [] };
 const session = (id: string, minutes: number | null, tags: string[] = [], sets = 0) => ({ id, title: "Workout", minutes, tags, sets });
 const pending = (over: Partial<PendingWorkout> = {}): PendingWorkout => ({ tempId: "t1", day: "2026-11-15", minutes: 45, outdoors: false, sessionId: null, undone: false, ...over });
 const kinds = (rows: ReturnType<typeof workoutRows>) => rows.map((r) => r.kind);
@@ -42,12 +42,7 @@ describe("workoutRows", () => {
     expect(kinds(workoutRows({ ...base, sessions: [session("a", 50), session("b", 50)], removed: ["a"] }))).toEqual(["workout", "empty"]);
   });
 
-  it("edited minutes show before the server confirms them, for a saved workout and a pending one", () => {
-    expect(workoutRows({ ...base, sessions: [session("a", 50)], minutesOver: { a: 70 } })[0]).toMatchObject({ minutes: 70 });
-    expect(workoutRows({ ...base, pending: [pending()], minutesOver: { t1: 30 } })[0]).toMatchObject({ minutes: 30 });
-  });
-
-  it("a workout with no time (logged elsewhere) shows with null minutes, to be filled in", () => {
+  it("a workout with no time (logged elsewhere) shows with null minutes", () => {
     expect(workoutRows({ ...base, sessions: [session("a", null)] })[0]).toMatchObject({ kind: "workout", minutes: null });
   });
 

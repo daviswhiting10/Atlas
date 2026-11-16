@@ -4,7 +4,10 @@
  * Goals, from the athlete's side (a client, or a coach in My training).
  * Every write derives the person from the session and re-checks that the goal
  * is theirs. A goal writes its own rows, plus the one-tap "Workout, 45 min" sessions the
- * workout rows log (a finished session with a name and a time and no sets) and the minutes on them.
+ * workout rows log (a finished session with a name and a time and no sets) and take back.
+ *
+ * 75 Hard is kept to its own rules (lib/goals/templates.ts): there is no action that adds, drops or loosens a
+ * rule. The one thing a person writes is what their diet is (startGoal's `diet`, and setDiet).
  */
 
 import { cookies } from "next/headers";
@@ -22,8 +25,8 @@ import { addDays } from "@/lib/goals/days";
 import { sealNow } from "@/lib/goals/data";
 import { confirmStart } from "@/lib/goals/preview";
 import { WorkoutMinutes } from "@/lib/goals/rows";
-import { DAY, GoalRules, addCheckInRule, removeRule, ruleActiveOn } from "@/lib/goals/rules";
-import { templateByKey } from "@/lib/goals/templates";
+import { DAY, GoalRules, ruleActiveOn } from "@/lib/goals/rules";
+import { DEFAULT_DIET, DIET_KEY, templateByKey } from "@/lib/goals/templates";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -58,15 +61,16 @@ const refresh = (goalId?: string) => {
   if (goalId) revalidatePath(`/goals/${goalId}`);
 };
 
+/** What the diet rule says: one line. */
+const Diet = z.string().transform((v) => v.replace(/\s+/g, " ").trim()).pipe(z.string().max(120));
+
 const StartInput = z.object({
   templateKey: z.string().max(40),
   startDay: Day,
   /** The day number the form showed on its Start button; the server refuses if the start day gives another. */
   shownDay: z.number().int().min(1).max(366),
-  /** Template rules switched off before starting. */
-  drop: z.array(Key).max(20).default([]),
-  /** Extra daily ticks, by label. */
-  add: z.array(z.string().trim().min(1).max(60)).max(10).default([]),
+  /** What the diet is, in the person's words; blank or missing means the default. */
+  diet: Diet.optional(),
 });
 
 export async function startGoal(raw: unknown): Promise<Result<{ goalId: string; dayOfGoal: number }>> {
@@ -84,16 +88,13 @@ export async function startGoal(raw: unknown): Promise<Result<{ goalId: string; 
 
   if (await prisma.goal.findFirst({ where: { clientId, status: "ACTIVE" }, select: { id: true } })) return { ok: false, error: "You already have a goal running." };
 
-  let rules: GoalRules;
-  try {
-    // Rules switched off at the start never judged a day, so they're simply left out.
-    const kept = { ...template.rules, rules: template.rules.rules.filter((r) => !input.drop.includes(r.key)) };
-    rules = input.add.reduce((r, label) => addCheckInRule(r, label, input.startDay), GoalRules.parse(kept));
-    // Added at the start means judged from day 1, not from "today".
-    rules = GoalRules.parse({ ...rules, rules: rules.rules.map((r) => (r.fromDay === input.startDay ? { ...r, fromDay: undefined } : r)), ...(preview.carriedDays > 0 ? { carriedThrough: addDays(today, -1) } : {}) });
-  } catch {
-    return { ok: false, error: "A goal needs at least one rule." };
-  }
+  // The challenge's own rules, as written; only the diet's wording is the person's. Days before today that count as done are carried.
+  const diet = input.diet || DEFAULT_DIET;
+  const rules = GoalRules.parse({
+    ...template.rules,
+    rules: template.rules.rules.map((r) => (r.key === DIET_KEY && r.kind === "check_in" ? { ...r, detail: diet } : r)),
+    ...(preview.carriedDays > 0 ? { carriedThrough: addDays(today, -1) } : {}),
+  });
 
   const goal = await prisma.goal.create({
     data: { workspaceId, clientId, templateKey: template.key, name: template.name, category: template.category, rules, timeZone, startDay: input.startDay, startedBy: by },
@@ -192,17 +193,6 @@ async function changeableWorkout(goalId: string, sessionId: string, clientId: st
   return blocked ? { ok: false as const, error: blocked } : { ok: true as const, goal, session: s };
 }
 
-/** Change the minutes on one of today's (or yesterday's) workouts, or fill them in when a workout had none. */
-export async function setWorkoutMinutes(raw: unknown): Promise<Result> {
-  const { clientId } = await me();
-  const input = z.object({ goalId: Id, sessionId: Id, minutes: WorkoutMinutes }).parse(raw);
-  const found = await changeableWorkout(input.goalId, input.sessionId, clientId);
-  if (!found.ok) return found;
-  await prisma.workoutLog.update({ where: { id: found.session.id }, data: { durationMin: input.minutes } });
-  refresh(found.goal.id);
-  return { ok: true };
-}
-
 /**
  * Undo or remove a one-tap workout. Only a workout with no sets can go (nothing is lost): one
  * logged by hand with sets is edited, not removed, from here. Its tags go with it.
@@ -217,27 +207,15 @@ export async function removeWorkout(raw: unknown): Promise<Result> {
   return { ok: true };
 }
 
-/** A new daily tick, counted from today. */
-export async function addGoalRule(raw: unknown): Promise<Result> {
+/** Change what the diet says. Wording only: it is never judged, so no day's result moves. */
+export async function setDiet(raw: unknown): Promise<Result> {
   const { clientId } = await me();
-  const input = z.object({ goalId: Id, label: z.string().trim().min(1).max(60) }).parse(raw);
-  const { goal, rules, today } = await ownActiveGoal(input.goalId, clientId);
-  const next = addCheckInRule(rules, input.label, today);
+  const input = z.object({ goalId: Id, diet: Diet }).parse(raw);
+  const { goal, rules } = await ownActiveGoal(input.goalId, clientId);
+  const diet = input.diet || DEFAULT_DIET;
+  if (!rules.rules.some((r) => r.key === DIET_KEY && r.kind === "check_in")) return { ok: false, error: "This goal has no diet to edit." };
+  const next = GoalRules.parse({ ...rules, rules: rules.rules.map((r) => (r.key === DIET_KEY && r.kind === "check_in" ? { ...r, detail: diet } : r)) });
   await prisma.goal.update({ where: { id: goal.id }, data: { rules: next } });
-  refresh(goal.id);
-  return { ok: true };
-}
-
-/** Stop counting a rule from tomorrow. The days it already judged keep their result. */
-export async function removeGoalRule(raw: unknown): Promise<Result> {
-  const { clientId } = await me();
-  const input = z.object({ goalId: Id, key: Key }).parse(raw);
-  const { goal, rules, today } = await ownActiveGoal(input.goalId, clientId);
-  try {
-    await prisma.goal.update({ where: { id: goal.id }, data: { rules: removeRule(rules, input.key, today) } });
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Couldn't remove that." };
-  }
   refresh(goal.id);
   return { ok: true };
 }

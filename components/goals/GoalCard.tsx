@@ -10,7 +10,7 @@ import { TodayLive, type GoalActions } from "./TodayLive";
 /**
  * The goal card on Today, from plain data: the whole goal in one place. The title and the day number on one
  * row, a compact strip (75 days in three rows), a checklist where every row is tappable (workouts in one
- * tap), a link to log a workout with sets, and a closed "Rules & end goal" area. It is built so the whole
+ * tap), a link to log a workout with sets, and a closed "Diet & end goal" area. It is built so the whole
  * checklist is on screen on a phone without scrolling.
  * GoalToday loads the data and passes the real saves; a preview can pass fakes.
  * The loading shape of this card is GoalCardSkeleton (Skeletons.tsx): change one, change the other.

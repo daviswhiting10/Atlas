@@ -45,6 +45,8 @@ const CheckInRule = z.object({
   kind: z.literal("check_in"),
   per: z.literal("day"),
   value: z.literal("done").default("done"),
+  /** A line under the label that the person writes (75 Hard's diet: what they are following). Never judged. */
+  detail: z.string().trim().min(1).max(120).optional(),
   ...Span,
 });
 

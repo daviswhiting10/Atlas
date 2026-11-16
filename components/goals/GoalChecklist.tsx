@@ -51,7 +51,10 @@ export function GoalChecklist() {
               <li key={r.key}>
                 <button type="button" aria-pressed={on} onClick={() => toggleTick(r.key, view.today, on)} className="dusk-row flex min-h-[56px] w-full items-center gap-3 py-3 text-left">
                   <TickCircle on={on} />
-                  <span className="text-[15px] font-medium text-dusk-text">{r.label}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium text-dusk-text">{r.label}</span>
+                    {r.detail && <span className="block truncate text-[13px] leading-snug text-dusk-mute">{r.detail}</span>}
+                  </span>
                 </button>
               </li>
             );

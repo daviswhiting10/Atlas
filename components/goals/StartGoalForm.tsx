@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { DayInput } from "@/components/ui/day-input";
 import { startGoal } from "@/lib/actions/goals";
@@ -11,14 +11,14 @@ import { dayFrom } from "@/lib/day-field";
 import { addDays } from "@/lib/goals/days";
 import { needsConfirmation, previewStart } from "@/lib/goals/preview";
 import { AccentTitle } from "./GoalStrip";
-import { TickCircle } from "./TickCircle";
 
-type Template = { key: string; name: string; blurb: string; length: number; rules: Array<{ key: string; label: string }> };
+type Template = { key: string; name: string; blurb: string; length: number; /** What the diet says unless the person writes their own. */ diet: string };
 
 /**
  * Start a goal. What matters is on screen first: which day number today would be (big, like the card's),
- * and a Start button. The rules and the start day are there if wanted, closed otherwise. Starting today is
- * one tap; starting on an earlier day asks first, because that counts days as done.
+ * and a Start button. The start day and the diet's wording are there if wanted, closed otherwise. The rules
+ * are the challenge's own and are not offered for change: the diet's wording is the one thing written here.
+ * Starting today is one tap; starting on an earlier day asks first, because that counts days as done.
  *
  * The start day is read from the field at the moment of the tap, and the day number the person was shown is
  * sent with it: the server refuses if they disagree (lib/day-field.ts, confirmStart).
@@ -28,30 +28,20 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [startDay, setStartDay] = useState(today);
-  const [dropped, setDropped] = useState<string[]>([]);
-  const [added, setAdded] = useState<string[]>([]);
-  const [draft, setDraft] = useState("");
+  const [diet, setDiet] = useState(template.diet);
   const [showDay, setShowDay] = useState(false);
-  const [showRules, setShowRules] = useState(false);
+  const [showDiet, setShowDiet] = useState(false);
   /** Set when a back-dated start is waiting for a yes: the day the person is being asked about. */
   const [confirming, setConfirming] = useState<string | null>(null);
   const dayRef = useRef<HTMLInputElement>(null);
 
   const preview = previewStart(startDay, today, template.length);
-  const kept = template.rules.filter((r) => !dropped.includes(r.key));
-  const ruleCount = kept.length + added.length;
-  const canStart = preview.ok && ruleCount > 0 && !pending;
-
-  const addRule = () => {
-    const label = draft.replace(/\s+/g, " ").trim();
-    if (label && !added.includes(label) && added.length < 10) setAdded([...added, label]);
-    setDraft("");
-  };
+  const canStart = preview.ok && !pending;
 
   const send = (day: string, shownDay: number) =>
     startTransition(async () => {
       // The day the field shows, and the day number that was shown: the server refuses if they disagree.
-      const r = await startGoal({ templateKey: template.key, startDay: day, shownDay, drop: dropped, add: added }).catch(() => ({ ok: false as const, error: "Couldn't start it." }));
+      const r = await startGoal({ templateKey: template.key, startDay: day, shownDay, diet }).catch(() => ({ ok: false as const, error: "Couldn't start it." }));
       if (!r.ok) {
         setConfirming(null);
         return void toast.error(r.error);
@@ -121,8 +111,8 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
         >
           {startDay === today ? "Started earlier?" : `Started ${format(parseISO(startDay), "MMM d")}`} <ChevronDown className={showDay ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
         </button>
-        <button type="button" aria-expanded={showRules} onClick={() => setShowRules(!showRules)} className="dusk-chip">
-          Customize · {ruleCount} rule{ruleCount === 1 ? "" : "s"} <ChevronDown className={showRules ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
+        <button type="button" aria-expanded={showDiet} onClick={() => setShowDiet(!showDiet)} className="dusk-chip">
+          Your diet <ChevronDown className={showDiet ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
         </button>
       </div>
 
@@ -143,42 +133,13 @@ export function StartGoalForm({ template, today }: { template: Template; today: 
         />
       </div>
 
-      {showRules && (
+      {showDiet && (
         <div className="mt-3">
-          <ul className="divide-y divide-dusk-line">
-            {template.rules.map((r) => {
-              const on = !dropped.includes(r.key);
-              return (
-                <li key={r.key}>
-                  <button type="button" onClick={() => setDropped(on ? [...dropped, r.key] : dropped.filter((k) => k !== r.key))} className="dusk-row flex min-h-[56px] w-full items-center gap-3 py-3 text-left" aria-pressed={on}>
-                    <TickCircle on={on} />
-                    <span className={on ? "text-[15px] font-medium text-dusk-text" : "text-[15px] text-dusk-mute line-through"}>{r.label}</span>
-                  </button>
-                </li>
-              );
-            })}
-            {added.map((label) => (
-              <li key={label} className="flex min-h-[56px] items-center gap-3 py-2">
-                <TickCircle on />
-                <span className="min-w-0 flex-1 break-words text-[15px] font-medium text-dusk-text">{label}</span>
-                <button type="button" aria-label={`Remove ${label}`} onClick={() => setAdded(added.filter((a) => a !== label))} className="dusk-chip is-quiet shrink-0">
-                  <X className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <form
-            className="mt-3 flex items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              addRule();
-            }}
-          >
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={60} aria-label="Add a rule" placeholder="e.g. No alcohol" className="dusk-input min-w-0 flex-1 text-[15px]" />
-            <button type="submit" className="dusk-chip shrink-0">
-              <Plus className="h-4 w-4" /> Add
-            </button>
-          </form>
+          <label className="dusk-eyebrow block" htmlFor="start-diet">
+            Diet
+          </label>
+          <input id="start-diet" value={diet} onChange={(e) => setDiet(e.target.value)} maxLength={120} placeholder={template.diet} className="dusk-input mt-2 w-full text-[15px]" />
+          <p className="mt-2 text-[13px] text-dusk-mute">What you are following. You can change it later.</p>
         </div>
       )}
 

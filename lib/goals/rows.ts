@@ -4,11 +4,10 @@
  *
  * A row is one of:
  * - empty: tap it to log "Workout, 45 min" in the background;
- * - a workout: its minutes can be edited inline and it can be marked (outdoors).
+ * - a workout: tap it to take it back off (only one with no sets can go); it can be marked (outdoors).
  *
  * What the screen shows is the server's workouts for the day, changed by what the person has just done and the
- * server hasn't confirmed yet: workouts being saved (`pending`), ones just removed (`removed`), and edited
- * minutes (`minutesOver`).
+ * server hasn't confirmed yet: workouts being saved (`pending`) and ones just removed (`removed`).
  */
 
 import { z } from "zod";
@@ -32,7 +31,7 @@ export type PendingWorkout = {
 
 export type WorkoutRow =
   | { kind: "empty"; key: string }
-  | { kind: "workout"; key: string; sessionId: string | null; title: string; minutes: number | null; tags: string[]; saving: boolean; /** No sets: nothing is lost if it is removed. */ timeOnly: boolean };
+  | { kind: "workout"; key: string; sessionId: string | null; title: string; minutes: number | null; tags: string[]; saving: boolean; /** No sets: nothing is lost if it is removed, so a tap takes it off. */ timeOnly: boolean };
 
 export type RowsInput = {
   need: number;
@@ -42,17 +41,15 @@ export type RowsInput = {
   pending: PendingWorkout[];
   /** Session ids hidden because a Remove or an Undo is in flight. */
   removed: string[];
-  /** Minutes just edited, by session id (or a pending workout's temp id). */
-  minutesOver: Record<string, number>;
 };
 
-export function workoutRows({ need, sessions, mark, pending, removed, minutesOver }: RowsInput): WorkoutRow[] {
+export function workoutRows({ need, sessions, mark, pending, removed }: RowsInput): WorkoutRow[] {
   const gone = new Set(removed);
   const known = new Set(sessions.map((s) => s.id));
 
   const real: WorkoutRow[] = sessions
     .filter((s) => !gone.has(s.id))
-    .map((s) => ({ kind: "workout", key: s.id, sessionId: s.id, title: s.title, minutes: minutesOver[s.id] ?? s.minutes, tags: s.tags, saving: false, timeOnly: s.sets === 0 }));
+    .map((s) => ({ kind: "workout", key: s.id, sessionId: s.id, title: s.title, minutes: s.minutes, tags: s.tags, saving: false, timeOnly: s.sets === 0 }));
 
   const saving: WorkoutRow[] = pending
     // Hidden by Undo; or already part of the server's list; or removed since.
@@ -62,7 +59,7 @@ export function workoutRows({ need, sessions, mark, pending, removed, minutesOve
       key: p.tempId,
       sessionId: p.sessionId,
       title: "Workout",
-      minutes: minutesOver[p.sessionId ?? p.tempId] ?? p.minutes,
+      minutes: p.minutes,
       tags: p.outdoors && mark ? [mark] : [],
       saving: p.sessionId == null,
       timeOnly: true,
