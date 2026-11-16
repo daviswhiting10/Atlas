@@ -33,12 +33,12 @@ export function TodayScreen({
       <div className="rise">
         <Greeting name={athlete.firstName} />
         {athlete.isDemo && (
-          <Link href="/agents#demo" className="press mt-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink-soft hover:border-ink/25 hover:text-ink">
+          <Link href="/agents#demo" className="press mt-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 max-md:min-h-11 text-[13px] font-medium text-ink-soft hover:border-ink/25 hover:text-ink">
             Demo account · watch an AI assistant use this data <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         )}
         {athlete.isGuest && !athlete.isDemo && (
-          <Link href="/you" className="press mt-3 inline-flex items-center gap-1.5 rounded-full border border-signal/30 bg-signal/5 px-3 py-1.5 text-[13px] font-medium text-signal hover:bg-signal/10">
+          <Link href="/you" className="press mt-3 inline-flex items-center gap-1.5 rounded-full border border-signal/30 bg-signal/5 px-3 py-1.5 max-md:min-h-11 text-[13px] font-medium text-signal hover:bg-signal/10">
             Guest account · save it to keep your progress <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         )}
@@ -50,8 +50,8 @@ export function TodayScreen({
       {!plan && !athlete.selfServe && !athlete.isCoach && <p className="text-[14px] text-ink-mute">Your coach hasn&apos;t assigned a program yet. It will show up here as soon as they do.</p>}
 
       {plan && next && (
-        <section className="surface-night rise rise-1 p-6 sm:p-8">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/55">
+        <section className="surface-night rise rise-1 border border-line p-6 sm:p-8">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-mute">
             Up next · Week {next.week} of {plan.totalWeeks}
             {block ? ` · ${block.name}` : ""}
             {lighterWeek ? " · Deload week" : ""}
@@ -59,18 +59,18 @@ export function TodayScreen({
           <div className="mt-3 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">
               <h2 className="text-4xl leading-none sm:text-5xl">{next.name}</h2>
-              <p className="mt-3 truncate text-[15px] text-white/65">
+              <p className="mt-3 truncate text-[15px] text-ink-soft">
                 {next.exercises
                   .slice(0, 3)
                   .map((e) => e.name)
                   .join(" · ")}
                 {next.exercises.length > 3 ? ` + ${next.exercises.length - 3} more` : ""}
               </p>
-              <p className="mt-1 text-[13px] text-white/45">
+              <p className="mt-1 text-[13px] text-ink-mute">
                 {next.exercises.length} exercises · about {next.estMinutes} min
               </p>
             </div>
-            <Link href={`/workouts/${next.id}`} className="press flex h-14 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-8 text-base font-semibold text-ink hover:bg-white/90">
+            <Link href={`/workouts/${next.id}`} className="press flex h-14 shrink-0 items-center justify-center gap-2 rounded-xl bg-dusk-button px-8 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/90">
               Start workout <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -78,17 +78,17 @@ export function TodayScreen({
       )}
 
       {plan && !next && (
-        <section className="surface-night rise rise-1 p-8">
+        <section className="surface-night rise rise-1 border border-line p-8">
           <h2 className="text-4xl">Plan complete.</h2>
           {athlete.selfServe ? (
             <>
-              <p className="mt-3 max-w-md text-white/65">Every week done. Rebuild your plan to start the next cycle — your history carries over.</p>
-              <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 font-semibold text-ink">
+              <p className="mt-3 max-w-md text-ink-soft">Every week done. Rebuild your plan to start the next cycle — your history carries over.</p>
+              <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 font-semibold text-dusk-button-text">
                 Build the next one <ArrowRight className="h-4 w-4" />
               </Link>
             </>
           ) : (
-            <p className="mt-3 max-w-md text-white/65">Every workout in this program is done. Your coach will set up what comes next.</p>
+            <p className="mt-3 max-w-md text-ink-soft">Every workout in this program is done. Your coach will set up what comes next.</p>
           )}
         </section>
       )}

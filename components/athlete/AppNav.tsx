@@ -35,11 +35,11 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
     <>
       <header className={cn("sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl", inWorkout && "hidden md:block")}>
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-8 md:h-16">
-          <Link href="/today" aria-label="Atlas home">
+          <Link href="/today" aria-label="Atlas home" className="flex min-h-11 items-center">
             <Logo />
           </Link>
 
-          <nav className="hidden items-center gap-1 rounded-full border border-line bg-white/80 p-1 md:flex" aria-label="Main">
+          <nav className="hidden items-center gap-1 rounded-full border border-line bg-paper/80 p-1 md:flex" aria-label="Main">
             {TABS.map(({ href, label }) => (
               <Link
                 key={href}
@@ -47,7 +47,7 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
                 aria-current={isActive(href) ? "page" : undefined}
                 className={cn(
                   "press rounded-full px-4 py-1.5 text-sm font-medium",
-                  isActive(href) ? "bg-ink text-white" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
+                  isActive(href) ? "bg-ink text-bone" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
                 )}
               >
                 {label}
@@ -58,11 +58,11 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
           <div className="flex items-center gap-2">
             {isDemo && <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-medium text-ink-mute">Demo data</span>}
             {isCoach && (
-              <Link href="/log" className="press hidden h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-sm font-medium text-ink-soft hover:border-ink/20 hover:text-ink md:flex">
+              <Link href="/log" className="press hidden h-9 items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 text-sm font-medium text-ink-soft hover:border-ink/20 hover:text-ink md:flex">
                 <ArrowLeft className="h-4 w-4" /> Coaching
               </Link>
             )}
-            <Link href="/you" className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" aria-label="Your profile">
+            <Link href="/you" className="flex h-11 w-11 items-center justify-center rounded-full border border-line-strong bg-paper text-sm font-semibold text-ink md:h-9 md:w-9" aria-label="Your profile">
               {name.charAt(0).toUpperCase()}
             </Link>
           </div>
@@ -72,7 +72,7 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
       {!inWorkout && (
         <nav
           aria-label="Main"
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/90 backdrop-blur-xl md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           <div className="mx-auto flex max-w-md">

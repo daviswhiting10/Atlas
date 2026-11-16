@@ -9,11 +9,11 @@ export function StartLink({ canStart }: { canStart: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
       {canStart && (
-        <Link href="/goals/new" className="press inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+        <Link href="/goals/new" className="press inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
           <Plus className="h-4 w-4" /> Start a goal
         </Link>
       )}
-      <Link href="/workouts/new" className="press inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
+      <Link href="/workouts/new" className="press inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-ink-soft hover:text-ink">
         <Plus className="h-4 w-4" /> Log a workout
       </Link>
     </div>
