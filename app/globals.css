@@ -51,6 +51,19 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Tap targets on a phone ────────────────────────────────────────────────
+   The coach screens are made of many small controls (tabs, chips, upload buttons, selects). At phone
+   width every one of them is at least 44px tall, and an icon-only button is 44px wide too. */
+@media (max-width: 767px) {
+  .coach-ui :is(button, select, [role="tab"], summary),
+  .coach-ui input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+    min-height: 44px;
+  }
+  .coach-ui button:has(> svg:only-child) {
+    min-width: 44px;
+  }
+}
+
 /* ── Reduced motion ────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

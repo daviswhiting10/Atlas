@@ -11,11 +11,11 @@ const buttonVariants = cva(
         default:
           "bg-[var(--dusk-button)] text-[var(--dusk-button-text)] hover:bg-[color-mix(in_srgb,var(--dusk-button)_88%,transparent)]",
         outline:
-          "border-[var(--dusk-line-strong)] bg-transparent text-[var(--ink)] hover:bg-[rgba(236,232,225,0.06)]",
+          "border-[var(--dusk-line-strong)] bg-transparent text-[var(--ink)] hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]",
         secondary:
-          "bg-[rgba(124,199,189,0.12)] text-[var(--dusk-teal)] hover:bg-[rgba(124,199,189,0.2)]",
+          "bg-[color-mix(in_srgb,var(--dusk-teal)_12%,transparent)] text-[var(--dusk-teal)] hover:bg-[color-mix(in_srgb,var(--dusk-teal)_20%,transparent)]",
         ghost:
-          "hover:bg-[rgba(236,232,225,0.06)] text-[var(--ink-soft)] hover:text-[var(--ink)]",
+          "hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] text-[var(--ink-soft)] hover:text-[var(--ink)]",
         destructive:
           "bg-[rgba(242,135,122,0.12)] text-[var(--destructive)] hover:bg-[rgba(242,135,122,0.2)]",
         link:

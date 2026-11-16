@@ -12,7 +12,7 @@ const badgeVariants = cva(
       variant: {
         // Teal outlined: the accent state
         default:
-          "border-[rgba(124,199,189,0.35)] bg-[rgba(124,199,189,0.1)] text-[var(--dusk-teal)]",
+          "border-[color-mix(in_srgb,var(--dusk-teal)_35%,transparent)] bg-[color-mix(in_srgb,var(--dusk-teal)_10%,transparent)] text-[var(--dusk-teal)]",
         // Ink outlined — neutral/secondary
         secondary:
           "border-[var(--line)] bg-transparent text-[var(--ink-soft)]",
@@ -24,7 +24,7 @@ const badgeVariants = cva(
           "border-[var(--line)] bg-transparent text-[var(--ink)]",
         // Teal outlined: done
         success:
-          "border-[rgba(124,199,189,0.35)] bg-[rgba(124,199,189,0.1)] text-[var(--success)]",
+          "border-[color-mix(in_srgb,var(--dusk-teal)_35%,transparent)] bg-[color-mix(in_srgb,var(--dusk-teal)_10%,transparent)] text-[var(--success)]",
         // Peach outlined: needs you
         warn:
           "border-[rgba(235,181,154,0.4)] bg-[rgba(235,181,154,0.1)] text-[var(--warn)]",
