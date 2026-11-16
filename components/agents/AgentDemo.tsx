@@ -111,15 +111,15 @@ export function AgentDemo() {
 
   return (
     <div ref={rootRef} className="mx-auto max-w-3xl">
-      <div className="overflow-hidden rounded-2xl bg-night shadow-[0_30px_60px_-30px_rgba(11,15,26,0.6)]">
-        <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+      <div className="overflow-hidden rounded-2xl bg-night shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-signal">
-            <Sparkles className="h-3.5 w-3.5 text-white" />
+            <Sparkles className="h-3.5 w-3.5 text-ink" />
           </span>
-          <span className="text-[13px] font-semibold text-white">Assistant</span>
-          <span className="text-[12px] text-white/40">· connected to Atlas</span>
-          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-white/40">
-            <span className={cn("h-1.5 w-1.5 rounded-full", playing ? "animate-pulse bg-[#8FD3B0]" : "bg-white/25")} /> {playing ? "live" : "demo"}
+          <span className="text-[13px] font-semibold text-ink">Assistant</span>
+          <span className="text-[12px] text-ink-mute">· connected to Atlas</span>
+          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-ink-mute">
+            <span className={cn("h-1.5 w-1.5 rounded-full", playing ? "animate-pulse bg-dusk-teal" : "bg-ink/25")} /> {playing ? "live" : "demo"}
           </span>
         </div>
 
@@ -130,7 +130,7 @@ export function AgentDemo() {
             if (b.kind === "user") {
               return (
                 <div key={i} className="chat-in flex justify-end">
-                  <div className="max-w-[82%] rounded-2xl rounded-br-md bg-white px-3.5 py-2 text-[14.5px] leading-snug text-ink">
+                  <div className="max-w-[82%] rounded-2xl rounded-br-md bg-dusk-button px-3.5 py-2 text-[14.5px] leading-snug text-dusk-button-text">
                     {isPending ? <Dots dark /> : b.text}
                   </div>
                 </div>
@@ -139,7 +139,7 @@ export function AgentDemo() {
             if (b.kind === "bot") {
               return (
                 <div key={i} className="chat-in flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-white/[0.08] px-3.5 py-2 text-[14.5px] leading-snug text-white/90">
+                  <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-paper/[0.08] px-3.5 py-2 text-[14.5px] leading-snug text-ink">
                     {isPending ? <Dots /> : b.text}
                   </div>
                 </div>
@@ -150,15 +150,15 @@ export function AgentDemo() {
                 <span
                   className={cn(
                     "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
-                    isPending ? "border border-white/30" : b.refused ? "bg-[#E3B05F]/20 text-[#E3B05F]" : "bg-[#8FD3B0]/15 text-[#8FD3B0]"
+                    isPending ? "border border-line" : b.refused ? "bg-dusk-peach/20 text-dusk-peach" : "bg-dusk-teal/15 text-dusk-teal"
                   )}
                 >
-                  {isPending ? <span className="h-1.5 w-1.5 animate-ping rounded-full bg-white/60" /> : b.refused ? <X className="h-2.5 w-2.5" /> : <Check className="h-2.5 w-2.5" />}
+                  {isPending ? <span className="h-1.5 w-1.5 animate-ping rounded-full bg-paper/60" /> : b.refused ? <X className="h-2.5 w-2.5" /> : <Check className="h-2.5 w-2.5" />}
                 </span>
                 <span className="min-w-0 truncate">
-                  <span className="text-white/75">{b.tool}</span>
-                  {b.args && <span className="text-white/35"> ({b.args})</span>}
-                  {!isPending && <span className={b.refused ? "text-[#E3B05F]" : "text-white/50"}> → {b.result}</span>}
+                  <span className="text-ink-soft">{b.tool}</span>
+                  {b.args && <span className="text-ink-mute"> ({b.args})</span>}
+                  {!isPending && <span className={b.refused ? "text-dusk-peach" : "text-ink-mute"}> → {b.result}</span>}
                 </span>
               </div>
             );
@@ -175,7 +175,7 @@ export function AgentDemo() {
           type="button"
           onClick={play}
           disabled={playing}
-          className="press flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-ink/25 disabled:opacity-40"
+          className="press flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/25 disabled:opacity-40"
         >
           {done ? <RotateCcw className="h-4 w-4" /> : <Play className="h-3.5 w-3.5 fill-current" />}
           {done ? "Replay" : playing ? "Playing" : "Play"}
@@ -190,7 +190,7 @@ function Dots({ dark = false }: { dark?: boolean }) {
   return (
     <span className="flex h-5 items-center gap-1" aria-label="typing">
       {[0, 1, 2].map((i) => (
-        <span key={i} className={cn("h-1.5 w-1.5 animate-bounce rounded-full", dark ? "bg-ink/40" : "bg-white/50")} style={{ animationDelay: `${i * 120}ms`, animationDuration: "900ms" }} />
+        <span key={i} className={cn("h-1.5 w-1.5 animate-bounce rounded-full", dark ? "bg-ink/40" : "bg-paper/50")} style={{ animationDelay: `${i * 120}ms`, animationDuration: "900ms" }} />
       ))}
     </span>
   );
