@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LoadedGoal, GoalRow, GoalSession } from "./data";
 import { evaluateGoal, type CheckInInput } from "./evaluate";
 import { GoalRules } from "./rules";
-import { SEVENTY_FIVE_HARD } from "./templates";
+import { DEFAULT_DIET, SEVENTY_FIVE_HARD } from "./templates";
 import { todayView } from "./today";
 
 const NOW = new Date("2026-11-15T12:00:00Z");
@@ -20,22 +20,26 @@ const workout = (id: string, day: string, minutes: number | null): GoalSession =
 const withRules = (change: (r: GoalRules["rules"][number]) => GoalRules["rules"][number], extra: Record<string, unknown> = {}) =>
   GoalRules.parse({ ...SEVENTY_FIVE_HARD.rules, ...extra, rules: SEVENTY_FIVE_HARD.rules.rules.map(change) });
 
-describe("todayView: the rules in the collapsed area", () => {
-  it("lists every rule, in order, and each running one can be stopped", () => {
-    const v = todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW);
-    expect(v.manage.rules.map((r) => r.label)).toEqual(["Two workouts, 45+ min", "One of them outdoors", "Water", "Reading", "Diet", "Progress photo"]);
-    expect(v.manage.rules.every((r) => r.removable)).toBe(true);
+describe("todayView: the diet, the one thing a person writes", () => {
+  it("a goal without its own words shows the default diet, on the diet row and in the collapsed area", () => {
+    const v = todayView(loaded(withRules((r) => (r.key === "diet" && r.kind === "check_in" ? { ...r, detail: undefined } : r)), "2026-11-15"), NOW);
+    expect(v.manage.diet).toBe(DEFAULT_DIET);
+    expect(v.rules.find((r) => r.key === "diet")?.detail).toBe(DEFAULT_DIET);
   });
 
-  it("a rule already set to stop (after today) is shown but can't be stopped again", () => {
-    const rules = withRules((r) => (r.key === "water" ? { ...r, toDay: "2026-11-15" } : r));
-    const water = todayView(loaded(rules, "2026-11-15"), NOW).manage.rules.find((r) => r.key === "water");
-    expect(water).toEqual({ key: "water", label: "Water", removable: false });
+  it("shows the person's own words, and no other rule carries a line", () => {
+    const v = todayView(loaded(withRules((r) => (r.key === "diet" && r.kind === "check_in" ? { ...r, detail: "Keto, no sugar" } : r)), "2026-11-15"), NOW);
+    expect(v.manage.diet).toBe("Keto, no sugar");
+    expect(v.rules.filter((r) => r.detail).map((r) => r.key)).toEqual(["diet"]);
   });
 
-  it("a rule that stopped before today is not shown", () => {
-    const rules = withRules((r) => (r.key === "water" ? { ...r, toDay: "2026-11-14" } : r));
-    expect(todayView(loaded(rules, "2026-11-10"), NOW).manage.rules.map((r) => r.key)).not.toContain("water");
+  it("a goal with no diet rule has none to edit", () => {
+    const rules = GoalRules.parse({ ...SEVENTY_FIVE_HARD.rules, rules: SEVENTY_FIVE_HARD.rules.rules.filter((r) => r.key !== "diet") });
+    expect(todayView(loaded(rules, "2026-11-15"), NOW).manage.diet).toBeNull();
+  });
+
+  it("credits the challenge", () => {
+    expect(todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW).manage.credit).toBe("75 Hard by Andy Frisella");
   });
 });
 

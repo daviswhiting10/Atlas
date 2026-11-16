@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Sun } from "lucide-react";
-import { toast } from "sonner";
-import { WorkoutMinutes, type WorkoutRow } from "@/lib/goals/rows";
+import type { WorkoutRow } from "@/lib/goals/rows";
 import { TickCircle } from "./TickCircle";
 import { useTodayLive } from "./TodayLive";
 
@@ -11,16 +9,16 @@ type Logged = Extract<WorkoutRow, { kind: "workout" }>;
 
 /**
  * The day's workouts: one row for each the goal needs. An empty row is one tap (it logs "Workout, 45 min"
- * in the background); a logged row shows its minutes, which can be edited right there, and carries the
- * tag (outdoors) as a toggle. Must sit inside <TodayLive>; renders <li>s for a list.
+ * in the background); tap a logged row again and it comes back off, at any time while its day can still be
+ * changed. A row is only that: there are no minutes to edit. A logged row carries the tag (outdoors) as a
+ * toggle. A workout logged with sets can't be taken off from here (only one with no sets loses nothing), so
+ * its row isn't a button. Must sit inside <TodayLive>; renders <li>s for a list.
  *
  * `which` picks the day: today's rows, or yesterday's while "Yesterday is still open" (a tap there logs the
- * workout dated to yesterday, and Undo takes it back the same way).
+ * workout dated to yesterday, and a second tap takes it back the same way).
  */
 export function WorkoutRows({ which = "today" }: { which?: "today" | "yesterday" }) {
   const live = useTodayLive();
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
   const w = live?.view.workout;
   if (!live || !w) return null;
   const mark = w.mark;
@@ -29,19 +27,6 @@ export function WorkoutRows({ which = "today" }: { which?: "today" | "yesterday"
   // Yesterday's rows sit inside a narrower panel, so the tag is just its icon there (still named for screen readers).
   const iconOnly = which === "yesterday" && mark === "outdoors";
   const chipClass = iconOnly ? "dusk-chip shrink-0 !px-0" : "dusk-chip shrink-0";
-
-  const open = (row: Logged) => {
-    if (!row.sessionId) return; // still saving: a moment
-    setDraft(row.minutes != null ? String(row.minutes) : "");
-    setEditing(row.sessionId);
-  };
-  const commit = (row: Logged) => {
-    const n = Number(draft);
-    const ok = WorkoutMinutes.safeParse(n);
-    if (!ok.success) return void toast("Enter the minutes, 1 to 600.", { duration: 3500 });
-    setEditing(null);
-    if (row.sessionId && n !== row.minutes) live.editMinutes(row.sessionId, n);
-  };
 
   const toggle = (row: Logged) => {
     if (!mark) return null;
@@ -72,53 +57,29 @@ export function WorkoutRows({ which = "today" }: { which?: "today" | "yesterday"
           );
         }
 
-        if (editing != null && editing === row.sessionId) {
-          return (
-            <li key={i} className="py-2">
-              <div className="flex min-h-[44px] flex-wrap items-center gap-x-3 gap-y-2">
-                <TickCircle on />
-                <span className="text-[15px] font-medium text-dusk-text">{row.title} ·</span>
-                <input
-                  autoFocus
-                  inputMode="numeric"
-                  aria-label="Minutes"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value.replace(/\D/g, ""))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commit(row);
-                    if (e.key === "Escape") setEditing(null);
-                  }}
-                  className="dusk-input w-[72px] text-center tabular-nums"
-                />
-                <span className="text-[14px] text-dusk-mute">min</span>
-                <button type="button" onClick={() => commit(row)} className="dusk-button !px-4">
-                  Done
-                </button>
-                {row.timeOnly && row.sessionId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing(null);
-                      live.removeRow(row.sessionId as string);
-                    }}
-                    className="dusk-chip is-quiet"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        }
-
+        const label = (
+          <>
+            <TickCircle on />
+            <span className="min-w-0 truncate text-[15px] font-medium text-dusk-text">
+              {row.title} · {row.minutes != null ? `${row.minutes} min` : <span className="text-dusk-mute">no time</span>}
+            </span>
+          </>
+        );
         return (
           <li key={i} className="flex min-h-[56px] items-center gap-3 py-1.5">
-            <button type="button" disabled={row.saving} onClick={() => open(row)} aria-label="Edit minutes" className="dusk-row flex min-h-[44px] min-w-0 flex-1 items-center gap-3 text-left">
-              <TickCircle on />
-              <span className="min-w-0 truncate text-[15px] font-medium text-dusk-text">
-                {row.title} · {row.minutes != null ? `${row.minutes} min` : <span className="text-dusk-peach">add time</span>}
-              </span>
-            </button>
+            {row.timeOnly ? (
+              <button
+                type="button"
+                aria-pressed
+                onClick={() => live.unlog(row.key, row.sessionId)}
+                aria-label={`Undo ${row.title}${row.minutes != null ? `, ${row.minutes} minutes` : ""}${when}`}
+                className="dusk-row flex min-h-[44px] min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                {label}
+              </button>
+            ) : (
+              <div className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3">{label}</div>
+            )}
             {toggle(row)}
           </li>
         );

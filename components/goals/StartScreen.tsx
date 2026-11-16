@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { SEVENTY_FIVE_HARD } from "@/lib/goals/templates";
+import { DEFAULT_DIET, SEVENTY_FIVE_HARD } from "@/lib/goals/templates";
 import { StartGoalForm } from "./StartGoalForm";
 
 /**
@@ -16,7 +16,7 @@ export function StartScreen({ today }: { today: string }) {
         <ArrowLeft className="h-4 w-4" /> Today
       </Link>
       <h1 className="sr-only">Start a goal</h1>
-      <StartGoalForm template={{ key: t.key, name: t.name, blurb: t.blurb, length: t.rules.length.days, rules: t.rules.rules.map((r) => ({ key: r.key, label: r.label })) }} today={today} />
+      <StartGoalForm template={{ key: t.key, name: t.name, blurb: t.blurb, credit: t.credit, length: t.rules.length.days, diet: DEFAULT_DIET }} today={today} />
     </div>
   );
 }
