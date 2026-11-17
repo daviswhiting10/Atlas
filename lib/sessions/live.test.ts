@@ -33,11 +33,11 @@ describe("live session store", () => {
   });
 
   it("keeps the start time and place when the same workout is reopened, and starts fresh for another", () => {
-    const first = { ...startLive(null, base, 1_000), scrollY: 640, openBlocks: [2] };
+    const first = { ...startLive(null, base, 1_000), scrollY: 640, order: [{ aweId: "a", section: "block:1" }] };
     const again = startLive(first, { ...base, workoutLogId: "wl1" }, 9_000);
-    expect(again).toMatchObject({ startedAt: 1_000, updatedAt: 9_000, scrollY: 640, openBlocks: [2], workoutLogId: "wl1" });
+    expect(again).toMatchObject({ startedAt: 1_000, updatedAt: 9_000, scrollY: 640, order: [{ aweId: "a", section: "block:1" }], workoutLogId: "wl1" });
     const other = startLive(first, { ...base, assignedWorkoutId: "aw2" }, 9_000);
-    expect(other).toMatchObject({ startedAt: 9_000, scrollY: 0, openBlocks: [], draft: null });
+    expect(other).toMatchObject({ startedAt: 9_000, scrollY: 0, order: null, draft: null });
   });
 });
 

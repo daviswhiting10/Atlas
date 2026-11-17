@@ -2,8 +2,8 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { parts, structure } from "@/lib/workouts/structure";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { LIVE_EVENT, clearLive, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -24,6 +23,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  GripVertical,
   Loader2,
   Mic,
   MicOff,
@@ -43,6 +46,7 @@ import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExerci
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
+import { fromRows, labelsOf, moveRow, sessionOrder, stepRow, toRows, type OrderEntry, type ReorderRow } from "@/lib/sessions/order";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -275,7 +279,7 @@ export default function WorkoutLogger({
   completed,
   uploadsEnabled,
   workspaceId,
-  exercises,
+  exercises: planExercises,
   existingWorkoutLogId,
   sessionDate,
   existingSetLogs,
@@ -302,6 +306,24 @@ export default function WorkoutLogger({
   availableWorkouts: WorkoutOption[];
 }) {
   const router = useRouter();
+
+  // ── This session's order (Reorder mode) ──────────────────────────────────────
+  // Kept on this phone with the live session and cleared when the session is finished. The plan
+  // is never changed, and sets follow their exercise (each set points at it, not at a place).
+  const [savedOrder, setSavedOrder] = useState<OrderEntry[] | null>(null);
+  const order = useMemo(
+    () => sessionOrder(planExercises.map((e) => ({ aweId: e.aweId, section: e.section })), savedOrder),
+    [planExercises, savedOrder]
+  );
+  /** The exercises in this session's order, each in the part it was moved to. */
+  const exercises = useMemo(() => {
+    const byId = new Map(planExercises.map((e) => [e.aweId, e]));
+    return order.flatMap((o) => {
+      const ex = byId.get(o.aweId);
+      return ex ? [{ ...ex, section: o.section }] : [];
+    });
+  }, [planExercises, order]);
+  const [reordering, setReordering] = useState(false);
 
   // ── Shared state ────────────────────────────────────────────────────────────
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingWorkoutLogId);
@@ -334,16 +356,6 @@ export default function WorkoutLogger({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // ── Collapsible blocks (mobile) — start with the first unfinished block open ──
-  const [expandedBlocks, setExpandedBlocks] = useState<Set<number>>(() => {
-    const initial = buildInitialState(exercises, existingSetLogs);
-    const blocks = groupIntoBlocks(exercises);
-    const idx = blocks.findIndex((b) =>
-      b.exIndices.some((exI) => initial[exercises[exI].aweId].sets.some((s) => !s.completed))
-    );
-    return new Set([idx === -1 ? 0 : idx]);
-  });
-
   // ── Live session: the "currently logging" bar on other screens, and coming back to this exact place ──
   // (lib/sessions/live). The database has every ticked set; this keeps the place on the screen.
   const liveRef = useRef<LiveSession | null>(null);
@@ -373,8 +385,9 @@ export default function WorkoutLogger({
     if (prev?.assignedWorkoutId === assignedWorkoutId) {
       restoringRef.current = prev.draft != null;
       setExState((cur) => mergeDraft(cur, prev, { assignedWorkoutId, workoutLogId: existingWorkoutLogId }));
-      if (prev.openBlocks.length > 0) setExpandedBlocks(new Set(prev.openBlocks));
-      // After the restored blocks have rendered.
+      const sameSession = !prev.workoutLogId || !existingWorkoutLogId || prev.workoutLogId === existingWorkoutLogId;
+      if (sameSession && prev.order?.length) setSavedOrder(prev.order);
+      // After the restored sets have rendered.
       if (prev.scrollY > 0) setTimeout(() => window.scrollTo({ top: prev.scrollY }), 50);
     }
     // Saved at most every 150ms (a timer, not animation frames: those pause in background tabs).
@@ -414,7 +427,7 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignedWorkoutId, completed]);
 
-  // Keep what's typed, which blocks are open, and the session id.
+  // Keep what's typed, the order, and the session id. (Which cards are folded is this screen's alone.)
   useEffect(() => {
     if (!liveRef.current || finished) return;
     // The restore is still on its way into exState: the next run saves the merged state.
@@ -425,13 +438,13 @@ export default function WorkoutLogger({
     const draft = Object.fromEntries(
       Object.entries(exState).map(([aweId, st]) => [aweId, { ...st, noteSaving: false, sets: st.sets.map((x) => ({ ...x, saving: false })) }])
     );
-    liveRef.current = { ...liveRef.current, draft, openBlocks: Array.from(expandedBlocks), workoutLogId: workoutLogId ?? liveRef.current.workoutLogId, updatedAt: Date.now() };
+    liveRef.current = { ...liveRef.current, draft, order: savedOrder, workoutLogId: workoutLogId ?? liveRef.current.workoutLogId, updatedAt: Date.now() };
     try {
       writeLive(window.localStorage, liveRef.current);
     } catch {
       // no storage: nothing to keep
     }
-  }, [exState, expandedBlocks, workoutLogId, finished]);
+  }, [exState, savedOrder, workoutLogId, finished]);
 
   // Done: the bar goes.
   useEffect(() => {
@@ -445,22 +458,12 @@ export default function WorkoutLogger({
     window.dispatchEvent(new Event(LIVE_EVENT));
   }, [finished, assignedWorkoutId]);
 
-  function toggleBlock(bi: number) {
-    setExpandedBlocks((prev) => {
-      const next = new Set(prev);
-      if (next.has(bi)) next.delete(bi);
-      else next.add(bi);
-      return next;
-    });
-  }
-
   // An exercise added or swapped mid-session arrives in new props: give it fresh
-  // set rows, and open its block so it's in view.
+  // set rows, and open its card so it's in view.
   const seenExercises = useRef(new Map(exercises.map((e) => [e.aweId, e.exerciseId])));
   useEffect(() => {
     const seen = seenExercises.current;
     const fresh = exercises.filter((e) => seen.get(e.aweId) !== e.exerciseId);
-    const added = exercises.filter((e) => !seen.has(e.aweId));
     seenExercises.current = new Map(exercises.map((e) => [e.aweId, e.exerciseId]));
     if (fresh.length === 0) return;
     setExState((prev) => {
@@ -468,24 +471,20 @@ export default function WorkoutLogger({
       for (const ex of fresh) next[ex.aweId] = freshState(ex);
       return next;
     });
-    if (added.length > 0) {
-      const blocks = groupIntoBlocks(exercises);
-      setExpandedBlocks((prev) => {
-        const next = new Set(prev);
-        blocks.forEach((b, bi) => {
-          if (b.exIndices.some((i) => added.some((a) => a.aweId === exercises[i].aweId))) next.add(bi);
-        });
-        return next;
-      });
-    }
+    setFoldOverride((prev) => {
+      const next = { ...prev };
+      for (const ex of fresh) delete next[ex.aweId];
+      return next;
+    });
   }, [exercises]);
 
   /** An exercise's set rows; new ones before the effect above has stored them. */
   const stateFor = (ex: LoggerExercise): ExerciseState => exState[ex.aweId] ?? freshState(ex);
 
   // ── Mobile-specific state ────────────────────────────────────────────────────
-  // A finished exercise folds to one line; these are the ones opened again by hand.
-  const [reopened, setReopened] = useState<Set<string>>(() => new Set());
+  // Folded cards. An exercise folds by itself once every set is logged; a tap on its chevron
+  // folds (true) or opens (false) it by hand. Kept on this screen only, never saved.
+  const [foldOverride, setFoldOverride] = useState<Record<string, boolean>>({});
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
   const [restSecs, setRestSecs] = useState(0);
@@ -515,7 +514,6 @@ export default function WorkoutLogger({
     }
   }
 
-  const isResuming = existingWorkoutLogId != null;
   const dateLabel = new Date(logDate + "T12:00:00").toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -617,11 +615,11 @@ export default function WorkoutLogger({
         completed: !entry.completed,
         setLogId: result.setLogId,
       });
-      // Logging the last open set folds the exercise to its one-line summary.
+      // Logging the last open set folds the exercise to one row (whatever was set by hand before).
       if (!entry.completed && exState[aweId].sets.every((x, i) => i === idx || x.completed)) {
-        setReopened((prev) => {
-          const next = new Set(prev);
-          next.delete(aweId);
+        setFoldOverride((prev) => {
+          const next = { ...prev };
+          delete next[aweId];
           return next;
         });
       }
@@ -822,19 +820,11 @@ export default function WorkoutLogger({
     const sets = stateFor(ex).sets;
     return sets.length > 0 && sets.every((x) => x.completed);
   };
-  const isFolded = (ex: LoggerExercise) => isDone(ex) && !reopened.has(ex.aweId);
-  function setOpen(aweId: string, open: boolean) {
-    setReopened((prev) => {
-      const next = new Set(prev);
-      if (open) next.add(aweId);
-      else next.delete(aweId);
-      return next;
-    });
-  }
-  /** Open an exercise's block (and the exercise, if it was folded) and bring it under the top bar. */
+  const isFolded = (ex: LoggerExercise) => foldOverride[ex.aweId] ?? isDone(ex);
+  const setFolded = (aweId: string, folded: boolean) => setFoldOverride((prev) => ({ ...prev, [aweId]: folded }));
+  /** Open an exercise and bring it under the top bar. */
   function jumpTo(ex: LoggerExercise) {
-    const bi = groupIntoBlocks(exercises).findIndex((b) => b.exIndices.some((i) => exercises[i].aweId === ex.aweId));
-    if (bi !== -1) setExpandedBlocks((prev) => new Set(prev).add(bi));
+    setFolded(ex.aweId, false);
     window.requestAnimationFrame(() =>
       window.requestAnimationFrame(() => cardRefs.current[ex.aweId]?.scrollIntoView({ behavior: "smooth", block: "start" }))
     );
@@ -1117,13 +1107,21 @@ export default function WorkoutLogger({
           <span className="max-w-[100px] truncate">{clientName}</span>
         </Link>
         <div className="flex items-center gap-2">
-          {isResuming && !completed && <Badge variant="warn">Resuming</Badge>}
           <div
             className="text-xs font-semibold tabular-nums px-2.5 py-1 rounded-full"
             style={{ border: "1px solid var(--line)", color: "var(--ink)" }}
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {reordering ? (
+            <button
+              type="button"
+              onClick={() => setReordering(false)}
+              className="logger-quiet flex h-9 shrink-0 items-center gap-1 rounded-full bg-dusk-button px-4 text-[14px] font-semibold text-dusk-button-text"
+            >
+              <Check className="h-4 w-4" strokeWidth={2.5} /> Done
+            </button>
+          ) : (
           <Button
             size="sm"
             disabled={completing || !anyCompleted}
@@ -1137,12 +1135,22 @@ export default function WorkoutLogger({
             )}
             Done
           </Button>
+          )}
         </div>
         </div>
         {/* Jump bar: every exercise, one tap away */}
-        {exercises.length > 1 && (
-          <nav aria-label="Exercises in this workout" className="-mx-4 mt-2 px-4">
-            <ol className="no-scrollbar flex gap-1.5 overflow-x-auto">
+        {!reordering && exercises.length > 1 && (
+          <nav aria-label="Exercises in this workout" className="-mx-4 mt-2 flex items-center gap-1.5 px-4">
+            {!completed && (
+              <button
+                type="button"
+                onClick={() => setReordering(true)}
+                className="logger-quiet flex h-8 shrink-0 items-center gap-1 rounded-full border border-line-strong px-2.5 text-[12px] font-semibold text-ink-soft hover:text-ink"
+              >
+                <ArrowUpDown className="h-3.5 w-3.5" /> Reorder
+              </button>
+            )}
+            <ol className="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
               {exercises.map((ex, i) => {
                 const done = isDone(ex);
                 const next = ex.aweId === upNext;
@@ -1188,107 +1196,37 @@ export default function WorkoutLogger({
         </button>
       )}
 
-      {/* ── Exercise list, grouped by block ─────────────────────────── */}
-      <div className="space-y-2">
+      {/* ── Reorder mode: every exercise as one row, moved by drag or arrows ───── */}
+      {reordering ? (
+        <ReorderList
+          order={order}
+          names={Object.fromEntries(exercises.map((e) => [e.aweId, e.name]))}
+          onChange={setSavedOrder}
+        />
+      ) : (
+      <div className="space-y-4">
         {groupIntoBlocks(exercises).map((block, bi) => {
-          // Warm-up, Block n and Cool-down always show (an empty part says "None").
-          const blockLabel = block.title;
-          const isCollapsible = block.exIndices.length > 0;
-          const isExpanded = !isCollapsible || expandedBlocks.has(bi);
-          const totalSets = block.exIndices.reduce(
-            (sum, exI) => sum + stateFor(exercises[exI]).sets.length,
-            0
-          );
-          const doneSets = block.exIndices.reduce(
-            (sum, exI) => sum + stateFor(exercises[exI]).sets.filter((s) => s.completed).length,
-            0
-          );
-          const blockDone = totalSets > 0 && doneSets === totalSets;
+          if (block.exIndices.length === 0) return null;
+          // No block headings: each card's label ("1A: Bench Press") shows the grouping.
+          // Warm-up and Cool-down keep a thin divider.
+          const isPart = block.section === WARMUP || block.section === COOLDOWN;
           return (
             <div key={bi} className="space-y-2">
-              {blockLabel && (
-                <button
-                  type="button"
-                  onClick={() => toggleBlock(bi)}
-                  className="logger-quiet w-full flex items-center gap-2 py-1 touch-manipulation"
-                >
-                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground min-w-0 truncate">
-                    {blockLabel}
-                  </span>
-                  <div className="flex-1 h-px bg-border shrink-0 min-w-[10px]" />
-                  {blockDone ? (
-                    <Check className="w-3.5 h-3.5 text-[var(--success)] shrink-0" />
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                      {doneSets}/{totalSets}
-                    </span>
-                  )}
-                  {isExpanded ? (
-                    <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  )}
-                </button>
-              )}
-              {block.exIndices.length === 0 && <p className="px-1 pb-1 text-xs text-muted-foreground">None</p>}
-              {!isExpanded && (
-                <button
-                  type="button"
-                  onClick={() => toggleBlock(bi)}
-                  className="w-full text-left text-xs text-muted-foreground px-1 pb-1 line-clamp-2 break-words touch-manipulation"
-                >
-                  {block.exIndices.map((exI) => exercises[exI].name).join(" · ")}
-                </button>
-              )}
-              {isExpanded && block.exIndices.map((exI, k) => {
+              {isPart && <PartDivider title={block.title} />}
+              {block.exIndices.map((exI, k) => {
                 const ex = exercises[exI];
                 const state = stateFor(ex);
                 const secs = ex.prescribedSets[0]?.unit === "secs";
                 if (isFolded(ex)) {
-                  const summary = describeSets(
-                    state.sets.map((x) => ({
-                      weight: x.isBodyweight || x.isBand ? null : x.weight ? parseFloat(x.weight) : null,
-                      bandColor: x.isBand ? x.bandColor : null,
-                      reps: x.reps ? parseInt(x.reps, 10) : null,
-                    })),
-                    secs
-                  );
                   return (
                     <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
-                      <button type="button" onClick={() => setOpen(ex.aweId, true)} aria-expanded={false} className="flex w-full items-center gap-2.5 px-3 py-2 text-left">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/20 text-[var(--success)]">
-                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                        </span>
-                        <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3">
-                          <ExerciseName name={ex.name} inControl className="text-[15px] font-semibold leading-snug text-ink" />
-                          <span className="text-[14px] tabular-nums text-ink-soft">{summary}</span>
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
-                      </button>
+                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} />
                     </section>
                   );
                 }
                 return (
                   <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper px-3 pb-1 pt-2">
-                    <CompactHeader
-                      ex={ex}
-                      index={block.labels[k]}
-                      isEditing={editingAweId === ex.aweId}
-                      busy={busy}
-                      onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
-                      onFold={isDone(ex) ? () => setOpen(ex.aweId, false) : undefined}
-                    />
-                    {editingAweId === ex.aweId && (
-                      <ChangePanel
-                        ex={ex}
-                        setCount={state.sets.length}
-                        busy={busy}
-                        onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
-                        onTargets={(t) => handleSetTargets(ex, t)}
-                        onRemove={() => handleRemoveExercise(ex)}
-                        media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
-                      />
-                    )}
+                    <CompactHeader ex={ex} index={block.labels[k]} onFold={() => setFolded(ex.aweId, true)} />
 
                     <SetTable
                       secs={secs}
@@ -1309,6 +1247,7 @@ export default function WorkoutLogger({
                       >
                         <Plus className="h-3.5 w-3.5" /> Add set
                       </button>
+                      <span className="flex-1" />
                       {state.noteAdded ? (
                         <span className="px-1 text-[13px] text-[var(--success)]">Note saved ✓</span>
                       ) : (
@@ -1321,7 +1260,21 @@ export default function WorkoutLogger({
                           <PencilLine className="h-3.5 w-3.5" /> Note
                         </button>
                       )}
+                      <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                     </div>
+                    {editingAweId === ex.aweId && (
+                      <div className="pb-2">
+                        <ChangePanel
+                          ex={ex}
+                          setCount={state.sets.length}
+                          busy={busy}
+                          onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                          onTargets={(t) => handleSetTargets(ex, t)}
+                          onRemove={() => handleRemoveExercise(ex)}
+                          media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
+                        />
+                      </div>
+                    )}
                     {state.noteOpen && !state.noteAdded && (
                       <div className="mt-1 flex gap-1.5 pb-1">
                         <Input
@@ -1359,12 +1312,14 @@ export default function WorkoutLogger({
           );
         })}
       </div>
+      )}
 
-      {addExercise}
+      {!reordering && addExercise}
 
-      {soapPanel}
+      {!reordering && soapPanel}
 
       {/* ── Finish session ───────────────────────────────────────── */}
+      {!reordering && (
       <Button
         className="w-full h-12 text-base mt-4"
         disabled={completing || !anyCompleted}
@@ -1379,6 +1334,7 @@ export default function WorkoutLogger({
           "Finish session"
         )}
       </Button>
+      )}
 
       {/* ── Floating rest timer ──────────────────────────────────── */}
       {lastSetAt && (
@@ -1438,7 +1394,6 @@ export default function WorkoutLogger({
               onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
               className="sr-only"
             />
-            {isResuming && !completed && <Badge variant="warn">Resuming</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1461,18 +1416,12 @@ export default function WorkoutLogger({
       {/* Exercise cards — grouped by block */}
       <div className="space-y-4">
         {groupIntoBlocks(exercises).map((block) =>
-          block.exIndices.length === 0 ? (
-            <div key={block.section} className="flex items-center gap-3 pt-1 pb-0">
-              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{block.title}</span>
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">None</span>
-            </div>
-          ) : (
+          block.exIndices.length === 0 ? null : (
             block.exIndices.map((exI, k) => {
           const ex = exercises[exI];
           const state = stateFor(ex);
-          // A header at the start of each part (Warm-up, Block n, Cool-down).
-          const showBlockHeader = k === 0;
+          // A thin divider before the Warm-up and the Cool-down; blocks show through the labels.
+          const showBlockHeader = k === 0 && (block.section === WARMUP || block.section === COOLDOWN);
           const blockHeaderLabel = block.title;
 
           return (
@@ -1485,33 +1434,23 @@ export default function WorkoutLogger({
                   <div className="flex-1 h-px bg-border" />
                 </div>
               )}
+            {isFolded(ex) ? (
+              <div className="mt-2 rounded-xl border border-line bg-paper">
+                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} />
+              </div>
+            ) : (
             <Card>
               <CardHeader className="pb-2 pt-4 px-4">
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-ink shrink-0"
-                        style={{ background: "var(--blue)" }}
-                      >
-                        {block.labels[k]}
-                      </div>
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
-                      <CardTitle className="text-sm font-semibold leading-tight min-w-0"><ExerciseName name={ex.name} /></CardTitle>
+                      <CardTitle className="text-base font-semibold leading-tight min-w-0"><ExerciseName name={labelled(block.labels[k], ex.name)} /></CardTitle>
                     </div>
-                    <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
+                    <div className="-mr-1.5 shrink-0">
+                      <CollapseButton name={ex.name} onClick={() => setFolded(ex.aweId, true)} />
+                    </div>
                   </div>
-                  {editingAweId === ex.aweId && (
-                    <ChangePanel
-                      ex={ex}
-                      setCount={state.sets.length}
-                      busy={busy}
-                      onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
-                      onTargets={(t) => handleSetTargets(ex, t)}
-                      onRemove={() => handleRemoveExercise(ex)}
-                      media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
-                    />
-                  )}
                   <p className="text-xs text-muted-foreground mt-0.5">{rxLabel(ex)}</p>
                 </div>
                 <LastWeek ex={ex} />
@@ -1531,14 +1470,28 @@ export default function WorkoutLogger({
                   );
                 })}
 
-                <button
-                  type="button"
-                  onClick={() => addSet(ex.aweId)}
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mt-1 px-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add set
-                </button>
+                <div className="mt-1 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => addSet(ex.aweId)}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add set
+                  </button>
+                  <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
+                </div>
+                {editingAweId === ex.aweId && (
+                  <ChangePanel
+                    ex={ex}
+                    setCount={state.sets.length}
+                    busy={busy}
+                    onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                    onTargets={(t) => handleSetTargets(ex, t)}
+                    onRemove={() => handleRemoveExercise(ex)}
+                    media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
+                  />
+                )}
 
                 <div className="pt-2 border-t mt-2">
                   {state.noteAdded ? (
@@ -1571,6 +1524,7 @@ export default function WorkoutLogger({
                 </div>
               </CardContent>
             </Card>
+            )}
             </div>
           );
             })
@@ -1608,37 +1562,25 @@ export default function WorkoutLogger({
 function CompactHeader({
   ex,
   index,
-  isEditing,
-  busy,
-  onToggleEdit,
   onFold,
 }: {
   ex: LoggerExercise;
   index: number | string;
-  isEditing: boolean;
-  busy: boolean;
-  onToggleEdit: () => void;
-  /** A finished exercise opened again: fold it back to one line. */
-  onFold?: () => void;
+  /** Fold the card to one row. */
+  onFold: () => void;
 }) {
   const notes = Array.from(
     new Set([ex.lastNote?.trim(), ...ex.prevWorkoutSets.map((x) => x.note?.trim())].filter((x): x is string => !!x))
   );
   return (
     <div className="mb-1 min-w-0">
-      <div className="flex items-center gap-2">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-ink/10 text-[12px] font-semibold tabular-nums text-ink">{index}</span>
+      <div className="-mr-1.5 flex items-center gap-2">
         <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
         <div className="min-w-0 flex-1">
-          <ExerciseName as="h3" name={ex.name} className="text-[15px] font-semibold leading-tight text-ink" />
-          <p className="text-[12px] leading-tight text-ink-mute">{rxLabel(ex)}</p>
+          <ExerciseName as="h3" name={labelled(String(index), ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
+          <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">{rxLabel(ex)}</p>
         </div>
-        {onFold && (
-          <button type="button" onClick={onFold} aria-label={`Fold ${ex.name}`} className="logger-quiet flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:text-ink">
-            <ChevronUp className="h-4 w-4" />
-          </button>
-        )}
-        <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} compact />
+        <CollapseButton name={ex.name} onClick={onFold} />
       </div>
       {notes.length > 0 && (
         <p className="mt-1 line-clamp-2 border-l-2 border-[var(--success)]/40 pl-2 text-[12px] italic leading-snug text-[var(--success)]">
@@ -1646,6 +1588,153 @@ function CompactHeader({
         </p>
       )}
     </div>
+  );
+}
+
+/** "1A: Bench Press". Warm-up and cool-down exercises are just their name (the divider says which). */
+function labelled(label: string, name: string): string {
+  return label === "W" || label === "C" || !label ? name : `${label}: ${name}`;
+}
+
+/** The thin divider above the Warm-up and the Cool-down. */
+function PartDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+/**
+ * Reorder mode: each exercise as one row with a drag handle, and small Up/Down arrows as the
+ * fallback. The part headings (Block n, Cool-down, and Warm-up when it has exercises) stay as
+ * dividers: whichever an exercise lands under is its part.
+ * An emptied block disappears and the labels renumber (lib/sessions/order).
+ */
+function ReorderList({ order, names, onChange }: { order: OrderEntry[]; names: Record<string, string>; onChange: (o: OrderEntry[]) => void }) {
+  const rows = toRows(order);
+  const labels = labelsOf(order);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const rowEls = useRef(new Map<string, HTMLElement>());
+  const keyOf = (r: ReorderRow) => (r.kind === "heading" ? `h:${r.section}` : r.aweId);
+  const lastItem = rows.reduce((n, r, i) => (r.kind === "item" ? i : n), -1);
+
+  function onMove(e: React.PointerEvent, aweId: string) {
+    if (dragging !== aweId) return;
+    const y = e.clientY;
+    // Near the top or bottom edge: scroll so a row can travel the whole list.
+    if (y < 150) window.scrollBy(0, -12);
+    else if (y > window.innerHeight - 110) window.scrollBy(0, 12);
+    const from = rows.findIndex((r) => r.kind === "item" && r.aweId === aweId);
+    const over = rows.findIndex((r) => {
+      const b = rowEls.current.get(keyOf(r))?.getBoundingClientRect();
+      return b != null && y >= b.top && y < b.bottom;
+    });
+    if (over === -1 || over === from) return;
+    onChange(fromRows(moveRow(rows, aweId, over)));
+  }
+
+  return (
+    <ol className="space-y-1.5" aria-label="Exercises, in order">
+      {rows.map((r, i) =>
+        // An empty Warm-up isn't shown: nothing is moved into a warm-up the plan doesn't have.
+        r.kind === "heading" && r.section === WARMUP && rows[i + 1]?.kind !== "item" ? null : r.kind === "heading" ? (
+          <li key={keyOf(r)} ref={(el) => void (el ? rowEls.current.set(keyOf(r), el) : rowEls.current.delete(keyOf(r)))} className="pt-2">
+            <PartDivider title={r.title} />
+          </li>
+        ) : (
+          <li
+            key={r.aweId}
+            ref={(el) => void (el ? rowEls.current.set(r.aweId, el) : rowEls.current.delete(r.aweId))}
+            className={cn(
+              "flex items-center gap-1 rounded-xl border pr-1 transition-shadow",
+              dragging === r.aweId ? "relative z-10 border-ink/60 bg-dusk-raised shadow-[0_12px_28px_-12px_rgba(0,0,0,0.8)]" : "border-line bg-paper"
+            )}
+          >
+            <button
+              type="button"
+              aria-label={`Drag ${names[r.aweId]}`}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setDragging(r.aweId);
+              }}
+              onPointerMove={(e) => onMove(e, r.aweId)}
+              onPointerUp={() => setDragging(null)}
+              onPointerCancel={() => setDragging(null)}
+              className="logger-cell flex h-12 w-11 shrink-0 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
+            >
+              <GripVertical className="h-5 w-5" />
+            </button>
+            <span className="min-w-0 flex-1 py-2 text-[16px] font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
+              {labelled(labels[r.aweId], names[r.aweId] ?? "")}
+            </span>
+            <button
+              type="button"
+              aria-label={`Move ${names[r.aweId]} up`}
+              disabled={i <= 1}
+              onClick={() => onChange(fromRows(stepRow(rows, r.aweId, -1)))}
+              className="logger-cell flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink disabled:opacity-25"
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Move ${names[r.aweId]} down`}
+              disabled={i >= lastItem && i === rows.length - 1}
+              onClick={() => onChange(fromRows(stepRow(rows, r.aweId, 1)))}
+              className="logger-cell flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink disabled:opacity-25"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
+          </li>
+        )
+      )}
+    </ol>
+  );
+}
+
+/** The chevron in a card's top-right corner: folds the card to one row. */
+function CollapseButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded
+      aria-label={`Collapse ${name}`}
+      className="logger-quiet flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-ink/5 hover:text-ink"
+    >
+      <ChevronUp className="h-4 w-4" />
+    </button>
+  );
+}
+
+/**
+ * A folded exercise: one skinny row with its badge and name, then a tick when every set is
+ * logged or "3/4" when some are. Tapping anywhere on it opens the card again.
+ */
+function FoldedRow({ label, name, sets, onOpen }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void }) {
+  const logged = sets.filter((x) => x.completed).length;
+  const done = sets.length > 0 && logged === sets.length;
+  return (
+    <button type="button" onClick={onOpen} aria-expanded={false} aria-label={`Expand ${name}`} className="logger-quiet flex w-full items-center gap-2 py-1.5 pl-3 pr-1.5 text-left">
+      <ExerciseName name={labelled(label, name)} inControl className="min-w-0 flex-1 text-[16px] font-semibold leading-snug text-ink" />
+      {done ? (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/20 text-[var(--success)]" title="Every set logged">
+          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          <span className="sr-only">Every set logged</span>
+        </span>
+      ) : logged > 0 ? (
+        <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ink-soft">
+          {logged}/{sets.length}
+          <span className="sr-only"> sets logged</span>
+        </span>
+      ) : null}
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
+        <ChevronDown className="h-4 w-4" />
+      </span>
+    </button>
   );
 }
 
@@ -1909,22 +1998,20 @@ function SetDetails({
 
 // ── Changing one exercise on the spot ──────────────────────────────────────────
 
-function ChangeButton({ open, busy, onClick, compact = false }: { open: boolean; busy: boolean; onClick: () => void; compact?: boolean }) {
+function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={busy}
       aria-expanded={open}
-      aria-label={compact ? (open ? "Close changes" : "Change this exercise") : undefined}
       className={cn(
-        "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
-        compact ? "logger-quiet w-8 justify-center" : "px-2.5",
-        open ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-border text-muted-foreground hover:text-foreground"
+        "logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium disabled:opacity-50",
+        open ? "text-ink" : "text-ink-soft hover:text-ink"
       )}
     >
       {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
-      {!compact && (open ? "Close" : "Change")}
+      {open ? "Close" : "Change"}
     </button>
   );
 }
