@@ -55,11 +55,13 @@
    The coach screens are made of many small controls (tabs, chips, upload buttons, selects). At phone
    width every one of them is at least 44px tall, and an icon-only button is 44px wide too. */
 @media (max-width: 767px) {
-  .coach-ui :is(button, select, [role="tab"], summary),
-  .coach-ui input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+  .coach-ui :is(button, select, [role="tab"], summary):not(.logger-cell):not(.logger-quiet),
+  .coach-ui input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(.logger-cell) {
     min-height: 44px;
   }
-  .coach-ui button:has(> svg:only-child) {
+  /* The logger's set table is the exception: thin 40px rows, so two exercises fit on a phone.
+     .logger-cell is a control in a set row; .logger-quiet a small text action under it. */
+  .coach-ui button:has(> svg:only-child):not(.logger-cell):not(.logger-quiet) {
     min-width: 44px;
   }
 }
