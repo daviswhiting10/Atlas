@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -24,8 +23,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  ChevronsDownUp,
-  ChevronsUpDown,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -517,7 +514,6 @@ export default function WorkoutLogger({
     }
   }
 
-  const isResuming = existingWorkoutLogId != null;
   const dateLabel = new Date(logDate + "T12:00:00").toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -826,11 +822,6 @@ export default function WorkoutLogger({
   };
   const isFolded = (ex: LoggerExercise) => foldOverride[ex.aweId] ?? isDone(ex);
   const setFolded = (aweId: string, folded: boolean) => setFoldOverride((prev) => ({ ...prev, [aweId]: folded }));
-  /** Any card open? Decides whether the jump bar offers "Collapse all" or "Expand all". */
-  const anyOpen = exercises.some((e) => !isFolded(e));
-  function foldAll(folded: boolean) {
-    setFoldOverride(Object.fromEntries(exercises.map((e) => [e.aweId, folded])));
-  }
   /** Open an exercise and bring it under the top bar. */
   function jumpTo(ex: LoggerExercise) {
     setFolded(ex.aweId, false);
@@ -1116,14 +1107,21 @@ export default function WorkoutLogger({
           <span className="max-w-[100px] truncate">{clientName}</span>
         </Link>
         <div className="flex items-center gap-2">
-          {isResuming && !completed && <Badge variant="warn">Resuming</Badge>}
           <div
             className="text-xs font-semibold tabular-nums px-2.5 py-1 rounded-full"
             style={{ border: "1px solid var(--line)", color: "var(--ink)" }}
           >
             {formatRest(sessionElapsedSec)}
           </div>
-          {!reordering && (
+          {reordering ? (
+            <button
+              type="button"
+              onClick={() => setReordering(false)}
+              className="logger-quiet flex h-9 shrink-0 items-center gap-1 rounded-full bg-dusk-button px-4 text-[14px] font-semibold text-dusk-button-text"
+            >
+              <Check className="h-4 w-4" strokeWidth={2.5} /> Done
+            </button>
+          ) : (
           <Button
             size="sm"
             disabled={completing || !anyCompleted}
@@ -1140,30 +1138,9 @@ export default function WorkoutLogger({
           )}
         </div>
         </div>
-        {/* Reorder mode: what to do, and the way out */}
-        {reordering && (
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <p className="text-[13px] text-ink-soft">Drag <GripVertical className="inline h-3.5 w-3.5 align-[-2px]" /> or use the arrows</p>
-            <button
-              type="button"
-              onClick={() => setReordering(false)}
-              className="logger-quiet flex h-9 shrink-0 items-center gap-1 rounded-full bg-dusk-button px-4 text-[14px] font-semibold text-dusk-button-text"
-            >
-              <Check className="h-4 w-4" strokeWidth={2.5} /> Done
-            </button>
-          </div>
-        )}
         {/* Jump bar: every exercise, one tap away */}
         {!reordering && exercises.length > 1 && (
           <nav aria-label="Exercises in this workout" className="-mx-4 mt-2 flex items-center gap-1.5 px-4">
-            <button
-              type="button"
-              onClick={() => foldAll(anyOpen)}
-              className="logger-quiet flex h-8 shrink-0 items-center gap-1 rounded-full border border-line-strong px-2.5 text-[12px] font-semibold text-ink-soft hover:text-ink"
-            >
-              {anyOpen ? <ChevronsDownUp className="h-3.5 w-3.5" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
-              {anyOpen ? "Collapse all" : "Expand all"}
-            </button>
             {!completed && (
               <button
                 type="button"
@@ -1249,25 +1226,7 @@ export default function WorkoutLogger({
                 }
                 return (
                   <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper px-3 pb-1 pt-2">
-                    <CompactHeader
-                      ex={ex}
-                      index={block.labels[k]}
-                      isEditing={editingAweId === ex.aweId}
-                      busy={busy}
-                      onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
-                      onFold={() => setFolded(ex.aweId, true)}
-                    />
-                    {editingAweId === ex.aweId && (
-                      <ChangePanel
-                        ex={ex}
-                        setCount={state.sets.length}
-                        busy={busy}
-                        onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
-                        onTargets={(t) => handleSetTargets(ex, t)}
-                        onRemove={() => handleRemoveExercise(ex)}
-                        media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
-                      />
-                    )}
+                    <CompactHeader ex={ex} index={block.labels[k]} onFold={() => setFolded(ex.aweId, true)} />
 
                     <SetTable
                       secs={secs}
@@ -1288,6 +1247,7 @@ export default function WorkoutLogger({
                       >
                         <Plus className="h-3.5 w-3.5" /> Add set
                       </button>
+                      <span className="flex-1" />
                       {state.noteAdded ? (
                         <span className="px-1 text-[13px] text-[var(--success)]">Note saved ✓</span>
                       ) : (
@@ -1300,7 +1260,21 @@ export default function WorkoutLogger({
                           <PencilLine className="h-3.5 w-3.5" /> Note
                         </button>
                       )}
+                      <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                     </div>
+                    {editingAweId === ex.aweId && (
+                      <div className="pb-2">
+                        <ChangePanel
+                          ex={ex}
+                          setCount={state.sets.length}
+                          busy={busy}
+                          onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                          onTargets={(t) => handleSetTargets(ex, t)}
+                          onRemove={() => handleRemoveExercise(ex)}
+                          media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
+                        />
+                      </div>
+                    )}
                     {state.noteOpen && !state.noteAdded && (
                       <div className="mt-1 flex gap-1.5 pb-1">
                         <Input
@@ -1420,7 +1394,6 @@ export default function WorkoutLogger({
               onChange={(e) => { if (e.target.value) handleDateChange(e.target.value); }}
               className="sr-only"
             />
-            {isResuming && !completed && <Badge variant="warn">Resuming</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1439,19 +1412,6 @@ export default function WorkoutLogger({
 
       {/* Day picker (desktop) */}
       {dayPicker}
-
-      {exercises.length > 1 && (
-        <div className="mb-2 flex justify-end">
-          <button
-            type="button"
-            onClick={() => foldAll(anyOpen)}
-            className="flex h-8 items-center gap-1 rounded-full border border-line-strong px-3 text-xs font-semibold text-ink-soft hover:text-ink"
-          >
-            {anyOpen ? <ChevronsDownUp className="h-3.5 w-3.5" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
-            {anyOpen ? "Collapse all" : "Expand all"}
-          </button>
-        </div>
-      )}
 
       {/* Exercise cards — grouped by block */}
       <div className="space-y-4">
@@ -1487,22 +1447,10 @@ export default function WorkoutLogger({
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
                       <CardTitle className="text-base font-semibold leading-tight min-w-0"><ExerciseName name={labelled(block.labels[k], ex.name)} /></CardTitle>
                     </div>
-                    <div className="-mr-1.5 flex shrink-0 items-center gap-1">
-                      <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
+                    <div className="-mr-1.5 shrink-0">
                       <CollapseButton name={ex.name} onClick={() => setFolded(ex.aweId, true)} />
                     </div>
                   </div>
-                  {editingAweId === ex.aweId && (
-                    <ChangePanel
-                      ex={ex}
-                      setCount={state.sets.length}
-                      busy={busy}
-                      onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
-                      onTargets={(t) => handleSetTargets(ex, t)}
-                      onRemove={() => handleRemoveExercise(ex)}
-                      media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
-                    />
-                  )}
                   <p className="text-xs text-muted-foreground mt-0.5">{rxLabel(ex)}</p>
                 </div>
                 <LastWeek ex={ex} />
@@ -1522,14 +1470,28 @@ export default function WorkoutLogger({
                   );
                 })}
 
-                <button
-                  type="button"
-                  onClick={() => addSet(ex.aweId)}
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mt-1 px-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add set
-                </button>
+                <div className="mt-1 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => addSet(ex.aweId)}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add set
+                  </button>
+                  <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
+                </div>
+                {editingAweId === ex.aweId && (
+                  <ChangePanel
+                    ex={ex}
+                    setCount={state.sets.length}
+                    busy={busy}
+                    onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                    onTargets={(t) => handleSetTargets(ex, t)}
+                    onRemove={() => handleRemoveExercise(ex)}
+                    media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
+                  />
+                )}
 
                 <div className="pt-2 border-t mt-2">
                   {state.noteAdded ? (
@@ -1600,16 +1562,10 @@ export default function WorkoutLogger({
 function CompactHeader({
   ex,
   index,
-  isEditing,
-  busy,
-  onToggleEdit,
   onFold,
 }: {
   ex: LoggerExercise;
   index: number | string;
-  isEditing: boolean;
-  busy: boolean;
-  onToggleEdit: () => void;
   /** Fold the card to one row. */
   onFold: () => void;
 }) {
@@ -1624,7 +1580,6 @@ function CompactHeader({
           <ExerciseName as="h3" name={labelled(String(index), ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">{rxLabel(ex)}</p>
         </div>
-        <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} compact />
         <CollapseButton name={ex.name} onClick={onFold} />
       </div>
       {notes.length > 0 && (
@@ -1652,8 +1607,9 @@ function PartDivider({ title }: { title: string }) {
 }
 
 /**
- * Reorder mode: each exercise as one row with a drag handle and Up/Down. The part headings
- * (Warm-up, Block n, Cool-down) stay as dividers: whichever an exercise lands under is its part.
+ * Reorder mode: each exercise as one row with a drag handle, and small Up/Down arrows as the
+ * fallback. The part headings (Block n, Cool-down, and Warm-up when it has exercises) stay as
+ * dividers: whichever an exercise lands under is its part.
  * An emptied block disappears and the labels renumber (lib/sessions/order).
  */
 function ReorderList({ order, names, onChange }: { order: OrderEntry[]; names: Record<string, string>; onChange: (o: OrderEntry[]) => void }) {
@@ -1682,7 +1638,8 @@ function ReorderList({ order, names, onChange }: { order: OrderEntry[]; names: R
   return (
     <ol className="space-y-1.5" aria-label="Exercises, in order">
       {rows.map((r, i) =>
-        r.kind === "heading" ? (
+        // An empty Warm-up isn't shown: nothing is moved into a warm-up the plan doesn't have.
+        r.kind === "heading" && r.section === WARMUP && rows[i + 1]?.kind !== "item" ? null : r.kind === "heading" ? (
           <li key={keyOf(r)} ref={(el) => void (el ? rowEls.current.set(keyOf(r), el) : rowEls.current.delete(keyOf(r)))} className="pt-2">
             <PartDivider title={r.title} />
           </li>
@@ -1718,18 +1675,18 @@ function ReorderList({ order, names, onChange }: { order: OrderEntry[]; names: R
               aria-label={`Move ${names[r.aweId]} up`}
               disabled={i <= 1}
               onClick={() => onChange(fromRows(stepRow(rows, r.aweId, -1)))}
-              className="logger-cell flex h-11 w-10 shrink-0 items-center justify-center rounded-lg text-ink-soft disabled:opacity-30"
+              className="logger-cell flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink disabled:opacity-25"
             >
-              <ArrowUp className="h-4 w-4" />
+              <ArrowUp className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               aria-label={`Move ${names[r.aweId]} down`}
               disabled={i >= lastItem && i === rows.length - 1}
               onClick={() => onChange(fromRows(stepRow(rows, r.aweId, 1)))}
-              className="logger-cell flex h-11 w-10 shrink-0 items-center justify-center rounded-lg text-ink-soft disabled:opacity-30"
+              className="logger-cell flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink disabled:opacity-25"
             >
-              <ArrowDown className="h-4 w-4" />
+              <ArrowDown className="h-3.5 w-3.5" />
             </button>
           </li>
         )
@@ -2041,22 +1998,20 @@ function SetDetails({
 
 // ── Changing one exercise on the spot ──────────────────────────────────────────
 
-function ChangeButton({ open, busy, onClick, compact = false }: { open: boolean; busy: boolean; onClick: () => void; compact?: boolean }) {
+function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={busy}
       aria-expanded={open}
-      aria-label={compact ? (open ? "Close changes" : "Change this exercise") : undefined}
       className={cn(
-        "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
-        compact ? "logger-quiet w-8 justify-center" : "px-2.5",
-        open ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-border text-muted-foreground hover:text-foreground"
+        "logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium disabled:opacity-50",
+        open ? "text-ink" : "text-ink-soft hover:text-ink"
       )}
     >
       {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
-      {!compact && (open ? "Close" : "Change")}
+      {open ? "Close" : "Change"}
     </button>
   );
 }
