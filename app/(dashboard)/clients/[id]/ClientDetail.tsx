@@ -394,7 +394,10 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
           />
           <section>{progress}</section>
           {/* Records live under the charts (they were a tab of their own). */}
-          <section className="mt-10">{records}</section>
+          <section className="mt-10">
+            <p className="eyebrow mb-3">Personal records</p>
+            {records}
+          </section>
         </div>
       )}
 
