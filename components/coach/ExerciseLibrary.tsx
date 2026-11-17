@@ -4,21 +4,20 @@ import { useMemo, useState } from "react";
 import { ImageOff, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExerciseThumb } from "@/components/ExercisePicture";
-import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
 import type { Picture } from "@/lib/exercises/pictures";
 import { ExerciseName } from "@/components/ExerciseName";
 
 export type LibraryRow = { id: string; name: string; picture: Picture | null; inPlans: boolean };
 
-type Filter = "plans" | "missing" | "all";
+type Filter = "plans" | "all";
 
-/** The coach's exercises, each with its picture and a way to add or change their own. */
-export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: LibraryRow[]; workspaceId: string; uploadsEnabled: boolean }) {
+/** The coach's exercises, each with its picture. */
+export function ExerciseLibrary({ rows }: { rows: LibraryRow[] }) {
   const [filter, setFilter] = useState<Filter>("plans");
   const [query, setQuery] = useState("");
 
   const counts = useMemo(
-    () => ({ plans: rows.filter((r) => r.inPlans).length, missing: rows.filter((r) => r.inPlans && !r.picture).length, all: rows.length }),
+    () => ({ plans: rows.filter((r) => r.inPlans).length, all: rows.length }),
     [rows]
   );
   const shown = useMemo(() => {
@@ -26,21 +25,17 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
     return rows.filter((r) => {
       if (q) return r.name.toLowerCase().includes(q); // a search looks through everything
       if (filter === "plans") return r.inPlans;
-      if (filter === "missing") return r.inPlans && !r.picture;
       return true;
     });
   }, [rows, filter, query]);
 
   const tabs: Array<{ id: Filter; label: string }> = [
     { id: "plans", label: `In your plans · ${counts.plans}` },
-    { id: "missing", label: `Needs a photo · ${counts.missing}` },
     { id: "all", label: `All · ${counts.all}` },
   ];
 
   return (
     <div className="space-y-4">
-      {!uploadsEnabled && <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm text-ink-soft">Uploads aren&rsquo;t set up yet: the storage token is missing.</p>}
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
           {tabs.map((t) => (
@@ -66,7 +61,7 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
       </div>
 
       {shown.length === 0 ? (
-        <p className="rule pt-4 text-[15px] text-ink-soft">{query ? `No exercise called “${query}”.` : filter === "missing" ? "Every exercise in your plans has a picture." : "Nothing here yet."}</p>
+        <p className="rule pt-4 text-[15px] text-ink-soft">{query ? `No exercise called “${query}”.` : "Nothing here yet."}</p>
       ) : (
         <ul className="divide-y divide-line rounded-2xl border border-line bg-paper">
           {shown.map((r) => (
@@ -84,11 +79,6 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
                   <p className="text-xs text-ink-mute">{r.picture?.own ? "Your photo" : r.picture ? "Library picture" : "No picture"}</p>
                 </div>
               </div>
-              {uploadsEnabled && (
-                <div className="sm:shrink-0">
-                  <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={r.id} picture={r.picture} compact />
-                </div>
-              )}
             </li>
           ))}
         </ul>

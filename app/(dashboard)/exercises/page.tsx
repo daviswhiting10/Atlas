@@ -5,16 +5,12 @@ import { prisma } from "@/lib/db/client";
 import { visibleTo } from "@/lib/exercises/find";
 import { displayName } from "@/lib/plan/catalog";
 import { pictureFor } from "@/lib/exercises/pictures";
-import { blobConfigured, mediaPictures, sameName } from "@/lib/exercises/media";
+import { mediaPictures, sameName } from "@/lib/exercises/media";
 import { ExerciseLibrary, type LibraryRow } from "@/components/coach/ExerciseLibrary";
 
 export const metadata: Metadata = { title: "Exercises" };
 
-/**
- * Every exercise the coach can use, with its picture: theirs if they've added
- * one, else the library's. Each can be given a photo or clip that stays with
- * the exercise everywhere it's used.
- */
+/** Every exercise the coach can use, with its picture: theirs if they've added one, else the library's. */
 export default async function ExercisesPage() {
   const session = await auth();
   const workspaceId = session?.user?.workspaceId;
@@ -44,9 +40,9 @@ export default async function ExercisesPage() {
     <div className="space-y-8">
       <div className="rise">
         <h1 className="text-4xl leading-none text-ink">Exercises</h1>
-        <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-soft">Add your own photo or short clip to any exercise. It stays with that exercise everywhere, for you and your clients.</p>
+        <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-soft">Every exercise you can put in a plan.</p>
       </div>
-      <ExerciseLibrary rows={rows} workspaceId={workspaceId} uploadsEnabled={blobConfigured()} />
+      <ExerciseLibrary rows={rows} />
     </div>
   );
 }
