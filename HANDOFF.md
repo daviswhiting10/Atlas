@@ -30,6 +30,7 @@ Last updated 2026-11-15. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 | Step | What shipped | Commit |
 |---|---|---|
 | Context box | The coach's note on a plan import is authoritative; the page shows "Read as: …" | `8645e15` |
+| Structure, live bar, history import | Warm-up / Block n (1A, 1B) / Cool-down everywhere (`lib/workouts/structure.ts`); the currently-logging bar (`lib/sessions/live.ts`); "Import completed weeks as history" with a review step first (`lib/programs/sheet-summary.ts`, source `IMPORT`); Programs moved to More. Merged with W2's `readability` (logger redesign, readability pass) and `atlas-goals`. Rollback: `f488e64`. | `aa04d66` |
 | Sheet import | "Import plan from spreadsheet" on every client page (opens the Plan tab's importer; `?tab=import` too). Drop or choose .xlsx/.csv (.xlsx read in the browser by `lib/programs/xlsx.ts`, so the server only sees CSV), or a Google link shared by link (redirects checked hop by hop, Google hosts only). | this commit |
 | 1 | Report only | — |
 | 2 | `WorkoutLog` gains `source`, `title` and `completedAt` (the only "done"). Plan status is derived, with a CHECK that keeps LOGGED out. Production: 711 → 713 sessions, sets identical. | `31bfcdb` |
@@ -248,6 +249,7 @@ Check this order against `docs/review-and-v1-scope.md` before planning.
   - `atlas-production-step4-apply-20261113-164259.dump`
   - `atlas-production-goals-apply-20261113-195343.dump`
   - `atlas-production-before-auth-20261114-071525.dump`: before the auth migration
+  - `prod-before-import-source-20261116-201345.dump`: before `20261117010000_session_source_import` (adds `IMPORT` to `SessionSource`). Rollback commit for that release: `f488e64` (main before it).
   - `atlas-production-before-goal-start-fix-20261115-082729.dump`: before the user's 75 Hard was moved to start Nov 4 (Day 12 on Nov 15). Undo with `goal-start-fix-20261115-reverse.sql`; the old row is in `goal-start-fix-20261115-before.json`.
 - **Reversal file** for the date fix: `session-date-fix-20261113-115227.json`.
 - **Neon branches:** listed in `CLAUDE.md`.

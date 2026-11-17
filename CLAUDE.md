@@ -10,7 +10,7 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 - Scripts in `scripts/exercise-cleanup/` refuse production unless `ALLOW_PROD=1`. Every change they make is logged in `ExerciseChange` and can be reversed with `undo.ts`.
 - **Code must never deploy ahead of the migration it reads.** Apply the migration first (backup, rehearse, compare), then push the code. The auth migration `20261114012242_sign_in_safety` is now on production (2026-11-14), and the code that reads it is on `main`.
 - `dev-sessions` and production both have `20261114012242_sign_in_safety`, and `main` has its file since the auth merge (2026-11-15).
-- `20261117010000_session_source_import` (additive enum value `IMPORT`) is on `dev-sessions` and rehearsed on `rehearsal-import-source`; **not yet on production**. The history-import code writes `IMPORT`, so it ships only after this is applied.
+- `20261117010000_session_source_import` (additive enum value `IMPORT`) is on `dev-sessions` and on production (2026-11-16, backup `prod-before-import-source-20261116-201345.dump`; every table's count matched). Rolling the code back past it: once a history import has written `IMPORT` sessions, older code can't read them, so first set them to `PLAN` (`UPDATE "WorkoutLog" SET source='PLAN' WHERE source='IMPORT'`, with a backup) or roll forward.
 - Read-only queries against production are allowed for counts, always in a `BEGIN READ ONLY` transaction, never printing names or emails (mask them).
 
 ### Branches (Neon project "Atlas", `mute-breeze-39649971`)
