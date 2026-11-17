@@ -135,7 +135,7 @@ function relativeTime(date: string) {
  * The client page. `progress` is rendered on the server (the client's lift
  * charts, the same screen they see) and shown above the tabs.
  */
-type View = "progress" | "records" | "sessions" | "plan" | "notes";
+type View = "progress" | "sessions" | "plan" | "notes";
 
 export function ClientDetail({ progress, records, initial }: { progress: React.ReactNode; records: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
@@ -260,7 +260,6 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
   const lastSession = client.workoutLogs[0] ?? null;
   const views: Array<{ id: View; label: string }> = [
     { id: "progress", label: "Progress" },
-    { id: "records", label: "Records" },
     { id: "sessions", label: "Sessions" },
     { id: "plan", label: "Plan" },
     // Intake and imported details, only when there are some.
@@ -389,10 +388,11 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
             ]}
           />
           <section>{progress}</section>
+          {/* Records live under the charts (they were a tab of their own). */}
+          <section className="mt-10">{records}</section>
         </div>
       )}
 
-      {view === "records" && <div className="fade-in">{records}</div>}
 
       {view === "sessions" && (
         <div className="fade-in">

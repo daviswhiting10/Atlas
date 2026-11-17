@@ -98,7 +98,6 @@ export type ProgressData = {
 
 const TABS = [
   { label: "Overview", href: "" },
-  { label: "Strength", href: "/strength" },
   { label: "Body",     href: "/body" },
 ];
 

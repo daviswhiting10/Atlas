@@ -6,6 +6,8 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadClientProgress } from "@/lib/coach/progress";
 import { ProgressView } from "@/components/athlete/ProgressView";
+import { prisma } from "@/lib/db/client";
+import { MilestoneCard } from "./_components/MilestoneCard";
 
 export const metadata: Metadata = { title: "Progress" };
 
@@ -18,7 +20,16 @@ export default async function ClientProgressPage({ params }: { params: { id: str
   const workspaceId = session?.user?.workspaceId;
   if (!workspaceId) redirect("/login");
 
-  const progress = await loadClientProgress(params.id, workspaceId);
+  // Milestones sit under the charts (they had a page of their own); newest first.
+  const [progress, milestones] = await Promise.all([
+    loadClientProgress(params.id, workspaceId),
+    prisma.milestone.findMany({
+      where: { clientId: params.id, workspaceId },
+      orderBy: { achievedAt: "desc" },
+      take: 12,
+      select: { id: true, type: true, title: true, description: true, metricValue: true, metricUnit: true, exerciseId: true, achievedAt: true, seenByClient: true, exercise: { select: { name: true } } },
+    }),
+  ]);
   if (!progress) notFound();
   const { client, data, metric } = progress;
   const { sessions, prs, since } = data.totals;
@@ -42,12 +53,19 @@ export default async function ClientProgressPage({ params }: { params: { id: str
           <Link href={`/clients/${client.id}/progress/body`} className="press rounded-lg px-3 py-2 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
             Body
           </Link>
-          <Link href={`/clients/${client.id}/progress/milestones`} className="press rounded-lg px-3 py-2 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
-            Milestones
-          </Link>
         </nav>
       </div>
       <ProgressView data={data} goalMetric={metric} emptyAction={{ href: `/clients/${client.id}/log`, label: `Log a workout for ${firstName}` }} />
+      {milestones.length > 0 && (
+        <section className="mt-10">
+          <p className="eyebrow mb-3">Milestones</p>
+          <div className="rounded-xl border bg-card px-4">
+            {milestones.map(({ exercise, achievedAt, ...m }) => (
+              <MilestoneCard key={m.id} milestone={{ ...m, exerciseName: exercise?.name ?? null, achievedAt: achievedAt.toISOString() }} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
