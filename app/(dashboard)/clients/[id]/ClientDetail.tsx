@@ -19,6 +19,7 @@ import { StatRow } from "@/components/athlete/StatRow";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
+import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
 import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
 import {
@@ -147,9 +148,13 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
   // ?tab=sessions opens Sessions (after logging a workout); ?tab=import opens Plan with the importer open.
   const [view, setView] = useState<View>(() => {
     const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
-    if (tab === "import") return "plan";
+    if (tab === "import" || tab === "build") return "plan";
     return tab === "plan" || tab === "sessions" ? tab : "progress";
   });
+  // "Build with Atlas" opens its form here on the Plan tab (it had a page of its own). ?tab=build opens it.
+  const [buildOpen, setBuildOpen] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "build"
+  );
   // The spreadsheet importer on the Plan tab: always open when there's no plan, otherwise on request.
   // ?tab=import opens it.
   const [importOpen, setImportOpen] = useState(
@@ -487,11 +492,16 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
             <AssignFromLibrary clientId={client.id} firstName={firstName} />
           </div>
           <div className="mb-3 flex justify-end">
-            <Link href={`/programs/new?client=${client.id}`} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>
+            <button type="button" onClick={() => setBuildOpen((o) => !o)} aria-expanded={buildOpen} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>
               <Dumbbell className="w-3 h-3 mr-1.5" />
               Build with Atlas
-            </Link>
+            </button>
           </div>
+          {buildOpen && (
+            <div className="mb-4 rounded-xl border bg-card px-4 py-4">
+              <CoachPlanForm clients={[{ id: client.id, fullName: client.fullName, primaryGoal: client.primaryGoal }]} fixedClientId={client.id} />
+            </div>
+          )}
           {client.programAssignments.length > 0 && (
             <div className="space-y-2">
               {client.programAssignments.map((a) => (

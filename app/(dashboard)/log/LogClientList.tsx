@@ -46,7 +46,7 @@ export function LogClientList({ rows }: { rows: LogRow[] }) {
           {shown.map((r) => (
             <li key={r.id}>
               <Link
-                href={r.hasPlan ? `/clients/${r.id}/log` : `/programs/new?client=${r.id}`}
+                href={r.hasPlan ? `/clients/${r.id}/log` : `/clients/${r.id}?tab=build`}
                 className="press flex items-center gap-3 px-4 py-3.5 hover:bg-ink/[0.03]"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/10 text-sm font-semibold text-ink">{r.name.charAt(0).toUpperCase()}</span>

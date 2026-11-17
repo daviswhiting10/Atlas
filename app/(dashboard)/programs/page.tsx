@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, ImageUp, Plus } from "lucide-react";
+import { ArrowRight, ImageUp } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { CATEGORIES, UNCATEGORIZED, categoryLabel, categoryOf } from "@/lib/programs/categories";
@@ -40,9 +40,6 @@ export default async function ProgramsPage() {
         <div className="flex flex-wrap gap-2">
           <Link href="/programs/import" className="press flex h-11 items-center gap-2 rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/25">
             <ImageUp className="h-4 w-4" /> Import from photos
-          </Link>
-          <Link href="/programs/new" className="press flex h-11 items-center gap-2 rounded-xl bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85">
-            <Plus className="h-4 w-4" /> Plan for a client
           </Link>
         </div>
       </div>

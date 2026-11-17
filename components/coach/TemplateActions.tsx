@@ -3,10 +3,9 @@
 import { useRef, useState, useTransition } from "react";
 import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Activity, Copy, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Activity, Copy, Loader2, Trash2 } from "lucide-react";
 import { draftFromTemplate } from "@/lib/actions/coach-plan";
 import { startMyProgram } from "@/lib/actions/athlete";
 
@@ -84,14 +83,6 @@ export function TemplateActions({ programId, clients, assigned }: { programId: s
           <span className="mt-0.5 block text-[13px] leading-relaxed text-ink-mute">Run it yourself in My training, as written, starting on the date above.</span>
         </span>
       </button>
-
-      <Link href={`/programs/new?from=${programId}`} className="press flex items-start gap-3 rounded-[14px] border border-line bg-paper p-4 hover:border-ink/25">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-signal" />
-        <span>
-          <span className="block text-[15px] font-semibold text-ink">Generate from these goals</span>
-          <span className="mt-0.5 block text-[13px] leading-relaxed text-ink-mute">A fresh 12-week plan with phases and progression, using this program&apos;s goal and condition tags.</span>
-        </span>
-      </Link>
 
       <div className="flex gap-1">
         <button type="button" onClick={duplicate} disabled={pending} className="press flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
