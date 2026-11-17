@@ -1,5 +1,7 @@
 # Atlas: working notes
 
+Read docs/principles.md before any task. Delete before you add; ship the simplest working version; report taps and seconds.
+
 Start with `HANDOFF.md` (where things stand, decisions, build order). Design docs for what's next are in `docs/`.
 
 ## Databases
