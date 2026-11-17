@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight } from "lucide-react";
-import { activeGoalId, loadGoal } from "@/lib/goals/data";
+import { todayGoal, todayGoalId } from "@/lib/goals/today-data";
 import { todayView } from "@/lib/goals/today";
 import { endGoal, logWorkout, removeWorkout, setDiet, tagSession, tickRule } from "@/lib/actions/goals";
 import { GoalCard } from "./GoalCard";
@@ -16,7 +16,7 @@ import { StartLink } from "./StartLink";
  * slow part, and that is what the skeleton stands in for.
  */
 export async function GoalToday({ clientId, canStart }: { clientId: string; canStart: boolean }) {
-  const id = await activeGoalId(clientId);
+  const id = await todayGoalId(clientId);
   if (!id) return <StartLink canStart={canStart} />;
   return (
     <Suspense fallback={<GoalCardSkeleton />}>
@@ -26,7 +26,7 @@ export async function GoalToday({ clientId, canStart }: { clientId: string; canS
 }
 
 async function LoadedGoal({ id, clientId, canStart }: { id: string; clientId: string; canStart: boolean }) {
-  const loaded = await loadGoal(id, clientId);
+  const loaded = await todayGoal(id, clientId);
   // A goal that finished while nobody was looking has just been closed: point at its chapter.
   if (!loaded || loaded.goal.status !== "ACTIVE") {
     return (

@@ -77,16 +77,19 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
   if (!identity) redirect("/error?error=NoAccess");
   const { clientId, workspaceId, isCoach } = identity;
 
-  const profile = await prisma.clientProfile.findUnique({
-    where: { id: clientId },
-    select: { fullName: true, goalTargets: true },
-  });
+  // My training goes by the coach's own name, read fresh so a change in Settings shows at once. Both in one round.
+  const [profile, coach] = await Promise.all([
+    prisma.clientProfile.findUnique({
+      where: { id: clientId },
+      select: { fullName: true, goalTargets: true },
+    }),
+    isCoach ? prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } }) : Promise.resolve(null),
+  ]);
   if (!profile) redirect("/login");
 
   const meta = (profile.goalTargets as { athlete?: { prefs?: unknown; demo?: boolean } } | null)?.athlete;
   const prefs = normalizePrefs(meta?.prefs);
-  // My training goes by the coach's own name, read fresh so a change in Settings shows at once.
-  const coachName = isCoach ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } }))?.name?.trim() : null;
+  const coachName = isCoach ? coach?.name?.trim() : null;
   const name = isCoach ? coachName || (profile.fullName !== "Me" ? profile.fullName : "") || "Coach" : profile.fullName || session.user.name || "Athlete";
   return {
     userId: session.user.id,
@@ -148,8 +151,8 @@ export type StalledLift = { exerciseId: string; name: string; /** First of the s
 /** The signed-in athlete's progress. The read model itself is shared with the coach side. */
 export const getProgress = cache(async (): Promise<ProgressData> => {
   const athlete = await getAthlete();
-  const plan = await getPlanOverview();
-  return loadProgress({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, plan, selfServe: athlete.selfServe, timeZone: getTimeZone() });
+  // The plan loads alongside the sets, not before them.
+  return loadProgress({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, plan: getPlanOverview(), selfServe: athlete.selfServe, timeZone: getTimeZone() });
 });
 
 /**
@@ -160,14 +163,14 @@ export const getProgress = cache(async (): Promise<ProgressData> => {
 export async function loadProgress({
   clientId,
   workspaceId,
-  plan,
+  plan: planInput,
   selfServe,
   timeZone,
 }: {
   clientId: string;
   workspaceId: string;
-  /** The client's live plan, for next-session targets. */
-  plan: PlanOverview | null;
+  /** The client's live plan, for next-session targets. A promise is fine: the sets load while it does. */
+  plan: PlanOverview | null | Promise<PlanOverview | null>;
   /** An athlete running their own plans (older ones count as generated). */
   selfServe: boolean;
   timeZone: string;
@@ -188,7 +191,7 @@ export async function loadProgress({
     },
   });
   const finishedQuery = prisma.workoutLog.findMany({ where: { clientId, client: { workspaceId }, completedAt: { not: null } }, select: { id: true, date: true, completedAt: true } });
-  const [sets, finished] = await Promise.all([setsQuery, finishedQuery]);
+  const [sets, finished, plan] = await Promise.all([setsQuery, finishedQuery, planInput]);
 
   // exercise → session → sets
   const byExercise = new Map<

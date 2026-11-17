@@ -138,11 +138,11 @@ function relativeTime(date: string) {
  */
 type View = "progress" | "records" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, records }: { progress: React.ReactNode; records: React.ReactNode }) {
+export function ClientDetail({ progress, records, initial }: { progress: React.ReactNode; records: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [client, setClient] = useState<Client | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
+  const [loading, setLoading] = useState(initial == null);
   const [invite, setInvite] = useState<InviteResult | null>(null);
   // ?tab=plan opens the Plan view (the log page links there when there's no plan);
   // ?tab=sessions opens Sessions (after logging a workout); ?tab=import opens Plan with the importer open.
@@ -166,6 +166,8 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
   const phase = useContentFade(loading);
 
   useEffect(() => {
+    // Loaded with the page: no second round trip.
+    if (initial != null) return;
     fetch(`/api/clients/${id}`)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
@@ -174,7 +176,7 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
       .then(setClient)
       .catch(() => setClient(null))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, initial]);
 
   async function inviteClient() {
     if (!client?.email) { toast.error("Add an email first"); return; }

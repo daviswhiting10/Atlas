@@ -21,20 +21,24 @@ export type ClientProgress = {
  * client isn't one of theirs.
  */
 export async function loadClientProgress(clientId: string, workspaceId: string): Promise<ClientProgress | null> {
-  const client = await prisma.clientProfile.findFirst({
-    where: { id: clientId, workspaceId, deletedAt: null, ...ROSTER },
-    select: { id: true, fullName: true, primaryGoal: true },
-  });
+  // All in one round: the plan and progress reads are scoped to this client in this workspace,
+  // so they can start before the roster check; nothing is returned unless it passes.
+  const planP = loadPlanOverview({ clientId, workspaceId });
+  const [client, plan, data] = await Promise.all([
+    prisma.clientProfile.findFirst({
+      where: { id: clientId, workspaceId, deletedAt: null, ...ROSTER },
+      select: { id: true, fullName: true, primaryGoal: true },
+    }),
+    planP,
+    loadProgress({
+      clientId,
+      workspaceId,
+      plan: planP,
+      selfServe: false,
+      timeZone: safeTimeZone(cookies().get(TZ_COOKIE)?.value),
+    }),
+  ]);
   if (!client) return null;
-
-  const plan = await loadPlanOverview({ clientId: client.id, workspaceId });
-  const data = await loadProgress({
-    clientId: client.id,
-    workspaceId,
-    plan,
-    selfServe: false,
-    timeZone: safeTimeZone(cookies().get(TZ_COOKIE)?.value),
-  });
   const goal = plan?.prefs ? GOALS[resolvePrefs(plan.prefs).goal] : null;
   return {
     client: { id: client.id, fullName: client.fullName, firstName: client.fullName.split(" ")[0] },

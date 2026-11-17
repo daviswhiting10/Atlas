@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadClientProgress } from "@/lib/coach/progress";
+import { getClient } from "@/lib/db/clients";
 import { ProgressView, RecordsList } from "@/components/athlete/ProgressView";
 import { ClientDetail } from "./ClientDetail";
 
@@ -20,12 +21,15 @@ export default async function ClientPage({ params }: { params: { id: string } })
   const workspaceId = session?.user?.workspaceId;
   if (!workspaceId) redirect("/login");
 
-  const progress = await loadClientProgress(params.id, workspaceId);
-  if (!progress) notFound();
+  // The client's details load with the charts, on the server: the page no longer waits for a second fetch from the browser.
+  const [progress, details] = await Promise.all([loadClientProgress(params.id, workspaceId), getClient(params.id, workspaceId)]);
+  if (!progress || !details) notFound();
   const { client, data, metric } = progress;
 
   return (
     <ClientDetail
+      // The same JSON /api/clients/[id] sends (dates as strings).
+      initial={JSON.parse(JSON.stringify(details))}
       progress={
         <>
           <div className="mb-4 flex items-baseline justify-between gap-3">

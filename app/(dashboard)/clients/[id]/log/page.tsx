@@ -1,12 +1,9 @@
 import { notFound, redirect } from "next/navigation";
+import { lastNotesFor, lastPerformanceFor } from "@/lib/sessions/last-time";
 import { DONE, planWorkoutStatus } from "@/lib/sessions/status";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { suggestNext, type LoadType, type ProgressionSuggestion } from "@/lib/progression";
-import {
-  getLastPerformance,
-  getLastExerciseNote,
-} from "@/lib/actions/workout-logger";
 import WorkoutLogger from "./WorkoutLogger";
 import { PlanNotLive } from "./PlanNotLive";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
@@ -167,7 +164,10 @@ export default async function LogPage({
   // availableWorkouts: day-picker; existingLog: resume support.
   const anyMissingSection = assignedWorkout.exercises.some((e) => e.section == null);
 
-  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog] =
+  // "Last time", notes and the coach's own pictures for every exercise ride in the same round:
+  // one query each, not a few per exercise (lib/sessions/last-time).
+  const exerciseIds = assignedWorkout.exercises.map((e) => e.exerciseId);
+  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog, lastSetsById, lastNoteById, own] =
     await Promise.all([
       // (a) Source section fallback — only fetch if any section is null
       anyMissingSection && assignedWorkout.sourceWorkoutId
@@ -244,6 +244,13 @@ export default async function LogPage({
           },
         },
       }),
+
+      // (e) Last time and the newest note, for every exercise at once. The session being logged is never "last time".
+      lastPerformanceFor({ clientId, exerciseIds, excludeAssignedWorkoutId: assignedWorkout.id }),
+      lastNotesFor({ clientId, workspaceId, exerciseIds }),
+
+      // (f) The coach's own photos and clips (they win over the library's).
+      mediaPictures(workspaceId, assignedWorkout.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.exercise.name }))),
     ]);
 
   // Build section lookup from source exercises
@@ -268,12 +275,9 @@ export default async function LogPage({
   // ── Per-exercise: last performance + note + suggestion (already parallel) ───
   const goal = client.primaryGoal ?? "general";
 
-  const exercises: LoggerExercise[] = await Promise.all(
-    assignedWorkout.exercises.map(async (awe) => {
-      const [lastSets, lastNote] = await Promise.all([
-        getLastPerformance(clientId, awe.exerciseId, existingLog?.id),
-        getLastExerciseNote(clientId, awe.exerciseId),
-      ]);
+  const exercises: LoggerExercise[] = assignedWorkout.exercises.map((awe) => {
+      const lastSets = lastSetsById.get(awe.exerciseId) ?? [];
+      const lastNote = lastNoteById.get(awe.exerciseId) ?? null;
 
       const prescribedSets = awe.prescribedSets as PrescribedSet[];
       const prescribedReps = prescribedSets[0]?.repMax ?? 10;
@@ -302,14 +306,9 @@ export default async function LogPage({
         prevWorkoutSets: prevWorkoutSetsByExercise[awe.exerciseId] ?? [],
         lastNote,
         suggestion,
-        picture: pictureFor({ name: awe.exercise.name, gifUrl: awe.exercise.gifUrl }),
+        picture: own.get(awe.exerciseId) ?? pictureFor({ name: awe.exercise.name, gifUrl: awe.exercise.gifUrl }),
       };
-    })
-  );
-
-  // The coach's own photos and clips win over the library's.
-  const own = await mediaPictures(workspaceId, exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name })));
-  for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
+    });
 
   return (
     <WorkoutLogger
