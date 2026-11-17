@@ -29,7 +29,6 @@ import {
   Trash2,
   UserCheck,
   ChevronDown,
-  CalendarDays,
   MoreHorizontal,
   Plus,
   FileSpreadsheet,
@@ -196,17 +195,7 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
     router.push("/clients");
   }
 
-  async function setReachOutDate(date: string | null) {
-    const res = await fetch(`/api/clients/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reachOutDate: date ? new Date(date + "T12:00:00").toISOString() : null }),
-    });
-    if (res.ok) {
-      setClient((prev) => (prev ? { ...prev, reachOutDate: date } : null));
-      toast.success(date ? "Reach-out date set" : "Reach-out date cleared");
-    }
-  }
+
 
   async function removePlan(a: ProgramAssignment, e: React.MouseEvent) {
     e.preventDefault();
@@ -341,39 +330,6 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
         <div className="mb-4 px-4 py-2.5 rounded-lg border border-warn/30 bg-warn/10 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-warn mt-0.5 shrink-0" />
           <p className="text-sm text-warn">{client.retentionFlag}</p>
-        </div>
-      )}
-
-      {/* Reach-out date (prospects only) */}
-      {client.status === "PROSPECT" && (
-        <div className="mb-4 px-4 py-2.5 rounded-lg border border-[var(--line)] bg-[var(--paper)] flex items-center gap-3 flex-wrap">
-          <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-          <span className="font-body text-sm" style={{ color: "var(--ink-mute)" }}>Reach-out date</span>
-          {client.reachOutDate ? (
-            <span className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>
-              {new Date(client.reachOutDate.slice(0, 10) + "T12:00:00").toLocaleDateString("en-US", {
-                weekday: "short", month: "short", day: "numeric",
-              })}
-            </span>
-          ) : (
-            <span className="font-body text-sm italic" style={{ color: "var(--ink-mute)" }}>Not set</span>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            <input
-              type="date"
-              value={client.reachOutDate ? client.reachOutDate.slice(0, 10) : ""}
-              onChange={(e) => setReachOutDate(e.target.value || null)}
-              className="font-body text-xs rounded-md border border-[var(--line)] px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-[var(--blue)]"
-            />
-            {client.reachOutDate && (
-              <button
-                onClick={() => setReachOutDate(null)}
-                className="font-body text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear
-              </button>
-            )}
-          </div>
         </div>
       )}
 

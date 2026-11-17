@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Upload, Users } from "lucide-react";
+import { Plus, Search, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Client = {
@@ -50,7 +50,6 @@ const sel = (setter: (v: string) => void) => (v: string | null) => { if (v) sett
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const phase = useContentFade(loading);
@@ -70,29 +69,11 @@ export default function ClientsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = clients.filter((c) => {
-    const matchesSearch =
-      c.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      (c.email ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = filterStatus === "all" || c.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
-
-  async function handleDelete(client: Client) {
-    setDeleting(client.id);
-    const res = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
-    setDeleting(null);
-    setConfirming(null);
-    if (!res.ok) {
-      toast.error("Couldn't delete that client. Please try again.");
-      return;
-    }
-    setClients((prev) => prev.filter((c) => c.id !== client.id));
-    toast.success(`${client.fullName} removed from your roster`);
-  }
+  // Search only: with a roster this size a status filter is one more control than it's worth.
+  // Deleting a client lives in the client page's ⋯ menu, not on every row.
+  const filtered = clients.filter(
+    (c) => c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
+  );
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -213,16 +194,6 @@ export default function ClientsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={filterStatus} onValueChange={sel(setFilterStatus)}>
-          <SelectTrigger className="w-32 sm:w-36 min-h-[44px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="PROSPECT">Prospect</SelectItem>
-            <SelectItem value="ACTIVE">Active</SelectItem>
-            <SelectItem value="AT_RISK">At Risk</SelectItem>
-            <SelectItem value="CHURNED">Churned</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="relative">
@@ -245,7 +216,7 @@ export default function ClientsPage() {
                   <p className="font-medium">{clients.length === 0 ? "No clients yet" : "No clients found"}</p>
                   <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
                     {clients.length > 0
-                      ? "Try adjusting your filters"
+                      ? "Try a different name"
                       : "Have a client list in a spreadsheet? Bring it over in one go, or add clients one at a time above."}
                   </p>
                   {clients.length === 0 && (
@@ -259,27 +230,11 @@ export default function ClientsPage() {
             ) : (
               <Card>
                 <div className="divide-y divide-border">
-                  {filtered.map((client) =>
-                    confirming === client.id ? (
-                      <div key={client.id} className="flex flex-col gap-3 bg-destructive/[0.04] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-ink">Delete {client.fullName}?</p>
-                          <p className="text-xs text-muted-foreground">They leave your roster and lose access to the app. Their logged history is kept.</p>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setConfirming(null)} disabled={deleting === client.id}>
-                            Cancel
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(client)} disabled={deleting === client.id}>
-                            {deleting === client.id ? "Deleting…" : "Delete"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
+                  {filtered.map((client) => (
                     <div key={client.id} className="group flex items-center hover:bg-muted/40 transition-colors">
                     <Link
                       href={`/clients/${client.id}`}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 pl-5 pr-2 min-h-[60px] active:bg-muted/60"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 px-5 min-h-[60px] active:bg-muted/60"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
@@ -306,18 +261,8 @@ export default function ClientsPage() {
                         </div>
                       </div>
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => setConfirming(client.id)}
-                      aria-label={`Delete ${client.fullName}`}
-                      title="Delete client"
-                      className="press mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                     </div>
-                    )
-                  )}
+                  ))}
                 </div>
               </Card>
             )}
