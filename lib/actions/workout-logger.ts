@@ -330,7 +330,9 @@ export async function addExerciseNote(input: {
 
 export async function getLastPerformance(
   clientId: string,
-  exerciseId: string
+  exerciseId: string,
+  /** The session being logged right now: never its own "last time". */
+  excludeWorkoutLogId?: string | null
 ): Promise<Array<{ weight: number | null; reps: number | null; rpe: number | null; completed: boolean }>> {
   const { workspaceId } = await requireWorkspace();
   await requireClientInWorkspace(clientId, workspaceId);
@@ -344,6 +346,7 @@ export async function getLastPerformance(
       workoutLog: {
         clientId,
         date: { gte: cutoff },
+        ...(excludeWorkoutLogId ? { id: { not: excludeWorkoutLogId } } : {}),
       },
     },
     orderBy: [

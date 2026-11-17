@@ -59,7 +59,7 @@ export function TodayScreen({
           <div className="mt-3 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">
               <h2 className="text-4xl leading-none sm:text-5xl">{next.name}</h2>
-              <p className="mt-3 truncate text-[15px] text-ink-soft">
+              <p className="mt-3 line-clamp-2 text-[15px] text-ink-soft">
                 {next.exercises
                   .slice(0, 3)
                   .map((e) => e.name)

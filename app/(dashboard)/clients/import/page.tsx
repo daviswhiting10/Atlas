@@ -317,7 +317,7 @@ export default function ImportClientsPage() {
                           role="radio"
                           aria-checked={choices[d.row] === value}
                           onClick={() => setChoices((c) => ({ ...c, [d.row]: value }))}
-                          className={cn("press rounded-md px-3 py-1.5 text-[13px] font-medium", choices[d.row] === value ? "bg-dusk-button text-dusk-button-text" : "text-ink-soft hover:text-ink")}
+                          className={cn("press rounded-md px-3 py-1.5 text-[13px] font-medium", choices[d.row] === value ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft hover:text-ink")}
                         >
                           {label}
                         </button>

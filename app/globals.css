@@ -55,11 +55,13 @@
    The coach screens are made of many small controls (tabs, chips, upload buttons, selects). At phone
    width every one of them is at least 44px tall, and an icon-only button is 44px wide too. */
 @media (max-width: 767px) {
-  .coach-ui :is(button, select, [role="tab"], summary),
-  .coach-ui input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+  .coach-ui :is(button, select, [role="tab"], summary):not(.logger-cell):not(.logger-quiet),
+  .coach-ui input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(.logger-cell) {
     min-height: 44px;
   }
-  .coach-ui button:has(> svg:only-child) {
+  /* The logger's set table is the exception: thin 40px rows, so two exercises fit on a phone.
+     .logger-cell is a control in a set row; .logger-quiet a small text action under it. */
+  .coach-ui button:has(> svg:only-child):not(.logger-cell):not(.logger-quiet) {
     min-width: 44px;
   }
 }
@@ -106,14 +108,14 @@
     --popover-foreground:    var(--dusk-text);
     --primary:               var(--dusk-button);          /* the one bright button */
     --primary-foreground:    var(--dusk-button-text);
-    --secondary:             rgba(236, 232, 225, 0.07);
+    --secondary:             rgba(230, 226, 219, 0.07);
     --secondary-foreground:  var(--dusk-text);
-    --muted:                 rgba(236, 232, 225, 0.05);
+    --muted:                 rgba(230, 226, 219, 0.05);
     --muted-foreground:      var(--dusk-mute);
     --accent:                rgba(124, 199, 189, 0.12);
     --accent-foreground:     var(--dusk-teal);
-    --destructive:           #f2877a;                     /* 8.1:1 on the page */
-    --destructive-foreground:#0a0a0d;
+    --destructive:           #e98c80;                     /* 7.5:1 on the page */
+    --destructive-foreground:#141417;
     --border:                var(--dusk-line);
     --input:                 var(--dusk-line-strong);     /* the outline of a field: 3.2:1 */
     --ring:                  var(--dusk-teal);
@@ -137,6 +139,7 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    line-height: var(--dusk-leading-body);
     font-family: var(--font-body), system-ui, sans-serif;
     padding-top: env(safe-area-inset-top, 0px);
   }
@@ -231,7 +234,7 @@
 /* Skeleton shimmer */
 .skeleton {
   border-radius: 14px;
-  background: linear-gradient(90deg, rgba(236, 232, 225, 0.05) 0%, rgba(236, 232, 225, 0.1) 50%, rgba(236, 232, 225, 0.05) 100%);
+  background: linear-gradient(90deg, rgba(230, 226, 219, 0.05) 0%, rgba(230, 226, 219, 0.1) 50%, rgba(230, 226, 219, 0.05) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
@@ -254,6 +257,11 @@
    One grotesque sans for everything, tabular numerals throughout. The serif
    is kept for a single display moment (the greeting).                      */
 .app-ui { font-variant-numeric: tabular-nums; }
+
+/* Body text, a step larger with more room between lines (Dusk type tokens).
+   Screens size text with these utilities, so the scale is set here once. */
+.app-ui :is(.text-\[15px\], .text-base) { font-size: var(--dusk-type-body); line-height: var(--dusk-leading-body); }
+.app-ui :is(.text-\[13px\], .text-sm) { font-size: var(--dusk-type-small); line-height: 1.5; }
 .app-ui h1, .app-ui h2, .app-ui h3, .app-ui h4,
 .app-ui .font-display {
   font-family: var(--font-body), system-ui, sans-serif;

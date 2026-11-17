@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Picture } from "@/lib/exercises/pictures";
+import { ExerciseName } from "@/components/ExerciseName";
 
 /** Start and end of the movement, alternating, so two photos read as a short clip. */
 function useFrame(frames: string[], running: boolean) {
@@ -47,7 +48,7 @@ function Viewer({ picture, name, onClose }: { picture: Picture; name: string; on
     <div role="dialog" aria-modal="true" aria-label={name} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 fade-in" onClick={onClose}>
       <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-paper shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <p className="min-w-0 truncate font-semibold text-ink">{name}</p>
+          <ExerciseName as="p" name={name} className="font-semibold text-ink" />
           <button type="button" onClick={onClose} aria-label="Close" className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-mute hover:bg-ink/5 hover:text-ink">
             <X className="h-5 w-5" />
           </button>

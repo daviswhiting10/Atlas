@@ -55,7 +55,7 @@ export function CoachNav({ name }: { name: string }) {
                 aria-current={isActive(href) ? "page" : undefined}
                 className={cn(
                   "press whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium",
-                  isActive(href) ? "bg-dusk-button text-dusk-button-text" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
+                  isActive(href) ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
                 )}
               >
                 {label}

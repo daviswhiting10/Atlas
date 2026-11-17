@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
 import type { Picture } from "@/lib/exercises/pictures";
+import { ExerciseName } from "@/components/ExerciseName";
 
 export type LibraryRow = { id: string; name: string; picture: Picture | null; inPlans: boolean };
 
@@ -52,7 +53,7 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
                 setFilter(t.id);
                 setQuery("");
               }}
-              className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-dusk-button text-dusk-button-text shadow-sm" : "text-ink-soft hover:text-ink")}
+              className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink")}
             >
               {t.label}
             </button>
@@ -79,7 +80,7 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-[15px] text-ink">{r.name}</p>
+                  <ExerciseName as="p" name={r.name} className="text-[15px] text-ink" />
                   <p className="text-xs text-ink-mute">{r.picture?.own ? "Your photo" : r.picture ? "Library picture" : "No picture"}</p>
                 </div>
               </div>

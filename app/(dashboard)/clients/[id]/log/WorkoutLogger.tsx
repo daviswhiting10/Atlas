@@ -18,7 +18,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
-  ArrowLeftRight,
   Calendar,
   SlidersHorizontal,
   Trash2,
@@ -28,6 +27,7 @@ import {
   Loader2,
   Mic,
   MicOff,
+  PencilLine,
   Plus,
   Timer,
   RotateCcw,
@@ -42,6 +42,7 @@ import {
 import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
+import { ExerciseName } from "@/components/ExerciseName";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ type ExerciseState = {
   noteInput: string;
   noteSaving: boolean;
   noteAdded: boolean;
+  /** Phone: the note field is open. */
+  noteOpen?: boolean;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -231,6 +234,15 @@ function groupIntoBlocks(exercises: LoggerExercise[]): ExBlock[] {
     exIndices: p.items.map((it) => it.index),
     labels: p.items.map((it) => it.label ?? (p.key === "warmup" ? "W" : "C")),
   }));
+}
+
+/** An exercise's badge by its index: "1A", "2", "W" or "C". */
+function exerciseLabel(exercises: LoggerExercise[], index: number): string {
+  for (const b of groupIntoBlocks(exercises)) {
+    const k = b.exIndices.indexOf(index);
+    if (k >= 0) return b.labels[k];
+  }
+  return String(index + 1);
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -472,6 +484,9 @@ export default function WorkoutLogger({
   const stateFor = (ex: LoggerExercise): ExerciseState => exState[ex.aweId] ?? freshState(ex);
 
   // ── Mobile-specific state ────────────────────────────────────────────────────
+  // A finished exercise folds to one line; these are the ones opened again by hand.
+  const [reopened, setReopened] = useState<Set<string>>(() => new Set());
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
   const [restSecs, setRestSecs] = useState(0);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -544,14 +559,6 @@ export default function WorkoutLogger({
     });
   }
 
-  function adjustWeight(aweId: string, idx: number, delta: number) {
-    const entry = exState[aweId].sets[idx];
-    if (entry.isBodyweight) return;
-    const current = parseFloat(entry.weight) || 0;
-    const next = Math.max(0, current + delta);
-    updateSet(aweId, idx, { weight: next % 1 === 0 ? String(next) : next.toFixed(1) });
-  }
-
   function addSet(aweId: string) {
     setExState((prev) => {
       const sets = prev[aweId].sets;
@@ -610,6 +617,14 @@ export default function WorkoutLogger({
         completed: !entry.completed,
         setLogId: result.setLogId,
       });
+      // Logging the last open set folds the exercise to its one-line summary.
+      if (!entry.completed && exState[aweId].sets.every((x, i) => i === idx || x.completed)) {
+        setReopened((prev) => {
+          const next = new Set(prev);
+          next.delete(aweId);
+          return next;
+        });
+      }
       // Mobile: start rest timer + show an "Undo" toast
       if (!entry.completed) {
         setLastSetAt(Date.now());
@@ -802,6 +817,31 @@ export default function WorkoutLogger({
     });
   }
 
+  // ── Phone: folding and jumping ───────────────────────────────────────────
+  const isDone = (ex: LoggerExercise) => {
+    const sets = stateFor(ex).sets;
+    return sets.length > 0 && sets.every((x) => x.completed);
+  };
+  const isFolded = (ex: LoggerExercise) => isDone(ex) && !reopened.has(ex.aweId);
+  function setOpen(aweId: string, open: boolean) {
+    setReopened((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(aweId);
+      else next.delete(aweId);
+      return next;
+    });
+  }
+  /** Open an exercise's block (and the exercise, if it was folded) and bring it under the top bar. */
+  function jumpTo(ex: LoggerExercise) {
+    const bi = groupIntoBlocks(exercises).findIndex((b) => b.exIndices.some((i) => exercises[i].aweId === ex.aweId));
+    if (bi !== -1) setExpandedBlocks((prev) => new Set(prev).add(bi));
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => cardRefs.current[ex.aweId]?.scrollIntoView({ behavior: "smooth", block: "start" }))
+    );
+  }
+  /** The exercise to do next: the first with a set still to log. */
+  const upNext = exercises.find((e) => !isDone(e))?.aweId ?? null;
+
   // ── Week / day picker helpers ─────────────────────────────────────────────
 
   function getWeekNum(w: { scheduledDate: string }): number {
@@ -844,11 +884,12 @@ export default function WorkoutLogger({
   }
 
   // ── Shared day picker — native <select> triggers iOS wheel on mobile ──────
-  const dayPicker = availableWorkouts.length > 1 ? (
+  const renderDayPicker = (lead?: React.ReactNode) => availableWorkouts.length > 1 ? (
     <div className="flex gap-2 mb-3">
+      {lead}
       {/* Week selector — hidden when there's only one week */}
       {allWeeks.length > 1 && (
-        <div className="relative flex-1">
+        <div className="relative min-w-0 flex-1">
           <select
             value={pickerWeek}
             onChange={(e) => handlePickerWeekChange(Number(e.target.value))}
@@ -866,7 +907,7 @@ export default function WorkoutLogger({
         </div>
       )}
       {/* Day selector */}
-      <div className="relative flex-1">
+      <div className="relative min-w-0 flex-1">
         <select
           value={pickerDayId}
           onChange={(e) => handlePickerDayChange(e.target.value)}
@@ -883,7 +924,8 @@ export default function WorkoutLogger({
         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
       </div>
     </div>
-  ) : null;
+  ) : lead ? <div className="mb-3 flex">{lead}</div> : null;
+  const dayPicker = renderDayPicker();
 
   // ── Add an exercise that isn't in the plan (both layouts) ─────────────────
   const addExercise = (
@@ -1063,9 +1105,10 @@ export default function WorkoutLogger({
   // ═══════════════════════════════════════════════════════════════════════════
 
   const mobileView = (
-    <div className="md:hidden px-4 pt-2 pb-28">
+    <div className="md:hidden -mt-3 pb-28">
       {/* ── Top bar ───────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-2 mb-2 bg-background/95 backdrop-blur border-b flex items-center justify-between">
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-2 mb-2 bg-background/95 backdrop-blur border-b">
+        <div className="flex items-center justify-between">
         <Link
           href={`/clients/${clientId}`}
           className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2")}
@@ -1095,27 +1138,60 @@ export default function WorkoutLogger({
             Done
           </Button>
         </div>
+        </div>
+        {/* Jump bar: every exercise, one tap away */}
+        {exercises.length > 1 && (
+          <nav aria-label="Exercises in this workout" className="-mx-4 mt-2 px-4">
+            <ol className="no-scrollbar flex gap-1.5 overflow-x-auto">
+              {exercises.map((ex, i) => {
+                const done = isDone(ex);
+                const next = ex.aweId === upNext;
+                return (
+                  <li key={ex.aweId} className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(ex)}
+                      aria-current={next ? "step" : undefined}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-left text-[13px] font-semibold",
+                        next ? "border-ink/60 bg-dusk-raised text-ink" : "border-line bg-paper text-ink-soft"
+                      )}
+                    >
+                      <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] tabular-nums", done ? "bg-[var(--success)]/20 text-[var(--success)]" : "bg-ink/10")}>
+                        {done ? <Check className="h-3 w-3" strokeWidth={3} /> : exerciseLabel(exercises, i)}
+                      </span>
+                      <ExerciseName name={ex.name} inControl className="max-w-[140px] leading-tight" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        )}
       </div>
 
-      {/* ── Session date chip ─────────────────────────────────────── */}
-      <div className="flex items-center justify-center gap-2 mb-2">
-        {completed && <CompletedPill />}
+      {/* ── Session date, then week and day, on one row ───────────── */}
+      {completed && (
+        <div className="mb-2 flex justify-center">
+          <CompletedPill />
+        </div>
+      )}
+      {renderDayPicker(
         <button
           type="button"
           onClick={() => dateInputRef.current?.showPicker()}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-muted/70 transition-colors touch-manipulation"
+          aria-label={`Session date: ${dateLabel}`}
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-border px-3 text-sm font-medium text-ink-soft touch-manipulation"
         >
-          <Calendar className="w-3 h-3 shrink-0" />
-          <span>{dateLabel}</span>
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          <span>{dateLabel.replace(/^\w+, /, "")}</span>
         </button>
-      </div>
-
-      {/* ── Day picker ────────────────────────────────────────────── */}
-      {dayPicker}
+      )}
 
       {/* ── Exercise list, grouped by block ─────────────────────────── */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {groupIntoBlocks(exercises).map((block, bi) => {
+          // Warm-up, Block n and Cool-down always show (an empty part says "None").
           const blockLabel = block.title;
           const isCollapsible = block.exIndices.length > 0;
           const isExpanded = !isCollapsible || expandedBlocks.has(bi);
@@ -1129,12 +1205,12 @@ export default function WorkoutLogger({
           );
           const blockDone = totalSets > 0 && doneSets === totalSets;
           return (
-            <div key={bi} className="space-y-3">
+            <div key={bi} className="space-y-2">
               {blockLabel && (
                 <button
                   type="button"
                   onClick={() => toggleBlock(bi)}
-                  className="w-full flex items-center gap-2 pt-1 touch-manipulation"
+                  className="logger-quiet w-full flex items-center gap-2 py-1 touch-manipulation"
                 >
                   <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground min-w-0 truncate">
                     {blockLabel}
@@ -1159,7 +1235,7 @@ export default function WorkoutLogger({
                 <button
                   type="button"
                   onClick={() => toggleBlock(bi)}
-                  className="w-full text-left text-xs text-muted-foreground px-1 pb-1 truncate touch-manipulation"
+                  className="w-full text-left text-xs text-muted-foreground px-1 pb-1 line-clamp-2 break-words touch-manipulation"
                 >
                   {block.exIndices.map((exI) => exercises[exI].name).join(" · ")}
                 </button>
@@ -1167,91 +1243,116 @@ export default function WorkoutLogger({
               {isExpanded && block.exIndices.map((exI, k) => {
                 const ex = exercises[exI];
                 const state = stateFor(ex);
+                const secs = ex.prescribedSets[0]?.unit === "secs";
+                if (isFolded(ex)) {
+                  const summary = describeSets(
+                    state.sets.map((x) => ({
+                      weight: x.isBodyweight || x.isBand ? null : x.weight ? parseFloat(x.weight) : null,
+                      bandColor: x.isBand ? x.bandColor : null,
+                      reps: x.reps ? parseInt(x.reps, 10) : null,
+                    })),
+                    secs
+                  );
+                  return (
+                    <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
+                      <button type="button" onClick={() => setOpen(ex.aweId, true)} aria-expanded={false} className="flex w-full items-center gap-2.5 px-3 py-2 text-left">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/20 text-[var(--success)]">
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3">
+                          <ExerciseName name={ex.name} inControl className="text-[15px] font-semibold leading-snug text-ink" />
+                          <span className="text-[14px] tabular-nums text-ink-soft">{summary}</span>
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
+                      </button>
+                    </section>
+                  );
+                }
                 return (
-                  <Card key={ex.aweId} size="sm">
-                    <CardContent className="space-y-3">
-                      <ExerciseHeader
+                  <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper px-3 pb-1 pt-2">
+                    <CompactHeader
+                      ex={ex}
+                      index={block.labels[k]}
+                      isEditing={editingAweId === ex.aweId}
+                      busy={busy}
+                      onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
+                      onFold={isDone(ex) ? () => setOpen(ex.aweId, false) : undefined}
+                    />
+                    {editingAweId === ex.aweId && (
+                      <ChangePanel
                         ex={ex}
-                        index={block.labels[k]}
-                        isEditing={editingAweId === ex.aweId}
+                        setCount={state.sets.length}
                         busy={busy}
-                        onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
+                        onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                        onTargets={(t) => handleSetTargets(ex, t)}
+                        onRemove={() => handleRemoveExercise(ex)}
+                        media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
                       />
-                      {editingAweId === ex.aweId && (
-                        <ChangePanel
-                          ex={ex}
-                          setCount={state.sets.length}
-                          busy={busy}
-                          onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
-                          onTargets={(t) => handleSetTargets(ex, t)}
-                          onRemove={() => handleRemoveExercise(ex)}
-                          media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
-                        />
-                      )}
+                    )}
 
-                      <div className="space-y-2">
-                        {state.sets.map((entry, idx) => {
-                          const prescribedWeight = ex.prescribedSets[idx]?.weight ?? null;
-                          return (
-                            <MobileSetRow
-                              key={idx}
-                              idx={idx}
-                              entry={entry}
-                              prescribedWeight={prescribedWeight}
-                              last={ex.lastSets[idx] ?? null}
-                              onChange={(patch) => updateSet(ex.aweId, idx, patch)}
-                              onAdjustWeight={(delta) => adjustWeight(ex.aweId, idx, delta)}
-                              onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
-                              onBlurPersist={() => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
-                              onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
-                            />
-                          );
-                        })}
-                      </div>
+                    <SetTable
+                      secs={secs}
+                      sets={state.sets}
+                      last={ex.lastSets}
+                      prescribed={ex.prescribedSets}
+                      onChange={(idx, patch) => updateSet(ex.aweId, idx, patch)}
+                      onComplete={(idx) => handleComplete(ex.aweId, ex.exerciseId, idx)}
+                      onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
+                      onRemove={(idx) => removeSet(ex.aweId, idx)}
+                    />
 
+                    <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={() => addSet(ex.aweId)}
-                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-1"
+                        className="logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
                       >
-                        <Plus className="w-3 h-3" />
-                        Add set
+                        <Plus className="h-3.5 w-3.5" /> Add set
                       </button>
-
-                      <div className="pt-2 border-t">
-                        {state.noteAdded ? (
-                          <p className="text-xs text-[var(--success)]">Note saved ✓</p>
-                        ) : (
-                          <div className="flex gap-1.5">
-                            <Input
-                              value={state.noteInput}
-                              onChange={(e) =>
-                                setExState((prev) => ({
-                                  ...prev,
-                                  [ex.aweId]: { ...prev[ex.aweId], noteInput: e.target.value },
-                                }))
-                              }
-                              placeholder="Pain, adaptation, form cue…"
-                              className="h-9"
-                              style={{ fontSize: "16px" }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveNote(ex.aweId, ex.exerciseId);
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-9 text-xs px-3 shrink-0"
-                              disabled={!state.noteInput.trim() || state.noteSaving}
-                              onClick={() => saveNote(ex.aweId, ex.exerciseId)}
-                            >
-                              {state.noteSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                            </Button>
-                          </div>
-                        )}
+                      {state.noteAdded ? (
+                        <span className="px-1 text-[13px] text-[var(--success)]">Note saved ✓</span>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-expanded={state.noteOpen}
+                          onClick={() => setExState((prev) => ({ ...prev, [ex.aweId]: { ...prev[ex.aweId], noteOpen: !prev[ex.aweId].noteOpen } }))}
+                          className="logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
+                        >
+                          <PencilLine className="h-3.5 w-3.5" /> Note
+                        </button>
+                      )}
+                    </div>
+                    {state.noteOpen && !state.noteAdded && (
+                      <div className="mt-1 flex gap-1.5 pb-1">
+                        <Input
+                          value={state.noteInput}
+                          onChange={(e) =>
+                            setExState((prev) => ({
+                              ...prev,
+                              [ex.aweId]: { ...prev[ex.aweId], noteInput: e.target.value },
+                            }))
+                          }
+                          placeholder="Pain, adaptation, form cue…"
+                          aria-label={`Note on ${ex.name}`}
+                          className="h-10"
+                          style={{ fontSize: "16px" }}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveNote(ex.aweId, ex.exerciseId);
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-10 shrink-0 px-3 text-xs"
+                          disabled={!state.noteInput.trim() || state.noteSaving}
+                          onClick={() => saveNote(ex.aweId, ex.exerciseId)}
+                        >
+                          {state.noteSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                        </Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </section>
                 );
               })}
             </div>
@@ -1281,7 +1382,7 @@ export default function WorkoutLogger({
 
       {/* ── Floating rest timer ──────────────────────────────────── */}
       {lastSetAt && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
           <Timer className="w-4 h-4 text-muted-foreground" />
           <span className="font-mono text-lg tabular-nums">{formatRest(restSecs)}</span>
           <button
@@ -1396,7 +1497,7 @@ export default function WorkoutLogger({
                         {block.labels[k]}
                       </div>
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
-                      <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
+                      <CardTitle className="text-sm font-semibold leading-tight min-w-0"><ExerciseName name={ex.name} /></CardTitle>
                     </div>
                     <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                   </div>
@@ -1502,58 +1603,328 @@ export default function WorkoutLogger({
   );
 }
 
-// ── Exercise header (shared info block for mobile cards) ────────────────────────
+// ── Exercise header (phone): number, picture, name, today's target ─────────────
 
-function ExerciseHeader({
+function CompactHeader({
   ex,
   index,
   isEditing,
   busy,
   onToggleEdit,
+  onFold,
 }: {
   ex: LoggerExercise;
   index: number | string;
   isEditing: boolean;
   busy: boolean;
   onToggleEdit: () => void;
+  /** A finished exercise opened again: fold it back to one line. */
+  onFold?: () => void;
+}) {
+  const notes = Array.from(
+    new Set([ex.lastNote?.trim(), ...ex.prevWorkoutSets.map((x) => x.note?.trim())].filter((x): x is string => !!x))
+  );
+  return (
+    <div className="mb-1 min-w-0">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-ink/10 text-[12px] font-semibold tabular-nums text-ink">{index}</span>
+        <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
+        <div className="min-w-0 flex-1">
+          <ExerciseName as="h3" name={ex.name} className="text-[15px] font-semibold leading-tight text-ink" />
+          <p className="text-[12px] leading-tight text-ink-mute">{rxLabel(ex)}</p>
+        </div>
+        {onFold && (
+          <button type="button" onClick={onFold} aria-label={`Fold ${ex.name}`} className="logger-quiet flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:text-ink">
+            <ChevronUp className="h-4 w-4" />
+          </button>
+        )}
+        <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} compact />
+      </div>
+      {notes.length > 0 && (
+        <p className="mt-1 line-clamp-2 border-l-2 border-[var(--success)]/40 pl-2 text-[12px] italic leading-snug text-[var(--success)]">
+          {notes.map((n) => `“${n}”`).join(" ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Set table (phone): one thin row per set ────────────────────────────────────
+
+/** What a number field may hold while typing: digits and one decimal point. */
+function cleanNumber(v: string, decimal: boolean): string {
+  const t = v.replace(",", ".").replace(decimal ? /[^\d.]/g : /\D/g, "");
+  const [whole, ...rest] = t.split(".");
+  return (rest.length ? `${whole}.${rest.join("")}` : whole).slice(0, 6);
+}
+
+/** A compact number field: one rounded outline, room for "102.5", the decimal keypad on phones. */
+function NumField({
+  value,
+  onChange,
+  onBlur,
+  label,
+  decimal,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  label: string;
+  decimal: boolean;
+  placeholder?: string;
 }) {
   return (
-    <div className="min-w-0">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-ink shrink-0"
-            style={{ background: "var(--blue)" }}
-          >
-            {index}
-          </div>
-          <ExerciseThumb picture={ex.picture} name={ex.name} className="h-10 w-10" />
-          <h3 className="font-display text-sm leading-tight truncate min-w-0">{ex.name}</h3>
-        </div>
-        <ChangeButton open={isEditing} busy={busy} onClick={onToggleEdit} />
+    <input
+      type="text"
+      inputMode={decimal ? "decimal" : "numeric"}
+      enterKeyHint="done"
+      autoComplete="off"
+      value={value}
+      onChange={(e) => onChange(cleanNumber(e.target.value, decimal))}
+      onFocus={(e) => e.target.select()}
+      onBlur={onBlur}
+      aria-label={label}
+      placeholder={placeholder}
+      className="logger-cell h-10 w-full min-w-0 rounded-lg border border-line-strong bg-dusk-raised px-1 text-center text-[16px] font-semibold tabular-nums text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/70"
+    />
+  );
+}
+
+const SET_GRID = "grid grid-cols-[1.25rem_2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.5rem_1.75rem] items-center gap-1";
+
+function SetTable({
+  secs,
+  sets,
+  last,
+  prescribed,
+  onChange,
+  onComplete,
+  onBlurPersist,
+  onRemove,
+}: {
+  secs: boolean;
+  sets: SetEntry[];
+  last: LoggerExercise["lastSets"];
+  prescribed: PrescribedSet[];
+  onChange: (idx: number, patch: Partial<SetEntry>) => void;
+  onComplete: (idx: number) => void;
+  onBlurPersist: (idx: number) => void;
+  onRemove: (idx: number) => void;
+}) {
+  const [detail, setDetail] = useState<number | null>(null);
+  const removable = (i: number) => sets.length > 1 && !sets[i].completed;
+  return (
+    <div className="text-ink">
+      <div aria-hidden className={cn(SET_GRID, "px-0.5 pb-0.5 text-[11px] font-semibold uppercase leading-4 tracking-wide text-ink-mute")}>
+        <span className="text-center">Set</span>
+        <span>Last</span>
+        <span className="text-center">lb</span>
+        <span className="text-center">{secs ? "Sec" : "Reps"}</span>
+        <span />
+        <span />
       </div>
-      <p className="text-xs text-muted-foreground mt-0.5">{rxLabel(ex)}</p>
-      <LastWeek ex={ex} />
+      <div className="space-y-1">
+        {sets.map((entry, idx) => {
+          const prev = last[idx];
+          // "102.5×10": breaks only before the ×, never inside a number.
+          const prevLabel =
+            prev && (prev.weight != null || prev.reps != null) ? (
+              <>
+                {prev.weight != null ? prev.weight : "BW"}
+                {prev.reps != null && <span className="whitespace-nowrap">×{prev.reps}</span>}
+              </>
+            ) : (
+              "—"
+            );
+          const band = BAND_COLORS.find((b) => b.id === entry.bandColor);
+          const extra = Boolean(entry.note.trim() || entry.rpe);
+          const persist = () => entry.completed && onBlurPersist(idx);
+          const open = detail === idx;
+          return (
+            <div key={idx} role="group" aria-label={`Set ${idx + 1}`}>
+              <div className={cn(SET_GRID, "rounded-lg px-0.5", entry.completed && "bg-[var(--success)]/[0.07]")}>
+                <button
+                  type="button"
+                 
+                  onClick={() => setDetail(open ? null : idx)}
+                  aria-expanded={open}
+                  aria-label={`Set ${idx + 1}: load type, RPE and note`}
+                  className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
+                >
+                  {idx + 1}
+                  {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
+                </button>
+                <span className="text-[12px] leading-tight tabular-nums text-ink-mute">{prevLabel}</span>
+                <span className="min-w-0">
+                  {entry.isBand || entry.isBodyweight ? (
+                    <button
+                      type="button"
+                      onClick={() => setDetail(open ? null : idx)}
+                      className="logger-cell flex h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-dusk-raised px-1 text-[13px] font-semibold"
+                    >
+                      {entry.isBand ? (
+                        <>
+                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: band?.hex }} />
+                          {band?.label}
+                        </>
+                      ) : (
+                        "BW"
+                      )}
+                    </button>
+                  ) : (
+                    <NumField
+                      value={entry.weight}
+                      onChange={(v) => onChange(idx, { weight: v })}
+                      onBlur={persist}
+                      label={`Set ${idx + 1} weight in pounds`}
+                      decimal
+                      placeholder={prescribed[idx]?.weight != null ? String(prescribed[idx].weight) : "lb"}
+                    />
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <NumField
+                    value={entry.reps}
+                    onChange={(v) => onChange(idx, { reps: v })}
+                    onBlur={persist}
+                    label={`Set ${idx + 1} ${entry.isSeconds ? "seconds" : "reps"}`}
+                    decimal={false}
+                    placeholder={entry.isSeconds ? "sec" : "reps"}
+                  />
+                </span>
+                <button
+                  type="button"
+                 
+                  onClick={() => onComplete(idx)}
+                  disabled={entry.saving}
+                  aria-pressed={entry.completed}
+                  aria-label={entry.completed ? `Set ${idx + 1} logged — tap to undo` : `Log set ${idx + 1}`}
+                  className={cn(
+                    "logger-cell flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
+                    entry.completed ? "border-[var(--success)] bg-[var(--success)] text-dusk-button-text" : "border-line-strong text-ink-mute"
+                  )}
+                >
+                  {entry.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
+                </button>
+                {removable(idx) ? (
+                  <button
+                    type="button"
+                   
+                    onClick={() => {
+                      if (detail === idx) setDetail(null);
+                      onRemove(idx);
+                    }}
+                    aria-label={`Delete set ${idx + 1}`}
+                    className="logger-cell flex h-10 w-7 items-center justify-center text-ink-mute hover:text-[var(--destructive)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <span />
+                )}
+              </div>
+              {open && (
+                <SetDetails
+                  idx={idx}
+                  entry={entry}
+                  onChange={(patch) => onChange(idx, patch)}
+                  onBlur={persist}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The rarer parts of a set, opened from its number: load type, seconds, RPE, a note. */
+function SetDetails({
+  idx,
+  entry,
+  onChange,
+  onBlur,
+}: {
+  idx: number;
+  entry: SetEntry;
+  onChange: (patch: Partial<SetEntry>) => void;
+  onBlur: () => void;
+}) {
+  const mode = entry.isBand ? "band" : entry.isBodyweight ? "bw" : "weight";
+  const seg = (on: boolean) =>
+    cn("logger-cell h-8 rounded-md px-2.5 text-[13px] font-medium", on ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft");
+  return (
+    <div className="my-1 ml-7 space-y-2 rounded-xl bg-ink/[0.04] p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label={`Set ${idx + 1} load`}>
+          <button type="button" className={seg(mode === "weight")} aria-pressed={mode === "weight"} onClick={() => onChange({ isBodyweight: false, isBand: false })}>Weight</button>
+          <button type="button" className={seg(mode === "bw")} aria-pressed={mode === "bw"} onClick={() => onChange({ isBodyweight: true, isBand: false, weight: "" })}>BW</button>
+          <button type="button" className={seg(mode === "band")} aria-pressed={mode === "band"} onClick={() => onChange({ isBodyweight: false, isBand: true })}>Band</button>
+        </div>
+        <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label={`Set ${idx + 1} counted in`}>
+          <button type="button" className={seg(!entry.isSeconds)} aria-pressed={!entry.isSeconds} onClick={() => onChange({ isSeconds: false })}>Reps</button>
+          <button type="button" className={seg(entry.isSeconds)} aria-pressed={entry.isSeconds} onClick={() => onChange({ isSeconds: true })}>Sec</button>
+        </div>
+      </div>
+      {entry.isBand && (
+        <div className="flex gap-1.5" role="group" aria-label="Band colour">
+          {BAND_COLORS.map(({ id, label, hex }) => (
+            <button
+              key={id}
+              type="button"
+              title={label}
+              aria-label={`${label} band`}
+              aria-pressed={entry.bandColor === id}
+              onClick={() => onChange({ bandColor: id })}
+              className={cn("logger-cell flex h-8 flex-1 items-center justify-center rounded-lg border-2", entry.bandColor === id ? "border-ink" : "border-transparent opacity-70")}
+              style={{ backgroundColor: hex }}
+            >
+              {entry.bandColor === id && <Check className="h-3.5 w-3.5 text-white drop-shadow" strokeWidth={3} />}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1.5">
+        <label className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-ink-mute">
+          RPE
+          <span className="w-14">
+            <NumField value={entry.rpe} onChange={(v) => onChange({ rpe: v })} onBlur={onBlur} label={`Set ${idx + 1} RPE`} decimal placeholder="–" />
+          </span>
+        </label>
+        <Input
+          value={entry.note}
+          onChange={(e) => onChange({ note: e.target.value })}
+          onBlur={onBlur}
+          placeholder="Set note…"
+          aria-label={`Set ${idx + 1} note`}
+          className="logger-cell h-10 px-2"
+          style={{ fontSize: "16px" }}
+        />
+      </div>
     </div>
   );
 }
 
 // ── Changing one exercise on the spot ──────────────────────────────────────────
 
-function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; onClick: () => void }) {
+function ChangeButton({ open, busy, onClick, compact = false }: { open: boolean; busy: boolean; onClick: () => void; compact?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={busy}
       aria-expanded={open}
+      aria-label={compact ? (open ? "Close changes" : "Change this exercise") : undefined}
       className={cn(
-        "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
-        open ? "border-ink bg-dusk-button text-dusk-button-text" : "border-border text-muted-foreground hover:text-foreground"
+        "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
+        compact ? "logger-quiet w-8 justify-center" : "px-2.5",
+        open ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-border text-muted-foreground hover:text-foreground"
       )}
     >
       {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
-      {open ? "Close" : "Change"}
+      {!compact && (open ? "Close" : "Change")}
     </button>
   );
 }
@@ -1642,216 +2013,6 @@ function ChangePanel({
 }
 
 // ── Mobile SetRow ─────────────────────────────────────────────────────────────
-
-function MobileSetRow({
-  idx,
-  entry,
-  prescribedWeight,
-  last,
-  onChange,
-  onAdjustWeight,
-  onComplete,
-  onBlurPersist,
-  onRemove,
-}: {
-  onRemove?: () => void;
-  idx: number;
-  entry: SetEntry;
-  prescribedWeight: number | null;
-  last: { weight: number | null; reps: number | null; rpe: number | null; completed: boolean } | null;
-  onChange: (patch: Partial<SetEntry>) => void;
-  onAdjustWeight: (delta: number) => void;
-  onComplete: () => void;
-  onBlurPersist: () => void;
-}) {
-
-  function persistIfCompleted() {
-    if (entry.completed) onBlurPersist();
-  }
-
-  function cycleLoadMode() {
-    if (!entry.isBodyweight && !entry.isBand) {
-      onChange({ isBodyweight: true, isBand: false, weight: "" });
-    } else if (entry.isBodyweight) {
-      onChange({ isBodyweight: false, isBand: true });
-    } else {
-      onChange({ isBodyweight: false, isBand: false });
-    }
-  }
-
-  const bandMeta = BAND_COLORS.find((b) => b.id === entry.bandColor);
-  const loadModeLabel = entry.isBand ? (bandMeta?.label ?? "Band") : entry.isBodyweight ? "Bodyweight" : "Weight";
-  const prevLabel =
-    last && (last.weight != null || last.reps != null)
-      ? `${last.weight != null ? `${last.weight}lb` : "BW"}${last.reps != null ? ` × ${last.reps}` : ""}`
-      : "—";
-
-  return (
-    <div className={cn("rounded-xl border p-2.5 space-y-2", entry.completed && "bg-muted/30")}>
-      {/* Primary row: Set / Prev / Weight / Reps / Check — mirrors the client logger's grid */}
-      <div className="grid grid-cols-[16px_44px_1fr_1fr_36px] gap-1.5 items-center">
-        <span className="text-xs text-muted-foreground text-center">{idx + 1}</span>
-        <span className="text-[11px] text-muted-foreground tabular-nums truncate">{prevLabel}</span>
-
-        {entry.isBand ? (
-          <div
-            className="h-11 rounded-lg border-2 flex items-center justify-center gap-1.5 px-1 min-w-0"
-            style={{ borderColor: bandMeta?.hex }}
-          >
-            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: bandMeta?.hex }} />
-            <span className="text-xs font-semibold truncate">{bandMeta?.label}</span>
-          </div>
-        ) : entry.isBodyweight ? (
-          <div className="h-11 rounded-lg border bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
-            BW
-          </div>
-        ) : (
-          <div className="h-11 rounded-lg border flex items-center min-w-0">
-            <button
-              type="button"
-              onClick={() => onAdjustWeight(-2.5)}
-              className="w-6 h-full flex items-center justify-center text-sm font-light text-muted-foreground touch-manipulation active:bg-muted shrink-0"
-            >
-              −
-            </button>
-            <Input
-              value={entry.weight}
-              onChange={(e) => onChange({ weight: e.target.value })}
-              onBlur={persistIfCompleted}
-              className="h-full min-w-0 flex-1 text-center text-sm font-semibold px-0 border-0 rounded-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-              type="number"
-              inputMode="decimal"
-              step="2.5"
-              style={{ fontSize: "16px" }}
-              placeholder="lb"
-            />
-            <button
-              type="button"
-              onClick={() => onAdjustWeight(2.5)}
-              className="w-6 h-full flex items-center justify-center text-sm font-light text-muted-foreground touch-manipulation active:bg-muted shrink-0"
-            >
-              +
-            </button>
-          </div>
-        )}
-
-        <div className="h-11 rounded-lg border flex items-center min-w-0">
-          <Input
-            value={entry.reps}
-            onChange={(e) => onChange({ reps: e.target.value })}
-            onBlur={persistIfCompleted}
-            className="h-full min-w-0 flex-1 text-center text-sm font-semibold px-0 border-0 rounded-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-            type="number"
-            inputMode="numeric"
-            style={{ fontSize: "16px" }}
-            placeholder={entry.isSeconds ? "sec" : "reps"}
-          />
-          <button
-            type="button"
-            onClick={() => onChange({ isSeconds: !entry.isSeconds })}
-            title={entry.isSeconds ? "Seconds — tap for reps" : "Reps — tap for seconds"}
-            className={cn(
-              "w-6 h-full flex items-center justify-center text-[11px] font-semibold shrink-0 border-l touch-manipulation",
-              entry.isSeconds ? "text-[var(--blue-deep)]" : "text-muted-foreground"
-            )}
-          >
-            {entry.isSeconds ? "s" : "×"}
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={onComplete}
-          disabled={entry.saving}
-          className={cn(
-            "h-11 rounded-lg border flex items-center justify-center transition-colors touch-manipulation",
-            entry.completed
-              ? "bg-[var(--success)] border-[var(--success)] text-dusk-button-text"
-              : "border-border text-muted-foreground active:bg-muted"
-          )}
-        >
-          {entry.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Secondary row: load type + RPE — quieter, smaller than the primary controls */}
-      <div className="flex items-center gap-2 pl-[62px]">
-        <button
-          type="button"
-          onClick={cycleLoadMode}
-          title="Switch load type"
-          className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground touch-manipulation"
-        >
-          <ArrowLeftRight className="w-3 h-3 shrink-0" />
-          {loadModeLabel}
-        </button>
-        {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-[var(--destructive)] touch-manipulation"
-          >
-            <X className="w-3 h-3 shrink-0" />
-            Remove set
-          </button>
-        )}
-        <div className="flex-1" />
-        <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">RPE</label>
-        <Input
-          value={entry.rpe}
-          onChange={(e) => onChange({ rpe: e.target.value })}
-          onBlur={persistIfCompleted}
-          className="w-11 h-8 text-center text-xs font-semibold px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-          type="number"
-          step="0.5"
-          min="1"
-          max="10"
-          style={{ fontSize: "16px" }}
-          placeholder="–"
-        />
-      </div>
-
-      {/* Band color swatches */}
-      {entry.isBand && (
-        <div className="flex gap-1.5 pl-[62px]">
-          {BAND_COLORS.map(({ id, label, hex }) => (
-            <button
-              key={id}
-              type="button"
-              title={label}
-              onClick={() => onChange({ bandColor: id })}
-              className={cn(
-                "flex-1 h-8 rounded-lg border-2 transition-all touch-manipulation flex items-center justify-center",
-                entry.bandColor === id ? "border-foreground scale-105" : "border-transparent opacity-70"
-              )}
-              style={{ backgroundColor: hex }}
-            >
-              {entry.bandColor === id && (
-                <Check className="w-3.5 h-3.5 text-ink drop-shadow" strokeWidth={3} />
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Per-set note */}
-      <div className="pl-[62px]">
-        <Input
-          value={entry.note}
-          onChange={(e) => onChange({ note: e.target.value })}
-          onBlur={persistIfCompleted}
-          placeholder="Set note…"
-          className="h-8 px-2"
-          style={{ fontSize: "16px" }}
-        />
-      </div>
-
-      {prescribedWeight != null && !entry.isBodyweight && !entry.isBand && (
-        <p className="text-xs text-[var(--success)] pl-[62px]">Prescribed: {prescribedWeight} lb</p>
-      )}
-    </div>
-  );
-}
 
 // ── Desktop SetRow ──────────────────────────────────────────────────────────────
 

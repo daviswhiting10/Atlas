@@ -15,6 +15,7 @@ import { TargetEditor } from "./TargetEditor";
 import { METRICS, formatValue, buildSeries, e1rm, isE1rmBest, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
+import { ExerciseName } from "@/components/ExerciseName";
 
 type SetMap = Record<string, LoggerSet[]>;
 
@@ -390,7 +391,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 const ex = data.exercises.find((e) => key.startsWith(e.aweId));
                 return (
                   <li key={key} className="flex items-baseline justify-between gap-3 text-[15px]">
-                    <span className="truncate font-medium text-ink">{ex?.name}</span>
+                    <ExerciseName name={ex?.name ?? ""} className="font-medium text-ink" />
                     <span className="tnum shrink-0 text-ink-soft">{label}</span>
                   </li>
                 );
@@ -460,7 +461,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 onClick={() => setIndex(i)}
                 className={cn(
                   "press flex shrink-0 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left lg:w-full",
-                  active ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink hover:border-ink/20"
+                  active ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink hover:border-ink/20"
                 )}
               >
                 <span
@@ -472,8 +473,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                   {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : label}
                 </span>
                 <span className="min-w-0">
-                  <span className="block max-w-[150px] truncate text-sm font-semibold lg:max-w-none">{e.name}</span>
-                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-dusk-button-text/70" : "text-ink-mute")}>
+                  <ExerciseName name={e.name} inControl className="w-max max-w-[150px] text-sm font-semibold leading-tight lg:max-w-none" />
+                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-dusk-selected-text/70" : "text-ink-mute")}>
                     {count}/{listOf(e).length} sets
                   </span>
                 </span>
@@ -668,7 +669,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                   exerciseDone(exercise) ? "bg-dusk-button text-dusk-button-text hover:bg-dusk-button/85" : "border border-line bg-paper text-ink hover:border-ink/20"
                 )}
               >
-                <span className="truncate">Next: {nextExercise?.name}</span> <ArrowRight className="h-5 w-5 shrink-0" />
+                <span className="line-clamp-2 min-w-0 break-words text-left leading-tight">Next: {nextExercise?.name}</span> <ArrowRight className="h-5 w-5 shrink-0" />
               </button>
             )}
           </div>

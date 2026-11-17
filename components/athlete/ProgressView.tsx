@@ -12,6 +12,7 @@ import { OverallChart } from "./OverallChart";
 import { ProgressChart } from "./ProgressChart";
 import { StatRow } from "./StatRow";
 import { cn } from "@/lib/utils";
+import { ExerciseName } from "@/components/ExerciseName";
 
 const ORDER: FocusMetric[] = ["weight", "reps", "e1rm", "volume"];
 const day = (iso: string) => format(parseISO(iso), "MMM d");
@@ -80,7 +81,7 @@ function ExerciseSearch({ exercises, value, onChange }: { exercises: ExercisePro
                   onClick={() => pick(e.exerciseId)}
                   className="press flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-ink/5"
                 >
-                  <span className="truncate text-[15px] text-ink">{e.name}</span>
+                  <ExerciseName name={e.name} inControl className="text-[15px] text-ink" />
                   <span className="shrink-0 text-xs text-ink-mute">
                     {e.series.length} session{e.series.length === 1 ? "" : "s"}
                   </span>
@@ -141,7 +142,7 @@ export function ProgressView({
     return (
       <div className="rise rise-1">
         <ProgressChart series={[]} metric={goalMetric} loaded height={260} legend={false} />
-        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-bone hover:bg-ink/85">
+        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
           {emptyAction.label} <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -310,7 +311,7 @@ export function RecordsList({ prs }: { prs: ProgressData["recentPRs"] }) {
       {prs.map((r, i) => (
         <li key={`${r.exercise}-${r.date}-${i}`} className="flex items-baseline gap-3 py-2.5">
           <span className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full bg-gold" />
-          <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{r.exercise}</span>
+          <ExerciseName name={r.exercise} className="flex-1 text-[15px] text-ink" />
           <span className="shrink-0 text-[13px] text-ink-mute">{day(r.date)}</span>
           <span className="w-20 shrink-0 text-right text-[15px] font-semibold text-ink">
             {formatValue(r.value, "weight")} <span className="text-xs font-normal text-ink-mute">{r.unit}</span>

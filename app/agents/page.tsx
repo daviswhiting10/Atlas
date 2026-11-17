@@ -67,7 +67,7 @@ export default function AgentsPage() {
           <Link href="/agents" aria-current="page" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink sm:block">
             For AI assistants
           </Link>
-          <Link href="/start" className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-bone hover:bg-ink/85">
+          <Link href="/start" className="press rounded-full bg-dusk-button px-4 py-2 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85">
             Get started
           </Link>
         </nav>

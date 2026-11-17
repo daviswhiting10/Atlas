@@ -271,7 +271,7 @@ export default async function LogPage({
   const exercises: LoggerExercise[] = await Promise.all(
     assignedWorkout.exercises.map(async (awe) => {
       const [lastSets, lastNote] = await Promise.all([
-        getLastPerformance(clientId, awe.exerciseId),
+        getLastPerformance(clientId, awe.exerciseId, existingLog?.id),
         getLastExerciseNote(clientId, awe.exerciseId),
       ]);
 

@@ -96,7 +96,7 @@ export function IntakeForm({
               onClick={() => setTag(c.tag)}
               className={cn(
                 "press rounded-full border px-4 py-2 text-sm font-medium",
-                tag === c.tag ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
+                tag === c.tag ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
               )}
             >
               {c.label}

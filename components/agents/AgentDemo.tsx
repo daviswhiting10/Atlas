@@ -130,7 +130,7 @@ export function AgentDemo() {
             if (b.kind === "user") {
               return (
                 <div key={i} className="chat-in flex justify-end">
-                  <div className="max-w-[82%] rounded-2xl rounded-br-md bg-dusk-button px-3.5 py-2 text-[14.5px] leading-snug text-dusk-button-text">
+                  <div className="max-w-[82%] rounded-2xl rounded-br-md bg-dusk-selected px-3.5 py-2 text-[14.5px] leading-snug text-dusk-selected-text">
                     {isPending ? <Dots dark /> : b.text}
                   </div>
                 </div>

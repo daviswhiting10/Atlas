@@ -37,7 +37,7 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
       onClick={onClick}
       className={cn(
         "press flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium",
-        on ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
+        on ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
       )}
     >
       {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
@@ -58,7 +58,7 @@ function Segment<T extends string | number>({ value, options, onChange, label }:
           onClick={() => onChange(o.value)}
           className={cn(
             "press min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-semibold",
-            o.value === value ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
+            o.value === value ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink"
           )}
         >
           {o.label}

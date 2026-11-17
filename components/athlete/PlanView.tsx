@@ -14,6 +14,7 @@ import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { ExercisePicker } from "./ExercisePicker";
 import { TargetEditor, type TargetValues } from "./TargetEditor";
 import { cn } from "@/lib/utils";
+import { ExerciseName } from "@/components/ExerciseName";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -80,7 +81,7 @@ function LighterWeeksSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
       >
         {/* The track is 28px tall; the button around it is 44px, so it is easy to hit. */}
         <span aria-hidden className={cn("absolute inset-x-0 top-2 h-7 rounded-full transition-colors", value ? "bg-signal" : "bg-ink/15")} />
-        <span aria-hidden className={cn("absolute left-0 top-2.5 h-6 w-6 rounded-full bg-dusk-button shadow-sm transition-transform", value ? "translate-x-[22px]" : "translate-x-0.5")} />
+        <span aria-hidden className={cn("absolute left-0 top-2.5 h-6 w-6 rounded-full bg-dusk-selected shadow-sm transition-transform", value ? "translate-x-[22px]" : "translate-x-0.5")} />
       </button>
     </div>
   );
@@ -230,7 +231,7 @@ function WorkoutCard({
                     <div className="flex items-center gap-2">
                       <span className="w-6 shrink-0 text-[13px] text-ink-mute">{label ?? (part.key === "warmup" ? "W" : "C")}</span>
                       <ExerciseThumb picture={e.picture} name={e.name} className="h-11 w-11" />
-                      <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{e.name}</span>
+                      <ExerciseName name={e.name} className="flex-1 text-[15px] leading-snug text-ink" />
                       <button
                         type="button"
                         onClick={() => setEditing(editing === e.aweId ? null : e.aweId)}
@@ -501,15 +502,15 @@ export function PlanView({
               onClick={() => setWeek(n)}
               className={cn(
                 "press relative flex h-[58px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl border text-center",
-                selected ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink hover:border-ink/20"
+                selected ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink hover:border-ink/20"
               )}
             >
               <span className={cn("text-[10px] font-medium uppercase tracking-wide", selected ? "text-dusk-button-text/70" : "text-ink-mute")}>Wk</span>
               <span className="text-lg font-semibold leading-tight">{n}</span>
               {done ? (
-                <span className={cn("absolute bottom-1.5 h-1 w-1 rounded-full", selected ? "bg-dusk-button-text" : "bg-signal")} />
+                <span className={cn("absolute bottom-1.5 h-1 w-1 rounded-full", selected ? "bg-dusk-selected-text" : "bg-signal")} />
               ) : n === plan.currentWeek ? (
-                <span className={cn("absolute bottom-1.5 h-1 w-3 rounded-full", selected ? "bg-dusk-button-text" : "bg-signal")} />
+                <span className={cn("absolute bottom-1.5 h-1 w-3 rounded-full", selected ? "bg-dusk-selected-text" : "bg-signal")} />
               ) : null}
             </button>
           );

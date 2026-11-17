@@ -12,6 +12,7 @@ import { createAccount } from "@/lib/actions/account";
 import { BuildingOverlay, useGuestSignIn } from "./guest";
 import { CredentialFields, GoogleButton, PENDING_PLAN_KEY, inputClass, signInWithPassword } from "./account";
 import { cn } from "@/lib/utils";
+import { ExerciseName } from "@/components/ExerciseName";
 
 const GOAL_ICONS: Record<Goal, typeof Dumbbell> = { muscle: Dumbbell, strength: Trophy, fat_loss: Flame, general: HeartPulse };
 const EQUIPMENT_ICONS: Record<Equipment, typeof Dumbbell> = { gym: Warehouse, dumbbells: Home, bodyweight: PersonStanding };
@@ -110,7 +111,7 @@ export function PlanPreview({ prefs, className }: { prefs: Prefs; className?: st
             <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
               {day.exercises.map((e) => (
                 <li key={e.slug} className="flex items-baseline justify-between gap-2 text-[13px]">
-                  <span className="truncate text-ink-soft">{e.name}</span>
+                  <ExerciseName name={e.name} className="text-ink-soft" />
                   <span className="tnum shrink-0 text-ink-mute">
                     {e.sets} × {e.repMin}–{e.repMax}
                     {e.unit === "secs" ? "s" : ""}

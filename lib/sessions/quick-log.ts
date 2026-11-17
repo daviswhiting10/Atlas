@@ -149,9 +149,20 @@ export type LastTime = {
 
 /** "3 × 10 @ 45 lb", "10, 8, 6 @ 45 lb", "3 × 45 s", "3 × 12 · blue band". */
 export function describeLast(last: LastTime): string {
-  const sets = last.sets.filter((s) => s.reps != null);
+  return describeSets(last.sets.filter((s) => s.reps != null), last.unit);
+}
+
+/**
+ * One line for an exercise being logged: its sets with reps, in the same words
+ * as "last time" ("3 × 10 @ 135 lb"). Empty when no set has reps yet.
+ */
+export function describeLogged(sets: QuickSet[], unit: "reps" | "secs"): string {
+  return describeSets(sets.filter((s) => s.reps != null && s.reps > 0), unit);
+}
+
+function describeSets(sets: QuickSet[], unitKind: "reps" | "secs"): string {
   if (sets.length === 0) return "";
-  const unit = last.unit === "secs" ? " s" : "";
+  const unit = unitKind === "secs" ? " s" : "";
   const reps = sets.map((s) => s.reps);
   const sameReps = reps.every((r) => r === reps[0]);
   const count = sameReps
