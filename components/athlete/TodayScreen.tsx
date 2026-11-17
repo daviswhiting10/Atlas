@@ -44,7 +44,6 @@ export function TodayScreen({
         )}
       </div>
 
-      {goal}
 
       {/* Someone whose coach hasn't assigned anything yet needs to know why Today is quiet. */}
       {!plan && !athlete.selfServe && !athlete.isCoach && <p className="text-[14px] text-ink-mute">Your coach hasn&apos;t assigned a program yet. It will show up here as soon as they do.</p>}
@@ -92,6 +91,8 @@ export function TodayScreen({
           )}
         </section>
       )}
+      {/* The goal's checklist sits under today's session: the session is the hero. */}
+      {goal}
     </div>
   );
 }
