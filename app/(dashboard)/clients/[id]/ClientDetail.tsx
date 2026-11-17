@@ -195,8 +195,6 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
     router.push("/clients");
   }
 
-
-
   async function removePlan(a: ProgramAssignment, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -357,7 +355,7 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
           className="press flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
         >
           <FileSpreadsheet className="h-4 w-4" />
-          Import plan from spreadsheet
+          Import plan
         </button>
       </div>
       <div className="mb-6">
@@ -457,7 +455,7 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
             {client.programAssignments.length === 0 ? (
               <Card className="mb-4">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold">Import plan from spreadsheet</CardTitle>
+                  <CardTitle className="text-base font-semibold">Import plan</CardTitle>
                   <p className="text-sm text-muted-foreground">{firstName} has no plan yet. Bring in the one you already use, or build one with Atlas below.</p>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -473,7 +471,7 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
                 <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold">
                   <span className="flex items-center gap-2">
                     <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    Import plan from spreadsheet
+                    Import plan
                   </span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>

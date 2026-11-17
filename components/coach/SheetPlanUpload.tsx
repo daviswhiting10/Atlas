@@ -8,13 +8,17 @@ import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { describeDay, type ImportSummary } from "@/lib/programs/sheet-summary";
+import { PHOTO_TYPES, toProgramBody, type ImportedProgram } from "@/lib/programs/screenshot-program";
+import { draftFromTemplate } from "@/lib/actions/coach-plan";
 
 /** What the file picker offers. */
-const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv," + PHOTO_TYPES.join(",");
+/** Photos go up in one request: Vercel takes 4.5 MB. */
+const MAX_PHOTO_BYTES = 4_000_000;
 /** A plan is a few hundred KB at most. */
 const MAX_FILE_BYTES = 5_000_000;
 
-type Picked = { name: string; csv: string };
+type Picked = { name: string; csv: string; photos?: File[] };
 
 /** What the read step returned: shown to the coach, then sent back to save. */
 type Read = { grid: unknown; context: unknown; summary: ImportSummary; weekOneStart: string | null };
@@ -29,7 +33,7 @@ async function readFile(f: File): Promise<Picked> {
   const ext = f.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
   if (ext === "numbers") throw new Error("That's a Numbers file. In Numbers, File → Export To → Excel, then drop the .xlsx here.");
   if (ext === "xls") throw new Error("That's an old .xls file. Open it in Excel and save it as .xlsx.");
-  if (ext !== "xlsx" && ext !== "csv") throw new Error("Choose an .xlsx or .csv file.");
+  if (ext !== "xlsx" && ext !== "csv") throw new Error("Choose an .xlsx or .csv file, or photos of the plan.");
   if (f.size > MAX_FILE_BYTES) throw new Error("That file is too big for a plan. Save just the plan's tabs and try again.");
   if (ext === "csv") return { name: f.name, csv: await f.text() };
   const { xlsxToCsv } = await import("@/lib/programs/xlsx");
@@ -58,10 +62,21 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   const [read_, setRead] = useState<Read | null>(null);
   const [history, setHistory] = useState(true);
 
-  async function pick(f: File | undefined) {
+  async function pick(list: FileList | File[] | null | undefined) {
+    const files = Array.from(list ?? []);
+    const f = files[0];
     if (!f || busy) return;
     setError(null);
     try {
+      // Photos (screenshots) of the plan: one or several, read by the photo reader.
+      const photos = files.filter((x) => PHOTO_TYPES.includes(x.type));
+      if (photos.length > 0) {
+        if (photos.length !== files.length) throw new Error("Choose a spreadsheet or photos, not both.");
+        if (photos.reduce((n, x) => n + x.size, 0) > MAX_PHOTO_BYTES) throw new Error("Those photos are too big together. Use fewer, or screenshots.");
+        setFile({ name: photos.length === 1 ? photos[0].name : `${photos.length} photos`, csv: "", photos });
+        setLink("");
+        return;
+      }
       const picked = await readFile(f);
       setFile(picked);
       setLink("");
@@ -80,6 +95,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
     setBusy(true);
     // Optional: an empty field means "not given".
     const weekOne = dayFrom(dateRef, date, { allowEmpty: true });
+    if (file?.photos) return void readPhotos(file.photos, weekOne);
     try {
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
@@ -94,6 +110,32 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       setHistory(true);
     } catch {
       setError("Couldn't reach the server. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  /** Photos: read into a program (saved to the library, as the photo import does), then a draft for this client. */
+  async function readPhotos(photos: File[], weekOne: string) {
+    try {
+      const form = new FormData();
+      photos.forEach((p, i) => form.append(`image${i}`, p));
+      if (notes.trim()) form.append("notes", notes.trim());
+      const res = await fetch("/api/ai/program-import", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't read those photos.");
+      const { program, readAs, warnings } = data as { program: ImportedProgram; readAs?: string; warnings?: string[] };
+      const saved = await fetch("/api/programs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(toProgramBody(program)) });
+      if (!saved.ok) throw new Error("Read the photos, but couldn't save the plan. Try again.");
+      const { id } = (await saved.json()) as { id: string };
+      const today = new Date();
+      const startDate = weekOne || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const draft = await draftFromTemplate({ programId: id, clientId, startDate });
+      if (!draft.ok) throw new Error(draft.error);
+      toast.success(`${readAs ? `Read as ${readAs}. ` : ""}Check it, then assign.`);
+      for (const w of warnings ?? []) toast.warning(w, { duration: 10_000 });
+      router.push(`/clients/${clientId}/programs/${draft.assignmentId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't read those photos.");
       setBusy(false);
     }
   }
@@ -218,7 +260,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            void pick(e.dataTransfer.files?.[0]);
+            void pick(e.dataTransfer.files);
           }}
           className={cn(
             "press flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 [&>*]:pointer-events-none border-dashed px-4 py-7 text-center transition-colors",
@@ -226,19 +268,20 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           )}
         >
           <Upload className="h-5 w-5 text-ink-soft" />
-          <span className="text-[15px] font-semibold text-ink">{dragging ? "Drop it here" : "Drop a spreadsheet, or choose a file"}</span>
-          <span className="text-[13px] text-ink-mute">.xlsx or .csv</span>
+          <span className="text-[15px] font-semibold text-ink">{dragging ? "Drop it here" : "Drop a spreadsheet or photos, or choose"}</span>
+          <span className="text-[13px] text-ink-mute">.xlsx, .csv or screenshots of the plan</span>
         </button>
       )}
       <input
         ref={fileRef}
         type="file"
         accept={ACCEPT}
+        multiple
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
+          const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          void pick(f);
+          void pick(files);
         }}
       />
 

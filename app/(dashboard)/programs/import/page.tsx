@@ -7,51 +7,8 @@ import { ArrowLeft, ImageUp, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { toProgramBody, type ImportedProgram } from "@/lib/programs/screenshot-program";
 
-/** What the import route returns: days of sections of exercises. */
-type ImportedProgram = {
-  name: string;
-  description: string;
-  durationWeeks: number;
-  goals: string[];
-  conditions: string[];
-  days: Array<{
-    name: string;
-    dayOfWeek: number;
-    order: number;
-    sections: Array<{ name: string; exercises: Array<{ exerciseId: string; order: number; notes: string; prescribedSets: Array<Record<string, unknown>> }> }>;
-  }>;
-};
-
-/** One block that repeats for the program's length; each day becomes a workout, sections flattened in order. */
-function toProgramBody(p: ImportedProgram) {
-  return {
-    name: p.name || "Imported program",
-    description: p.description || null,
-    goalTags: { goals: p.goals ?? [], conditions: p.conditions ?? [] },
-    blocks: [
-      {
-        name: "Block 1",
-        order: 1,
-        weeks: Math.max(1, Math.round(p.durationWeeks || 1)),
-        workouts: p.days.map((d, i) => ({
-          name: d.name,
-          dayOfWeek: Math.min(7, Math.max(1, d.dayOfWeek)),
-          order: i + 1,
-          exercises: d.sections
-            .flatMap((section) => section.exercises.map((e) => ({ ...e, section: section.name })))
-            .map((e, j) => ({
-              exerciseId: e.exerciseId,
-              order: j + 1,
-              notes: e.notes || null,
-              section: e.section,
-              prescribedSets: e.prescribedSets.map((set, k) => ({ ...set, setNumber: k + 1 })),
-            })),
-        })),
-      },
-    ],
-  };
-}
 const ALLOWED = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 type ImageEntry = { file: File; previewUrl: string };
