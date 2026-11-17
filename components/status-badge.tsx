@@ -29,33 +29,3 @@ export function StatusBadge({ status }: { status: ClientStatus }) {
     </span>
   );
 }
-
-type LeadStatus = "NEW" | "CONTACTED" | "REPLIED" | "BOOKED" | "CONVERTED" | "DEAD";
-
-const leadConfig: Record<
-  LeadStatus,
-  { label: string; border: string; bg: string; color: string }
-> = {
-  NEW: { label: "New", ...tone("var(--dusk-teal)") },
-  CONTACTED: { label: "Contacted", ...tone("var(--dusk-purple)") },
-  REPLIED: { label: "Replied", ...tone("var(--dusk-purple)") },
-  BOOKED: { label: "Booked", ...tone("var(--dusk-peach)") },
-  CONVERTED: { label: "Converted", ...tone("var(--dusk-teal)") },
-  DEAD: { label: "Dead", ...quietTone, color: "var(--ink-mute)" },
-};
-
-export function LeadStatusBadge({ status }: { status: string }) {
-  const cfg = leadConfig[status as LeadStatus] ?? leadConfig.NEW;
-  return (
-    <span
-      className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium"
-      style={{
-        borderColor: cfg.border,
-        background: cfg.bg,
-        color: cfg.color,
-      }}
-    >
-      {cfg.label}
-    </span>
-  );
-}
