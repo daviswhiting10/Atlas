@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromRows, labelsOf, move, sessionOrder, splitPairs, stepRow, toRows, type PlanEntry } from "./order";
+import { fromRows, labelsOf, move, sessionOrder, stepRow, toRows, type PlanEntry } from "./order";
 
 // Warm-up, a superset (1A Bench / 1B Row), Squat on its own, Stretch to cool down.
 const plan: PlanEntry[] = [
@@ -34,12 +34,11 @@ describe("session order", () => {
     expect(labelsOf(moved)).toMatchObject({ squat: "1A", bench: "1B", row: "1C" });
   });
 
-  it("splits a superset: Row moves to a new block, Bench is a block of one, both flagged", () => {
+  it("moves one half of a superset into the next block: labels renumber", () => {
     const o = sessionOrder(plan, null);
     const rows = toRows(o);
-    const moved = move(o, "row", rowIndex(rows, "New block"));
-    expect(labelsOf(moved)).toMatchObject({ bench: "1", squat: "2", row: "3" });
-    expect(splitPairs(plan, moved)).toEqual({ bench: "1A", row: "1B" });
+    const moved = move(o, "row", rowIndex(rows, "Block 2"));
+    expect(labelsOf(moved)).toMatchObject({ bench: "1", row: "2A", squat: "2B" });
   });
 
   it("an emptied block disappears and the rest close up", () => {
@@ -51,7 +50,6 @@ describe("session order", () => {
     expect(toRows(moved).filter((r) => r.kind === "heading").map((r) => (r.kind === "heading" ? r.title : ""))).toEqual([
       "Warm-up",
       "Block 1",
-      "New block",
       "Cool-down",
     ]);
   });
@@ -64,7 +62,6 @@ describe("session order", () => {
     // Row down: past the Block 2 heading, so it's grouped with Squat.
     const down = fromRows(stepRow(toRows(o), "row", 1));
     expect(labelsOf(down)).toMatchObject({ bench: "1", row: "2A", squat: "2B" });
-    expect(splitPairs(plan, down)).toEqual({ bench: "1A", row: "1B" });
   });
 
   it("never lets an exercise above the Warm-up heading", () => {
@@ -86,11 +83,9 @@ describe("session order", () => {
     expect(labelsOf(o)).toEqual({ warm: "W", squat: "1", bench: "2A", row: "2B", curl: "3", stretch: "C" });
   });
 
-  it("flags nothing while pairs stay together, and nothing for exercises that were alone", () => {
-    expect(splitPairs(plan, sessionOrder(plan, null))).toEqual({});
+  it("swaps the halves of a superset without splitting it", () => {
     const o = sessionOrder(plan, null);
-    const swapped = move(o, "row", rowIndex(toRows(o), "Block 1") + 1); // Row before Bench, still together
+    const swapped = move(o, "row", rowIndex(toRows(o), "Block 1") + 1); // Row before Bench
     expect(labelsOf(swapped)).toMatchObject({ row: "1A", bench: "1B" });
-    expect(splitPairs(plan, swapped)).toEqual({});
   });
 });

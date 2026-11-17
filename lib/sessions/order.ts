@@ -8,7 +8,7 @@
  * AssignedWorkoutExercise, not at a position.
  *
  * Reorder mode is a flat list of rows: a heading for each part (Warm-up,
- * Block 1…n, a "new block" slot, Cool-down) with the exercises under them.
+ * Block 1…n, Cool-down) with the exercises under them.
  * Dragging, or Up/Down, moves an exercise between rows; what heading it ends
  * up under decides its part. Blocks are then renumbered in order, so an
  * emptied block disappears and the labels (1A, 1B, 2…) stay sensible.
@@ -18,11 +18,11 @@
 
 import { COOLDOWN, WARMUP, blockSection, canonicalSections, readSection, structure } from "@/lib/workouts/structure";
 
+// Kept on the phone (lib/sessions/live) and cleared when the session is finished. If history
+// ever needs the order a session was done in, it comes from the sets' createdAt, not a column.
+
 export type OrderEntry = { aweId: string; section: string };
 export type PlanEntry = { aweId: string; section: string | null };
-
-/** A new block, made by dropping an exercise on the slot after the last block. */
-export const NEW_BLOCK = "block:new";
 
 export type ReorderRow = { kind: "heading"; section: string; title: string } | { kind: "item"; aweId: string };
 
@@ -53,7 +53,7 @@ export function sessionOrder(plan: PlanEntry[], saved: OrderEntry[] | null | und
   return normalise([...kept, ...shifted]);
 }
 
-/** The order as rows for reorder mode: every part's heading, its exercises, and a slot for a new block. */
+/** The order as rows for reorder mode: every part's heading and its exercises. */
 export function toRows(order: OrderEntry[]): ReorderRow[] {
   const s = structure(order, (e) => e.section);
   const rows: ReorderRow[] = [{ kind: "heading", section: WARMUP, title: "Warm-up" }];
@@ -62,7 +62,6 @@ export function toRows(order: OrderEntry[]): ReorderRow[] {
     rows.push({ kind: "heading", section: blockSection(b.n), title: `Block ${b.n}` });
     for (const it of b.items) rows.push({ kind: "item", aweId: it.item.aweId });
   }
-  rows.push({ kind: "heading", section: NEW_BLOCK, title: "New block" });
   rows.push({ kind: "heading", section: COOLDOWN, title: "Cool-down" });
   for (const it of s.cooldown) rows.push({ kind: "item", aweId: it.item.aweId });
   return rows;
@@ -73,7 +72,7 @@ export function fromRows(rows: ReorderRow[]): OrderEntry[] {
   const out: OrderEntry[] = [];
   let section = WARMUP;
   for (const r of rows) {
-    if (r.kind === "heading") section = r.section === NEW_BLOCK ? "block:99" : r.section;
+    if (r.kind === "heading") section = r.section;
     else out.push({ aweId: r.aweId, section });
   }
   return normalise(out);
@@ -110,27 +109,5 @@ export function labelsOf(order: OrderEntry[]): Record<string, string> {
   for (const it of s.warmup) out[it.item.aweId] = "W";
   for (const it of s.cooldown) out[it.item.aweId] = "C";
   for (const b of s.blocks) for (const it of b.items) out[it.item.aweId] = it.label ?? String(b.n);
-  return out;
-}
-
-/**
- * Supersets the move split up: for each exercise that was paired in the plan
- * and no longer shares a block with a partner that's still in the session,
- * the label it had in the plan ("was 1A").
- */
-export function splitPairs(plan: PlanEntry[], order: OrderEntry[]): Record<string, string> {
-  const planOrder = normalise(plan.map((p) => ({ aweId: p.aweId, section: p.section ?? "" })));
-  const planLabels = labelsOf(planOrder);
-  const blockOf = (o: OrderEntry[]) => new Map(o.map((e) => [e.aweId, e.section]));
-  const planBlock = blockOf(planOrder);
-  const nowBlock = blockOf(order);
-  const out: Record<string, string> = {};
-  for (const e of planOrder) {
-    if (readSection(e.section).kind !== "group") continue;
-    const partners = planOrder.filter((p) => p.aweId !== e.aweId && planBlock.get(p.aweId) === e.section && nowBlock.has(p.aweId));
-    if (partners.length === 0) continue;
-    const together = partners.some((p) => nowBlock.get(p.aweId) === nowBlock.get(e.aweId));
-    if (!together && nowBlock.has(e.aweId)) out[e.aweId] = planLabels[e.aweId];
-  }
   return out;
 }

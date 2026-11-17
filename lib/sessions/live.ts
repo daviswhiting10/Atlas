@@ -1,8 +1,8 @@
 /**
  * The session the coach has open in the logger, kept in the browser so a bar
  * can show it on other screens (like a now-playing bar) and a tap returns to
- * exactly where they were: the same workout, scroll position, open blocks and
- * anything typed but not yet ticked.
+ * exactly where they were: the same workout, scroll position, the order the
+ * exercises were moved into, and anything typed but not yet ticked.
  *
  * The database already holds what's saved (each ticked set). This only holds
  * the place in the screen. It's per device, and goes when the session is
@@ -30,8 +30,8 @@ export type LiveSession = {
   updatedAt: number;
   workoutLogId: string | null;
   scrollY: number;
-  /** Indices of the open blocks. */
-  openBlocks: number[];
+  /** The exercises in the order the coach moved them into (lib/sessions/order); null = the plan's. */
+  order?: Array<{ aweId: string; section: string }> | null;
   /** The logger's per-exercise state, so typed values survive leaving the screen. */
   draft: Record<string, DraftExercise> | null;
 };
@@ -94,7 +94,7 @@ export function startLive(
   if (prev && prev.assignedWorkoutId === next.assignedWorkoutId) {
     return { ...prev, ...next, workoutLogId: next.workoutLogId ?? prev.workoutLogId, updatedAt: now };
   }
-  return { ...next, startedAt: now, updatedAt: now, scrollY: 0, openBlocks: [], draft: null };
+  return { ...next, startedAt: now, updatedAt: now, scrollY: 0, order: null, draft: null };
 }
 
 /**
