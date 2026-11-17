@@ -412,7 +412,7 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
               onClick={() => setView(v.id)}
               className={cn(
                 "press h-12 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors",
-                view === v.id ? "bg-dusk-button text-dusk-button-text shadow-sm" : "text-ink-soft hover:text-ink"
+                view === v.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink"
               )}
             >
               {v.label}

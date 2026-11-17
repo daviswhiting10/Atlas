@@ -142,7 +142,7 @@ export function ProgressView({
     return (
       <div className="rise rise-1">
         <ProgressChart series={[]} metric={goalMetric} loaded height={260} legend={false} />
-        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-[15px] font-semibold text-bone hover:bg-ink/85">
+        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
           {emptyAction.label} <ArrowRight className="h-4 w-4" />
         </Link>
       </div>

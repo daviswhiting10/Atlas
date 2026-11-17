@@ -64,7 +64,7 @@ export function NewPlanChooser({
               mode === value ? "border-ink bg-paper shadow-[0_0_0_1px_var(--ink)]" : "border-line bg-paper/60 hover:border-ink/25"
             )}
           >
-            <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", mode === value ? "bg-dusk-button text-dusk-button-text" : "bg-ink/5 text-ink-soft")}>
+            <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", mode === value ? "bg-dusk-selected text-dusk-selected-text" : "bg-ink/5 text-ink-soft")}>
               <Icon className="h-4 w-4" />
             </span>
             <span>

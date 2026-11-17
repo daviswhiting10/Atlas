@@ -53,7 +53,7 @@ export function ExerciseLibrary({ rows, workspaceId, uploadsEnabled }: { rows: L
                 setFilter(t.id);
                 setQuery("");
               }}
-              className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-dusk-button text-dusk-button-text shadow-sm" : "text-ink-soft hover:text-ink")}
+              className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink")}
             >
               {t.label}
             </button>

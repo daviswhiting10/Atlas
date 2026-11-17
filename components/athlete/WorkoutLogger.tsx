@@ -453,7 +453,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 onClick={() => setIndex(i)}
                 className={cn(
                   "press flex shrink-0 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left lg:w-full",
-                  active ? "border-ink bg-dusk-button text-dusk-button-text" : "border-line bg-paper text-ink hover:border-ink/20"
+                  active ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink hover:border-ink/20"
                 )}
               >
                 <span
@@ -466,7 +466,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 </span>
                 <span className="min-w-0">
                   <ExerciseName name={e.name} inControl className="w-max max-w-[150px] text-sm font-semibold leading-tight lg:max-w-none" />
-                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-dusk-button-text/70" : "text-ink-mute")}>
+                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-dusk-selected-text/70" : "text-ink-mute")}>
                     {count}/{listOf(e).length} sets
                   </span>
                 </span>

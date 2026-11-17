@@ -1445,7 +1445,7 @@ function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; o
       aria-expanded={open}
       className={cn(
         "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 touch-manipulation",
-        open ? "border-ink bg-dusk-button text-dusk-button-text" : "border-border text-muted-foreground hover:text-foreground"
+        open ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-border text-muted-foreground hover:text-foreground"
       )}
     >
       {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
@@ -1606,7 +1606,7 @@ function MobileSetRow({
             <button
               type="button"
               onClick={() => onAdjustWeight(-2.5)}
-              className="w-6 h-full flex items-center justify-center text-sm font-light text-muted-foreground touch-manipulation active:bg-muted shrink-0"
+              className="w-6 h-full flex items-center justify-center text-sm font-normal text-muted-foreground touch-manipulation active:bg-muted shrink-0"
             >
               −
             </button>
@@ -1624,7 +1624,7 @@ function MobileSetRow({
             <button
               type="button"
               onClick={() => onAdjustWeight(2.5)}
-              className="w-6 h-full flex items-center justify-center text-sm font-light text-muted-foreground touch-manipulation active:bg-muted shrink-0"
+              className="w-6 h-full flex items-center justify-center text-sm font-normal text-muted-foreground touch-manipulation active:bg-muted shrink-0"
             >
               +
             </button>

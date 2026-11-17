@@ -107,6 +107,9 @@ const config: Config = {
           // The one bright button on a screen, and the text on it.
           button: "var(--dusk-button)",
           "button-text": "var(--dusk-button-text)",
+          // What's chosen: a tab, a week, a filter (neutral, not the accent).
+          selected: "var(--dusk-selected)",
+          "selected-text": "var(--dusk-selected-text)",
           // The outline of something you tap.
           "line-strong": "var(--dusk-line-strong)",
         },
