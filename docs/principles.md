@@ -20,6 +20,20 @@ Brutally simple, with all excess wiped.
 - The build process gets the same simplicity treatment.
 - Measure in seconds and taps, on a real phone.
 
+## Tesla app patterns
+1. One hero, status at a glance. Home = today's session: next exercise, next set, Log. Nothing competing.
+2. About 4 primary actions per screen, max. Everything else one long-press or one sheet away.
+3. The best interaction is none. Auto-start session on first set, auto-advance, auto-fill from last time.
+4. Instant open. Show cached/last-known data immediately, refresh in the background; log optimistically.
+5. Contextual controls. Show a control only when it matters (rest timer only while resting, logger bar only in a session).
+6. Works outside the app (later): home-screen shortcut straight to Log session.
+7. Built for each screen size. Coach view on iPad/laptop = two columns (roster left, client right), not a stretched phone.
+
+Avoid:
+- Mixing states and actions. A logged set must never look like a button; a button never looks like a status.
+- Burying frequent actions in the name of minimalism. Simple = frequent things are closest.
+- Measuring screen time. Measure friction: taps and seconds.
+
 ## Targets
 - Open app to first set logged: under 5 s.
 - 1 tap to log a set.
