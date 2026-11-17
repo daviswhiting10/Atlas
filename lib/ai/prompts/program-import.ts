@@ -82,7 +82,8 @@ export function buildProgramSheetPrompt(csv: string, notes?: string) {
 - A training day starts with a label like "Day 1" (often in the first column of a header row).
 - Each exercise is a row: its name, often a notes column, then for each week a "Sets/reps" cell and a "Load" cell.
 - Week headings ("Week 1", "Week 2", …) sit above their columns; in CSV a heading is often in one cell with the cells to its right blank.
-- Blank rows separate groups. Ignore them.
+- Exercises are often grouped: a label cell left of the name ("A", "B", "1A", "1B", "2A", "Block 2", "Warm-up", "Cool-down"), usually written only on a group's first row, with blank rows between groups.
+- Blank rows separate groups. Don't output them.
 
 ## Output
 Respond ONLY with JSON, no markdown fences, no commentary:
@@ -93,6 +94,7 @@ Respond ONLY with JSON, no markdown fences, no commentary:
       "name": string,
       "exercises": [
         {
+          "label": string,
           "name": string,
           "notes": string,
           "weeks": [ { "week": number, "setsReps": string, "load": string } ]
@@ -105,6 +107,7 @@ Respond ONLY with JSON, no markdown fences, no commentary:
 ## Rules
 - One entry per training day, in sheet order. "name" is the day label as written (e.g. "Day 1").
 - One entry per exercise row, in order. Copy the exercise name and its notes exactly.
+- "label": the row's group label as written ("A", "1A", "2B", "Block 2", "Warm-up"). A label written once applies to the rows under it until a blank row, a new label or a new day: copy it onto each of those rows. A section heading row ("Warm-up", "Cool-down") is the label of the rows under it. Use "" when the row has no group.
 - "weeks": one entry for every week column the sheet has, numbered 1, 2, 3… in order. "setsReps" and "load" are the cell text exactly as written ("2x12-15", "5 min", "4x20 yd", "12.5", "BW", "blue", "2nd to hardest. 3x"). Use "" for an empty cell. Never fill a cell in from another week.
 - If the sheet has no week columns, treat the single set of columns as week 1.
 - Skip rows that aren't exercises: titles, headers, totals, blank rows, the client's name, dates.

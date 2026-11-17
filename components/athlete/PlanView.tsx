@@ -1,5 +1,6 @@
 "use client";
 
+import { parts, structure } from "@/lib/workouts/structure";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import Link from "next/link";
@@ -215,13 +216,19 @@ function WorkoutCard({
             <p className="py-2 text-[15px] text-ink-mute">No exercises yet.</p>
           ) : (
             <ol className="divide-y divide-line">
-              {w.exercises.map((e, i) => {
+              {/* Warm-up, Block 1, 2…, Cool-down: always listed (lib/workouts/structure). */}
+              {parts(structure(w.exercises, (x) => x.section)).flatMap((part) => [
+                <li key={part.key} className="pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-ink-mute first:pt-0">
+                  {part.title}
+                  {part.items.length === 0 && <span className="ml-2 font-normal normal-case tracking-normal">None</span>}
+                </li>,
+                ...part.items.map(({ item: e, label }) => {
                 const cat = CATALOG_BY_SLUG[e.slug];
                 const loaded = cat ? cat.tool !== "bodyweight" : true;
                 return (
                   <li key={e.aweId} className="py-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-4 shrink-0 text-[13px] text-ink-mute">{i + 1}</span>
+                      <span className="w-6 shrink-0 text-[13px] text-ink-mute">{label ?? (part.key === "warmup" ? "W" : "C")}</span>
                       <ExerciseThumb picture={e.picture} name={e.name} className="h-11 w-11" />
                       <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{e.name}</span>
                       <button
@@ -273,7 +280,8 @@ function WorkoutCard({
                     )}
                   </li>
                 );
-              })}
+                }),
+              ])}
             </ol>
           )}
 

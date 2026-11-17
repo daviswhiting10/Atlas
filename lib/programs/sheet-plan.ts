@@ -17,8 +17,10 @@
  * Pure: no I/O.
  */
 
+import { sectionsFromSheet } from "@/lib/workouts/structure";
+
 export type GridWeek = { week: number; setsReps?: string; load?: string };
-export type GridExercise = { name: string; notes?: string; weeks: GridWeek[] };
+export type GridExercise = { name: string; notes?: string; /** The sheet's group label ("A", "1A", "Warm-up"), carried down its group. */ label?: string; weeks: GridWeek[] };
 export type GridDay = { name: string; exercises: GridExercise[] };
 export type SheetGrid = { programName?: string; days: GridDay[] };
 
@@ -30,22 +32,27 @@ export function readGrid(raw: string): SheetGrid | null {
   try {
     const g = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim()) as SheetGrid;
     if (!Array.isArray(g?.days)) return null;
+    // Capped: the save step takes the grid back from the browser.
     const days = g.days
+      .slice(0, 14)
       .filter((d) => d && Array.isArray(d.exercises))
       .map((d) => ({
         name: String(d.name ?? "").trim().slice(0, 120),
         exercises: d.exercises
+          .slice(0, 60)
           .filter((e) => e && typeof e.name === "string" && e.name.trim() && Array.isArray(e.weeks))
           .map((e) => ({
             name: e.name.trim().slice(0, 120),
             notes: typeof e.notes === "string" ? e.notes.trim().slice(0, 500) : undefined,
+            label: typeof e.label === "string" && e.label.trim() ? e.label.trim().slice(0, 40) : undefined,
             weeks: e.weeks
+              .slice(0, 52)
               .filter((w) => w && Number.isInteger(w.week) && w.week >= 1 && w.week <= 52)
-              .map((w) => ({ week: w.week, setsReps: String(w.setsReps ?? "").trim(), load: String(w.load ?? "").trim() })),
+              .map((w) => ({ week: w.week, setsReps: String(w.setsReps ?? "").trim().slice(0, 120), load: String(w.load ?? "").trim().slice(0, 300) })),
           })),
       }))
       .filter((d) => d.exercises.length > 0);
-    return days.length > 0 ? { programName: typeof g.programName === "string" ? g.programName : undefined, days } : null;
+    return days.length > 0 ? { programName: typeof g.programName === "string" ? g.programName.slice(0, 120) : undefined, days } : null;
   } catch {
     return null;
   }
@@ -99,7 +106,7 @@ export function spreadDays(count: number): number[] {
   return table[Math.min(Math.max(count, 1), 7)];
 }
 
-export type PlannedEntry = { exercise: string; notes: string | null; rx: Rx; load: Load | null };
+export type PlannedEntry = { exercise: string; notes: string | null; /** "warmup" | "block:<n>" | "cooldown" (lib/workouts/structure). */ section: string; rx: Rx; load: Load | null };
 export type PlanWeek = { week: number; days: Array<{ name: string; dayOfWeek: number; entries: PlannedEntry[]; logged: boolean }> };
 
 /** A load that records a session, as opposed to "BW" written ahead of time. */
@@ -119,6 +126,8 @@ export function planFromGrid(grid: SheetGrid): { weeks: PlanWeek[]; lastLoggedWe
   const lastRx = new Map<string, Rx>();
   for (let week = 1; week <= totalWeeks; week++) {
     const planDays = grid.days.slice(0, 7).map((d, i) => {
+      // Warm-up, blocks and cool-down from the sheet's labels: the same every week.
+      const sections = sectionsFromSheet(d.exercises);
       const entries: PlannedEntry[] = d.exercises.flatMap((e, j) => {
         const cell = e.weeks.find((w) => w.week === week);
         const key = `${i}:${j}`;
@@ -126,7 +135,7 @@ export function planFromGrid(grid: SheetGrid): { weeks: PlanWeek[]; lastLoggedWe
         const rx = parseSetsReps(cell?.setsReps) ?? (recordsSession(parseLoad(cell?.load)) ? lastRx.get(key) ?? null : null);
         if (!rx) return [];
         lastRx.set(key, rx);
-        return [{ exercise: e.name, notes: [e.notes, rx.note].filter(Boolean).join(" · ") || null, rx, load: parseLoad(cell?.load) }];
+        return [{ exercise: e.name, notes: [e.notes, rx.note].filter(Boolean).join(" · ") || null, section: sections[j], rx, load: parseLoad(cell?.load) }];
       });
       const logged = entries.some((x) => recordsSession(x.load));
       if (logged) lastLoggedWeek = Math.max(lastLoggedWeek, week);

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { parts, structure } from "@/lib/workouts/structure";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -75,19 +76,25 @@ export default async function LibraryProgramPage({ params }: { params: { id: str
                       {w.dayOfWeek && <span className="text-[13px] text-ink-mute">{DAY[w.dayOfWeek]}</span>}
                     </div>
                     <ol className="mt-2 divide-y divide-line">
-                      {w.exercises.map((e, i) => {
-                        const sets = (e.prescribedSets as Array<{ repMin?: number; repMax?: number; unit?: "reps" | "secs" }>) ?? [];
-                        return (
-                          <li key={e.id} className="flex items-baseline gap-3 py-2 text-[15px]">
-                            <span className="w-4 shrink-0 text-[13px] text-ink-mute">{i + 1}</span>
-                            <span className="min-w-0 flex-1 truncate text-ink">{displayName(null, e.exercise.name)}</span>
-                            {e.section && <span className="hidden shrink-0 text-xs text-ink-mute sm:block">{e.section}</span>}
-                            <span className="shrink-0 text-ink-soft">
-                              {sets.length} × {repLabel(sets)}
-                            </span>
-                          </li>
-                        );
-                      })}
+                      {/* Warm-up, Block 1, 2…, Cool-down: always listed (lib/workouts/structure). */}
+                      {parts(structure(w.exercises, (x) => x.section)).flatMap((part) => [
+                        <li key={part.key} className="pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-ink-mute first:pt-0">
+                          {part.title}
+                          {part.items.length === 0 && <span className="ml-2 font-normal normal-case tracking-normal">None</span>}
+                        </li>,
+                        ...part.items.map(({ item: e, label }) => {
+                          const sets = (e.prescribedSets as Array<{ repMin?: number; repMax?: number; unit?: "reps" | "secs" }>) ?? [];
+                          return (
+                            <li key={e.id} className="flex items-baseline gap-3 py-2 text-[15px]">
+                              <span className="w-6 shrink-0 text-[13px] text-ink-mute">{label ?? (part.key === "warmup" ? "W" : "C")}</span>
+                              <span className="min-w-0 flex-1 truncate text-ink">{displayName(null, e.exercise.name)}</span>
+                              <span className="shrink-0 text-ink-soft">
+                                {sets.length} × {repLabel(sets)}
+                              </span>
+                            </li>
+                          );
+                        }),
+                      ])}
                     </ol>
                   </div>
                 ))}

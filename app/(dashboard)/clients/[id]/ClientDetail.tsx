@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { StatRow } from "@/components/athlete/StatRow";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
+import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
 import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
 import {
@@ -525,6 +526,10 @@ export function ClientDetail({ progress, records }: { progress: React.ReactNode;
             )}
           </div>
 
+          {/* Assign a program: from the library (also reachable from More), or built by Atlas. */}
+          <div className="mb-4 rounded-xl border bg-card px-4 py-3">
+            <AssignFromLibrary clientId={client.id} firstName={firstName} />
+          </div>
           <div className="mb-3 flex justify-end">
             <Link href={`/programs/new?client=${client.id}`} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>
               <Dumbbell className="w-3 h-3 mr-1.5" />

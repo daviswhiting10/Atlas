@@ -1,5 +1,6 @@
 "use client";
 
+import { parts, structure } from "@/lib/workouts/structure";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ExercisePicture } from "@/components/ExercisePicture";
 import Link from "next/link";
@@ -96,6 +97,12 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const debounce = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const railRef = useRef<HTMLDivElement>(null);
+  // Each exercise's place in the workout: "1A", "2", "W" (warm-up), "C" (cool-down).
+  const labels = useMemo(() => {
+    const out = new Map<number, string>();
+    for (const p of parts(structure(data.exercises, (e) => e.role))) for (const it of p.items) out.set(it.index, it.label ?? (p.key === "warmup" ? "W" : "C"));
+    return out;
+  }, [data.exercises]);
 
   const apply = useCallback((next: SetMap) => {
     setsRef.current = next;
@@ -440,6 +447,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         <div ref={railRef} className="no-scrollbar relative -mx-4 flex min-w-0 gap-2 overflow-x-auto px-4 sm:-mx-8 sm:px-8 lg:sticky lg:top-44 lg:mx-0 lg:flex-col lg:self-start lg:overflow-visible lg:px-0" role="tablist" aria-label="Exercises">
           {data.exercises.map((e, i) => {
             const done = exerciseDone(e);
+            const label = labels.get(i) ?? String(i + 1);
             const active = i === index;
             const count = listOf(e).filter((s) => s.done).length;
             return (
@@ -461,7 +469,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                     done ? "bg-signal text-bone" : active ? "bg-ink/15 text-bone" : "bg-ink/5 text-ink-mute"
                   )}
                 >
-                  {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+                  {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : label}
                 </span>
                 <span className="min-w-0">
                   <span className="block max-w-[150px] truncate text-sm font-semibold lg:max-w-none">{e.name}</span>

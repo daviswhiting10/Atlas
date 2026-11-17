@@ -10,6 +10,7 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 - Scripts in `scripts/exercise-cleanup/` refuse production unless `ALLOW_PROD=1`. Every change they make is logged in `ExerciseChange` and can be reversed with `undo.ts`.
 - **Code must never deploy ahead of the migration it reads.** Apply the migration first (backup, rehearse, compare), then push the code. The auth migration `20261114012242_sign_in_safety` is now on production (2026-11-14), and the code that reads it is on `main`.
 - `dev-sessions` and production both have `20261114012242_sign_in_safety`, and `main` has its file since the auth merge (2026-11-15).
+- `20261117010000_session_source_import` (additive enum value `IMPORT`) is on `dev-sessions` and rehearsed on `rehearsal-import-source`; **not yet on production**. The history-import code writes `IMPORT`, so it ships only after this is applied.
 - Read-only queries against production are allowed for counts, always in a `BEGIN READ ONLY` transaction, never printing names or emails (mask them).
 
 ### Branches (Neon project "Atlas", `mute-breeze-39649971`)
@@ -22,6 +23,7 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 | `rehearsal-auth` | Production copy (2026-11-14) with `20261114012242_sign_in_safety` applied; every existing table matched | Until the user says |
 | `dev-prod-copy` | Production as it was before the sessions migrations (rollback reference) | 2026-11-20 |
 | `rehearsal-goal-start` | Production copy where the 75 Hard start-day fix was rehearsed (2026-11-15) | 2026-11-20 |
+| `rehearsal-import-source` | Production copy (2026-11-17) with `20261117010000_session_source_import` applied (adds `IMPORT` to `SessionSource`); every table's count matched | Until the user says |
 
 Git branches: `main` (deploys); `auth-wip`, the sign-in work (merged into `main` 2026-11-15); `atlas-goals` (worktree at `~/Documents/atlas-goals`, merged into `main` up to `8754384`, the design pass).
 

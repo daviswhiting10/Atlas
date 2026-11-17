@@ -3,15 +3,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardPen, Dumbbell, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
+import { Activity, ClipboardPen, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { cn } from "@/lib/utils";
 
-/** Logging comes first: it's what the coach opens the app to do. */
+/**
+ * Logging comes first: it's what the coach opens the app to do. Items with an
+ * icon are phone tabs; the rest sit behind More. Programs is in More: a plan is
+ * assigned from the client's page, which also links to the library.
+ */
 const ITEMS = [
   { href: "/log", label: "Log session", icon: ClipboardPen },
   { href: "/clients", label: "Roster", icon: Users },
-  { href: "/programs", label: "Programs", icon: Dumbbell },
+  { href: "/programs", label: "Programs" },
   { href: "/exercises", label: "Exercises" },
   { href: "/intake", label: "Intake" },
 ] as const;

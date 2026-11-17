@@ -47,6 +47,8 @@ export type WorkoutSummary = {
     weight: number | null;
     /** What the movement looks like, when the library has it. */
     picture: Picture | null;
+    /** Warm-up, block or cool-down, as stored (read with lib/workouts/structure). */
+    section: string | null;
   }>;
 };
 
@@ -138,7 +140,7 @@ export async function loadPlanOverview({
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
-            select: { id: true, exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true, gifUrl: true } } },
+            select: { id: true, exerciseId: true, prescribedSets: true, section: true, exercise: { select: { name: true, slug: true, gifUrl: true } } },
           },
         },
       },
@@ -179,6 +181,7 @@ export async function loadPlanOverview({
         unit: sets[0]?.unit === "secs" ? ("secs" as const) : ("reps" as const),
         weight: sets[0]?.weight ?? null,
         picture: pictureFor({ name: displayName(e.exercise.slug, e.exercise.name), gifUrl: e.exercise.gifUrl }),
+        section: e.section,
       };
     }),
   }));

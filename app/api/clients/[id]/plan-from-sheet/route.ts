@@ -6,7 +6,8 @@ import { ROSTER } from "@/lib/db/roster";
 import { callAI, MODELS } from "@/lib/ai/client";
 import { buildProgramSheetPrompt } from "@/lib/ai/prompts/program-import";
 import { readGrid } from "@/lib/programs/sheet-plan";
-import { NO_CONTEXT, contextFromText, contextWarnings, describeReadAs, mergeContext, modelContextFromReply } from "@/lib/programs/plan-context";
+import { summarizeSheetImport } from "@/lib/programs/sheet-summary";
+import { NO_CONTEXT, contextFromText, contextWarnings, describeReadAs, mergeContext, modelContextFromReply, type PlanContext } from "@/lib/programs/plan-context";
 import { saveSheetPlan } from "@/lib/programs/save-sheet-plan";
 import { SheetError, fetchSheetCsv, parseSheetLink, tidyCsv } from "@/lib/programs/sheet";
 import { CATEGORIES } from "@/lib/programs/categories";
@@ -14,9 +15,22 @@ import { rateLimiter } from "@/lib/password";
 
 export const maxDuration = 120;
 
+const Context = z.object({
+  durationWeeks: z.number().int().min(1).max(52).nullable(),
+  trainingDays: z.number().int().min(1).max(7).nullable(),
+  startAtWeek: z.number().int().min(1).max(52).nullable(),
+});
+
 const Body = z.object({
+  /** "read": read the sheet and say what importing it will do (nothing is saved). "save": save what was read. */
+  step: z.enum(["read", "save"]).default("read"),
   sheetUrl: z.string().max(2000).optional(),
   csv: z.string().max(1_000_000).optional(),
+  /** save: the grid and context the read step returned, as the coach confirmed them. */
+  grid: z.unknown().optional(),
+  context: Context.optional(),
+  /** save: import the weeks the sheet shows as done as finished sessions (source IMPORT). */
+  history: z.boolean().default(false),
   /** When week 1 began. Left out, it's worked out from the weeks the sheet shows as done. */
   weekOneStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   name: z.string().trim().max(120).optional(),
@@ -28,19 +42,34 @@ const Body = z.object({
 const perWorkspace = rateLimiter(20, 60 * 60_000);
 
 /**
- * A client's plan from the coach's own spreadsheet: read it (Google Sheets
- * link, or CSV the browser made from an .xlsx or .csv), save it to the coach's library, and open it for this client
- * as a draft to check and assign.
+ * A client's plan from the coach's own spreadsheet, in two steps:
+ *  1. read: the sheet (Google Sheets link, or CSV the browser made from an
+ *     .xlsx or .csv) is read into a grid, and the reply says what importing
+ *     it will do, including the sessions "Import completed weeks as history"
+ *     would backdate. Nothing is saved.
+ *  2. save: the grid comes back as confirmed, is saved to the coach's library,
+ *     and opens for this client as a draft to check and assign. No second AI call.
  */
 export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, userId }, { params }) => {
   const { id } = await params;
   const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success || (!parsed.data.sheetUrl && !parsed.data.csv)) {
-    return NextResponse.json({ error: "Drop an .xlsx or .csv file, or paste a Google Sheets link." }, { status: 400 });
-  }
+  if (!parsed.success) return NextResponse.json({ error: "Drop an .xlsx or .csv file, or paste a Google Sheets link." }, { status: 400 });
 
   const client = await prisma.clientProfile.findFirst({ where: { id, workspaceId, deletedAt: null, ...ROSTER }, select: { id: true, fullName: true, primaryGoal: true } });
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  const weekOneStart = parsed.data.weekOneStart ? new Date(`${parsed.data.weekOneStart}T00:00:00`) : null;
+
+  if (parsed.data.step === "save") {
+    // The grid as read in step 1, run through the same checks as the model's reply.
+    const grid = parsed.data.grid ? readGrid(JSON.stringify(parsed.data.grid)) : null;
+    if (!grid) return NextResponse.json({ error: "Read the sheet again, then save." }, { status: 400 });
+    return save(client, { workspaceId, grid, name: parsed.data.name, weekOneStart, context: parsed.data.context ?? NO_CONTEXT, history: parsed.data.history });
+  }
+
+  if (!parsed.data.sheetUrl && !parsed.data.csv) {
+    return NextResponse.json({ error: "Drop an .xlsx or .csv file, or paste a Google Sheets link." }, { status: 400 });
+  }
   if (!perWorkspace(workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
 
   // 1. The sheet's contents.
@@ -76,27 +105,40 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
 
   // The coach's note beats what the sheet suggests (e.g. "start fresh" ignores last block's loads).
   const context = notes ? mergeContext(contextFromText(notes), modelContext) : NO_CONTEXT;
+  const summary = summarizeSheetImport({ grid, context, weekOneStart, today: new Date() });
+  return NextResponse.json({
+    grid,
+    context,
+    summary,
+    readAs: summary.readAs,
+    warnings: contextWarnings(context, { days: summary.daysPerWeek }, "sheet"),
+  });
+});
 
-  // 3. Into the library under the client's goal, then a draft for the client with the weeks already done logged.
+async function save(
+  client: { id: string; fullName: string; primaryGoal: string | null },
+  input: { workspaceId: string; grid: NonNullable<ReturnType<typeof readGrid>>; name?: string; weekOneStart: Date | null; context: PlanContext; history: boolean }
+) {
+  // Into the library under the client's goal, then a draft for the client (and, if asked, the weeks already done as history).
   const category = CATEGORIES.find((c) => c.goalCode === client.primaryGoal)?.tag;
   const first = client.fullName.split(" ")[0];
   try {
     const saved = await saveSheetPlan({
-      workspaceId,
+      workspaceId: input.workspaceId,
       clientId: client.id,
-      grid,
-      name: parsed.data.name || grid.programName || `${first}'s plan`,
+      grid: input.grid,
+      name: input.name || input.grid.programName || `${first}'s plan`,
       goals: category ? [category] : [],
-      weekOneStart: parsed.data.weekOneStart ? new Date(`${parsed.data.weekOneStart}T00:00:00`) : null,
-      context,
+      weekOneStart: input.weekOneStart,
+      context: input.context,
+      history: input.history,
     });
     return NextResponse.json({
       ...saved,
       readAs: describeReadAs({ weeks: saved.weeks, days: saved.days, startAtWeek: Math.min(saved.weeksDone + 1, saved.weeks) }),
-      warnings: contextWarnings(context, { days: saved.days }, "sheet"),
     });
   } catch (err) {
     console.error("[plan-from-sheet] save failed:", err);
     return NextResponse.json({ error: "Read the sheet, but couldn't save the plan. Please try again." }, { status: 500 });
   }
-});
+}

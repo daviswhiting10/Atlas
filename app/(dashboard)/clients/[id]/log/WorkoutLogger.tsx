@@ -3,6 +3,8 @@
 /// <reference types="@types/dom-speech-recognition" />
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { parts, structure } from "@/lib/workouts/structure";
+import { LIVE_EVENT, clearLive, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
 import { useRouter } from "next/navigation";
@@ -214,31 +216,21 @@ function freshState(ex: LoggerExercise): ExerciseState {
 
 // ── Block helpers ───────────────────────────────────────────────────────────────
 
-/** A contiguous group of exercises sharing the same section label. */
-type ExBlock = { section: string | null; exIndices: number[] };
+/**
+ * One part of the workout: Warm-up, Block n or Cool-down (lib/workouts/structure).
+ * Warm-up and Cool-down are always listed, even with nothing in them.
+ * `labels[k]` is the badge for exIndices[k]: "1A", "2", or "W"/"C".
+ */
+type ExBlock = { section: string; title: string; exIndices: number[]; labels: string[] };
 
-/** Group exercises into blocks by section, preserving order. */
+/** The workout's parts, in the order they're done. Exercises keep their index. */
 function groupIntoBlocks(exercises: LoggerExercise[]): ExBlock[] {
-  const blocks: ExBlock[] = [];
-  for (let i = 0; i < exercises.length; i++) {
-    const sec = exercises[i].section;
-    const last = blocks[blocks.length - 1];
-    if (last && last.section === sec) {
-      last.exIndices.push(i);
-    } else {
-      blocks.push({ section: sec, exIndices: [i] });
-    }
-  }
-  return blocks;
-}
-
-/** Human-readable block label. */
-function formatBlockLabel(section: string | null): string {
-  if (!section) return "";
-  if (section === "warmup") return "Warm-up";
-  if (section === "finisher") return "Finisher";
-  // "block_a" → "Block A"
-  return section.replace(/^block_/, "Block ").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return parts(structure(exercises, (e) => e.section)).map((p) => ({
+    section: p.key,
+    title: p.title,
+    exIndices: p.items.map((it) => it.index),
+    labels: p.items.map((it) => it.label ?? (p.key === "warmup" ? "W" : "C")),
+  }));
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -314,7 +306,8 @@ export default function WorkoutLogger({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // ── Session elapsed timer (display only) ────────────────────────────────────
-  const [sessionStart] = useState(() => Date.now());
+  // Set from the live session on mount, so leaving and coming back doesn't restart the clock.
+  const [sessionStart, setSessionStart] = useState(() => Date.now());
   const [sessionNow, setSessionNow] = useState(() => Date.now());
   useEffect(() => {
     if (finished) return;
@@ -338,6 +331,107 @@ export default function WorkoutLogger({
     );
     return new Set([idx === -1 ? 0 : idx]);
   });
+
+  // ── Live session: the "currently logging" bar on other screens, and coming back to this exact place ──
+  // (lib/sessions/live). The database has every ticked set; this keeps the place on the screen.
+  const liveRef = useRef<LiveSession | null>(null);
+  // Set while the saved draft is being put back, so the save below doesn't overwrite it with the unmerged state.
+  const restoringRef = useRef(false);
+  useEffect(() => {
+    if (completed) return;
+    let store: Storage | null = null;
+    try {
+      store = window.localStorage;
+    } catch {
+      return;
+    }
+    const prev = readLive(store);
+    const live = startLive(prev, {
+      assignedWorkoutId,
+      clientId,
+      clientName,
+      workoutName,
+      href: `/clients/${clientId}/log?workoutId=${assignedWorkoutId}`,
+      workoutLogId: existingWorkoutLogId,
+    });
+    liveRef.current = live;
+    writeLive(store, live);
+    window.dispatchEvent(new Event(LIVE_EVENT));
+    setSessionStart(live.startedAt);
+    if (prev?.assignedWorkoutId === assignedWorkoutId) {
+      restoringRef.current = prev.draft != null;
+      setExState((cur) => mergeDraft(cur, prev, { assignedWorkoutId, workoutLogId: existingWorkoutLogId }));
+      if (prev.openBlocks.length > 0) setExpandedBlocks(new Set(prev.openBlocks));
+      // After the restored blocks have rendered.
+      if (prev.scrollY > 0) setTimeout(() => window.scrollTo({ top: prev.scrollY }), 50);
+    }
+    // Saved at most every 150ms (a timer, not animation frames: those pause in background tabs).
+    // The position is read as the coach scrolls, so leaving (when the next page may already be at the top) can't save 0.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastY = prev?.assignedWorkoutId === assignedWorkoutId ? prev.scrollY : 0;
+    const saveScroll = () => {
+      timer = null;
+      if (!liveRef.current) return;
+      liveRef.current = { ...liveRef.current, scrollY: lastY, updatedAt: Date.now() };
+      writeLive(store, liveRef.current);
+    };
+    const onScroll = () => {
+      lastY = Math.round(window.scrollY);
+      if (!timer) timer = setTimeout(saveScroll, 150);
+    };
+    // Scroll events can lag (a backgrounded tab gets none), so the position is also read on the way out.
+    const readNow = () => {
+      if (window.scrollY > 0) lastY = Math.round(window.scrollY);
+    };
+    const onLeave = () => {
+      readNow();
+      saveScroll();
+    };
+    const onHide = () => document.visibilityState === "hidden" && onLeave();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onLeave);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onLeave);
+      if (timer) clearTimeout(timer);
+      onLeave();
+    };
+    // Once per workout opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignedWorkoutId, completed]);
+
+  // Keep what's typed, which blocks are open, and the session id.
+  useEffect(() => {
+    if (!liveRef.current || finished) return;
+    // The restore is still on its way into exState: the next run saves the merged state.
+    if (restoringRef.current) {
+      restoringRef.current = false;
+      return;
+    }
+    const draft = Object.fromEntries(
+      Object.entries(exState).map(([aweId, st]) => [aweId, { ...st, noteSaving: false, sets: st.sets.map((x) => ({ ...x, saving: false })) }])
+    );
+    liveRef.current = { ...liveRef.current, draft, openBlocks: Array.from(expandedBlocks), workoutLogId: workoutLogId ?? liveRef.current.workoutLogId, updatedAt: Date.now() };
+    try {
+      writeLive(window.localStorage, liveRef.current);
+    } catch {
+      // no storage: nothing to keep
+    }
+  }, [exState, expandedBlocks, workoutLogId, finished]);
+
+  // Done: the bar goes.
+  useEffect(() => {
+    if (!finished) return;
+    liveRef.current = null;
+    try {
+      clearLive(window.localStorage, assignedWorkoutId);
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new Event(LIVE_EVENT));
+  }, [finished, assignedWorkoutId]);
 
   function toggleBlock(bi: number) {
     setExpandedBlocks((prev) => {
@@ -1022,8 +1116,8 @@ export default function WorkoutLogger({
       {/* ── Exercise list, grouped by block ─────────────────────────── */}
       <div className="space-y-3">
         {groupIntoBlocks(exercises).map((block, bi) => {
-          const blockLabel = formatBlockLabel(block.section);
-          const isCollapsible = !!blockLabel;
+          const blockLabel = block.title;
+          const isCollapsible = block.exIndices.length > 0;
           const isExpanded = !isCollapsible || expandedBlocks.has(bi);
           const totalSets = block.exIndices.reduce(
             (sum, exI) => sum + stateFor(exercises[exI]).sets.length,
@@ -1060,6 +1154,7 @@ export default function WorkoutLogger({
                   )}
                 </button>
               )}
+              {block.exIndices.length === 0 && <p className="px-1 pb-1 text-xs text-muted-foreground">None</p>}
               {!isExpanded && (
                 <button
                   type="button"
@@ -1069,7 +1164,7 @@ export default function WorkoutLogger({
                   {block.exIndices.map((exI) => exercises[exI].name).join(" · ")}
                 </button>
               )}
-              {isExpanded && block.exIndices.map((exI) => {
+              {isExpanded && block.exIndices.map((exI, k) => {
                 const ex = exercises[exI];
                 const state = stateFor(ex);
                 return (
@@ -1077,7 +1172,7 @@ export default function WorkoutLogger({
                     <CardContent className="space-y-3">
                       <ExerciseHeader
                         ex={ex}
-                        index={exI + 1}
+                        index={block.labels[k]}
                         isEditing={editingAweId === ex.aweId}
                         busy={busy}
                         onToggleEdit={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))}
@@ -1264,12 +1359,20 @@ export default function WorkoutLogger({
 
       {/* Exercise cards — grouped by block */}
       <div className="space-y-4">
-        {exercises.map((ex, exI) => {
+        {groupIntoBlocks(exercises).map((block) =>
+          block.exIndices.length === 0 ? (
+            <div key={block.section} className="flex items-center gap-3 pt-1 pb-0">
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{block.title}</span>
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">None</span>
+            </div>
+          ) : (
+            block.exIndices.map((exI, k) => {
+          const ex = exercises[exI];
           const state = stateFor(ex);
-          // Show a block header when section changes
-          const prevSection = exI > 0 ? exercises[exI - 1].section : "__start__";
-          const showBlockHeader = ex.section !== prevSection && ex.section != null;
-          const blockHeaderLabel = formatBlockLabel(ex.section);
+          // A header at the start of each part (Warm-up, Block n, Cool-down).
+          const showBlockHeader = k === 0;
+          const blockHeaderLabel = block.title;
 
           return (
             <div key={ex.aweId}>
@@ -1290,7 +1393,7 @@ export default function WorkoutLogger({
                         className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold text-ink shrink-0"
                         style={{ background: "var(--blue)" }}
                       >
-                        {exI + 1}
+                        {block.labels[k]}
                       </div>
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
                       <CardTitle className="text-sm font-semibold leading-tight truncate min-w-0">{ex.name}</CardTitle>
@@ -1369,7 +1472,9 @@ export default function WorkoutLogger({
             </Card>
             </div>
           );
-        })}
+            })
+          )
+        )}
       </div>
 
       {addExercise}
@@ -1407,7 +1512,7 @@ function ExerciseHeader({
   onToggleEdit,
 }: {
   ex: LoggerExercise;
-  index: number;
+  index: number | string;
   isEditing: boolean;
   busy: boolean;
   onToggleEdit: () => void;

@@ -461,6 +461,7 @@ enum SessionSource {
   MANUAL // typed in by hand after the fact
   SCREENSHOT // read from a screenshot of a finished workout
   OFF_PLAN // a workout done outside any plan
+  IMPORT // a past session brought in from a coach's spreadsheet (a completed week), dated back to when it was done
 }
 
 /// A session: one workout actually done. The single source of truth for

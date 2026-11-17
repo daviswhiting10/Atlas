@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { describeDay, type ImportSummary } from "@/lib/programs/sheet-summary";
 
 /** What the file picker offers. */
 const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
@@ -14,6 +15,11 @@ const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreads
 const MAX_FILE_BYTES = 5_000_000;
 
 type Picked = { name: string; csv: string };
+
+/** What the read step returned: shown to the coach, then sent back to save. */
+type Read = { grid: unknown; context: unknown; summary: ImportSummary; weekOneStart: string | null };
+
+const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 /**
  * Turn a dropped or chosen file into CSV text, or say what to do instead.
@@ -48,6 +54,9 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // After reading: the summary to confirm, and whether to bring in the completed weeks as history.
+  const [read_, setRead] = useState<Read | null>(null);
+  const [history, setHistory] = useState(true);
 
   async function pick(f: File | undefined) {
     if (!f || busy) return;
@@ -75,25 +84,106 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(file ? { csv: file.csv } : { sheetUrl: link.trim() }), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) }),
+        body: JSON.stringify({ step: "read", ...(file ? { csv: file.csv } : { sheetUrl: link.trim() }), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setBusy(false);
+      if (!res.ok) return void setError(data?.error ?? "Couldn't read that sheet.");
+      for (const w of (data.warnings ?? []) as string[]) toast.warning(w, { duration: 10_000 });
+      setRead({ grid: data.grid, context: data.context, summary: data.summary, weekOneStart: weekOne || null });
+      setHistory(true);
+    } catch {
+      setError("Couldn't reach the server. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  async function save() {
+    if (!read_) return;
+    setError(null);
+    setBusy(true);
+    const withHistory = history && read_.summary.history.sessions > 0;
+    try {
+      const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "save", grid: read_.grid, context: read_.context, history: withHistory, ...(read_.weekOneStart ? { weekOneStart: read_.weekOneStart } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data?.error ?? "Couldn't read that sheet.");
+        setError(data?.error ?? "Couldn't save the plan.");
         setBusy(false);
         return;
       }
       toast.success(
-        `Read as ${data.readAs}.` +
-          (data.sessionsLogged > 0 ? ` ${data.sessionsLogged} done session${data.sessionsLogged === 1 ? "" : "s"} logged.` : "") +
+        `Saved as ${data.readAs}.` +
+          (data.sessionsLogged > 0 ? ` ${data.sessionsLogged} past session${data.sessionsLogged === 1 ? "" : "s"} imported.` : "") +
           " Check it, then assign."
       );
-      for (const w of (data.warnings ?? []) as string[]) toast.warning(w, { duration: 10_000 });
       router.push(`/clients/${clientId}/programs/${data.assignmentId}`);
     } catch {
       setError("Couldn't reach the server. Please try again.");
       setBusy(false);
     }
+  }
+
+  if (read_) {
+    const { summary } = read_;
+    const h = summary.history;
+    const weeksDone = h.perWeek.map((w) => w.week);
+    const weekRange = weeksDone.length === 0 ? "" : weeksDone.length === 1 ? `Week ${weeksDone[0]}` : `Weeks ${weeksDone[0]}–${weeksDone[weeksDone.length - 1]}`;
+    return (
+      <div className="space-y-4">
+        <div>
+          <p className="text-[15px] font-semibold text-ink">Read as {summary.readAs}</p>
+          <p className="mt-0.5 text-[13px] text-ink-mute">
+            {summary.exercises} exercises · week 1 started {shortDay(summary.weekOneStart)}
+          </p>
+        </div>
+        <ul className="space-y-1.5 text-[13px] text-ink-soft">
+          {summary.days.map((d) => (
+            <li key={d.name}>
+              <span className="font-medium text-ink">{d.name}:</span> {describeDay(d)}
+            </li>
+          ))}
+        </ul>
+        {h.sessions > 0 ? (
+          <label className="flex items-start gap-3 rounded-lg border border-line-strong bg-dusk-raised p-3">
+            <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} disabled={busy} className="mt-1 h-4 w-4 shrink-0" />
+            <span className="text-sm">
+              <span className="block font-semibold text-ink">Import completed weeks as history</span>
+              <span className="mt-0.5 block text-ink-soft">
+                {weekRange}: {h.sessions} session{h.sessions === 1 ? "" : "s"}, {h.sets} sets, dated {shortDay(h.from!)}
+                {h.to !== h.from ? ` – ${shortDay(h.to!)}` : ""}. {firstName}&rsquo;s progress charts fill in now and keep updating as you log.
+              </span>
+            </span>
+          </label>
+        ) : (
+          <p className="text-[13px] text-ink-mute">No completed weeks in this sheet, so there&rsquo;s no history to import.</p>
+        )}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button type="button" onClick={() => setRead(null)} disabled={busy} className="press h-11 rounded-xl border border-line-strong px-5 text-[15px] font-semibold text-ink hover:border-ink/40">
+            Back
+          </button>
+          <button type="button" onClick={save} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70">
+            {busy ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+              </>
+            ) : history && h.sessions > 0 ? (
+              `Save plan and ${h.sessions} past session${h.sessions === 1 ? "" : "s"}`
+            ) : (
+              "Save plan"
+            )}
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className="text-sm leading-relaxed text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
+    );
   }
 
   const field = "h-11 w-full rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60";

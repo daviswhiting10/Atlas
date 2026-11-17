@@ -66,7 +66,7 @@ describe("shapePlan", () => {
   const rx = { sets: 2, repMin: 12, repMax: 12, unit: "reps" as const, note: null };
   const week = (n: number, logged: boolean): PlanWeek => ({
     week: n,
-    days: [{ name: "Day 1", dayOfWeek: 1, logged, entries: [{ exercise: "Goblet Squat", notes: null, rx, load: logged ? { weight: 20, band: null, note: null } : null }] }],
+    days: [{ name: "Day 1", dayOfWeek: 1, logged, entries: [{ exercise: "Goblet Squat", notes: null, section: "block:1", rx, load: logged ? { weight: 20, band: null, note: null } : null }] }],
   });
   const sheet = { weeks: [week(1, true), week(2, true), week(3, false), week(4, false)], lastLoggedWeek: 2 };
 

@@ -1,14 +1,18 @@
 /**
  * Writes a plan read from a coach's spreadsheet: the program (one block per
- * week, so each week keeps its own prescription), the client's draft plan,
- * and every week the sheet shows as done as a logged session, so the
- * charts and next targets pick up where the sheet leaves off.
+ * week, so each week keeps its own prescription) and the client's draft plan.
+ * With `history`, every week the sheet shows as done also becomes a finished
+ * session (source IMPORT), dated back to the day it was planned, so the
+ * client's charts and next targets pick up where the sheet leaves off.
+ *
+ * The coach sees the same numbers first (lib/programs/sheet-summary).
  */
 
 import { prisma } from "@/lib/db/client";
 import { assignProgram, upsertProgram } from "@/lib/db/programs";
 import { resolveExercise } from "./resolve-exercise";
-import { inferWeekOneStart, planFromGrid, shapePlan, type SheetGrid } from "./sheet-plan";
+import { type SheetGrid } from "./sheet-plan";
+import { dayDate, planStart, shapeSheet } from "./sheet-summary";
 import { NO_CONTEXT, type PlanContext } from "./plan-context";
 
 export type SavedSheetPlan = { assignmentId: string; programId: string; weeks: number; days: number; weeksDone: number; sessionsLogged: number; exercises: number };
@@ -23,9 +27,11 @@ export async function saveSheetPlan(input: {
   weekOneStart?: Date | null;
   /** The coach's note ("4 week block, start fresh"), already read. */
   context?: PlanContext;
+  /** Import the weeks the sheet shows as done as finished sessions. */
+  history: boolean;
   today?: Date;
 }): Promise<SavedSheetPlan> {
-  const { weeks, lastLoggedWeek } = shapePlan(planFromGrid(input.grid), input.context ?? NO_CONTEXT);
+  const { weeks, lastLoggedWeek } = shapeSheet(input.grid, input.context ?? NO_CONTEXT);
 
   const names = Array.from(new Set(weeks.flatMap((w) => w.days.flatMap((d) => d.entries.map((e) => e.exercise)))));
   const ids = new Map<string, string>();
@@ -48,7 +54,7 @@ export async function saveSheetPlan(input: {
           exerciseId: ids.get(e.exercise)!,
           order: j + 1,
           notes: e.notes,
-          section: null,
+          section: e.section,
           prescribedSets: Array.from({ length: e.rx.sets }, (_, k) => ({
             setNumber: k + 1,
             weight: null,
@@ -65,7 +71,7 @@ export async function saveSheetPlan(input: {
   });
 
   const today = input.today ?? new Date();
-  const start = input.weekOneStart ?? (lastLoggedWeek > 0 ? inferWeekOneStart(lastLoggedWeek, today) : new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+  const start = planStart(lastLoggedWeek, input.weekOneStart, today);
   const assignment = await assignProgram(input.workspaceId, program.id, input.clientId, start);
   // A draft until the coach has checked it and assigns it.
   await prisma.programAssignment.update({ where: { id: assignment.id }, data: { status: "PAUSED" } });
@@ -85,12 +91,12 @@ export async function saveSheetPlan(input: {
   for (const aw of scheduled) {
     const at = aw.sourceWorkoutId ? origin.get(aw.sourceWorkoutId) : undefined;
     const day = at ? weeks[at.week - 1]?.days[at.day] : undefined;
-    if (!day?.logged) continue;
-    const date = new Date(aw.scheduledDate);
-    date.setHours(12, 0, 0, 0);
+    if (!input.history || !day?.logged || !at) continue;
+    // The day the preview showed: the same rule the plan is scheduled by.
+    const date = dayDate(start, at.week, day.dayOfWeek);
     await prisma.$transaction(async (tx) => {
       // The sheet records that the week was done, not the day: the scheduled day is the only date there is.
-      const log = await tx.workoutLog.create({ data: { clientId: input.clientId, assignedWorkoutId: aw.id, source: "PLAN", date, completedAt: date, trainerSeen: true }, select: { id: true } });
+      const log = await tx.workoutLog.create({ data: { clientId: input.clientId, assignedWorkoutId: aw.id, source: "IMPORT", date, completedAt: date, trainerSeen: true }, select: { id: true } });
       const sets = day.entries.flatMap((e, j) => {
         const awe = aw.exercises.find((x) => x.order === j + 1);
         if (!awe) return [];

@@ -101,3 +101,31 @@ describe("the plan from a filled-in sheet", () => {
     expect(readGrid(JSON.stringify({ days: [{ name: "x", exercises: [] }] }))).toBeNull();
   });
 });
+
+describe("sheet labels become the workout's structure", () => {
+  it("reads labels, and maps A/B groups and a warm-up note to Warm-up and Blocks", () => {
+    const raw = JSON.stringify({
+      days: [
+        {
+          name: "Day 1",
+          exercises: [
+            { label: "A", name: "Ski erg", notes: "Warm-up. Easy pace", weeks: [{ week: 1, setsReps: "5 min", load: "" }] },
+            { label: "A", name: "Med ball slam", notes: "", weeks: [{ week: 1, setsReps: "2 x 15", load: "" }] },
+            { label: "A", name: "Push up on bar", notes: "", weeks: [{ week: 1, setsReps: "2 x 12", load: "" }] },
+            { label: "B", name: "Chest press", notes: "", weeks: [{ week: 1, setsReps: "3 x 10", load: "" }] },
+            { label: " ", name: "Stretch", notes: "Stretch hips", weeks: [{ week: 1, setsReps: "1 x 60 sec", load: "" }] },
+          ],
+        },
+      ],
+    });
+    const grid = readGrid(raw)!;
+    expect(grid.days[0].exercises.map((e) => e.label)).toEqual(["A", "A", "A", "B", undefined]);
+    const { weeks } = planFromGrid(grid);
+    expect(weeks[0].days[0].entries.map((e) => e.section)).toEqual(["warmup", "block:1", "block:1", "block:2", "cooldown"]);
+  });
+
+  it("keeps a sheet without labels as one block per exercise", () => {
+    const { weeks } = planFromGrid({ days: [{ name: "Day 1", exercises: [{ name: "Squat", weeks: [{ week: 1, setsReps: "3x5" }] }, { name: "Row", weeks: [{ week: 1, setsReps: "3x8" }] }] }] });
+    expect(weeks[0].days[0].entries.map((e) => e.section)).toEqual(["block:1", "block:2"]);
+  });
+});
