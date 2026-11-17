@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIVE_KEY, LIVE_MAX_MS, clearLive, formatElapsed, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "./live";
+import { LIVE_KEY, LIVE_MAX_MS, clearLive, liveIsFresh, formatElapsed, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "./live";
 
 function memory() {
   const m = new Map<string, string>();
@@ -82,5 +82,16 @@ describe("formatElapsed", () => {
     expect(formatElapsed(245_000)).toBe("4:05");
     expect(formatElapsed(3_729_000)).toBe("1:02:09");
     expect(formatElapsed(-5)).toBe("0:00");
+  });
+});
+
+describe("idle limit", () => {
+  it("drops a session untouched for 3 hours, counting from the last activity, not the start", () => {
+    expect(LIVE_MAX_MS).toBe(3 * 60 * 60_000);
+    const started = { updatedAt: 0 };
+    expect(liveIsFresh(started, 3 * 60 * 60_000 - 1)).toBe(true);
+    expect(liveIsFresh(started, 3 * 60 * 60_000)).toBe(false);
+    // Busy for 5 hours (last touched at 4h50): still live.
+    expect(liveIsFresh({ updatedAt: 4 * 3600_000 + 50 * 60_000 }, 5 * 3600_000)).toBe(true);
   });
 });

@@ -12,8 +12,15 @@
  */
 
 export const LIVE_KEY = "atlas.liveSession.v1";
-/** A session left open longer than this is assumed abandoned. */
-export const LIVE_MAX_MS = 12 * 60 * 60_000;
+/**
+ * A session nobody has touched for this long (no set, no typing, no scrolling)
+ * is assumed abandoned: the bar goes, and reopening the workout starts a fresh
+ * clock instead of showing hours of elapsed time.
+ */
+export const LIVE_MAX_MS = 3 * 60 * 60_000;
+
+/** Whether a live session still counts as in progress. */
+export const liveIsFresh = (s: Pick<LiveSession, "updatedAt">, now = Date.now()) => now - s.updatedAt < LIVE_MAX_MS;
 /** Fired on window when the live session changes in this tab (storage events only reach other tabs). */
 export const LIVE_EVENT = "atlas:live-session";
 
@@ -48,7 +55,7 @@ export function readLive(storage: Storage | null | undefined, now = Date.now()):
     if (!raw) return null;
     const s = JSON.parse(raw) as LiveSession;
     if (!s || typeof s.assignedWorkoutId !== "string" || typeof s.href !== "string" || !s.href.startsWith("/")) return null;
-    if (!(now - s.updatedAt < LIVE_MAX_MS)) {
+    if (!liveIsFresh(s, now)) {
       storage.removeItem(LIVE_KEY);
       return null;
     }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, X } from "lucide-react";
-import { LIVE_EVENT, LIVE_KEY, clearLive, formatElapsed, readLive, type LiveSession } from "@/lib/sessions/live";
+import { LIVE_EVENT, LIVE_KEY, clearLive, formatElapsed, liveIsFresh, readLive, type LiveSession } from "@/lib/sessions/live";
 
 function storage(): Storage | null {
   try {
@@ -40,7 +40,8 @@ export function LiveSessionBar() {
   }, [pathname]);
 
   const onLogger = live != null && pathname === live.href.split("?")[0];
-  const visible = live != null && !onLogger;
+  // Gone once the session has sat untouched for 3 hours, even while this screen stays open.
+  const visible = live != null && !onLogger && liveIsFresh(live, now);
 
   useEffect(() => {
     if (!visible) return;
