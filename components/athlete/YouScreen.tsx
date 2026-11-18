@@ -15,6 +15,7 @@ export function YouScreen({
   hasPlan,
   programs,
   goalsOpen,
+  canStartGoal,
 }: {
   athlete: Pick<Athlete, "name" | "prefs" | "selfServe" | "isDemo" | "isGuest" | "isCoach">;
   account: { email: string | null; passwordHash: string | null } | null;
@@ -22,10 +23,18 @@ export function YouScreen({
   /** A coach's own library programs (empty for everyone else). */
   programs: LibraryProgram[];
   goalsOpen: boolean;
+  /** No goal is running: starting one (75 Hard) is here, not on Today. */
+  canStartGoal: boolean;
 }) {
   return (
     <div className="rise">
       <h1 className="truncate text-3xl leading-none text-ink sm:text-4xl">{athlete.name}</h1>
+
+      {canStartGoal && (
+        <Link href="/goals/new" className="press mt-8 flex min-h-[56px] items-center justify-between gap-3 border-y border-line text-[17px] font-semibold text-ink hover:text-ink-soft">
+          Start a goal <ArrowRight className="h-4 w-4 shrink-0 text-ink-soft" />
+        </Link>
+      )}
 
       {/* A demo account is sample data; a guest's own plan is worth keeping. */}
       {athlete.isDemo && (

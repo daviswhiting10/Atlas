@@ -1,18 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadClientProgress } from "@/lib/coach/progress";
 import { getClient } from "@/lib/db/clients";
-import { ProgressView, RecordsList } from "@/components/athlete/ProgressView";
+import { ProgressView } from "@/components/athlete/ProgressView";
 import { ClientDetail } from "./ClientDetail";
 
-/** One record per exercise: the most recent, which is the heaviest (a record only lands when it's beaten). */
-function bestPerExercise<T extends { exercise: string }>(prs: T[]): T[] {
-  const seen = new Set<string>();
-  return prs.filter((r) => (seen.has(r.exercise) ? false : (seen.add(r.exercise), true)));
-}
 
 export const metadata: Metadata = { title: "Client" };
 
@@ -24,24 +17,13 @@ export default async function ClientPage({ params }: { params: { id: string } })
   // The client's details load with the charts, on the server: the page no longer waits for a second fetch from the browser.
   const [progress, details] = await Promise.all([loadClientProgress(params.id, workspaceId), getClient(params.id, workspaceId)]);
   if (!progress || !details) notFound();
-  const { client, data, metric } = progress;
+  const { data, metric } = progress;
 
   return (
     <ClientDetail
       // The same JSON /api/clients/[id] sends (dates as strings).
       initial={JSON.parse(JSON.stringify(details))}
-      progress={
-        <>
-          <div className="mb-4 flex items-baseline justify-between gap-3">
-            <p className="eyebrow">Progress</p>
-            <Link href={`/clients/${client.id}/progress`} className="press inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink">
-              Body <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <ProgressView data={data} goalMetric={metric} totals={false} records={false} emptyAction={{ href: `/clients/${client.id}/log`, label: `Log a workout for ${client.firstName}` }} />
-        </>
-      }
-      records={<RecordsList prs={bestPerExercise(data.recentPRs)} />}
+      progress={<ProgressView data={data} goalMetric={metric} />}
     />
   );
 }

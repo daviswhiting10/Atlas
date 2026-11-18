@@ -50,7 +50,7 @@ export default async function ClientProgressPage({ params }: { params: { id: str
           </p>
         </div>
       </div>
-      <ProgressView data={data} goalMetric={metric} emptyAction={{ href: `/clients/${client.id}/log`, label: `Log a workout for ${firstName}` }} />
+      <ProgressView data={data} goalMetric={metric} />
       {milestones.length > 0 && (
         <section className="mt-10">
           <p className="eyebrow mb-3">Milestones</p>

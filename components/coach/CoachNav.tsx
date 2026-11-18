@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardPen, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
+import { ClipboardPen, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
+import { ModeToggle } from "@/components/ModeToggle";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,14 +21,12 @@ const ITEMS = [
   { href: "/intake", label: "Intake" },
 ] as const;
 
-/** The coach's own training: the athlete app on their own profile. */
-const MY_TRAINING = { href: "/today", label: "My training", icon: Activity };
-
-/** Phones get the most-used sections as tabs; the rest sit behind "More". */
-const TABS = [...(ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Users }>), MY_TRAINING];
+/** Phones get the most-used sections as tabs; the rest (and Settings, Sign out) sit behind "More".
+ *  The coach's own training is the Me side of the toggle in the header, not a tab. */
+const TABS = ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Users }>;
 const MORE: Array<{ href: string; label: string }> = [...ITEMS.filter((i) => !("icon" in i)), { href: "/settings", label: "Settings" }];
 
-export function CoachNav({ name }: { name: string }) {
+export function CoachNav() {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
@@ -65,12 +64,6 @@ export function CoachNav({ name }: { name: string }) {
 
           <div className="flex shrink-0 items-center gap-1">
             <Link
-              href={MY_TRAINING.href}
-              className="press mr-1 hidden h-9 items-center gap-1.5 rounded-full bg-signal px-3.5 text-sm font-semibold text-bone hover:bg-signal/90 md:flex"
-            >
-              <Activity className="h-4 w-4" /> My training
-            </Link>
-            <Link
               href="/settings"
               aria-label="Settings"
               className={cn("press hidden h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5 hover:text-ink md:flex", isActive("/settings") && "bg-ink/5 text-ink")}
@@ -80,9 +73,7 @@ export function CoachNav({ name }: { name: string }) {
             <button type="button" onClick={signOut} aria-label="Sign out" className="press hidden h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5 hover:text-ink md:flex">
               <LogOut className="h-[18px] w-[18px]" />
             </button>
-            <span className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-ink/10 text-sm font-semibold text-ink" title={name}>
-              {name.charAt(0).toUpperCase()}
-            </span>
+            <ModeToggle mode="coach" />
           </div>
         </div>
       </header>

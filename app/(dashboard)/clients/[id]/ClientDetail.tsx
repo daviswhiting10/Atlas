@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { StatRow } from "@/components/athlete/StatRow";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
@@ -23,7 +22,6 @@ import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
 import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
 import {
-  ArrowLeft,
   Dumbbell,
   ClipboardList,
   AlertTriangle,
@@ -33,6 +31,7 @@ import {
   MoreHorizontal,
   Plus,
   FileSpreadsheet,
+  Ruler,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -86,22 +85,7 @@ type Client = {
   outreachLog: Array<{ id: string; purpose: string; channel: string; createdAt: string; sentAt: string | null }>;
 };
 
-const GOAL_LABELS: Record<string, string> = {
-  weight_loss: "Weight Loss",
-  hypertrophy: "Hypertrophy",
-  pain_mgmt: "Pain Management",
-  performance: "Athletic Performance",
-  general: "General Fitness",
-};
 
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 // Parse a date string (YYYY-MM-DD or ISO) as local time to avoid UTC-offset day shift
 function localDate(dateStr: string): Date {
@@ -110,27 +94,7 @@ function localDate(dateStr: string): Date {
   return new Date(`${s}T12:00:00`);
 }
 
-function getWeekBounds() {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((day + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { monday, sunday };
-}
 
-function relativeTime(date: string) {
-  const diff = Date.now() - localDate(date).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
 
 /**
  * The client page. `progress` is rendered on the server (the client's lift
@@ -138,7 +102,7 @@ function relativeTime(date: string) {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, records, initial }: { progress: React.ReactNode; records: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ progress, initial }: { progress: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -161,12 +125,6 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "import"
   );
   const importRef = useRef<HTMLDivElement>(null);
-  function openImport() {
-    setView("plan");
-    setImportOpen(true);
-    // After the Plan tab renders.
-    requestAnimationFrame(() => importRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  }
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -251,18 +209,11 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
   }
 
   // ── Computed values ──────────────────────────────────────────────────────
-  const goalLabel = client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null;
   const firstName = client.fullName.split(" ")[0];
   // Spreadsheet details from an import are shown on their own, never as an intake.
   const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
   const redFlags = intakes[0]?.redFlags ?? null;
-  const { monday, sunday } = getWeekBounds();
-  const sessionsThisWeek = client.workoutLogs.filter((s) => {
-    const d = localDate(s.date);
-    return d >= monday && d <= sunday;
-  }).length;
-  const lastSession = client.workoutLogs[0] ?? null;
   const views: Array<{ id: View; label: string }> = [
     { id: "progress", label: "Progress" },
     { id: "sessions", label: "Sessions" },
@@ -273,58 +224,32 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
 
   return (
     <div className={cn("pb-12", phase === "fading" && "animate-in fade-in-0 duration-200 ease-out")}>
-      {/* Back */}
-      <Link href="/clients" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-3 -ml-2")}>
-        <ArrowLeft className="w-4 h-4 mr-1" />
-        Clients
-      </Link>
-
-      {/* ── Header strip ──────────────────────────────────────────────────── */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Avatar */}
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink/10 text-base font-semibold text-ink md:h-14 md:w-14 md:text-lg">
-            {getInitials(client.fullName)}
-          </div>
-          {/* Name + meta */}
-          <div className="min-w-0">
-            <h1 className="text-[30px] leading-[1.08] text-ink sm:truncate sm:text-[38px]">{client.fullName}</h1>
-            {goalLabel && <p className="mt-0.5 text-sm text-muted-foreground">{goalLabel}</p>}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {!client.userId && (
-            <button
-              type="button"
-              onClick={inviteClient}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 px-3")}
-              title={client.email ? `Give ${client.fullName.split(" ")[0]} access to their plan and progress` : "Add an email to invite"}
-            >
-              <UserCheck className="w-4 h-4 shrink-0" />
-              <span className="ml-1.5">Invite</span>
-            </button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
-              <MoreHorizontal className="w-4 h-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={inviteClient}>
-                <UserCheck className="w-3.5 h-3.5 mr-2" />
-                {client.userId ? "New sign-in link" : "Invite client"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={deleteClient}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-2" />
-                Delete client
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      {/* ── Header: the name, and ⋯ for everything that isn't logging ──────── */}
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="min-w-0 text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-ink [overflow-wrap:anywhere]">{client.fullName}</h1>
+        <DropdownMenu>
+          <DropdownMenuTrigger aria-label={`More for ${client.fullName}`} className="press inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink-soft hover:text-ink">
+            <MoreHorizontal className="h-5 w-5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[200px]">
+            <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}/log-workout`)}>
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              Log a workout
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}/progress/body`)}>
+              <Ruler className="mr-2 h-3.5 w-3.5" />
+              Body measurements
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={inviteClient}>
+              <UserCheck className="mr-2 h-3.5 w-3.5" />
+              {client.userId ? "New sign-in link" : "Invite to the app"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={deleteClient} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              Delete client
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Retention flag banner */}
@@ -337,33 +262,15 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
 
       {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
 
-      {/* ── Log first; everything else one tap away ─────────────────────── */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <Link
-          href={`/clients/${client.id}/log`}
-          className="press flex h-14 items-center justify-center gap-2.5 rounded-2xl bg-dusk-button px-8 text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:min-w-[260px]"
-        >
-          <ClipboardList className="h-5 w-5" />
-          Log session
-        </Link>
-        <Link
-          href={`/clients/${client.id}/log-workout`}
-          className="press flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
-        >
-          <Plus className="h-4 w-4" />
-          Log a workout
-        </Link>
-        <button
-          type="button"
-          onClick={openImport}
-          className="press flex h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line bg-paper px-6 text-[15px] font-semibold text-ink hover:border-ink/25"
-        >
-          <FileSpreadsheet className="h-4 w-4" />
-          Import plan
-        </button>
-      </div>
-      <div className="mb-6">
-        <div role="tablist" className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
+      {/* ── The one action: log ─────────────────────────────────────────── */}
+      <Link
+        href={`/clients/${client.id}/log`}
+        className="press mb-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:max-w-sm"
+      >
+        Log session
+      </Link>
+      <div className="mb-12">
+        <div role="tablist" className="flex w-full max-w-md gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
           {views.map((v) => (
             <button
               key={v.id}
@@ -372,7 +279,7 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
               aria-selected={view === v.id}
               onClick={() => setView(v.id)}
               className={cn(
-                "press h-12 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors",
+                "press h-11 flex-1 shrink-0 rounded-xl px-4 text-[15px] font-medium transition-colors",
                 view === v.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink"
               )}
             >
@@ -383,30 +290,12 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
       </div>
 
       {view === "progress" && (
-        <div className="fade-in">
-          <StatRow
-            className="mb-8"
-            stats={[
-              { label: "Sessions", value: String(client.workoutLogs.length), hint: "logged in total" },
-              { label: "This week", value: String(sessionsThisWeek), hint: sessionsThisWeek === 1 ? "session" : "sessions" },
-              { label: "Last session", value: lastSession ? relativeTime(lastSession.date) : "—", hint: lastSession ? localDate(lastSession.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "None yet" },
-            ]}
-          />
-          <section>{progress}</section>
-          {/* Records live under the charts (they were a tab of their own). */}
-          <section className="mt-10">
-            <p className="eyebrow mb-3">Personal records</p>
-            {records}
-          </section>
-        </div>
+        <div className="fade-in">{progress}</div>
       )}
 
 
       {view === "sessions" && (
         <div className="fade-in">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">{client.workoutLogs.length} sessions</p>
-          </div>
           {client.workoutLogs.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center">
@@ -464,7 +353,6 @@ export function ClientDetail({ progress, records, initial }: { progress: React.R
               <Card className="mb-4">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-semibold">Import plan</CardTitle>
-                  <p className="text-sm text-muted-foreground">{firstName} has no plan yet. Bring in the one you already use, or build one with Atlas below.</p>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <SheetPlanUpload clientId={client.id} firstName={firstName} />

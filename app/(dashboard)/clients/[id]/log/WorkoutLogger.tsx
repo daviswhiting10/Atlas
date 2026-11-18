@@ -25,7 +25,6 @@ import {
   ChevronUp,
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   GripVertical,
   Loader2,
   Mic,
@@ -267,14 +266,6 @@ function groupIntoBlocks(exercises: LoggerExercise[]): ExBlock[] {
   }));
 }
 
-/** An exercise's badge by its index: "1A", "2", "W" or "C". */
-function exerciseLabel(exercises: LoggerExercise[], index: number): string {
-  for (const b of groupIntoBlocks(exercises)) {
-    const k = b.exIndices.indexOf(index);
-    if (k >= 0) return b.labels[k];
-  }
-  return String(index + 1);
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1077,8 +1068,6 @@ export default function WorkoutLogger({
       window.requestAnimationFrame(() => cardRefs.current[ex.aweId]?.scrollIntoView({ behavior: "smooth", block: "start" }))
     );
   }
-  /** The exercise to do next: the first with a set still to log. */
-  const upNext = exercises.find((e) => !isDone(e))?.aweId ?? null;
 
   // ── Week / day picker helpers ─────────────────────────────────────────────
 
@@ -1385,44 +1374,6 @@ export default function WorkoutLogger({
           ) : null}
         </div>
         </div>
-        {/* Jump bar: every exercise, one tap away */}
-        {!reordering && exercises.length > 1 && (
-          <nav aria-label="Exercises in this workout" className="-mx-4 mt-2 flex items-center gap-1.5 px-4">
-            {!completed && (
-              <button
-                type="button"
-                onClick={() => setReordering(true)}
-                className="logger-quiet flex h-8 shrink-0 items-center gap-1 rounded-full border border-line-strong px-2.5 text-[12px] font-semibold text-ink-soft hover:text-ink"
-              >
-                <ArrowUpDown className="h-3.5 w-3.5" /> Reorder
-              </button>
-            )}
-            <ol className="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-              {exercises.map((ex, i) => {
-                const done = isDone(ex);
-                const next = ex.aweId === upNext;
-                return (
-                  <li key={ex.aweId} className="shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => jumpTo(ex)}
-                      aria-current={next ? "step" : undefined}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-left text-[13px] font-semibold",
-                        next ? "border-ink/60 bg-dusk-raised text-ink" : "border-line bg-paper text-ink-soft"
-                      )}
-                    >
-                      <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] tabular-nums", done ? "bg-[var(--success)]/20 text-[var(--success)]" : "bg-ink/10")}>
-                        {done ? <Check className="h-3 w-3" strokeWidth={3} /> : exerciseLabel(exercises, i)}
-                      </span>
-                      <ExerciseName name={ex.name} inControl className="max-w-[140px] leading-tight" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </nav>
-        )}
       </div>
 
       {/* ── Session date, then week and day, on one row ───────────── */}
@@ -1468,13 +1419,13 @@ export default function WorkoutLogger({
                 if (isFolded(ex)) {
                   return (
                     <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
-                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} />
+                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} onHold={completed ? undefined : () => setReordering(true)} />
                     </section>
                   );
                 }
                 return (
                   <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper px-3 pb-1 pt-2">
-                    <CompactHeader ex={ex} index={block.labels[k]} onFold={() => setFolded(ex.aweId, true)} />
+                    <CompactHeader ex={ex} index={block.labels[k]} onFold={() => setFolded(ex.aweId, true)} onHold={completed ? undefined : () => setReordering(true)} />
 
                     <SetTable
                       secs={secs}
@@ -1811,25 +1762,28 @@ function CompactHeader({
   ex,
   index,
   onFold,
+  onHold,
 }: {
   ex: LoggerExercise;
   index: number | string;
   /** Fold the card to one row. */
   onFold: () => void;
+  /** Holding the exercise's row: reorder the session's exercises. */
+  onHold?: () => void;
 }) {
   const notes = Array.from(
     new Set([ex.lastNote?.trim(), ...ex.prevWorkoutSets.map((x) => x.note?.trim())].filter((x): x is string => !!x))
   );
   return (
     <div className="mb-1 min-w-0">
-      <div className="-mr-1.5 flex items-center gap-2">
+      <HoldRow onHold={onHold ?? (() => {})} className="-mr-1.5 flex items-center gap-2">
         <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
         <div className="min-w-0 flex-1">
           <ExerciseName as="h3" name={labelled(String(index), ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">{rxLabel(ex)}</p>
         </div>
         <CollapseButton name={ex.name} onClick={onFold} />
-      </div>
+      </HoldRow>
       {notes.length > 0 && (
         <p className="mt-1 line-clamp-2 border-l-2 border-[var(--success)]/40 pl-2 text-[12px] italic leading-snug text-[var(--success)]">
           {notes.map((n) => `“${n}”`).join(" ")}
@@ -1962,11 +1916,18 @@ function CollapseButton({ name, onClick }: { name: string; onClick: () => void }
  * A folded exercise: one skinny row with its badge and name, then a tick when every set is
  * logged or "3/4" when some are. Tapping anywhere on it opens the card again.
  */
-function FoldedRow({ label, name, sets, onOpen }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void }) {
+function FoldedRow({ label, name, sets, onOpen, onHold }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void; /** Holding the row: reorder. */ onHold?: () => void }) {
+  const press = useLongPress(onHold ?? (() => {}), onOpen);
   const logged = sets.filter((x) => x.completed).length;
   const done = sets.length > 0 && logged === sets.length;
   return (
-    <button type="button" onClick={onOpen} aria-expanded={false} aria-label={`Expand ${name}`} className="logger-quiet flex w-full items-center gap-2 py-1.5 pl-3 pr-1.5 text-left">
+    <button
+      type="button"
+      {...(onHold ? press : { onClick: onOpen })}
+      aria-expanded={false}
+      aria-label={`Expand ${name}`}
+      className="logger-quiet flex w-full select-none items-center gap-2 py-1.5 pl-3 pr-1.5 text-left [-webkit-touch-callout:none]"
+    >
       <ExerciseName name={labelled(label, name)} inControl className="min-w-0 flex-1 text-[16px] font-semibold leading-snug text-ink" />
       {done ? (
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/20 text-[var(--success)]" title="Every set logged">

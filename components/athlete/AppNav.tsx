@@ -3,8 +3,9 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, ChartLine, House, UserRound, Users } from "lucide-react";
+import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
 import { Logo } from "./Logo";
+import { ModeToggle } from "@/components/ModeToggle";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -14,8 +15,9 @@ const TABS = [
   { href: "/you", label: "You", icon: UserRound },
 ];
 
-/** `isCoach`: a coach in My training gets a way back to their clients. */
-export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo: boolean; isCoach?: boolean }) {
+/** `isCoach`: a coach on their own training gets the Coach | Me toggle (the way back to their clients).
+ *  There's no avatar: the person is the You tab. */
+export function AppNav({ isDemo, isCoach = false }: { isDemo: boolean; isCoach?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -57,14 +59,7 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
 
           <div className="flex items-center gap-2">
             {isDemo && <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-medium text-ink-mute">Demo data</span>}
-            {isCoach && (
-              <Link href="/log" className="press hidden h-9 items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 text-sm font-medium text-ink-soft hover:border-ink/20 hover:text-ink md:flex">
-                <ArrowLeft className="h-4 w-4" /> Coaching
-              </Link>
-            )}
-            <Link href="/you" className="flex h-11 w-11 items-center justify-center rounded-full border border-line-strong bg-paper text-sm font-semibold text-ink md:h-9 md:w-9" aria-label="Your profile">
-              {name.charAt(0).toUpperCase()}
-            </Link>
+            {isCoach && <ModeToggle mode="me" />}
           </div>
         </div>
       </header>
@@ -90,12 +85,6 @@ export function AppNav({ name, isDemo, isCoach = false }: { name: string; isDemo
                 </Link>
               );
             })}
-            {isCoach && (
-              <Link href="/log" className="press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium text-ink-mute">
-                <Users className="h-[22px] w-[22px]" strokeWidth={1.8} />
-                Coaching
-              </Link>
-            )}
           </div>
         </nav>
       )}

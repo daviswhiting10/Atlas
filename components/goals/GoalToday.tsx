@@ -6,39 +6,33 @@ import { todayView } from "@/lib/goals/today";
 import { endGoal, logWorkout, removeWorkout, setDiet, tagSession, tickRule } from "@/lib/actions/goals";
 import { GoalCard } from "./GoalCard";
 import { GoalCardSkeleton } from "./Skeletons";
-import { StartLink } from "./StartLink";
 
 /**
- * The goal card on Today, or a quiet link to start one.
+ * The goal card on Today while a goal is running; nothing otherwise (starting a goal lives on You).
  *
  * Finding out whether there is a goal is one light query, so it comes first with no
  * placeholder (someone with no goal never sees one). Loading the goal itself is the
  * slow part, and that is what the skeleton stands in for.
  */
-export async function GoalToday({ clientId, canStart }: { clientId: string; canStart: boolean }) {
+export async function GoalToday({ clientId }: { clientId: string }) {
   const id = await todayGoalId(clientId);
-  if (!id) return <StartLink canStart={canStart} />;
+  if (!id) return null;
   return (
     <Suspense fallback={<GoalCardSkeleton />}>
-      <LoadedGoal id={id} clientId={clientId} canStart={canStart} />
+      <LoadedGoal id={id} clientId={clientId} />
     </Suspense>
   );
 }
 
-async function LoadedGoal({ id, clientId, canStart }: { id: string; clientId: string; canStart: boolean }) {
+async function LoadedGoal({ id, clientId }: { id: string; clientId: string }) {
   const loaded = await todayGoal(id, clientId);
   // A goal that finished while nobody was looking has just been closed: point at its chapter.
   if (!loaded || loaded.goal.status !== "ACTIVE") {
-    return (
-      <div className="space-y-2">
-        {loaded && (
-          <Link href={`/goals/${loaded.goal.id}`} className="press inline-flex items-center gap-1 text-[14px] font-semibold text-ink">
-            {loaded.goal.name} is finished · see the chapter <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        )}
-        <StartLink canStart={canStart} />
-      </div>
-    );
+    return loaded ? (
+      <Link href={`/goals/${loaded.goal.id}`} className="press inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-ink">
+        {loaded.goal.name} is finished · see the chapter <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
+    ) : null;
   }
   return <GoalCard view={todayView(loaded)} actions={{ tickRule, tagSession, logWorkout, removeWorkout, setDiet, endGoal }} />;
 }
