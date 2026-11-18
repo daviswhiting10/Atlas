@@ -20,6 +20,16 @@ export const MODELS = {
   haiku: "claude-haiku-4-5-20251001",
 } as const;
 
+// Sonnet 5.5 thinks by default: a thinking block comes first and eats max_tokens, so a short
+// answer can come back empty. Our prompts want the answer only; turn it off (Haiku has no such mode).
+function noThinking(model: string) {
+  return (model === MODELS.sonnet ? { thinking: { type: "between_tools" } } : {}) as Record<string, never>;
+}
+
+function firstText(blocks: { type: string; text?: string }[]): string {
+  return blocks.find((b) => b.type === "text")?.text ?? "";
+}
+
 export type CallAIParams = {
   system: string;
   user: string;
@@ -69,12 +79,12 @@ export async function callAI({
   const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
+    ...noThinking(model),
     system,
     messages: [{ role: "user", content: user }],
   });
 
-  const content =
-    response.content[0].type === "text" ? response.content[0].text : "";
+  const content = firstText(response.content);
   const latencyMs = Date.now() - start;
 
   console.log(
@@ -162,12 +172,12 @@ export async function callAIVision({
   const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
+    ...noThinking(model),
     system,
     messages: [{ role: "user", content }],
   });
 
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
+  const text = firstText(response.content);
   const latencyMs = Date.now() - start;
 
   console.log(
@@ -213,6 +223,7 @@ export async function* callAIStream({
   const stream = getClient().messages.stream({
     model,
     max_tokens: maxTokens,
+    ...noThinking(model),
     system,
     messages: [{ role: "user", content: user }],
   });
