@@ -1,7 +1,7 @@
 "use client";
 
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -43,6 +43,9 @@ import { ExerciseName } from "@/components/ExerciseName";
 
 type SetMap = Record<string, LoggerSet[]>;
 
+/** A set's tick is ignored this long after the cards fold, open or move under the finger. */
+const SETTLE_MS = 400;
+
 /** Heaviest load the logger accepts. Above any real lift, low enough to catch a typo like 1450 for 145. */
 const MAX_WEIGHT_LB = 1000;
 
@@ -60,6 +63,7 @@ function Stepper({
   label,
   onChange,
   dim,
+  settled,
 }: {
   value: number | null;
   step: number;
@@ -67,8 +71,11 @@ function Stepper({
   label: string;
   onChange: (v: number | null) => void;
   dim: boolean;
+  /** False just after cards fold, open or move: a +/− tapped now was meant for what was there (it would change a logged set). */
+  settled: () => boolean;
 }) {
   const bump = (dir: 1 | -1) => {
+    if (!settled()) return;
     const next = value == null ? (dir === 1 ? step : 0) : Math.max(0, Math.round((value + dir * step) * 100) / 100);
     onChange(unit === "lb" ? Math.min(next, MAX_WEIGHT_LB) : next);
   };
@@ -111,6 +118,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     const first = data.exercises.find((e) => e.sets.some((s) => !s.done)) ?? data.exercises[0];
     return new Set(first ? [first.aweId] : []);
   });
+  // When a card folds, opens or moves, the cards under the finger change: a tick right after is a
+  // second tap meant for what was there (a double tap on a header, a tap just after a drop), not a
+  // set logged. It's ignored until the screen has settled. (The click after a lift is swallowed
+  // wherever it lands by useDragOrder.)
+  const movedAt = useRef(0);
+  const firstLayout = useRef(true);
+  const settled = () => performance.now() - movedAt.current > SETTLE_MS;
   const setOpenFor = (aweId: string, on: boolean) =>
     setOpen((cur) => {
       const next = new Set(cur);
@@ -155,6 +169,10 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       return ex ? [{ ...ex, role: o.section }] : [];
     });
   }, [data.exercises, order]);
+  useLayoutEffect(() => {
+    if (firstLayout.current) firstLayout.current = false;
+    else movedAt.current = performance.now();
+  }, [open, order]);
   const drag = useDragOrder({ order, enabled: data.status !== "LOGGED", onChange: setSavedOrder });
   /** Up, Down and "superset with the one above", for screen readers (the drag gestures, as buttons). */
   const moves = (aweId: string) => {
@@ -343,6 +361,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   }
 
   function toggle(ex: LoggerExercise, i: number) {
+    if (!settled()) return;
     const list = setsRef.current[ex.aweId] ?? ex.sets;
     const s = list[i];
     const done = !s.done;
@@ -790,13 +809,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                             <li key={s.setNumber}>
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-2">
                                 <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} onChange={(v) => edit(ex, i, { weight: v })} />}
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
                                 <Stepper
                                   value={s.reps}
                                   step={timed ? 5 : 1}
                                   unit={unit}
                                   label={`Set ${s.setNumber} ${timed ? "seconds" : "reps"}`}
                                   dim={s.done}
+                                  settled={settled}
                                   onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })}
                                 />
                                 <button
