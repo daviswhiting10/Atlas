@@ -11,6 +11,12 @@ export const MERGE_MS = 500;
 const SLOP = 8;
 /** Space between two cards, added to the lifted card's height for the slot it opens. */
 const SPACING = 8;
+/** Edge zones (px from the top and bottom of the screen) where the page scrolls under a lifted card. */
+const EDGE_TOP = 120;
+const EDGE_BOTTOM = 150;
+/** Auto-scroll speed in px/s: entering the zone, and at the very edge. */
+const SCROLL_MIN = 150;
+const SCROLL_MAX = 900;
 
 type Rect = { top: number; bottom: number };
 type Drag = {
@@ -28,6 +34,8 @@ type Drag = {
   y: number;
   /** Where it drops: how many of the others are above it. */
   gap: number;
+  /** How far the page may scroll while carrying: to the end of the list, no further. */
+  maxScroll: number;
   /** The card under the finger's middle (the merge timer is running). */
   hover: string | null;
   /** Hovered long enough: letting go supersets the two. */
@@ -131,17 +139,33 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     setDrag({ ...d, y: pageY, gap, hover, merge });
   }, []);
 
-  // Near an edge, the page scrolls under the lifted card.
+  // Near an edge, the page scrolls under the lifted card: slowly as the finger enters the edge
+  // zone, faster the closer it gets to the edge. Speed is per second, not per frame (the same on a
+  // 120 Hz phone), and it stops at the end of the list (the carried card mustn't push the page
+  // longer and scroll on into blank space).
   useEffect(() => {
     if (!drag) return;
     let raf = 0;
-    const tick = () => {
+    let last = 0;
+    let carry = 0;
+    const tick = (now: number) => {
+      const dt = last ? Math.min(now - last, 50) : 0;
+      last = now;
       const y = clientY.current;
-      const dy = y < 120 ? -10 : y > window.innerHeight - 150 ? 10 : 0;
-      if (dy !== 0) {
-        window.scrollBy(0, dy);
-        update(y + window.scrollY);
-      }
+      const bottomEdge = window.innerHeight - EDGE_BOTTOM;
+      const depth = y < EDGE_TOP ? -(EDGE_TOP - y) / EDGE_TOP : y > bottomEdge ? (y - bottomEdge) / EDGE_BOTTOM : 0;
+      const d = dragRef.current;
+      if (depth !== 0 && d) {
+        const f = Math.min(Math.abs(depth), 1);
+        carry += Math.sign(depth) * (SCROLL_MIN + (SCROLL_MAX - SCROLL_MIN) * f * f) * (dt / 1000);
+        const step = Math.trunc(carry);
+        carry -= step;
+        const to = Math.max(0, Math.min(d.maxScroll, window.scrollY + step));
+        if (to !== window.scrollY) {
+          window.scrollTo(0, to);
+          update(y + window.scrollY);
+        }
+      } else carry = 0;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -200,9 +224,11 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     });
     rects.set(id, { top: mine.top, bottom: mine.top + compact });
     const y = clientY.current + window.scrollY;
+    // The page's own end, less the height the carried card gives up.
+    const maxScroll = Math.max(window.scrollY, document.documentElement.scrollHeight - window.innerHeight - closeUp);
     swallowClick.current = true;
     buzz(10);
-    setDrag({ id, from, others: ids.filter((x) => x !== id), rects, compact, h: compact + SPACING, startY: y, y, gap: from, hover: null, merge: null });
+    setDrag({ id, from, others: ids.filter((x) => x !== id), rects, compact, h: compact + SPACING, startY: y, y, maxScroll, gap: from, hover: null, merge: null });
   }
 
   function onMove(e: PointerEvent) {
