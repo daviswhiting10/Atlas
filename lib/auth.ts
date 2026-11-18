@@ -11,6 +11,8 @@ import { Email as EmailAddress, hashPassword, needsRehash, verifyAgainstDecoy, v
 import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle"
 import { RECHECK_MS, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
 import { proofOk } from "@/lib/auth/proof"
+import { LINK_LIMIT_URL, allowLinkRequest } from "@/lib/auth/link-limit"
+import { headers } from "next/headers"
 
 const baseAdapter = PrismaAdapter(prisma)
 
@@ -155,9 +157,12 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
     // Email sign-in is for people who already have an account: the coach, and
     // clients the coach has invited. Without this, any address that completed
     // a magic link would become a new user with the default (coach) role.
-    async signIn({ user, account }) {
+    async signIn({ user, account, email }) {
       if (account?.provider !== "email") return true
       if (!user.email) return false
+      // Asking for a link (not opening one): a few an hour per address and per connection.
+      // The login page shows a friendly message for LINK_LIMIT_URL.
+      if (email?.verificationRequest && !(await allowLinkRequest(user.email, ipFrom(headers())))) return LINK_LIMIT_URL
       const existing = await prisma.user.findUnique({ where: { email: user.email }, select: { id: true } })
       if (existing) return true
       // Brand-new database: let the first person in so they can bootstrap it.

@@ -38,7 +38,8 @@ export default function LoginPage() {
     const { signIn } = await import("next-auth/react");
     const res = await signIn("email", { email, redirect: false, callbackUrl: "/" });
     // Unknown addresses are refused server-side; say so rather than promise an email.
-    if (res?.error) setError("We couldn't send a link to that address. Links are for existing accounts; to start fresh, create an account below.");
+    if (res?.error === "LinkLimit") setError("That's a lot of sign-in emails. Please wait a little before asking again, or sign in with your password.");
+    else if (res?.error) setError("We couldn't send a link to that address. Links are for existing accounts; to start fresh, create an account below.");
     else setSent(true);
     setLoading(false);
   }
