@@ -26,16 +26,3 @@ export async function loadMethodology(
     .map((d) => `### ${d.title || d.slug}\n\n${d.content}`)
     .join("\n\n---\n\n");
 }
-
-/**
- * Retrieve a single methodology document by slug.
- */
-export async function getMethodology(
-  workspaceId: string,
-  slug: string
-): Promise<string | null> {
-  const doc = await prisma.methodologyDocument.findUnique({
-    where: { workspaceId_slug: { workspaceId, slug } },
-  });
-  return doc?.content ?? null;
-}

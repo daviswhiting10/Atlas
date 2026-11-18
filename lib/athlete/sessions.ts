@@ -47,18 +47,3 @@ export function referenceSession<T extends { deload: boolean; sets: LoggedSet[] 
   const usable = sessions.filter((s) => s.sets.some((x) => x.completed && x.reps != null && x.reps > 0));
   return [...usable].reverse().find((s) => !s.deload) ?? usable[usable.length - 1] ?? null;
 }
-
-/**
- * Consecutive weeks with at least one session, counting back from the current
- * week. The current week doesn't break a streak just because it has no
- * session yet.
- */
-export function weekStreak(weeks: Array<{ sessions: number }>): number {
-  let streak = 0;
-  for (let i = weeks.length - 1; i >= 0; i--) {
-    if (weeks[i].sessions > 0) streak += 1;
-    else if (i === weeks.length - 1) continue;
-    else break;
-  }
-  return streak;
-}

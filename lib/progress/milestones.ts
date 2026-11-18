@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/db/client";
 import { e1RM, bestE1RM, type SetRecord } from "./math";
+import { isRecordWeight, sessionMilestones } from "./milestone-rules";
 
 // ── Internal: award one milestone, silently skip dupes ───────────────────────
 
@@ -55,51 +56,13 @@ export async function checkSessionMilestones(
   clientId: string
 ): Promise<void> {
   try {
-    const now = new Date();
-    const totalSessions = await prisma.workoutLog.count({ where: { clientId } });
-
-    if (totalSessions === 1) {
-      await award({
-        workspaceId, clientId,
-        type: "first_session",
-        title: "First session logged!",
-        description: "You showed up. That's where it all starts.",
-        metricValue: 1, metricUnit: "sessions", achievedAt: now,
-      });
-    }
-
-    for (const count of [25, 50, 100] as const) {
-      if (totalSessions === count) {
-        await award({
-          workspaceId, clientId,
-          type: `session_${count}`,
-          title: `${count}-session club`,
-          description: `${count} sessions logged — consistency is the real skill.`,
-          metricValue: count, metricUnit: "sessions", achievedAt: now,
-        });
-      }
-    }
-
-    // 7 sessions in any 14-day window
-    const recent = await prisma.workoutLog.findMany({
-      where: { clientId },
-      orderBy: { date: "desc" },
-      take: 14,
+    // Finished sessions only, each milestone on the day of the session that reached it.
+    const finished = await prisma.workoutLog.findMany({
+      where: { clientId, completedAt: { not: null } },
       select: { date: true },
     });
-    if (recent.length >= 7) {
-      const newest = new Date(recent[0].date).getTime();
-      const cutoff = newest - 14 * 24 * 60 * 60 * 1000;
-      const inWindow = recent.filter((s) => new Date(s.date).getTime() >= cutoff).length;
-      if (inWindow >= 7) {
-        await award({
-          workspaceId, clientId,
-          type: "session_7_streak",
-          title: "7 sessions in 2 weeks",
-          description: "7 sessions in any 14-day window — elite frequency.",
-          metricValue: 7, metricUnit: "sessions", achievedAt: now,
-        });
-      }
+    for (const m of sessionMilestones(finished.map((f) => f.date))) {
+      await award({ workspaceId, clientId, ...m });
     }
   } catch (err) {
     console.error("[milestones] checkSessionMilestones:", err);
@@ -162,13 +125,15 @@ export async function checkStrengthMilestones(
   setLogId: string
 ): Promise<void> {
   try {
-    const now = new Date();
+    // A milestone sits on the day the session was done, not the day it was noticed.
+    const done = await prisma.setLog.findUnique({ where: { id: setLogId }, select: { workoutLog: { select: { date: true } } } });
+    const now = done?.workoutLog.date ?? new Date();
 
     // All completed sets for this exercise from this client, oldest first
     const allSets = await prisma.setLog.findMany({
       where: { workoutLog: { clientId }, exerciseId, completed: true },
       orderBy: { createdAt: "asc" },
-      select: { weight: true, reps: true, completed: true },
+      select: { id: true, weight: true, reps: true, completed: true },
     });
 
     if (allSets.length === 0) return;
@@ -196,20 +161,22 @@ export async function checkStrengthMilestones(
       const baselineSets = setRecords.slice(0, Math.min(5, setRecords.length));
       const baselineE1RM = bestE1RM(baselineSets);
 
+      // One record rule: the heaviest weight so far (as lib/history/records.ts). The set's own row is
+      // in `allSets`, so only the sets before it are compared.
+      const at = allSets.findIndex((x) => x.id === setLogId);
+      if (at > 0 && isRecordWeight(allSets.slice(0, at).map((x) => x.weight), newSet.weight)) {
+        await award({
+          workspaceId, clientId,
+          type: "first_pr", exerciseId,
+          title: `${exerciseName} PR`,
+          description: `Heaviest set so far: ${newSet.weight} lb.`,
+          metricValue: newSet.weight, metricUnit: "lb",
+          achievedAt: now, sourceSetLogId: setLogId,
+        });
+      }
+
       if (baselineE1RM != null && baselineE1RM > 0 && allSets.length > 1) {
         const pctChange = ((currentE1RM - baselineE1RM) / baselineE1RM) * 100;
-
-        // First PR (any improvement over baseline)
-        if (currentE1RM > baselineE1RM) {
-          await award({
-            workspaceId, clientId,
-            type: "first_pr", exerciseId,
-            title: `${exerciseName} PR`,
-            description: `New personal record — ${currentE1RM.toFixed(0)} lb estimated 1RM.`,
-            metricValue: currentE1RM, metricUnit: "lb e1RM",
-            achievedAt: now, sourceSetLogId: setLogId,
-          });
-        }
 
         for (const [pct, label] of [
           [10, "10% stronger"], [25, "25% stronger"], [50, "50% stronger"],

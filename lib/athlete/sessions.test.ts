@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, localDay, mondayOf, referenceSession, safeTimeZone, weekOf, weekStreak } from "./sessions";
+import { DAY_MS, localDay, mondayOf, referenceSession, safeTimeZone, weekOf } from "./sessions";
 
 const set = (weight: number | null, reps: number, completed = true) => ({ weight, reps, completed });
 
@@ -69,23 +69,5 @@ describe("referenceSession", () => {
   it("returns null with no usable history", () => {
     expect(referenceSession([])).toBeNull();
     expect(referenceSession([untouched])).toBeNull();
-  });
-});
-
-describe("weekStreak", () => {
-  const weeks = (...sessions: number[]) => sessions.map((n) => ({ sessions: n }));
-
-  it("counts consecutive weeks back from the current one", () => {
-    expect(weekStreak(weeks(1, 2, 3))).toBe(3);
-    expect(weekStreak(weeks(2, 0, 1, 1))).toBe(2);
-  });
-
-  it("does not break the streak because this week has no session yet", () => {
-    expect(weekStreak(weeks(1, 1, 0))).toBe(2);
-  });
-
-  it("is zero after a missed week, or with no history", () => {
-    expect(weekStreak(weeks(1, 0, 0))).toBe(0);
-    expect(weekStreak([])).toBe(0);
   });
 });

@@ -27,10 +27,6 @@ export function bestE1RM(sets: SetRecord[]): number | null {
   return best;
 }
 
-export function isEnduranceSet(reps: number): boolean {
-  return reps > 12;
-}
-
 // ── Volume (tonnage) ──────────────────────────────────────────────────────────
 // Sum of weight × reps for all completed weighted sets.
 export function sessionVolume(sets: SetRecord[]): number {

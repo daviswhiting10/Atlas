@@ -192,13 +192,6 @@ export async function removeWorkout(scope: PlanScope, workoutId: string): Promis
   });
 }
 
-export async function renameWorkout(scope: PlanScope, workoutId: string, name: string): Promise<void> {
-  const w = await ownWorkout(scope, workoutId);
-  const clean = cleanText(name, LIMITS.name);
-  if (!clean) throw invalid("Give the workout a name.");
-  await prisma.assignedWorkout.update({ where: { id: w.id }, data: { name: clean } });
-}
-
 // ── Exercises ───────────────────────────────────────────────────────────────
 
 export async function addExercise(

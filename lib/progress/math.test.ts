@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   e1RM,
   bestE1RM,
-  isEnduranceSet,
   sessionVolume,
   weightTrendEMA,
   strengthComposite,
@@ -63,20 +62,6 @@ describe("bestE1RM", () => {
       { weight: 50,  reps: 8, completed: true },
     ];
     expect(bestE1RM(sets)).toBeCloseTo(e1RM(50, 8), 5);
-  });
-});
-
-// ── isEnduranceSet ────────────────────────────────────────────────────────────
-
-describe("isEnduranceSet", () => {
-  it("returns false for ≤ 12 reps", () => {
-    expect(isEnduranceSet(12)).toBe(false);
-    expect(isEnduranceSet(5)).toBe(false);
-  });
-
-  it("returns true for > 12 reps", () => {
-    expect(isEnduranceSet(13)).toBe(true);
-    expect(isEnduranceSet(20)).toBe(true);
   });
 });
 
