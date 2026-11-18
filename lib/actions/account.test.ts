@@ -227,11 +227,24 @@ describe("snoozePasswordStep", () => {
     expect(env.updates).toHaveLength(1);
   });
 
-  it("refuses accounts created since the step shipped", async () => {
+  it("lets an account created since the step shipped skip once, never twice", async () => {
     addUser({ id: "u1", email: "new@example.com", createdAt: new Date("2026-11-16T00:00:00Z") });
     env.session = { user: { id: "u1", role: "CLIENT" } };
+    expect(await snoozePasswordStep()).toEqual({ ok: true });
+    const first = db.users.get("u1")!.passwordPromptAfter!;
+    expect(first).toBeInstanceOf(Date);
+    // Asking again, even right away or after the 7 days, is refused and changes nothing.
     expect(await snoozePasswordStep()).toEqual({ ok: false, error: "Set a password to go on." });
-    expect(db.users.get("u1")!.passwordPromptAfter).toBeNull();
+    db.users.get("u1")!.passwordPromptAfter = new Date(Date.now() - 1000);
+    expect(await snoozePasswordStep()).toEqual({ ok: false, error: "Set a password to go on." });
+    expect(env.updates).toHaveLength(1);
+  });
+
+  it("lets an older account wait again and again", async () => {
+    addUser({ id: "u1", email: "sam@example.com", createdAt: new Date("2026-05-13T00:00:00Z"), passwordPromptAfter: new Date(Date.now() - 1000) });
+    env.session = { user: { id: "u1", role: "TRAINER" } };
+    expect(await snoozePasswordStep()).toEqual({ ok: true });
+    expect(await snoozePasswordStep()).toEqual({ ok: true });
   });
 
   it("needs a session", async () => {

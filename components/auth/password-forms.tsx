@@ -180,9 +180,6 @@ export function SetPasswordStep({ email, canSnooze }: { email: string; canSnooze
   return (
     <div className="rise mt-10">
       <h1 className="font-display text-4xl text-ink">Set a password</h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">
-        So you can sign in as <strong className="font-semibold text-ink">{email}</strong> on any device, including the app on your home screen, without waiting for an email.
-      </p>
       <form onSubmit={save} className="mt-7 space-y-3">
         {/* Lets password managers file the new password under the right account. */}
         <input type="email" value={email} readOnly autoComplete="username" className="sr-only" tabIndex={-1} aria-hidden />

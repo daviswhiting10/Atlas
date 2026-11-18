@@ -16,7 +16,7 @@ import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN, createAthlete } from "@/lib/guest";
 import { Email, Password, hashPassword, passwordProblem, rateLimiter, verifyPassword } from "@/lib/password";
 import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle";
-import { SNOOZE_MS, passwordStep } from "@/lib/auth/session-policy";
+import { SNOOZE_MS, mayWait } from "@/lib/auth/session-policy";
 import { stampProof } from "@/lib/auth/proof";
 import { RESET_TTL_MS, consumeReset, createReset, peekReset, resetUrl } from "@/lib/auth/reset";
 import { sendEmail } from "@/lib/email";
@@ -178,28 +178,18 @@ export async function setAccountPassword(raw: { password: string; current?: stri
 }
 
 /**
- * "Not now" on the set-password step: asks again in 7 days. Only accounts
- * from before the step shipped may wait; newer ones must set a password.
+ * "Not now" on the set-password step: asks again in 7 days. Accounts from before the step shipped
+ * may wait every time; newer ones (invited clients) once, then they must set a password.
  */
 export async function snoozePasswordStep(): Promise<AccountResult> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { ok: false, error: "Sign in first." };
 
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, passwordHash: true, createdAt: true, accounts: { where: { provider: "google" }, select: { id: true }, take: 1 } },
-  });
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true, passwordPromptAfter: true } });
   if (!u) return { ok: false, error: "Sign in first." };
+  if (!mayWait(u.createdAt, u.passwordPromptAfter)) return { ok: false, error: "Set a password to go on." };
   const now = new Date();
-  // Asked as if the step were on and no snooze were running: may this account wait at all?
-  const step = passwordStep(
-    { email: u.email, hasPassword: u.passwordHash != null, createdAt: u.createdAt, passwordPromptAfter: null, googleLinked: u.accounts.length > 0 },
-    now,
-    true,
-    GUEST_EMAIL_DOMAIN
-  );
-  if (step.needs && !step.canSnooze) return { ok: false, error: "Set a password to go on." };
 
   await prisma.user.update({ where: { id: userId }, data: { passwordPromptAfter: new Date(now.getTime() + SNOOZE_MS) } });
   try {

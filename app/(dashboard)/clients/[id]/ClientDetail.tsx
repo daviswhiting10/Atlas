@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
+import { shareInvite } from "@/lib/coach/invite-share";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
 import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
@@ -147,7 +148,11 @@ export function ClientDetail({ progress, history, initial }: { /** null: nothing
       toast.error(err?.error ?? "Invite failed");
       return;
     }
-    setInvite((await res.json()) as InviteResult);
+    // One tap: the link goes straight to the phone's share sheet. Without one (or if the browser
+    // won't open it), the sheet with the link and Copy opens instead.
+    const result = (await res.json()) as InviteResult;
+    const outcome = await shareInvite(result, client.fullName.split(" ")[0]);
+    if (outcome === "unavailable") setInvite(result);
   }
 
   async function deleteClient() {
