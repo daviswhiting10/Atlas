@@ -20,6 +20,16 @@ Brutally simple, with all excess wiped.
 - The build process gets the same simplicity treatment.
 - Measure in seconds and taps, on a real phone.
 
+## Visual rules (Davis, Nov 17: "words do not equate to elegance")
+- Colors and fonts of Dusk are right; keep them. The problem is density, not style.
+- Each section = one heading + one visual (graph, big number, or a single row). No explanatory sentences, no helper text, no captions a user doesn't need.
+- Big number, tiny label. Prefer a chart or sparkline to a sentence.
+- One primary action per screen (accent color). Everything else is secondary text or lives in a ⋯ menu or sheet.
+- More empty space than content. Generous spacing between sections; when in doubt, remove the element, don't shrink it.
+- Graphs are welcome. They are the preferred way to show progress.
+- Never duplicate: if the page already lists it, don't also put it in a header, chip row or jump bar.
+- Switching between Coach and My view is a toggle in the top right, not a different set of screens in the bottom nav.
+
 ## Tesla app patterns
 1. One hero, status at a glance. Home = today's session: next exercise, next set, Log. Nothing competing.
 2. About 4 primary actions per screen, max. Everything else one long-press or one sheet away.
