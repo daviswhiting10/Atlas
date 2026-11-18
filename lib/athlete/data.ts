@@ -21,8 +21,10 @@ import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/li
 import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
 export type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
-import { DAY_MS, iso, localDay, mondayOf, referenceSession, safeTimeZone, weekOf } from "./sessions";
+import { DAY_MS, iso, localDay, referenceSession, safeTimeZone, weekOf } from "./sessions";
 import { finishedTotals } from "./totals";
+import { loadCalendar } from "@/lib/history/load";
+import type { HistoryCalendar } from "@/lib/history/calendar";
 
 /** Upper bound on sets per exercise in one workout. */
 export const MAX_SETS = 20;
@@ -134,11 +136,8 @@ export type ExerciseProgress = {
   target: Target | null;
 };
 
-export type WeekBucket = { week: string; sessions: number; volume: number };
-
 export type ProgressData = {
   exercises: ExerciseProgress[];
-  weeks: WeekBucket[];
   totals: { sessions: number; volume: number; sets: number; prs: number; streak: number; since: string | null };
   recentPRs: Array<{ exercise: string; date: string; value: number; unit: "lb" | "reps" }>;
   /** Lifts with no gain (weight, est. 1RM or reps) across their last three counted sessions. */
@@ -147,6 +146,12 @@ export type ProgressData = {
 
 export type StalledLift = { exerciseId: string; name: string; /** First of the stalled sessions. */ since: string; sessions: number };
 
+
+/** The signed-in athlete's History calendar (Progress). */
+export const getHistory = cache(async (): Promise<HistoryCalendar> => {
+  const athlete = await getAthlete();
+  return loadCalendar({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, timeZone: getTimeZone(), viewer: { kind: "athlete" } });
+});
 
 /** The signed-in athlete's progress. The read model itself is shared with the coach side. */
 export const getProgress = cache(async (): Promise<ProgressData> => {
@@ -198,8 +203,6 @@ export async function loadProgress({
     string,
     { name: string; muscles: string[]; inc: number; timed: boolean; sessions: Map<string, Session> }
   >();
-  const sessionDates = new Map<string, Date>();
-  const weekMap = new Map<string, { sessions: Set<string>; volume: number }>();
   let totalVolume = 0;
   let totalSets = 0;
 
@@ -226,17 +229,7 @@ export async function loadProgress({
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
 
     if (s.completed && s.reps) {
-      sessionDates.set(s.workoutLogId, date);
-      const wk = mondayOf(localDay(date, tz));
-      let bucket = weekMap.get(wk);
-      if (!bucket) {
-        bucket = { sessions: new Set(), volume: 0 };
-        weekMap.set(wk, bucket);
-      }
-      bucket.sessions.add(s.workoutLogId);
-      const v = (s.weight ?? 0) * s.reps;
-      bucket.volume += v;
-      totalVolume += v;
+      totalVolume += (s.weight ?? 0) * s.reps;
       totalSets += 1;
     }
   }
@@ -284,23 +277,10 @@ export async function loadProgress({
   });
   stalled.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Fill empty weeks between the first and the current one so gaps show honestly.
-  const weeks: WeekBucket[] = [];
-  const keys = Array.from(weekMap.keys()).sort();
-  if (keys.length > 0) {
-    const end = new Date(mondayOf(localDay(new Date(), tz)) + "T00:00:00Z").getTime();
-    for (let t = new Date(keys[0] + "T00:00:00Z").getTime(); t <= end; t += 7 * DAY_MS) {
-      const key = iso(new Date(t));
-      const b = weekMap.get(key);
-      weeks.push({ week: key, sessions: b?.sessions.size ?? 0, volume: Math.round(b?.volume ?? 0) });
-    }
-  }
-
   const headline = finishedTotals(finished, tz, localDay(new Date(), tz));
 
   return {
     exercises,
-    weeks: weeks.slice(-12),
     totals: {
       sessions: headline.sessions,
       volume: Math.round(totalVolume),

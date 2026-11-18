@@ -101,7 +101,7 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, initial }: { progress: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ progress, history, initial }: { progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -290,7 +290,8 @@ export function ClientDetail({ progress, initial }: { progress: React.ReactNode;
 
 
       {view === "sessions" && (
-        <div className="fade-in">
+        <div className="fade-in space-y-10">
+          {history}
           {client.workoutLogs.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center">
