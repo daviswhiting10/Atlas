@@ -31,7 +31,6 @@ import {
   MoreHorizontal,
   Plus,
   FileSpreadsheet,
-  Ruler,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -235,10 +234,6 @@ export function ClientDetail({ progress, initial }: { progress: React.ReactNode;
             <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}/log-workout`)}>
               <Plus className="mr-2 h-3.5 w-3.5" />
               Log a workout
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}/progress/body`)}>
-              <Ruler className="mr-2 h-3.5 w-3.5" />
-              Body measurements
             </DropdownMenuItem>
             <DropdownMenuItem onClick={inviteClient}>
               <UserCheck className="mr-2 h-3.5 w-3.5" />
