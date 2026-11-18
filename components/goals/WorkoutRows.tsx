@@ -4,7 +4,7 @@ import { Sun } from "lucide-react";
 import type { WorkoutRow } from "@/lib/goals/rows";
 import { TickCircle } from "./TickCircle";
 import { useTodayLive } from "./TodayLive";
-import { useLongPress } from "./useLongPress";
+import { useLongPress } from "@/hooks/use-long-press";
 
 type Logged = Extract<WorkoutRow, { kind: "workout" }>;
 type Live = NonNullable<ReturnType<typeof useTodayLive>>;

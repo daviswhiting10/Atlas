@@ -46,6 +46,9 @@ import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExerci
 import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
+import { DayInput } from "@/components/ui/day-input";
+import { useLongPress } from "@/hooks/use-long-press";
+import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { fromRows, labelsOf, moveRow, sessionOrder, stepRow, toRows, type OrderEntry, type ReorderRow } from "@/lib/sessions/order";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -324,18 +327,22 @@ export default function WorkoutLogger({
     });
   }, [planExercises, order]);
   const [reordering, setReordering] = useState(false);
+  const [whenOpen, setWhenOpen] = useState(false);
 
   // ── Shared state ────────────────────────────────────────────────────────────
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingWorkoutLogId);
   const [exState, setExState] = useState<Record<string, ExerciseState>>(() =>
     buildInitialState(exercises, existingSetLogs)
   );
+  // The latest sets, for code that runs later than the render it was made in (a toast's Undo, a timer).
+  const exStateRef = useRef(exState);
+  exStateRef.current = exState;
   const [soapOpen, setSoapOpen] = useState(false);
   const [rawInput, setRawInput] = useState("");
   const [structuredNote, setStructuredNote] = useState<Record<string, unknown> | null>(null);
   const [structuring, setStructuring] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [completing, startComplete] = useTransition();
+  const [, startComplete] = useTransition();
   const [finished, setFinished] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -519,7 +526,6 @@ export default function WorkoutLogger({
     month: "short",
     day: "numeric",
   });
-  const anyCompleted = Object.values(exState).some((ex) => ex.sets.some((s) => s.completed));
 
   // ── Rest timer ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -588,9 +594,14 @@ export default function WorkoutLogger({
   }
 
   // ── Log set ───────────────────────────────────────────────────────────────
+  // Logging an exercise's last set moves on to the next exercise with sets left; logging the
+  // session's last set finishes it a few seconds later, with an Undo (lib/sessions/flow).
   async function handleComplete(aweId: string, exerciseId: string, idx: number) {
-    const entry = exState[aweId].sets[idx];
+    const entry = exStateRef.current[aweId].sets[idx];
     if (entry.saving) return;
+    const nowDone = !entry.completed;
+    // A set un-ticked: the session isn't over after all.
+    if (!nowDone) cancelFinish();
     updateSet(aweId, idx, { saving: true });
     try {
       const result = await logSet({
@@ -606,36 +617,127 @@ export default function WorkoutLogger({
         reps: entry.reps ? parseInt(entry.reps, 10) : null,
         rpe: entry.rpe ? parseFloat(entry.rpe) : null,
         note: entry.note.trim() || null,
-        completed: !entry.completed,
+        completed: nowDone,
         date: workoutLogId ? undefined : logDate, // pass override only on first create
       });
       if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
       updateSet(aweId, idx, {
         saving: false,
-        completed: !entry.completed,
+        completed: nowDone,
         setLogId: result.setLogId,
       });
-      // Logging the last open set folds the exercise to one row (whatever was set by hand before).
-      if (!entry.completed && exState[aweId].sets.every((x, i) => i === idx || x.completed)) {
-        setFoldOverride((prev) => {
-          const next = { ...prev };
-          delete next[aweId];
-          return next;
-        });
+      if (!nowDone) return;
+      setLastSetAt(Date.now());
+      setRestSecs(0);
+      const lists = doneLists({ aweId, idx });
+      if (allDone(lists)) {
+        scheduleFinish();
+        return;
       }
-      // Mobile: start rest timer + show an "Undo" toast
-      if (!entry.completed) {
-        setLastSetAt(Date.now());
-        setRestSecs(0);
-        toast.success(`Set ${idx + 1} logged`, {
-          action: { label: "Undo", onClick: () => handleUndo(aweId, idx) },
-        });
-      }
+      // Undo un-logs it on the server too (the same toggle, the other way).
+      toast.success(`Set ${idx + 1} logged`, {
+        action: { label: "Undo", onClick: () => handleComplete(aweId, exerciseId, idx) },
+      });
+      afterExerciseChange(aweId, lists);
     } catch {
       toast.error("Failed to save set");
       updateSet(aweId, idx, { saving: false });
     }
   }
+
+  /** Every exercise's sets as done flags, from the latest state, with one set (or one change) applied. */
+  function doneLists(change?: { aweId: string; idx: number; removed?: boolean }): boolean[][] {
+    return exercises.map((e) => {
+      const sets = (exStateRef.current[e.aweId] ?? freshState(e)).sets.map((x) => x.completed);
+      if (!change || change.aweId !== e.aweId) return sets;
+      return change.removed ? sets.filter((_, i) => i !== change.idx) : sets.map((x, i) => (i === change.idx ? true : x));
+    });
+  }
+
+  /** An exercise just finished: fold it and go to the next one with sets left. */
+  function afterExerciseChange(aweId: string, lists: boolean[][]) {
+    const i = exercises.findIndex((e) => e.aweId === aweId);
+    const done = lists.map((l) => l.length > 0 && l.every(Boolean));
+    if (i === -1 || !done[i]) return;
+    setFoldOverride((prev) => {
+      const next = { ...prev };
+      delete next[aweId];
+      return next;
+    });
+    const n = nextOpen(done, i);
+    if (n != null) setTimeout(() => jumpTo(exercises[n]), 350);
+  }
+
+  /** Delete a set that isn't logged (a long-press on its row, or Delete in its details), with an Undo. */
+  function deleteSet(aweId: string, idx: number) {
+    const sets = exStateRef.current[aweId].sets;
+    const entry = sets[idx];
+    if (!entry) return;
+    if (entry.completed) return void toast("Untick the set first to delete it");
+    if (sets.length <= 1) return void toast("An exercise keeps at least one set");
+    removeSet(aweId, idx);
+    const lists = doneLists({ aweId, idx, removed: true });
+    toast(`Set ${idx + 1} deleted`, {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          cancelFinish();
+          setExState((prev) => {
+            const next = [...prev[aweId].sets];
+            next.splice(idx, 0, entry);
+            return { ...prev, [aweId]: { ...prev[aweId], sets: next } };
+          });
+        },
+      },
+    });
+    // The sets left were all logged: that was the exercise's (or the session's) last one.
+    if (allDone(lists)) scheduleFinish();
+    else afterExerciseChange(aweId, lists);
+  }
+
+  // ── Finishing: by itself, FINISH_DELAY_MS after the last set, unless Undo is tapped ─────
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completeRef = useRef<() => void>(() => {});
+  function cancelFinish() {
+    if (!finishTimer.current) return;
+    clearTimeout(finishTimer.current);
+    finishTimer.current = null;
+    toast.dismiss("finish");
+  }
+  function scheduleFinish() {
+    cancelFinish();
+    toast.success("Every set logged. Finishing…", {
+      id: "finish",
+      duration: FINISH_DELAY_MS,
+      action: { label: "Undo", onClick: () => cancelFinish() },
+    });
+    finishTimer.current = setTimeout(() => {
+      finishTimer.current = null;
+      completeRef.current();
+    }, FINISH_DELAY_MS);
+  }
+  // Leaving the screen inside those seconds still finishes the session.
+  useEffect(
+    () => () => {
+      if (finishTimer.current) {
+        clearTimeout(finishTimer.current);
+        completeRef.current();
+      }
+    },
+    []
+  );
+  // Coming back to a session whose sets are all logged but that never finished (the app was
+  // closed mid-countdown): the countdown starts again, with its Undo. (A tick later, so React's
+  // development double-mount doesn't read it as leaving.)
+  useEffect(() => {
+    if (completed) return;
+    const t = setTimeout(() => {
+      if (allDone(doneLists())) scheduleFinish();
+    }, 0);
+    return () => clearTimeout(t);
+    // Once, on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Update an already-completed set (keeps completed = true) ─────────────
   async function handleUpdateCompletedSet(aweId: string, exerciseId: string, idx: number) {
@@ -666,12 +768,6 @@ export default function WorkoutLogger({
       toast.error("Failed to update set");
       updateSet(aweId, idx, { saving: false });
     }
-  }
-
-  // ── Undo last set ─────────────────────────────────────────────────────────
-  function handleUndo(aweId: string, idx: number) {
-    updateSet(aweId, idx, { completed: false, setLogId: null });
-    toast("Set undone");
   }
 
   // ── Save coach note ───────────────────────────────────────────────────────
@@ -794,6 +890,35 @@ export default function WorkoutLogger({
     setRecording(true);
   }
 
+  // ── Session notes: typed any time, before or after the session finishes ───
+  // completeSession saves them again on a finished session (it keeps when it was first finished).
+  // A structured (AI) note is sent once, so saving again never makes a second SessionNote.
+  const [savedNotes, setSavedNotes] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const sentStructured = useRef<Record<string, unknown> | null>(null);
+  async function saveNotes() {
+    if (!workoutLogId || savingNotes) return;
+    setSavingNotes(true);
+    const fresh = structuredNote && structuredNote !== sentStructured.current ? structuredNote : undefined;
+    try {
+      await completeSession({
+        workoutLogId,
+        assignedWorkoutId,
+        clientId,
+        clientNotes: rawInput,
+        rawInput: fresh ? rawInput : undefined,
+        structuredNote: fresh,
+      });
+      sentStructured.current = structuredNote;
+      setSavedNotes(rawInput);
+      toast.success("Notes saved");
+    } catch {
+      toast.error("Couldn't save the notes. Please try again.");
+    } finally {
+      setSavingNotes(false);
+    }
+  }
+
   // ── Complete session ──────────────────────────────────────────────────────
   async function handleCompleteSession() {
     if (!workoutLogId) { toast.error("Log at least one set before completing"); return; }
@@ -803,17 +928,23 @@ export default function WorkoutLogger({
           workoutLogId,
           assignedWorkoutId,
           clientId,
-          clientNotes: rawInput || undefined,
+          clientNotes: rawInput.trim() ? rawInput : undefined,
           rawInput: rawInput && structuredNote ? rawInput : undefined,
           structuredNote: structuredNote ?? undefined,
         });
-        toast.success("Session complete");
+        sentStructured.current = structuredNote;
+        setSavedNotes(rawInput);
+        toast.dismiss("finish");
+        // The notes stay open on the finished screen: they can be written now.
+        setSoapOpen(true);
         setFinished(true);
       } catch {
         toast.error("Failed to complete session");
       }
     });
   }
+
+  completeRef.current = handleCompleteSession;
 
   // ── Phone: folding and jumping ───────────────────────────────────────────
   const isDone = (ex: LoggerExercise) => {
@@ -1083,6 +1214,19 @@ export default function WorkoutLogger({
           ))}
         </div>
 
+        {/* Notes can still be written: the session is finished, the notes aren't. */}
+        <div className="mb-6 w-full text-left">
+          {soapPanel}
+          <Button
+            className="mt-3 w-full"
+            disabled={savingNotes || rawInput.trim() === savedNotes.trim()}
+            onClick={saveNotes}
+          >
+            {savingNotes ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+            {rawInput.trim() === savedNotes.trim() && savedNotes.trim() ? "Notes saved" : "Save notes"}
+          </Button>
+        </div>
+
         <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
           Back to {clientName}
         </Button>
@@ -1121,21 +1265,7 @@ export default function WorkoutLogger({
             >
               <Check className="h-4 w-4" strokeWidth={2.5} /> Done
             </button>
-          ) : (
-          <Button
-            size="sm"
-            disabled={completing || !anyCompleted}
-            onClick={handleCompleteSession}
-            variant="outline"
-          >
-            {completing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Check className="w-3.5 h-3.5 mr-1" />
-            )}
-            Done
-          </Button>
-          )}
+          ) : null}
         </div>
         </div>
         {/* Jump bar: every exercise, one tap away */}
@@ -1184,17 +1314,18 @@ export default function WorkoutLogger({
           <CompletedPill />
         </div>
       )}
-      {renderDayPicker(
-        <button
-          type="button"
-          onClick={() => dateInputRef.current?.showPicker()}
-          aria-label={`Session date: ${dateLabel}`}
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-border px-3 text-sm font-medium text-ink-soft touch-manipulation"
-        >
-          <Calendar className="h-3.5 w-3.5 shrink-0" />
-          <span>{dateLabel.replace(/^\w+, /, "")}</span>
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setWhenOpen(true)}
+        aria-haspopup="dialog"
+        className="mb-3 flex h-11 w-full items-center gap-2 rounded-xl border border-line-strong px-3 text-left text-[15px] font-medium text-ink touch-manipulation"
+      >
+        <Calendar className="h-4 w-4 shrink-0 text-ink-mute" />
+        <span className="min-w-0 flex-1 truncate">
+          {dateLabel} · Week {currentWorkoutWeek} · {workoutName}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
+      </button>
 
       {/* ── Reorder mode: every exercise as one row, moved by drag or arrows ───── */}
       {reordering ? (
@@ -1236,7 +1367,7 @@ export default function WorkoutLogger({
                       onChange={(idx, patch) => updateSet(ex.aweId, idx, patch)}
                       onComplete={(idx) => handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
-                      onRemove={(idx) => removeSet(ex.aweId, idx)}
+                      onRemove={(idx) => deleteSet(ex.aweId, idx)}
                     />
 
                     <div className="flex items-center justify-between gap-2">
@@ -1318,22 +1449,36 @@ export default function WorkoutLogger({
 
       {!reordering && soapPanel}
 
-      {/* ── Finish session ───────────────────────────────────────── */}
-      {!reordering && (
-      <Button
-        className="w-full h-12 text-base mt-4"
-        disabled={completing || !anyCompleted}
-        onClick={handleCompleteSession}
-      >
-        {completing ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-            Saving…
-          </>
-        ) : (
-          "Finish session"
-        )}
-      </Button>
+
+      {/* ── Date, week and day: one sheet ───────────────────────────── */}
+      {whenOpen && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={() => setWhenOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Date, week and day"
+            className="w-full rounded-t-[24px] border-t border-line bg-background px-4 pt-3"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-ink">Date, week and day</h2>
+              <button type="button" onClick={() => setWhenOpen(false)} aria-label="Close" className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <label className="mb-3 block">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-mute">Done on</span>
+              <DayInput
+                value={logDate}
+                max={localToday()}
+                onDay={(d) => d && handleDateChange(d)}
+                className="h-11 w-full rounded-xl border-2 border-border bg-background px-3 text-[16px] text-ink"
+              />
+            </label>
+            {dayPicker}
+          </div>
+        </div>
       )}
 
       {/* ── Floating rest timer ──────────────────────────────────── */}
@@ -1403,10 +1548,6 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
-          <Button size="sm" disabled={completing || !anyCompleted} onClick={handleCompleteSession}>
-            {completing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1.5" />}
-            Done
-          </Button>
         </div>
       </div>
 
@@ -1536,16 +1677,6 @@ export default function WorkoutLogger({
 
       {soapPanel}
 
-      <div className="mt-6 flex justify-end gap-3">
-        <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>Cancel</Button>
-        <Button
-          disabled={completing || !anyCompleted}
-          onClick={handleCompleteSession}
-          className="min-w-[160px]"
-        >
-          {completing ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Saving…</> : "Save & Complete Session"}
-        </Button>
-      </div>
     </div>
   );
 
@@ -1780,7 +1911,7 @@ function NumField({
   );
 }
 
-const SET_GRID = "grid grid-cols-[1.25rem_2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.5rem_1.75rem] items-center gap-1";
+const SET_GRID = "grid grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-1.5";
 
 function SetTable({
   secs,
@@ -1802,7 +1933,6 @@ function SetTable({
   onRemove: (idx: number) => void;
 }) {
   const [detail, setDetail] = useState<number | null>(null);
-  const removable = (i: number) => sets.length > 1 && !sets[i].completed;
   return (
     <div className="text-ink">
       <div aria-hidden className={cn(SET_GRID, "px-0.5 pb-0.5 text-[11px] font-semibold uppercase leading-4 tracking-wide text-ink-mute")}>
@@ -1810,7 +1940,6 @@ function SetTable({
         <span>Last</span>
         <span className="text-center">lb</span>
         <span className="text-center">{secs ? "Sec" : "Reps"}</span>
-        <span />
         <span />
       </div>
       <div className="space-y-1">
@@ -1832,7 +1961,13 @@ function SetTable({
           const open = detail === idx;
           return (
             <div key={idx} role="group" aria-label={`Set ${idx + 1}`}>
-              <div className={cn(SET_GRID, "rounded-lg px-0.5", entry.completed && "bg-[var(--success)]/[0.07]")}>
+              <HoldRow
+                onHold={() => {
+                  if (detail === idx) setDetail(null);
+                  onRemove(idx);
+                }}
+                className={cn(SET_GRID, "rounded-lg px-0.5", entry.completed && "bg-[var(--success)]/[0.07]")}
+              >
                 <button
                   type="button"
                  
@@ -1896,29 +2031,17 @@ function SetTable({
                 >
                   {entry.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
                 </button>
-                {removable(idx) ? (
-                  <button
-                    type="button"
-                   
-                    onClick={() => {
-                      if (detail === idx) setDetail(null);
-                      onRemove(idx);
-                    }}
-                    aria-label={`Delete set ${idx + 1}`}
-                    className="logger-cell flex h-10 w-7 items-center justify-center text-ink-mute hover:text-[var(--destructive)]"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <span />
-                )}
-              </div>
+              </HoldRow>
               {open && (
                 <SetDetails
                   idx={idx}
                   entry={entry}
                   onChange={(patch) => onChange(idx, patch)}
                   onBlur={persist}
+                  onDelete={() => {
+                    setDetail(null);
+                    onRemove(idx);
+                  }}
                 />
               )}
             </div>
@@ -1935,11 +2058,14 @@ function SetDetails({
   entry,
   onChange,
   onBlur,
+  onDelete,
 }: {
   idx: number;
   entry: SetEntry;
   onChange: (patch: Partial<SetEntry>) => void;
   onBlur: () => void;
+  /** The same as holding the row: here for anyone who can't long-press. */
+  onDelete: () => void;
 }) {
   const mode = entry.isBand ? "band" : entry.isBodyweight ? "bw" : "weight";
   const seg = (on: boolean) =>
@@ -1992,6 +2118,39 @@ function SetDetails({
           style={{ fontSize: "16px" }}
         />
       </div>
+      {!entry.completed && (
+        <button type="button" onClick={onDelete} className="logger-quiet inline-flex items-center gap-1 py-1 text-[13px] font-medium text-[var(--destructive)]">
+          <Trash2 className="h-3.5 w-3.5" /> Delete set
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A set's row. Holding it (anywhere but a number field or the check) deletes the set; the tap that ends
+ * a hold is swallowed, so the set number's own tap doesn't also open its details.
+ */
+function HoldRow({ onHold, className, children }: { onHold: () => void; className: string; children: React.ReactNode }) {
+  const press = useLongPress(onHold);
+  return (
+    <div
+      className={cn(className, "select-none [-webkit-touch-callout:none]")}
+      onPointerDown={(e) => {
+        // Not in a number field, and not on the check (a slow tap on it must still log the set).
+        if ((e.target as HTMLElement).closest("input, [aria-pressed]")) return;
+        press.onPointerDown(e);
+      }}
+      onPointerUp={press.onPointerUp}
+      onPointerLeave={press.onPointerLeave}
+      onPointerCancel={press.onPointerCancel}
+      onContextMenu={press.onContextMenu}
+      onClickCapture={(e) => {
+        press.onClick(e);
+        if (e.defaultPrevented) e.stopPropagation();
+      }}
+    >
+      {children}
     </div>
   );
 }

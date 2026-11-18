@@ -15,6 +15,8 @@ import { TargetEditor } from "./TargetEditor";
 import { METRICS, formatValue, buildSeries, e1rm, isE1rmBest, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
+import { useLongPress } from "@/hooks/use-long-press";
+import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { ExerciseName } from "@/components/ExerciseName";
 
 type SetMap = Record<string, LoggerSet[]>;
@@ -266,17 +268,15 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       toast(`Enter your ${ex.unit === "secs" ? "time" : "reps"} first`);
       return;
     }
-    // A loaded lift saved without a weight would be charted as bodyweight.
-    if (done && ex.loaded && !s.weight) {
-      toast("Enter the weight first");
-      return;
-    }
+    // The weight starts at the target when there is one; with none (a new lift), a blank is fine.
     const next = list.map((x, j) => (j === i ? { ...x, done } : x));
     apply({ ...setsRef.current, [ex.aweId]: next });
     persist(ex.aweId, s.setNumber);
 
     const key = `${ex.aweId}:${s.setNumber}`;
     if (!done) {
+      // A set un-ticked: the workout isn't over after all.
+      cancelFinish();
       setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
       return;
     }
@@ -308,10 +308,95 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       }
     }
 
-    const everythingDone = data.exercises.every((e) => (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));
-    if (!everythingDone) setRest({ endsAt: Date.now() + ex.restSeconds * 1000, total: ex.restSeconds });
-    else setRest(null);
+    afterChange(ex);
   }
+
+  /**
+   * After a set is logged or deleted: the workout's last set finishes it (a few seconds later,
+   * with an Undo); an exercise's last set moves on to the next exercise with sets left.
+   */
+  function afterChange(ex: LoggerExercise) {
+    const lists = data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done));
+    if (allDone(lists)) {
+      setRest(null);
+      scheduleFinish();
+      return;
+    }
+    setRest({ endsAt: Date.now() + ex.restSeconds * 1000, total: ex.restSeconds });
+    const at = data.exercises.findIndex((e) => e.aweId === ex.aweId);
+    const done = lists.map((l) => l.length > 0 && l.every(Boolean));
+    if (at === -1 || !done[at]) return;
+    const n = nextOpen(done, at);
+    if (n != null) setTimeout(() => setIndex(n), 450);
+  }
+
+  /** Delete a set that isn't logged (hold its row), with an Undo. Later sets close up. */
+  function deleteSet(ex: LoggerExercise, i: number) {
+    const list = setsRef.current[ex.aweId] ?? ex.sets;
+    const s = list[i];
+    if (!s) return;
+    if (s.done || s.setLogId) return void toast("Untick the set first to delete it");
+    if (list.length <= 1) return void toast("An exercise keeps at least one set");
+    // A saved set after it keeps its number, so only the unsaved ones after it can close up.
+    if (list.slice(i + 1).some((x) => x.done || x.setLogId)) return void toast("Delete the sets after it first");
+    const renumber = (l: LoggerSet[]) => l.map((x, j) => ({ ...x, setNumber: j + 1 }));
+    apply({ ...setsRef.current, [ex.aweId]: renumber(list.filter((_, j) => j !== i)) });
+    toast(`Set ${s.setNumber} deleted`, {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          cancelFinish();
+          const cur = setsRef.current[ex.aweId] ?? ex.sets;
+          apply({ ...setsRef.current, [ex.aweId]: renumber([...cur.slice(0, i), s, ...cur.slice(i)]) });
+        },
+      },
+    });
+    afterChange(ex);
+  }
+
+  // ── Finishing: by itself, FINISH_DELAY_MS after the last set, unless Undo is tapped ─────
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishRef = useRef<() => void>(() => {});
+  function cancelFinish() {
+    if (!finishTimer.current) return;
+    clearTimeout(finishTimer.current);
+    finishTimer.current = null;
+    toast.dismiss("finish");
+  }
+  function scheduleFinish() {
+    cancelFinish();
+    toast.success("Every set logged. Finishing…", {
+      id: "finish",
+      duration: FINISH_DELAY_MS,
+      action: { label: "Undo", onClick: () => cancelFinish() },
+    });
+    finishTimer.current = setTimeout(() => {
+      finishTimer.current = null;
+      finishRef.current();
+    }, FINISH_DELAY_MS);
+  }
+  // Leaving the screen inside those seconds still finishes the workout.
+  useEffect(
+    () => () => {
+      if (finishTimer.current) {
+        clearTimeout(finishTimer.current);
+        finishRef.current();
+      }
+    },
+    []
+  );
+  // Coming back to a workout whose sets are all logged but that never finished (the app was
+  // closed mid-countdown): the countdown starts again, with its Undo. (A tick later, so React's
+  // development double-mount doesn't read it as leaving.)
+  useEffect(() => {
+    if (data.status === "LOGGED") return;
+    const t = setTimeout(() => {
+      if (allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) scheduleFinish();
+    }, 0);
+    return () => clearTimeout(t);
+    // Once, on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function addSet(ex: LoggerExercise) {
     const list = setsRef.current[ex.aweId] ?? ex.sets;
@@ -323,6 +408,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   }
 
   function finish() {
+    toast.dismiss("finish");
     startFinish(async () => {
       try {
         await queue.current;
@@ -336,14 +422,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     });
   }
 
+  finishRef.current = finish;
+
   // ── Derived numbers ───────────────────────────────────────────────────────
   const all = data.exercises.flatMap((e) => listOf(e));
   const doneCount = all.filter((s) => s.done).length;
   const totalCount = all.length;
   const volume = Math.round(all.reduce((sum, s) => (s.done && s.reps ? sum + (s.weight ?? 0) * s.reps : sum), 0));
   const exerciseDone = (e: LoggerExercise) => listOf(e).every((s) => s.done);
-  const isLast = index === data.exercises.length - 1;
-  const nextExercise = data.exercises[index + 1];
 
   const today = new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd in the athlete's own timezone
   const { series, metric } = useMemo(() => {
@@ -429,14 +515,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 text-ink-mute" />
           </button>
-          <button
-            type="button"
-            onClick={finish}
-            disabled={finishing || doneCount === 0}
-            className="press flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-30"
-          >
-            {finishing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finish"}
-          </button>
+          {finishing && <Loader2 className="h-5 w-5 shrink-0 animate-spin text-ink-mute" aria-label="Finishing" />}
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
           <div className="h-full rounded-full bg-signal transition-[width] duration-500 ease-out" style={{ width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%` }} />
@@ -604,7 +683,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 const record = records[`${exercise.aweId}:${s.setNumber}`];
                 return (
                   <li key={s.setNumber}>
-                    <div className="flex items-center gap-2">
+                    <HoldRow onHold={() => deleteSet(exercise, i)} className="flex items-center gap-2">
                       <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
                       {exercise.loaded && (
                         <Stepper value={s.weight} step={exercise.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} onChange={(v) => edit(exercise, i, { weight: v })} />
@@ -629,7 +708,12 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                       >
                         <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
                       </button>
-                    </div>
+                    </HoldRow>
+                    {!s.done && current.length > 1 && (
+                      <button type="button" onClick={() => deleteSet(exercise, i)} className="sr-only focus:not-sr-only focus:mt-1 focus:inline-flex focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm">
+                        Delete set {s.setNumber}
+                      </button>
+                    )}
                     {record && (
                       <p className="fade-in tnum ml-7 mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">
                         <Medal className="h-3 w-3" /> New record · {record}
@@ -642,36 +726,6 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             <button type="button" onClick={() => addSet(exercise)} className="press mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink">
               <Plus className="h-4 w-4" /> Add a set
             </button>
-          </div>
-
-          {/* Next / finish */}
-          <div className="flex gap-2">
-            {index > 0 && (
-              <button type="button" onClick={() => setIndex(index - 1)} aria-label="Previous exercise" className="press flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-line bg-paper text-ink-soft hover:border-ink/20">
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-            )}
-            {isLast ? (
-              <button
-                type="button"
-                onClick={finish}
-                disabled={finishing || doneCount === 0}
-                className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-dusk-button text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40"
-              >
-                {finishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <>{data.status === "LOGGED" ? "Save changes" : "Finish workout"} <Check className="h-5 w-5" strokeWidth={3} /></>}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIndex(index + 1)}
-                className={cn(
-                  "press flex h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl px-4 text-base font-semibold",
-                  exerciseDone(exercise) ? "bg-dusk-button text-dusk-button-text hover:bg-dusk-button/85" : "border border-line bg-paper text-ink hover:border-ink/20"
-                )}
-              >
-                <span className="line-clamp-2 min-w-0 break-words text-left leading-tight">Next: {nextExercise?.name}</span> <ArrowRight className="h-5 w-5 shrink-0" />
-              </button>
-            )}
           </div>
 
           {/* Live chart: on the page, no card */}
@@ -788,6 +842,33 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A set's row. Holding it deletes the set (not on a field, a +/− or the check, so a slow tap on
+ * those still does its own thing). The tap that ends a hold is swallowed.
+ */
+function HoldRow({ onHold, className, children }: { onHold: () => void; className: string; children: React.ReactNode }) {
+  const press = useLongPress(onHold);
+  return (
+    <div
+      className={cn(className, "select-none [-webkit-touch-callout:none]")}
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest("input, button")) return;
+        press.onPointerDown(e);
+      }}
+      onPointerUp={press.onPointerUp}
+      onPointerLeave={press.onPointerLeave}
+      onPointerCancel={press.onPointerCancel}
+      onContextMenu={press.onContextMenu}
+      onClickCapture={(e) => {
+        press.onClick(e);
+        if (e.defaultPrevented) e.stopPropagation();
+      }}
+    >
+      {children}
     </div>
   );
 }
