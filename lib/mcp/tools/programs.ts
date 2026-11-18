@@ -126,7 +126,7 @@ export const generateProgram = clientTool({
       system,
       user,
       model: MODELS.sonnet,
-      maxTokens: 4096,
+      maxTokens: 8192,
       feature: "program-generate",
       workspaceId: caller.workspaceId,
       userId: caller.userId,

@@ -3,8 +3,7 @@ import { withWorkspace } from "@/lib/api/middleware";
 import { callAI, MODELS } from "@/lib/ai/client";
 import { getClient } from "@/lib/db/clients";
 import { prisma } from "@/lib/db/client";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+import { PDFParse } from "pdf-parse";
 
 const SYSTEM = `You are Atlas, an AI assistant for a personal trainer.
 
@@ -61,8 +60,12 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
   const buffer = Buffer.from(await file.arrayBuffer());
   let pdfText: string;
   try {
-    const parsed = await pdfParse(buffer);
-    pdfText = parsed.text.trim();
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    try {
+      pdfText = (await parser.getText()).text.trim();
+    } finally {
+      await parser.destroy();
+    }
   } catch {
     return NextResponse.json({ error: "Failed to parse PDF" }, { status: 422 });
   }

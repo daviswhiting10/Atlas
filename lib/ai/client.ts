@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db/client";
+import { firstText, noThinking } from "./blocks";
 
 let _client: Anthropic | null = null;
 
@@ -19,16 +20,6 @@ export const MODELS = {
   sonnet: "claude-sonnet-5-5",
   haiku: "claude-haiku-4-5-20251001",
 } as const;
-
-// Sonnet 5.5 thinks by default: a thinking block comes first and eats max_tokens, so a short
-// answer can come back empty. Our prompts want the answer only; turn it off (Haiku has no such mode).
-function noThinking(model: string) {
-  return (model === MODELS.sonnet ? { thinking: { type: "between_tools" } } : {}) as Record<string, never>;
-}
-
-function firstText(blocks: { type: string; text?: string }[]): string {
-  return blocks.find((b) => b.type === "text")?.text ?? "";
-}
 
 export type CallAIParams = {
   system: string;
@@ -79,7 +70,7 @@ export async function callAI({
   const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
-    ...noThinking(model),
+    ...noThinking(model, MODELS.sonnet),
     system,
     messages: [{ role: "user", content: user }],
   });
@@ -172,7 +163,7 @@ export async function callAIVision({
   const response = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
-    ...noThinking(model),
+    ...noThinking(model, MODELS.sonnet),
     system,
     messages: [{ role: "user", content }],
   });
@@ -223,7 +214,7 @@ export async function* callAIStream({
   const stream = getClient().messages.stream({
     model,
     max_tokens: maxTokens,
-    ...noThinking(model),
+    ...noThinking(model, MODELS.sonnet),
     system,
     messages: [{ role: "user", content: user }],
   });

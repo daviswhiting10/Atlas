@@ -55,7 +55,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     system,
     user,
     model: MODELS.sonnet,
-    maxTokens: 4096,
+    maxTokens: 8192,
     feature: "program-generate",
     workspaceId,
     userId,
