@@ -31,7 +31,7 @@ export function useGuestSignIn() {
 
 const STEPS = {
   plan: ["Reading your goal", "Choosing your split", "Picking exercises", "Scheduling 12 weeks"],
-  demo: ["Creating a demo athlete", "Building a 12-week plan", "Logging 9 weeks of training", "Drawing the charts"],
+  demo: ["Creating a demo coach", "Adding five clients", "Logging five months of training", "Drawing the charts"],
 };
 
 export function BuildingOverlay({ mode }: { mode: null | "plan" | "demo" }) {

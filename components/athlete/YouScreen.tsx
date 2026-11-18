@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HowItWorks } from "@/components/HowItWorks";
 import { ArrowRight } from "lucide-react";
 import type { Athlete } from "@/lib/athlete/data";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
@@ -30,8 +31,10 @@ export function YouScreen({
     <div className="rise">
       <h1 className="truncate text-3xl leading-none text-ink sm:text-4xl">{athlete.name}</h1>
 
+      <HowItWorks className="mt-8" />
+
       {canStartGoal && (
-        <Link href="/goals/new" className="press mt-8 flex min-h-[56px] items-center justify-between gap-3 border-y border-line text-[17px] font-semibold text-ink hover:text-ink-soft">
+        <Link href="/goals/new" className="press flex min-h-[56px] items-center justify-between gap-3 border-y border-line text-[17px] font-semibold text-ink hover:text-ink-soft">
           Start a goal <ArrowRight className="h-4 w-4 shrink-0 text-ink-soft" />
         </Link>
       )}

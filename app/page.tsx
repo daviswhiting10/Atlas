@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ChartNoAxesCombined, ListChecks, Play, Sparkles, Target } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
+import { HOW_IT_WORKS as STEPS } from "@/lib/how-it-works";
 
 const FEATURES = [
   {
@@ -21,11 +22,6 @@ const FEATURES = [
   },
 ];
 
-const STEPS = [
-  ["Pick a goal", "Muscle, strength, fat loss or general fitness, plus your schedule and equipment."],
-  ["Train the plan", "Open today's workout, follow the targets, tap each set when it's done."],
-  ["Watch it climb", "Personal records are marked as they happen and your next target is always on the chart."],
-];
 
 // Hero chart: one lift's estimated max over eight weeks.
 const POINTS = [
@@ -79,7 +75,7 @@ export default function LandingPage() {
               </DemoButton>
             </div>
             <p className="rise rise-4 mt-4 text-sm text-ink-mute">
-              Your plan is ready in under a minute. The demo needs no account and opens with nine weeks already logged.
+              Your plan is ready in under a minute. The demo needs no account and opens with five months already logged.
             </p>
             <Link
               href="/agents#demo"

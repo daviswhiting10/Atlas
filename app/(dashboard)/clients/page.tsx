@@ -243,8 +243,7 @@ export default function ClientsPage() {
                         <div>
                           <p className="text-sm font-semibold">{client.fullName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {client.email ?? "No email"}
-                            {client.primaryGoal ? ` · ${GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal}` : ""}
+                            {[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}
                           </p>
                         </div>
                       </div>

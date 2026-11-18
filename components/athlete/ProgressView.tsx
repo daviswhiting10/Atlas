@@ -11,6 +11,7 @@ import { OverallChart } from "./OverallChart";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
+import { useEscape } from "@/hooks/use-escape";
 
 const day = (iso: string) => format(parseISO(iso), "MMM d");
 
@@ -27,6 +28,7 @@ function LiftSheet({ exercises, value, onChange, onClose }: { exercises: Exercis
     onChange(id);
     onClose();
   };
+  useEscape(true, onClose);
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm" onClick={onClose}>
       <div

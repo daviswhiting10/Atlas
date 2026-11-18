@@ -9,8 +9,10 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db/client";
 import { GOALS, normalizePrefs, resolvePrefs, type Prefs } from "@/lib/plan/generator";
 import { createPlanForClient, ensureCatalog, seedDemoHistory } from "@/lib/plan/persist";
+import { sealNow } from "@/lib/goals/data";
 
-export const GUEST_EMAIL_DOMAIN = "guest.atlas.app";
+import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
+export { GUEST_EMAIL_DOMAIN };
 /** Ceiling across all visitors — a backstop against runaway cost, not the main defence. */
 const MAX_GUESTS_PER_HOUR = 120;
 /** Per-visitor limit. Generous for a person, useless for a script. */
@@ -40,11 +42,11 @@ export const DEMO_PREFS: Prefs = {
   equipment: "gym",
   minutes: 60,
 };
-const DEMO_WEEKS_OF_HISTORY = 9;
 
 export type AthleteMeta = { prefs: Prefs; demo: boolean };
 
 type NewAthlete = { id: string; name: string; email: string; role: "CLIENT"; workspaceId: string };
+type NewDemo = { id: string; name: string; email: string; role: "TRAINER"; workspaceId: string };
 
 export async function createGuest(input: {
   name?: string;
@@ -52,7 +54,7 @@ export async function createGuest(input: {
   demo?: boolean;
   /** Caller's IP, when known, for the per-visitor limit. */
   ip?: string | null;
-}): Promise<NewAthlete> {
+}): Promise<NewAthlete | NewDemo> {
   if (!underIpLimit(input.ip ?? null)) throw new Error("Too many new accounts from this connection. Try again later.");
 
   const recent = await prisma.user.count({
@@ -63,7 +65,8 @@ export async function createGuest(input: {
   });
   if (recent >= MAX_GUESTS_PER_HOUR) throw new Error("Too many new accounts right now. Try again shortly.");
 
-  return createAthlete({ ...input, email: `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`, passwordHash: null });
+  const email = `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`;
+  return input.demo === true ? createDemo(email) : createAthlete({ ...input, email, passwordHash: null });
 }
 
 /**
@@ -75,20 +78,16 @@ export async function createGuest(input: {
 export async function createAthlete(input: {
   name?: string;
   prefs?: unknown;
-  demo?: boolean;
   email: string;
   passwordHash: string | null;
 }): Promise<NewAthlete> {
-  const demo = input.demo === true;
-  const prefs = demo ? DEMO_PREFS : normalizePrefs(input.prefs);
-  const name = (typeof input.name === "string" ? input.name : "").trim().slice(0, 40) || (demo ? "Alex" : "Athlete");
+  const prefs = normalizePrefs(input.prefs);
+  const name = (typeof input.name === "string" ? input.name : "").trim().slice(0, 40) || "Athlete";
   const email = input.email;
-  const meta: AthleteMeta = { prefs, demo };
+  const meta: AthleteMeta = { prefs, demo: false };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDate = new Date(today);
-  if (demo) startDate.setDate(today.getDate() - DEMO_WEEKS_OF_HISTORY * 7);
+  const startDate = new Date();
+  startDate.setHours(0, 0, 0, 0);
 
   await ensureCatalog(); // shared library rows; resolved before the transaction opens
 
@@ -111,8 +110,7 @@ export async function createAthlete(input: {
         },
         select: { id: true },
       });
-      const { workouts } = await createPlanForClient({ workspaceId: workspace.id, clientId: profile.id, prefs, startDate }, tx);
-      if (demo) await seedDemoHistory({ clientId: profile.id, prefs, workouts, until: today }, tx);
+      await createPlanForClient({ workspaceId: workspace.id, clientId: profile.id, prefs, startDate }, tx);
       return { id: user.id, name, email, role: "CLIENT" as const, workspaceId: workspace.id };
     },
     { timeout: 30_000, maxWait: 10_000 }
@@ -139,4 +137,104 @@ export async function createOAuthAthlete(input: { email: string; name?: string |
     });
     return user;
   });
+}
+
+// ── The demo ─────────────────────────────────────────────────────────────────
+
+const DAY_MS = 86_400_000;
+const daysAgo = (today: Date, n: number) => {
+  const d = new Date(today);
+  d.setDate(today.getDate() - n);
+  return d;
+};
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+/** The demo coach's clients: where each is in their plan, and what they train for. No emails, no logins. */
+const DEMO_ROSTER: Array<{ name: string; prefs: Prefs; weeksIn: number | null; seed: number; skip: number[] }> = [
+  { name: "Jordan Lee", prefs: { goal: "muscle", experience: "intermediate", daysPerWeek: 4, equipment: "gym", minutes: 60 }, weeksIn: 7, seed: 11, skip: [5, 17] },
+  { name: "Sam Patel", prefs: { goal: "strength", experience: "advanced", daysPerWeek: 3, equipment: "gym", minutes: 75 }, weeksIn: 10, seed: 23, skip: [12] },
+  { name: "Maya Chen", prefs: { goal: "general", experience: "beginner", daysPerWeek: 3, equipment: "gym", minutes: 45 }, weeksIn: 3, seed: 37, skip: [] },
+  { name: "Chris Okafor", prefs: { goal: "fat_loss", experience: "intermediate", daysPerWeek: 4, equipment: "gym", minutes: 45 }, weeksIn: 5, seed: 41, skip: [3, 15, 16, 17] },
+  { name: "Riley Morgan", prefs: { goal: "muscle", experience: "beginner", daysPerWeek: 3, equipment: "gym", minutes: 60 }, weeksIn: null, seed: 0, skip: [] },
+];
+
+/**
+ * The demo: a coach ("Alex") in a workspace of their own, isolated like every
+ * guest. Their own training (My training) has about five months behind it —
+ * a finished strength block, then the current muscle plan in its last week —
+ * and a finished 30-day goal with its chapter. Their roster is five clients at
+ * different points (one brand new), with sessions the coach hasn't seen yet.
+ * Nobody here has an email or a login, so nothing can reach a real person.
+ */
+async function createDemo(email: string): Promise<NewDemo> {
+  const name = "Alex";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  await ensureCatalog();
+
+  const made = await prisma.$transaction(
+    async (tx) => {
+      const workspace = await tx.workspace.create({ data: { name: `${name} — demo` }, select: { id: true } });
+      const workspaceId = workspace.id;
+      const user = await tx.user.create({ data: { name, email, passwordHash: null, role: "TRAINER", workspaceId, emailVerified: new Date() }, select: { id: true } });
+
+      // My training: a strength block that finished, then the plan running now (week 12 of 12).
+      const strength: Prefs = { ...DEMO_PREFS, goal: "strength" };
+      const me = await tx.clientProfile.create({
+        data: { workspaceId, userId: user.id, fullName: name, primaryGoal: GOALS[resolvePrefs(DEMO_PREFS).goal].primaryGoal, status: "ACTIVE", goalTargets: { athlete: { prefs: DEMO_PREFS, demo: true } satisfies AthleteMeta } },
+        select: { id: true },
+      });
+      const before = await createPlanForClient({ workspaceId, clientId: me.id, prefs: strength, startDate: daysAgo(today, 23 * 7) }, tx);
+      const now = await createPlanForClient({ workspaceId, clientId: me.id, prefs: DEMO_PREFS, startDate: daysAgo(today, 11 * 7) }, tx);
+      // One history across both plans, so each lift keeps climbing from where the last block left it.
+      await seedDemoHistory({ clientId: me.id, prefs: DEMO_PREFS, workouts: [...before.workouts, ...now.workouts], until: today, skip: new Set([9, 30, 41]) }, tx);
+
+      // A 30-day habits goal, finished two months ago: its chapter is on the You screen.
+      const startDay = daysAgo(today, 95);
+      const rules = [
+        { key: "steps", label: "10,000 steps", kind: "check_in" as const, per: "day" as const, value: "done" as const },
+        { key: "protein", label: "Protein at every meal", kind: "check_in" as const, per: "day" as const, value: "done" as const },
+        { key: "mobility", label: "10 minutes of mobility", kind: "check_in" as const, per: "day" as const, value: "done" as const },
+      ];
+      const goal = await tx.goal.create({
+        data: {
+          workspaceId,
+          clientId: me.id,
+          templateKey: null,
+          name: "30-day reset",
+          category: "consistency",
+          rules: { length: { days: 30 }, rules, onMiss: "reset" },
+          timeZone: "UTC",
+          startDay: ymd(startDay),
+          status: "COMPLETED",
+          startedBy: "TRAINER",
+          endedAt: new Date(startDay.getTime() + 29 * DAY_MS + 20 * 3_600_000), // the evening of day 30
+          createdAt: startDay,
+        },
+        select: { id: true },
+      });
+      await tx.goalCheckIn.createMany({
+        data: Array.from({ length: 30 }, (_, i) => ymd(new Date(startDay.getTime() + i * DAY_MS))).flatMap((day) =>
+          rules.map((r) => ({ goalId: goal.id, ruleKey: r.key, day, by: "TRAINER" as const }))
+        ),
+      });
+
+      // The roster. Sessions from the last four days are new to the coach.
+      const unseenAfter = daysAgo(today, 4);
+      for (const c of DEMO_ROSTER) {
+        const p = await tx.clientProfile.create({
+          data: { workspaceId, fullName: c.name, primaryGoal: GOALS[resolvePrefs(c.prefs).goal].primaryGoal, status: "ACTIVE", createdAt: daysAgo(today, (c.weeksIn ?? 0) * 7 + 3) },
+          select: { id: true },
+        });
+        if (c.weeksIn == null) continue; // new: no plan yet
+        const plan = await createPlanForClient({ workspaceId, clientId: p.id, prefs: c.prefs, startDate: daysAgo(today, c.weeksIn * 7 - 1) }, tx);
+        await seedDemoHistory({ clientId: p.id, prefs: c.prefs, workouts: plan.workouts, until: today, seed: c.seed, skip: new Set(c.skip), unseenAfter }, tx);
+      }
+      return { id: user.id, workspaceId, goalId: goal.id, clientId: me.id };
+    },
+    { timeout: 60_000, maxWait: 10_000 }
+  );
+  // The chapter is written the way the app writes any finished goal's.
+  await sealNow(made.goalId, made.clientId);
+  return { id: made.id, name, email, role: "TRAINER", workspaceId: made.workspaceId };
 }

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PasswordPanel } from "@/components/athlete/account";
+import { HowItWorks } from "@/components/HowItWorks";
+import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 
 type Profile = { name: string; email: string; voiceProfile: string; hasPassword?: boolean };
 
@@ -33,6 +35,8 @@ export default function SettingsPage() {
       .catch(() => toast.error("Couldn't load your profile"));
   }, []);
 
+  // The demo (a guest) has a made-up address and no way to sign in again: no email, no password here.
+  const guest = saved?.email.endsWith(`@${GUEST_EMAIL_DOMAIN}`) ?? false;
   const dirty = saved != null && (form.name.trim() !== saved.name || form.voiceProfile.trim() !== saved.voiceProfile.trim());
 
   async function save(e: React.FormEvent) {
@@ -75,11 +79,13 @@ export default function SettingsPage() {
               <span className="text-sm font-medium text-ink">Name</span>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} placeholder="Your name" className={field} />
             </label>
-            <label className="block">
-              <span className="text-sm font-medium text-ink">Email</span>
-              <input value={form.email} disabled className={field} />
-              <span className="mt-1 block text-xs text-ink-mute">The address you sign in with.</span>
-            </label>
+            {!guest && (
+              <label className="block">
+                <span className="text-sm font-medium text-ink">Email</span>
+                <input value={form.email} disabled className={field} />
+                <span className="mt-1 block text-xs text-ink-mute">The address you sign in with.</span>
+              </label>
+            )}
           </div>
         </section>
 
@@ -112,7 +118,9 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      {saved && (
+      <HowItWorks className="rise rise-2 mt-10" />
+
+      {saved && !guest && (
         <section className="rise rise-2 mt-10">
           <p className="eyebrow">Sign-in</p>
           <PasswordPanel key={String(saved.hasPassword)} className="mt-3" email={saved.email} hasPassword={saved.hasPassword === true} />

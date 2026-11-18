@@ -66,6 +66,7 @@ const store = () => {
 import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
 import { useDragOrder } from "./useDragOrder";
 import { useLongPress } from "@/hooks/use-long-press";
+import { useEscape } from "@/hooks/use-escape";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -355,6 +356,7 @@ export default function WorkoutLogger({
     };
   };
   const [whenOpen, setWhenOpen] = useState(false);
+  useEscape(whenOpen, () => setWhenOpen(false));
 
   // ── Shared state ────────────────────────────────────────────────────────────
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingWorkoutLogId);
@@ -987,12 +989,13 @@ export default function WorkoutLogger({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, rawInput }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      // The server's own reason when it gives one ("Not available in the demo").
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Failed to structure notes");
       const data = await res.json();
       setStructuredNote(data.structuredNote);
       toast.success("Notes structured");
-    } catch {
-      toast.error("Failed to structure notes");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Failed to structure notes");
     } finally {
       setStructuring(false);
     }

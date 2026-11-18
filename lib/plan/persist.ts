@@ -248,22 +248,29 @@ export async function seedDemoHistory(
     prefs,
     workouts,
     until,
+    seed,
+    skip,
+    unseenAfter,
   }: {
     clientId: string;
     prefs: Prefs;
     workouts: CreatedWorkout[];
     until: Date;
+    seed?: number;
+    skip?: ReadonlySet<number>;
+    /** Sessions after this moment are new to the coach (the demo coach's roster). */
+    unseenAfter?: Date;
   },
   db: Db = prisma
 ): Promise<void> {
-  const { logs, skipped } = simulateDemoHistory({ prefs, workouts, until });
+  const { logs, skipped } = simulateDemoHistory({ prefs, workouts, until, seed, skip });
 
   const logRows: Prisma.WorkoutLogCreateManyInput[] = [];
   const setRows: Prisma.SetLogCreateManyInput[] = [];
   for (const log of logs) {
     const logId = id();
     // A generated plan's history: each session finished the day it was done.
-    logRows.push({ id: logId, clientId, assignedWorkoutId: log.workoutId, source: "GENERATED", date: log.date, completedAt: log.date, durationMin: log.durationMin, trainerSeen: true });
+    logRows.push({ id: logId, clientId, assignedWorkoutId: log.workoutId, source: "GENERATED", date: log.date, completedAt: log.date, durationMin: log.durationMin, trainerSeen: !unseenAfter || log.date <= unseenAfter });
     for (const s of log.sets) {
       setRows.push({
         workoutLogId: logId,

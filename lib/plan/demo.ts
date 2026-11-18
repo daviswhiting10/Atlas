@@ -71,13 +71,18 @@ export function simulateDemoHistory({
   prefs,
   workouts,
   until,
+  seed = 20260519,
+  skip = SKIPPED_SESSIONS,
 }: {
   prefs: Prefs;
   workouts: DemoWorkout[];
   /** Only workouts scheduled before this moment are logged. */
   until: Date;
+  /** A different seed and missed sessions for each demo person, so no two histories look alike. */
+  seed?: number;
+  skip?: ReadonlySet<number>;
 }): { logs: DemoLog[]; skipped: string[] } {
-  const rand = mulberry32(20260519);
+  const rand = mulberry32(seed);
   const state = new Map<string, LiftState>();
   const scale = LEVEL_SCALE[prefs.experience];
   const logs: DemoLog[] = [];
@@ -86,7 +91,7 @@ export function simulateDemoHistory({
   const past = workouts.filter((w) => w.scheduledDate.getTime() < until.getTime());
 
   past.forEach((w, n) => {
-    if (SKIPPED_SESSIONS.has(n)) {
+    if (skip.has(n)) {
       skipped.push(w.id);
       return;
     }
