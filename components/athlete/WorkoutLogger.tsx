@@ -17,6 +17,25 @@ import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
+import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+
+/** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
+let leaving = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => (leaving = true));
+  window.addEventListener("beforeunload", () => (leaving = true));
+  // Back from the back/forward cache: the page is live again.
+  window.addEventListener("pageshow", () => (leaving = false));
+}
+
+/** The browser's storage, or null where there is none (private mode, the server). */
+const store = () => {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+};
 import { ExerciseName } from "@/components/ExerciseName";
 
 type SetMap = Record<string, LoggerSet[]>;
@@ -204,9 +223,19 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
   // Saves run one at a time, in order, so the first set of a workout always
   // creates the log before the second one looks for it.
+  // Ticks show at once (toggle changes setsRef first); saves run one at a time behind the screen.
+  // What the server has for each set, and how many saves for it are still to run: a failed save
+  // only rolls the set back to the server's state when no newer one is coming (that one sends the
+  // latest state anyway).
+  const serverDone = useRef(new Map<string, boolean>());
+  const pending = useRef(new Map<string, number>());
   const persist = useCallback(
     (aweId: string, setNumber: number) => {
+      const key = `${aweId}:${setNumber}`;
+      pending.current.set(key, (pending.current.get(key) ?? 0) + 1);
       queue.current = queue.current.then(async () => {
+        const left = (pending.current.get(key) ?? 1) - 1;
+        pending.current.set(key, left);
         const s = setsRef.current[aweId]?.find((x) => x.setNumber === setNumber);
         if (!s || (!s.done && !s.setLogId)) return;
         try {
@@ -219,20 +248,38 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             done: s.done,
             setLogId: s.setLogId,
           });
+          // A failed answer can come back as nothing rather than an error: that's a refusal too.
+          if (!res?.setLogId) throw new Error("The set wasn't saved");
+          serverDone.current.set(key, s.done);
+          // Confirmed while the page is closing: the next page may have read the server before this
+          // landed, so it stays pending there (that page clears it, or resends it harmlessly).
+          if (!leaving) clearPending(store(), data.id, key, s.done);
           apply({
             ...setsRef.current,
             [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, setLogId: res.setLogId } : x)),
           });
-        } catch {
-          // A set that never reached the server must not keep looking done.
-          if (!s.setLogId) {
-            apply({
-              ...setsRef.current,
-              [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, done: false } : x)),
-            });
-            setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== `${aweId}:${setNumber}`)));
+        } catch (e) {
+          // Cut off by a reload or close: it stays pending and is sent again when the page opens.
+          if (leaving) return;
+          // No connection: the tick stays and is sent when the connection is back. Only a refusal
+          // from the server puts the set back.
+          if (isNetworkError(e)) {
+            toast("You're offline. Sets save when you're back.", { id: "offline" });
+            return;
           }
-          toast.error("Couldn't save that set. Check your connection and tap it again.");
+          if (left > 0) return;
+          clearPending(store(), data.id, key);
+          // Back to the way the server has it: unticked if it never got there, ticked if an un-tick didn't.
+          const back = serverDone.current.get(key) ?? false;
+          apply({
+            ...setsRef.current,
+            [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, done: back } : x)),
+          });
+          if (!back) {
+            setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
+            cancelFinish();
+          }
+          toast.error(`Set ${setNumber} didn't save. Check your connection and tap it again.`, { id: `save-${key}` });
         }
       });
     },
@@ -268,9 +315,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       toast(`Enter your ${ex.unit === "secs" ? "time" : "reps"} first`);
       return;
     }
+    // The server's state before the screen first changes it (for a rollback if a save fails).
+    const key0 = `${ex.aweId}:${s.setNumber}`;
+    if (!serverDone.current.has(key0)) serverDone.current.set(key0, s.setLogId ? s.done : false);
     // The weight starts at the target when there is one; with none (a new lift), a blank is fine.
     const next = list.map((x, j) => (j === i ? { ...x, done } : x));
     apply({ ...setsRef.current, [ex.aweId]: next });
+    // Kept on the phone until the server confirms it: a reload mid-save puts it back and resends it.
+    addPending(store(), data.id, pendingKey(ex.aweId, s.setNumber), { done, weight: s.weight, reps: s.reps });
     persist(ex.aweId, s.setNumber);
 
     const key = `${ex.aweId}:${s.setNumber}`;
@@ -385,6 +437,53 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     },
     []
   );
+  // Ticks the server hasn't confirmed (the page reloaded or the app closed mid-save, or the
+  // connection dropped): on the screen as tapped, with the values they were ticked with, and sent
+  // again. On opening (before the finish check below) and whenever the connection comes back.
+  function resendPending() {
+    for (const [key, tick] of Object.entries(readPending(store(), data.id))) {
+      const [aweId, n] = key.split(":");
+      const setNumber = Number(n);
+      const list = setsRef.current[aweId];
+      const s = list?.find((x) => x.setNumber === setNumber);
+      if (!list || !s) continue;
+      const serverHasIt = serverDone.current.has(key) ? serverDone.current.get(key) === tick.done && !!s.setLogId : s.done === tick.done && !!s.setLogId;
+      if (serverHasIt) {
+        clearPending(store(), data.id, key, tick.done);
+        continue;
+      }
+      if (!serverDone.current.has(key)) serverDone.current.set(key, s.setLogId ? s.done : false);
+      if (s.done !== tick.done) {
+        apply({
+          ...setsRef.current,
+          [aweId]: list.map((x) => (x.setNumber === setNumber ? { ...x, done: tick.done, weight: tick.weight !== undefined ? tick.weight : x.weight, reps: tick.reps !== undefined ? tick.reps : x.reps } : x)),
+        });
+      }
+      persist(aweId, setNumber);
+    }
+  }
+  const summaryRef = useRef(false);
+  summaryRef.current = summary != null;
+  const onOnline = useRef(() => {});
+  onOnline.current = () => {
+    toast.dismiss("offline");
+    resendPending();
+    // Everything logged while offline: finish now that it can.
+    queue.current.then(() => {
+      if (!summaryRef.current && data.status !== "LOGGED" && !finishTimer.current && allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) scheduleFinish();
+    });
+  };
+  useEffect(() => {
+    const t = setTimeout(resendPending, 0);
+    const online = () => onOnline.current();
+    window.addEventListener("online", online);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("online", online);
+    };
+    // Once, on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Coming back to a workout whose sets are all logged but that never finished (the app was
   // closed mid-countdown): the countdown starts again, with its Undo. (A tick later, so React's
   // development double-mount doesn't read it as leaving.)
@@ -411,7 +510,9 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     toast.dismiss("finish");
     startFinish(async () => {
       try {
+        // The last ticks may still be saving: wait for them, and finish only if they all stuck.
         await queue.current;
+        if (!allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) return;
         const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
         await finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : minutes });
         setRest(null);

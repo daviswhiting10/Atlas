@@ -49,6 +49,25 @@ import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
+import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+
+/** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
+let leaving = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => (leaving = true));
+  window.addEventListener("beforeunload", () => (leaving = true));
+  // Back from the back/forward cache: the page is live again.
+  window.addEventListener("pageshow", () => (leaving = false));
+}
+
+/** The browser's storage, or null where there is none (private mode, the server). */
+const store = () => {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+};
 import { fromRows, labelsOf, moveRow, sessionOrder, stepRow, toRows, type OrderEntry, type ReorderRow } from "@/lib/sessions/order";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -64,8 +83,13 @@ type SetEntry = {
   reps: string;       // stores seconds when isSeconds === true
   rpe: string;
   completed: boolean;
-  saving: boolean;
+  /** Stable for the life of the screen: saves find their set by it, whatever moved or was deleted meanwhile. */
+  uid: string;
 };
+
+let uidSeq = 0;
+/** A set's screen id. */
+const newUid = () => `s${Date.now().toString(36)}${(uidSeq++).toString(36)}`;
 
 // Band colors — order = lightest → heaviest
 const BAND_COLORS = [
@@ -112,7 +136,7 @@ function initSetEntry(
       reps: existing.reps != null ? String(existing.reps) : "",
       rpe: existing.rpe != null ? String(existing.rpe) : "",
       completed: existing.completed,
-      saving: false,
+      uid: newUid(),
     };
   }
   const suggestedWeight =
@@ -132,7 +156,7 @@ function initSetEntry(
     reps: suggestedReps != null ? String(suggestedReps) : "",
     rpe: "",
     completed: false,
-    saving: false,
+    uid: newUid(),
   };
 }
 
@@ -391,7 +415,14 @@ export default function WorkoutLogger({
     setSessionStart(live.startedAt);
     if (prev?.assignedWorkoutId === assignedWorkoutId) {
       restoringRef.current = prev.draft != null;
-      setExState((cur) => mergeDraft(cur, prev, { assignedWorkoutId, workoutLogId: existingWorkoutLogId }));
+      // Each set keeps the id it has on this page (the draft's ids are from the last one, and a
+      // save or a restored tick may already be using this page's); a set only the draft has gets one.
+      setExState((cur) => {
+        const merged = mergeDraft(cur, prev, { assignedWorkoutId, workoutLogId: existingWorkoutLogId });
+        return Object.fromEntries(
+          Object.entries(merged).map(([k, ex]) => [k, { ...ex, sets: ex.sets.map((x, i) => ({ ...x, uid: cur[k]?.sets[i]?.uid ?? newUid() })) }])
+        );
+      });
       const sameSession = !prev.workoutLogId || !existingWorkoutLogId || prev.workoutLogId === existingWorkoutLogId;
       if (sameSession && prev.order?.length) setSavedOrder(prev.order);
       // After the restored sets have rendered.
@@ -443,7 +474,7 @@ export default function WorkoutLogger({
       return;
     }
     const draft = Object.fromEntries(
-      Object.entries(exState).map(([aweId, st]) => [aweId, { ...st, noteSaving: false, sets: st.sets.map((x) => ({ ...x, saving: false })) }])
+      Object.entries(exState).map(([aweId, st]) => [aweId, { ...st, noteSaving: false, sets: st.sets }])
     );
     liveRef.current = { ...liveRef.current, draft, order: savedOrder, workoutLogId: workoutLogId ?? liveRef.current.workoutLogId, updatedAt: Date.now() };
     try {
@@ -578,7 +609,7 @@ export default function WorkoutLogger({
         reps: last?.reps ?? "",
         rpe: "",
         completed: false,
-        saving: false,
+        uid: newUid(),
       };
       return { ...prev, [aweId]: { ...prev[aweId], sets: [...sets, newSet] } };
     });
@@ -594,55 +625,118 @@ export default function WorkoutLogger({
   }
 
   // ── Log set ───────────────────────────────────────────────────────────────
-  // Logging an exercise's last set moves on to the next exercise with sets left; logging the
-  // session's last set finishes it a few seconds later, with an Undo (lib/sessions/flow).
-  async function handleComplete(aweId: string, exerciseId: string, idx: number) {
-    const entry = exStateRef.current[aweId].sets[idx];
-    if (entry.saving) return;
+  // A tap changes the screen at once (no waiting, no spinner); the save follows behind it
+  // (saveSet). Logging an exercise's last set moves on to the next exercise with sets left;
+  // logging the session's last set finishes it a few seconds later, with an Undo (lib/sessions/flow).
+  function handleComplete(aweId: string, exerciseId: string, idx: number) {
+    const entry = exStateRef.current[aweId]?.sets[idx];
+    if (!entry) return;
     const nowDone = !entry.completed;
     // A set un-ticked: the session isn't over after all.
     if (!nowDone) cancelFinish();
-    updateSet(aweId, idx, { saving: true });
-    try {
-      const result = await logSet({
-        workoutLogId: workoutLogId ?? undefined,
-        assignedWorkoutId,
-        clientId,
-        exerciseId,
-        assignedWorkoutExerciseId: aweId,
-        setLogId: entry.setLogId ?? undefined,
-        setNumber: idx + 1,
-        weight: (entry.isBodyweight || entry.isBand) ? null : (entry.weight ? parseFloat(entry.weight) : null),
-        bandColor: entry.isBand ? entry.bandColor : null,
-        reps: entry.reps ? parseInt(entry.reps, 10) : null,
-        rpe: entry.rpe ? parseFloat(entry.rpe) : null,
-        note: entry.note.trim() || null,
-        completed: nowDone,
-        date: workoutLogId ? undefined : logDate, // pass override only on first create
-      });
-      if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
-      updateSet(aweId, idx, {
-        saving: false,
-        completed: nowDone,
-        setLogId: result.setLogId,
-      });
-      if (!nowDone) return;
-      setLastSetAt(Date.now());
-      setRestSecs(0);
-      const lists = doneLists({ aweId, idx });
-      if (allDone(lists)) {
-        scheduleFinish();
-        return;
-      }
-      // Undo un-logs it on the server too (the same toggle, the other way).
-      toast.success(`Set ${idx + 1} logged`, {
-        action: { label: "Undo", onClick: () => handleComplete(aweId, exerciseId, idx) },
-      });
-      afterExerciseChange(aweId, lists);
-    } catch {
-      toast.error("Failed to save set");
-      updateSet(aweId, idx, { saving: false });
+    noteServer(entry);
+    // Only this set's tick changes (nothing carried forward), and the ref changes with it, so a
+    // second tap before React re-renders sees it.
+    setSet(aweId, entry.uid, { completed: nowDone });
+    // Kept on the phone until the server confirms it: a reload mid-save puts it back and resends it.
+    addPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1), { done: nowDone });
+    saveSet(aweId, exerciseId, entry.uid, { ...entry, completed: nowDone }, idx);
+    if (!nowDone) return;
+    setLastSetAt(Date.now());
+    setRestSecs(0);
+    const lists = doneLists();
+    if (allDone(lists)) {
+      scheduleFinish();
+      return;
     }
+    // Undo un-logs it (the same toggle, the other way), on the server too.
+    toast.success(`Set ${idx + 1} logged`, {
+      id: `logged-${entry.uid}`,
+      action: { label: "Undo", onClick: () => toggleByUid(aweId, exerciseId, entry.uid) },
+    });
+    afterExerciseChange(aweId, lists);
+  }
+
+  /** Toggle a set found by its id (a toast's Undo: the set may have moved since). */
+  function toggleByUid(aweId: string, exerciseId: string, uid: string) {
+    const i = exStateRef.current[aweId]?.sets.findIndex((x) => x.uid === uid) ?? -1;
+    if (i !== -1) handleComplete(aweId, exerciseId, i);
+  }
+
+  /** Change one set by its id, in state and in the ref at once. */
+  function setSet(aweId: string, uid: string, patch: Partial<SetEntry>) {
+    const cur = exStateRef.current[aweId];
+    if (!cur) return;
+    exStateRef.current = { ...exStateRef.current, [aweId]: { ...cur, sets: cur.sets.map((x) => (x.uid === uid ? { ...x, ...patch } : x)) } };
+    setExState((prev) => {
+      const ex = prev[aweId];
+      return ex ? { ...prev, [aweId]: { ...ex, sets: ex.sets.map((x) => (x.uid === uid ? { ...x, ...patch } : x)) } } : prev;
+    });
+  }
+
+  // ── Saving sets: one at a time, in the order they were tapped, behind the screen ──────
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const logIdRef = useRef<string | null>(existingWorkoutLogId);
+  /** What the server has for each set (by uid): its row, and whether it's logged there. */
+  const serverSets = useRef(new Map<string, { setLogId: string | null; completed: boolean }>());
+  /** Saves still to run for each set: a failed one only rolls back when nothing newer is coming. */
+  const pendingSaves = useRef(new Map<string, number>());
+  /** Remember a set's server state before the screen first changes it. */
+  function noteServer(entry: SetEntry) {
+    if (!serverSets.current.has(entry.uid)) serverSets.current.set(entry.uid, { setLogId: entry.setLogId, completed: entry.setLogId ? entry.completed : false });
+  }
+  function saveSet(aweId: string, exerciseId: string, uid: string, want: SetEntry, idx: number) {
+    pendingSaves.current.set(uid, (pendingSaves.current.get(uid) ?? 0) + 1);
+    saveChain.current = saveChain.current.then(async () => {
+      const left = (pendingSaves.current.get(uid) ?? 1) - 1;
+      pendingSaves.current.set(uid, left);
+      const server = serverSets.current.get(uid) ?? { setLogId: want.setLogId, completed: false };
+      // Never saved, and not logged: nothing to tell the server.
+      if (!server.setLogId && !want.completed) return;
+      try {
+        const result = await logSet({
+          workoutLogId: logIdRef.current ?? undefined,
+          assignedWorkoutId,
+          clientId,
+          exerciseId,
+          assignedWorkoutExerciseId: aweId,
+          setLogId: server.setLogId ?? undefined,
+          setNumber: idx + 1,
+          weight: want.isBodyweight || want.isBand ? null : want.weight ? parseFloat(want.weight) : null,
+          bandColor: want.isBand ? want.bandColor : null,
+          reps: want.reps ? parseInt(want.reps, 10) : null,
+          rpe: want.rpe ? parseFloat(want.rpe) : null,
+          note: want.note.trim() || null,
+          completed: want.completed,
+          date: logIdRef.current ? undefined : logDate, // only when this save creates the session
+        });
+        // A failed answer can come back as nothing rather than an error: that's a refusal too.
+        if (!result?.setLogId || !result.workoutLogId) throw new Error("The set wasn't saved");
+        logIdRef.current = result.workoutLogId;
+        serverSets.current.set(uid, { setLogId: result.setLogId, completed: want.completed });
+        // Confirmed while the page is closing: the next page may have read the server before this
+        // landed, so it stays pending there (that page clears it, or resends it harmlessly).
+        if (!leaving) clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1), want.completed);
+        setWorkoutLogId(result.workoutLogId);
+        setSet(aweId, uid, { setLogId: result.setLogId });
+      } catch (e) {
+        // Cut off by a reload or close: it stays pending and is sent again when the page opens.
+        if (leaving) return;
+        // No connection: the tick stays (it's the truth on this phone) and is sent when the
+        // connection is back. Only a refusal from the server puts the set back.
+        if (isNetworkError(e)) {
+          toast("You're offline. Sets save when you're back.", { id: "offline" });
+          return;
+        }
+        // Refused: put the set back the way the server has it, unless a newer tap for it is still on its way.
+        if (left > 0) return;
+        clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
+        setSet(aweId, uid, { completed: server.completed });
+        toast.dismiss(`logged-${uid}`);
+        if (!server.completed) cancelFinish();
+        toast.error(`Set ${idx + 1} didn't save. Check your connection and tap it again.`, { id: `save-${uid}` });
+      }
+    });
   }
 
   /** Every exercise's sets as done flags, from the latest state, with one set (or one change) applied. */
@@ -726,6 +820,49 @@ export default function WorkoutLogger({
     },
     []
   );
+  // Ticks the server hasn't confirmed (the page reloaded or the app closed mid-save, or the
+  // connection dropped): on the screen as tapped, and sent again. On opening (before the finish
+  // check below, so a restored last tick counts) and whenever the connection comes back.
+  function resendPending() {
+    for (const [key, tick] of Object.entries(readPending(store(), assignedWorkoutId))) {
+      const [aweId, n] = key.split(":");
+      const idx = Number(n) - 1;
+      const entry = exStateRef.current[aweId]?.sets[idx];
+      const ex = exercises.find((e) => e.aweId === aweId);
+      if (!entry || !ex) continue;
+      const known = serverSets.current.get(entry.uid);
+      const serverHasIt = known ? known.completed === tick.done && !!known.setLogId : entry.completed === tick.done && !!entry.setLogId;
+      if (serverHasIt) {
+        clearPending(store(), assignedWorkoutId, key, tick.done);
+        continue;
+      }
+      noteServer(entry);
+      if (entry.completed !== tick.done) setSet(aweId, entry.uid, { completed: tick.done });
+      saveSet(aweId, ex.exerciseId, entry.uid, { ...entry, completed: tick.done }, idx);
+    }
+  }
+  const finishedRef = useRef(false);
+  finishedRef.current = finished;
+  const onOnline = useRef(() => {});
+  onOnline.current = () => {
+    toast.dismiss("offline");
+    resendPending();
+    // Everything logged while offline: finish now that it can.
+    saveChain.current.then(() => {
+      if (!finishedRef.current && !finishTimer.current && allDone(doneLists())) scheduleFinish();
+    });
+  };
+  useEffect(() => {
+    const t = setTimeout(resendPending, 0);
+    const online = () => onOnline.current();
+    window.addEventListener("online", online);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("online", online);
+    };
+    // Once, on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Coming back to a session whose sets are all logged but that never finished (the app was
   // closed mid-countdown): the countdown starts again, with its Undo. (A tick later, so React's
   // development double-mount doesn't read it as leaving.)
@@ -739,35 +876,12 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Update an already-completed set (keeps completed = true) ─────────────
-  async function handleUpdateCompletedSet(aweId: string, exerciseId: string, idx: number) {
-    const entry = exState[aweId].sets[idx];
-    if (entry.saving) return;
-    updateSet(aweId, idx, { saving: true });
-    try {
-      const result = await logSet({
-        workoutLogId: workoutLogId ?? undefined,
-        assignedWorkoutId,
-        clientId,
-        exerciseId,
-        assignedWorkoutExerciseId: aweId,
-        setLogId: entry.setLogId ?? undefined,
-        setNumber: idx + 1,
-        weight: (entry.isBodyweight || entry.isBand) ? null : (entry.weight ? parseFloat(entry.weight) : null),
-        bandColor: entry.isBand ? entry.bandColor : null,
-        reps: entry.reps ? parseInt(entry.reps, 10) : null,
-        rpe: entry.rpe ? parseFloat(entry.rpe) : null,
-        note: entry.note.trim() || null,
-        completed: true,
-        date: workoutLogId ? undefined : logDate,
-      });
-      if (!workoutLogId) setWorkoutLogId(result.workoutLogId);
-      updateSet(aweId, idx, { saving: false, setLogId: result.setLogId });
-      toast.success(`Set ${idx + 1} updated`);
-    } catch {
-      toast.error("Failed to update set");
-      updateSet(aweId, idx, { saving: false });
-    }
+  // ── An edit to a logged set (a field left): saved behind the screen, like a tick ──
+  function handleUpdateCompletedSet(aweId: string, exerciseId: string, idx: number) {
+    const entry = exStateRef.current[aweId]?.sets[idx];
+    if (!entry || !entry.completed) return;
+    noteServer(entry);
+    saveSet(aweId, exerciseId, entry.uid, entry, idx);
   }
 
   // ── Save coach note ───────────────────────────────────────────────────────
@@ -831,7 +945,7 @@ export default function WorkoutLogger({
           for (let i = sets.length - 1; i >= 0 && sets.length > t.sets; i--) if (!sets[i].completed) sets = sets.filter((_, j) => j !== i);
           const last = sets[sets.length - 1];
           while (sets.length < t.sets) {
-            sets = [...sets, { ...(last ?? initSetEntry(ex.prescribedSets[0], ex.suggestion)), setLogId: null, reps: String(t.repMax), rpe: "", note: "", completed: false, saving: false }];
+            sets = [...sets, { ...(last ?? initSetEntry(ex.prescribedSets[0], ex.suggestion)), setLogId: null, reps: String(t.repMax), rpe: "", note: "", completed: false, uid: newUid() }];
           }
           return { ...prev, [ex.aweId]: { ...cur, sets } };
         })
@@ -921,8 +1035,11 @@ export default function WorkoutLogger({
 
   // ── Complete session ──────────────────────────────────────────────────────
   async function handleCompleteSession() {
-    if (!workoutLogId) { toast.error("Log at least one set before completing"); return; }
     startComplete(async () => {
+      // The last ticks may still be saving: wait for them, and finish only if they all stuck.
+      await saveChain.current;
+      const workoutLogId = logIdRef.current;
+      if (!workoutLogId || !allDone(doneLists())) return;
       try {
         await completeSession({
           workoutLogId,
@@ -2021,7 +2138,6 @@ function SetTable({
                   type="button"
                  
                   onClick={() => onComplete(idx)}
-                  disabled={entry.saving}
                   aria-pressed={entry.completed}
                   aria-label={entry.completed ? `Set ${idx + 1} logged — tap to undo` : `Log set ${idx + 1}`}
                   className={cn(
@@ -2029,7 +2145,7 @@ function SetTable({
                     entry.completed ? "border-[var(--success)] bg-[var(--success)] text-dusk-button-text" : "border-line-strong text-ink-mute"
                   )}
                 >
-                  {entry.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
                 </button>
               </HoldRow>
               {open && (
@@ -2373,7 +2489,6 @@ function DesktopSetRow({
         <button
           type="button"
           onClick={onComplete}
-          disabled={entry.saving}
           className={cn(
             "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
             entry.completed
@@ -2381,7 +2496,7 @@ function DesktopSetRow({
               : "border-border text-muted-foreground hover:border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] hover:text-[var(--success)]"
           )}
         >
-          {entry.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+          <Check className="w-3 h-3" />
         </button>
         {onRemove ? (
           <button type="button" onClick={onRemove} title="Remove set" aria-label={`Remove set ${idx + 1}`} className="w-6 h-7 flex items-center justify-center shrink-0 text-muted-foreground hover:text-[var(--destructive)]">
