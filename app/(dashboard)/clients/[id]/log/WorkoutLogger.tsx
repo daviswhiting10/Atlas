@@ -2,7 +2,7 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { LIVE_EVENT, clearLive, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
 import { ExerciseThumb } from "@/components/ExercisePicture";
@@ -108,6 +108,9 @@ type ExerciseState = {
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** A set's tick is ignored this long after the cards fold, open or move under the finger. */
+const SETTLE_MS = 400;
 
 function formatRest(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -523,6 +526,16 @@ export default function WorkoutLogger({
   // Folded cards. An exercise folds by itself once every set is logged; a tap on its chevron
   // folds (true) or opens (false) it by hand. Kept on this screen only, never saved.
   const [foldOverride, setFoldOverride] = useState<Record<string, boolean>>({});
+  // When a card folds, opens or moves, the cards under the finger change: a set's tick right after
+  // is a second tap meant for what was there (a double tap on a header, a tap just after a drop),
+  // not a set logged. It's ignored until the screen has settled.
+  const movedAt = useRef(0);
+  const firstLayout = useRef(true);
+  useLayoutEffect(() => {
+    if (firstLayout.current) firstLayout.current = false;
+    else movedAt.current = performance.now();
+  }, [foldOverride, order]);
+  const settled = () => performance.now() - movedAt.current > SETTLE_MS;
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const [lastSetAt, setLastSetAt] = useState<number | null>(null);
   const [restSecs, setRestSecs] = useState(0);
@@ -1435,7 +1448,7 @@ export default function WorkoutLogger({
                       last={ex.lastSets}
                       prescribed={ex.prescribedSets}
                       onChange={(idx, patch) => updateSet(ex.aweId, idx, patch)}
-                      onComplete={(idx) => handleComplete(ex.aweId, ex.exerciseId, idx)}
+                      onComplete={(idx) => settled() && handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
                       onRemove={(idx) => deleteSet(ex.aweId, idx)}
                     />

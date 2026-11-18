@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { canMerge, dropAt, mergeWith, type OrderEntry } from "@/lib/sessions/order";
 
 /** Holding a card's header this long picks it up. */
@@ -58,6 +58,7 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
   const dragRef = useRef<Drag | null>(null);
   const press = useRef<{ id: string; x: number; y: number; header: HTMLElement; timer: ReturnType<typeof setTimeout> } | null>(null);
   const swallowClick = useRef(false);
+  const swallowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientY = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -70,6 +71,19 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     dragRef.current = d;
     setDragState(d);
   };
+
+  // The click that follows letting go of a lifted card isn't a tap, wherever it lands (the finger
+  // may be over another card's set by then). Caught before React sees it.
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (!swallowClick.current) return;
+      swallowClick.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("click", h, true);
+    return () => window.removeEventListener("click", h, true);
+  }, []);
 
   // A lifted card owns the finger: the page mustn't scroll under it. (Non-passive, so it can cancel.)
   useEffect(() => {
@@ -188,10 +202,18 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     if (mergeTimer.current) clearTimeout(mergeTimer.current);
     mergeTimer.current = null;
     const d = dragRef.current;
+    if (d) {
+      // Where its header shows as it's let go: it lands there (see below).
+      const el = listRef.current?.querySelector<HTMLElement>(`[data-exercise="${d.id}"]`);
+      if (el) landing.current = { id: d.id, top: el.getBoundingClientRect().top };
+    }
     window.removeEventListener("pointermove", listeners.move);
     window.removeEventListener("pointerup", listeners.up);
     window.removeEventListener("pointercancel", listeners.cancel);
     if (!d) return;
+    // A drag ends with no click: stop waiting for one.
+    swallowTimer.current = setTimeout(() => (swallowClick.current = false), 400);
+    if (listRef.current) listRef.current.style.paddingBottom = "";
     setDrag(null);
     if (!commit) return;
     const o = orderRef.current;
@@ -199,6 +221,18 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     if (JSON.stringify(next) !== JSON.stringify(o)) onChangeRef.current(next);
   }
   endRef.current = end;
+
+  // A dropped card grows back to full height in its new place; moved down, that puts its sets
+  // where its header was, so a tap right after letting go would tick a set. The page scrolls by
+  // the difference instead: the header stays under the finger.
+  const landing = useRef<{ id: string; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const l = landing.current;
+    if (drag || !l) return;
+    landing.current = null;
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-exercise="${l.id}"]`);
+    if (el) window.scrollBy(0, el.getBoundingClientRect().top - l.top);
+  }, [drag]);
 
   function lift(id: string) {
     const list = listRef.current;
@@ -218,6 +252,8 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     const full = mine.bottom - mine.top;
     const compact = header ? Math.min(full, header.bottom + window.scrollY - mine.top + 6) : full;
     const closeUp = full - compact;
+    // The page keeps its height (at the bottom, a shorter page would pull everything under the finger).
+    list.style.paddingBottom = `${closeUp}px`;
     ids.forEach((x, i) => {
       const r = rects.get(x);
       if (i > from && r) rects.set(x, { top: r.top - closeUp, bottom: r.bottom - closeUp });
@@ -226,6 +262,7 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     const y = clientY.current + window.scrollY;
     // The page's own end, less the height the carried card gives up.
     const maxScroll = Math.max(window.scrollY, document.documentElement.scrollHeight - window.innerHeight - closeUp);
+    if (swallowTimer.current) clearTimeout(swallowTimer.current);
     swallowClick.current = true;
     buzz(10);
     setDrag({ id, from, others: ids.filter((x) => x !== id), rects, compact, h: compact + SPACING, startY: y, y, maxScroll, gap: from, hover: null, merge: null });
@@ -256,13 +293,6 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
             window.addEventListener("pointermove", listeners.move);
             window.addEventListener("pointerup", listeners.up);
             window.addEventListener("pointercancel", listeners.cancel);
-          },
-          // The click after a lift isn't a tap.
-          onClickCapture: (e: React.MouseEvent) => {
-            if (!swallowClick.current) return;
-            swallowClick.current = false;
-            e.preventDefault();
-            e.stopPropagation();
           },
           // The phone's own long-press menu would cover the card.
           onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
