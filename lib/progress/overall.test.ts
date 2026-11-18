@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSeries, sessionPoint } from "@/lib/plan/overload";
-import { overallProgress } from "./overall";
+import { hasProgressToShow, overallProgress } from "./overall";
 
 const set = (weight: number | null, reps: number) => ({ weight, reps, completed: true });
 const lift = (sessions: Array<[string, number | null, number, boolean?]>) => {
@@ -45,5 +45,17 @@ describe("overall progress", () => {
 
   it("says nothing without enough data", () => {
     expect(overallProgress([])).toEqual({ points: [], change: null, lifts: 0, since: null });
+  });
+});
+
+describe("hasProgressToShow", () => {
+  const pt = (date: string, weight: number) => ({ date, weight, reps: 5, e1rm: weight * 1.17, volume: weight * 5, record: false, deload: false }) as never;
+  it("is false with nothing logged, or one session of a lift and no record", () => {
+    expect(hasProgressToShow({ exercises: [], recentPRs: [], totals: { sessions: 0 } })).toBe(false);
+    expect(hasProgressToShow({ exercises: [{ loaded: true, series: [pt("2026-11-17", 100)] }], recentPRs: [], totals: { sessions: 1 } })).toBe(false);
+  });
+  it("is true with a strength line, or a record", () => {
+    expect(hasProgressToShow({ exercises: [{ loaded: true, series: [pt("2026-11-02", 100), pt("2026-11-16", 110)] }], recentPRs: [], totals: { sessions: 2 } })).toBe(true);
+    expect(hasProgressToShow({ exercises: [], recentPRs: [{}], totals: { sessions: 1 } })).toBe(true);
   });
 });

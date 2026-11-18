@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { safeTimeZone } from "@/lib/athlete/sessions";
 import { TZ_COOKIE } from "@/lib/athlete/data";
 import { loadCalendar } from "@/lib/history/load";
+import { hasProgressToShow } from "@/lib/progress/overall";
 import { ClientDetail } from "./ClientDetail";
 
 
@@ -34,7 +35,8 @@ export default async function ClientPage({ params }: { params: { id: string } })
     <ClientDetail
       // The same JSON /api/clients/[id] sends (dates as strings).
       initial={JSON.parse(JSON.stringify(details))}
-      progress={<ProgressView data={data} goalMetric={metric} />}
+      // Nothing to chart yet (a thin history): no Progress tab; the page opens on Sessions.
+      progress={hasProgressToShow(data) ? <ProgressView data={data} goalMetric={metric} /> : null}
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
       history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : null}
     />

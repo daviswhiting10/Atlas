@@ -101,7 +101,7 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, history, initial }: { progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ progress, history, initial }: { /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -112,7 +112,7 @@ export function ClientDetail({ progress, history, initial }: { progress: React.R
   const [view, setView] = useState<View>(() => {
     const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
     if (tab === "import" || tab === "build") return "plan";
-    return tab === "plan" || tab === "sessions" ? tab : "progress";
+    return tab === "plan" || tab === "sessions" ? tab : progress ? "progress" : "sessions";
   });
   // "Build with Atlas" opens its form here on the Plan tab (it had a page of its own). ?tab=build opens it.
   const [buildOpen, setBuildOpen] = useState(
@@ -213,8 +213,10 @@ export function ClientDetail({ progress, history, initial }: { progress: React.R
   const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
   const redFlags = intakes[0]?.redFlags ?? null;
+  // Progress open but nothing to chart any more (sessions deleted): show Sessions, not a blank tab.
+  const shown: View = view === "progress" && !progress ? "sessions" : view;
   const views: Array<{ id: View; label: string }> = [
-    { id: "progress", label: "Progress" },
+    ...(progress ? [{ id: "progress" as const, label: "Progress" }] : []),
     { id: "sessions", label: "Sessions" },
     { id: "plan", label: "Plan" },
     // Intake and imported details, only when there are some.
@@ -271,11 +273,11 @@ export function ClientDetail({ progress, history, initial }: { progress: React.R
               key={v.id}
               type="button"
               role="tab"
-              aria-selected={view === v.id}
+              aria-selected={shown === v.id}
               onClick={() => setView(v.id)}
               className={cn(
                 "press h-11 flex-1 shrink-0 rounded-xl px-4 text-[15px] font-medium transition-colors",
-                view === v.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink"
+                shown === v.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink"
               )}
             >
               {v.label}
@@ -284,12 +286,12 @@ export function ClientDetail({ progress, history, initial }: { progress: React.R
         </div>
       </div>
 
-      {view === "progress" && (
+      {shown === "progress" && (
         <div className="fade-in">{progress}</div>
       )}
 
 
-      {view === "sessions" && (
+      {shown === "sessions" && (
         <div className="fade-in space-y-10">
           {history}
           {client.workoutLogs.length === 0 ? (
@@ -342,7 +344,7 @@ export function ClientDetail({ progress, history, initial }: { progress: React.R
         </div>
       )}
 
-      {view === "plan" && (
+      {shown === "plan" && (
         <div className="fade-in">
           <div ref={importRef} className="scroll-mt-4">
             {client.programAssignments.length === 0 ? (
@@ -427,7 +429,7 @@ export function ClientDetail({ progress, history, initial }: { progress: React.R
         </div>
       )}
 
-      {view === "notes" && (
+      {shown === "notes" && (
         <div className="fade-in max-w-2xl space-y-4">
               {/* Details carried over from a spreadsheet import */}
               {imported.map((f) => {

@@ -62,3 +62,14 @@ export function overallProgress(lifts: Lift[]): Overall {
   const last = points[points.length - 1];
   return { points, change: last ? last.pct : null, lifts: last?.lifts ?? 0, since: points[0]?.week ?? null };
 }
+
+/**
+ * Whether a client's Progress has anything to show: an overall strength line, or a record.
+ * (History lives on Progress for the athlete and on Sessions for the coach.) The coach's
+ * client page leaves the Progress tab out until this is true.
+ */
+export function hasProgressToShow(data: { exercises: Lift[]; recentPRs: unknown[]; totals: { sessions: number } }): boolean {
+  if (data.totals.sessions === 0) return false;
+  const o = overallProgress(data.exercises);
+  return (o.change != null && o.since != null) || data.recentPRs.length > 0;
+}
