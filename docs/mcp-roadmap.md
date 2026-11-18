@@ -260,3 +260,7 @@ schema change.
    coach-only `excuse_day` and `get_group_progress`.
 8. **Later:** an athlete version of `generate_program`, and a "describe a
    screenshot" flow that feeds `log_session` with `from: "screenshot"`.
+
+## Parked
+
+- `log_measurement` (generic: type, value, unit, date, source) + screenshot ingestion; replaces the form UI; schema change needs Davis's approval first.

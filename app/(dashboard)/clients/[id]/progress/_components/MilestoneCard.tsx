@@ -1,7 +1,19 @@
 import { Trophy, Flame, TrendingUp, Target, Award, Dumbbell, Star } from "lucide-react";
 import { format } from "date-fns";
-import type { MilestoneRecord } from "./ProgressShell";
 import { shownValue } from "@/lib/progress/format";
+
+type MilestoneRecord = {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  metricValue: number | null;
+  metricUnit: string | null;
+  exerciseId: string | null;
+  exerciseName: string | null;
+  achievedAt: string;
+  seenByClient: boolean;
+};
 
 const ICON_MAP: Record<string, React.ElementType> = {
   first_session: Star,

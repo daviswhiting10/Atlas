@@ -49,11 +49,6 @@ export default async function ClientProgressPage({ params }: { params: { id: str
               : `${sessions} workout${sessions === 1 ? "" : "s"} and ${prs} record${prs === 1 ? "" : "s"} since ${format(parseISO(since), "MMM d")}. This is the same screen ${firstName} sees.`}
           </p>
         </div>
-        <nav className="flex shrink-0 gap-1 text-sm">
-          <Link href={`/clients/${client.id}/progress/body`} className="press rounded-lg px-3 py-2 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
-            Body
-          </Link>
-        </nav>
       </div>
       <ProgressView data={data} goalMetric={metric} emptyAction={{ href: `/clients/${client.id}/log`, label: `Log a workout for ${firstName}` }} />
       {milestones.length > 0 && (

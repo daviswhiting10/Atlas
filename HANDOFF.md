@@ -9,7 +9,7 @@ Last updated 2026-11-17. Read this, then `CLAUDE.md`. Design docs are in `docs/`
 - **Production database:** migrations up to `20261117010000_session_source_import` (additive: `IMPORT` added to `SessionSource`; backup `prod-before-import-source-20261116-201345.dump`). `dev-sessions` has the same. Never run `prisma migrate dev` on `main` against `dev-sessions`: it would offer to reset the database.
 - **In flight (W2, not on `main`):** **Design pass 1**, branch `design-pass-1` (worktree `~/Documents/atlas-readability`, based on `e388a9f`, commits `8702141` and `0278b06`). W2 says it's ready: Coach | Me toggle, client page, Today, Progress and the logger reworked, "Visual rules" added to `docs/principles.md`; no schema or data changes. **Not merged**: waiting for the user's go-ahead to W1. Then merge, run the usual checks, push, and log the rollback (`d7ca967` unless more lands first). Don't touch W2's logger files meanwhile.
 - **Batch B check, one open item:** on dev, deleting a set that leaves everything logged showed the "Finishing… Undo" toast on both loggers, and an Undo in time left the session open for 50+ s. In two earlier runs a session finished 10–30 s after my Undo, with extra server calls; not reproduced in the monitored runs, and a screenshot between the hold and the Undo (the page counts as hidden, so toasts pause while the finish timer keeps running) probably explains one of them. Watch for sessions finishing by themselves.
-- **Still unconfirmed:** whether Vercel's `DATABASE_URL` uses the Neon `-pooler` host (the Vercel CLI login here has expired), and the Body/Measurements cut (0 measurements ever; left in until the user decides).
+- **Still unconfirmed:** whether Vercel's `DATABASE_URL` uses the Neon `-pooler` host (the Vercel CLI login here has expired). The Body/Measurements screens are cut (UI only; the `Measurement` table and data are untouched).
 - **Not done:** the speed ideas left over (Progress still reads every set a client has logged; Neon's 5-minute idle sleep).
 - **Uncommitted files:** `Untitled` in the repo is the user's draft prompt. Leave it.
 - **Design docs** on `main`: `docs/review-and-v1-scope.md`, `docs/screenshot-to-session.md`, `docs/training-types.md` (see "Training types" below).
@@ -214,7 +214,7 @@ Check this order against `docs/review-and-v1-scope.md` before planning.
 ## Open questions
 - Two set-less sessions on production from a churned client added May 21: real client or test data?
 - Body measurements are still entered in kg; does "lb everywhere" cover body weight?
-- Cut the Body/Measurements screens (0 measurements ever)? Left in until the user decides.
+- Body/Measurements screens: cut (UI only, table untouched). Replacement `log_measurement` is parked in `docs/mcp-roadmap.md`; a schema change needs the user's approval first.
 - Is Vercel's `DATABASE_URL` the Neon `-pooler` host? Needs the user's Vercel settings or a fresh `vercel login`.
 - Plan imports still link a name to a library name that contains it (`lib/programs/resolve-exercise.ts`, step 3). Replace that with a pick-from-close-matches screen?
 - Whether picking a library exercise after typing something else should save an alternate name.
