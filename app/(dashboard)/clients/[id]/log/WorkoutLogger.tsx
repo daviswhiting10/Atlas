@@ -23,9 +23,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  ArrowDown,
-  ArrowUp,
-  GripVertical,
   Loader2,
   Mic,
   MicOff,
@@ -46,7 +43,6 @@ import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
-import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 
@@ -67,7 +63,9 @@ const store = () => {
     return null;
   }
 };
-import { fromRows, labelsOf, moveRow, sessionOrder, stepRow, toRows, type OrderEntry, type ReorderRow } from "@/lib/sessions/order";
+import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
+import { useDragOrder } from "./useDragOrder";
+import { useLongPress } from "@/hooks/use-long-press";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -325,7 +323,7 @@ export default function WorkoutLogger({
 }) {
   const router = useRouter();
 
-  // ── This session's order (Reorder mode) ──────────────────────────────────────
+  // ── This session's order (moved by holding a card and dragging it) ─────────────
   // Kept on this phone with the live session and cleared when the session is finished. The plan
   // is never changed, and sets follow their exercise (each set points at it, not at a place).
   const [savedOrder, setSavedOrder] = useState<OrderEntry[] | null>(null);
@@ -341,7 +339,18 @@ export default function WorkoutLogger({
       return ex ? [{ ...ex, section: o.section }] : [];
     });
   }, [planExercises, order]);
-  const [reordering, setReordering] = useState(false);
+  // Hold a card's header to pick it up; drop between cards to reorder, hold over one to superset.
+  const drag = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  /** Up, Down and "superset with the one above", for screen readers (useDragOrder's gestures, as buttons). */
+  const moves = (aweId: string) => {
+    const i = order.findIndex((o) => o.aweId === aweId);
+    const above = order[i - 1]?.aweId;
+    return {
+      up: () => setSavedOrder(stepOrder(order, aweId, -1)),
+      down: () => setSavedOrder(stepOrder(order, aweId, 1)),
+      merge: above && canMerge(order, aweId, above) && order[i - 1].section !== order[i].section ? () => setSavedOrder(mergeWith(order, aweId, above)) : undefined,
+    };
+  };
   const [whenOpen, setWhenOpen] = useState(false);
 
   // ── Shared state ────────────────────────────────────────────────────────────
@@ -1363,15 +1372,6 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
-          {reordering ? (
-            <button
-              type="button"
-              onClick={() => setReordering(false)}
-              className="logger-quiet flex h-9 shrink-0 items-center gap-1 rounded-full bg-dusk-button px-4 text-[14px] font-semibold text-dusk-button-text"
-            >
-              <Check className="h-4 w-4" strokeWidth={2.5} /> Done
-            </button>
-          ) : null}
         </div>
         </div>
       </div>
@@ -1395,15 +1395,15 @@ export default function WorkoutLogger({
         <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
       </button>
 
-      {/* ── Reorder mode: every exercise as one row, moved by drag or arrows ───── */}
-      {reordering ? (
-        <ReorderList
-          order={order}
-          names={Object.fromEntries(exercises.map((e) => [e.aweId, e.name]))}
-          onChange={setSavedOrder}
-        />
-      ) : (
-      <div className="space-y-4">
+      {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
+      <div ref={drag.listRef} className="relative space-y-4">
+        {drag.lineTop != null && (
+          <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+            <span className="h-[3px] flex-1 rounded-full bg-dusk-teal" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+          </div>
+        )}
         {groupIntoBlocks(exercises).map((block, bi) => {
           if (block.exIndices.length === 0) return null;
           // No block headings: each card's label ("1A: Bench Press") shows the grouping.
@@ -1418,14 +1418,16 @@ export default function WorkoutLogger({
                 const secs = ex.prescribedSets[0]?.unit === "secs";
                 if (isFolded(ex)) {
                   return (
-                    <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
-                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} onHold={completed ? undefined : () => setReordering(true)} />
+                    <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} style={drag.styleFor(ex.aweId)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
+                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} hold={drag.bind(ex.aweId)} />
+                      {!completed && <MoveButtons name={ex.name} {...moves(ex.aweId)} />}
                     </section>
                   );
                 }
                 return (
-                  <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} className="scroll-mt-28 rounded-2xl border border-line bg-paper px-3 pb-1 pt-2">
-                    <CompactHeader ex={ex} index={block.labels[k]} onFold={() => setFolded(ex.aweId, true)} onHold={completed ? undefined : () => setReordering(true)} />
+                  <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} style={drag.styleFor(ex.aweId)} className="scroll-mt-28 rounded-2xl border border-line bg-paper px-3 pb-1 pt-2">
+                    <CompactHeader ex={ex} index={block.labels[k]} onFold={() => setFolded(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                    {!completed && <MoveButtons name={ex.name} {...moves(ex.aweId)} />}
 
                     <SetTable
                       secs={secs}
@@ -1511,11 +1513,10 @@ export default function WorkoutLogger({
           );
         })}
       </div>
-      )}
 
-      {!reordering && addExercise}
+      {addExercise}
 
-      {!reordering && soapPanel}
+      {soapPanel}
 
 
       {/* ── Date, week and day: one sheet ───────────────────────────── */}
@@ -1762,28 +1763,35 @@ function CompactHeader({
   ex,
   index,
   onFold,
-  onHold,
+  hold,
 }: {
   ex: LoggerExercise;
   index: number | string;
-  /** Fold the card to one row. */
+  /** Fold the card to one row (a tap on the header). */
   onFold: () => void;
-  /** Holding the exercise's row: reorder the session's exercises. */
-  onHold?: () => void;
+  /** Holding the header picks the card up (useDragOrder). */
+  hold: React.HTMLAttributes<HTMLElement>;
 }) {
   const notes = Array.from(
     new Set([ex.lastNote?.trim(), ...ex.prevWorkoutSets.map((x) => x.note?.trim())].filter((x): x is string => !!x))
   );
   return (
     <div className="mb-1 min-w-0">
-      <HoldRow onHold={onHold ?? (() => {})} className="-mr-1.5 flex items-center gap-2">
+      <div
+        {...hold}
+        onClick={(e) => {
+          // A tap folds the card; its own buttons (the picture, the chevron) do their own thing.
+          if (!(e.target as HTMLElement).closest("button")) onFold();
+        }}
+        className="-mr-1.5 flex cursor-pointer select-none items-center gap-2 [-webkit-touch-callout:none]"
+      >
         <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
         <div className="min-w-0 flex-1">
           <ExerciseName as="h3" name={labelled(String(index), ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">{rxLabel(ex)}</p>
         </div>
         <CollapseButton name={ex.name} onClick={onFold} />
-      </HoldRow>
+      </div>
       {notes.length > 0 && (
         <p className="mt-1 line-clamp-2 border-l-2 border-[var(--success)]/40 pl-2 text-[12px] italic leading-snug text-[var(--success)]">
           {notes.map((n) => `“${n}”`).join(" ")}
@@ -1809,91 +1817,25 @@ function PartDivider({ title }: { title: string }) {
 }
 
 /**
- * Reorder mode: each exercise as one row with a drag handle, and small Up/Down arrows as the
- * fallback. The part headings (Block n, Cool-down, and Warm-up when it has exercises) stay as
- * dividers: whichever an exercise lands under is its part.
- * An emptied block disappears and the labels renumber (lib/sessions/order).
+ * Up, Down and "superset with the one above" for a screen reader or a keyboard: what holding and
+ * dragging the card does, as buttons. Hidden until focused.
  */
-function ReorderList({ order, names, onChange }: { order: OrderEntry[]; names: Record<string, string>; onChange: (o: OrderEntry[]) => void }) {
-  const rows = toRows(order);
-  const labels = labelsOf(order);
-  const [dragging, setDragging] = useState<string | null>(null);
-  const rowEls = useRef(new Map<string, HTMLElement>());
-  const keyOf = (r: ReorderRow) => (r.kind === "heading" ? `h:${r.section}` : r.aweId);
-  const lastItem = rows.reduce((n, r, i) => (r.kind === "item" ? i : n), -1);
-
-  function onMove(e: React.PointerEvent, aweId: string) {
-    if (dragging !== aweId) return;
-    const y = e.clientY;
-    // Near the top or bottom edge: scroll so a row can travel the whole list.
-    if (y < 150) window.scrollBy(0, -12);
-    else if (y > window.innerHeight - 110) window.scrollBy(0, 12);
-    const from = rows.findIndex((r) => r.kind === "item" && r.aweId === aweId);
-    const over = rows.findIndex((r) => {
-      const b = rowEls.current.get(keyOf(r))?.getBoundingClientRect();
-      return b != null && y >= b.top && y < b.bottom;
-    });
-    if (over === -1 || over === from) return;
-    onChange(fromRows(moveRow(rows, aweId, over)));
-  }
-
+function MoveButtons({ name, up, down, merge }: { name: string; up: () => void; down: () => void; merge?: () => void }) {
+  const cls = "logger-quiet rounded-lg border border-line-strong px-3 py-2 text-[13px] font-medium text-ink";
   return (
-    <ol className="space-y-1.5" aria-label="Exercises, in order">
-      {rows.map((r, i) =>
-        // An empty Warm-up isn't shown: nothing is moved into a warm-up the plan doesn't have.
-        r.kind === "heading" && r.section === WARMUP && rows[i + 1]?.kind !== "item" ? null : r.kind === "heading" ? (
-          <li key={keyOf(r)} ref={(el) => void (el ? rowEls.current.set(keyOf(r), el) : rowEls.current.delete(keyOf(r)))} className="pt-2">
-            <PartDivider title={r.title} />
-          </li>
-        ) : (
-          <li
-            key={r.aweId}
-            ref={(el) => void (el ? rowEls.current.set(r.aweId, el) : rowEls.current.delete(r.aweId))}
-            className={cn(
-              "flex items-center gap-1 rounded-xl border pr-1 transition-shadow",
-              dragging === r.aweId ? "relative z-10 border-ink/60 bg-dusk-raised shadow-[0_12px_28px_-12px_rgba(0,0,0,0.8)]" : "border-line bg-paper"
-            )}
-          >
-            <button
-              type="button"
-              aria-label={`Drag ${names[r.aweId]}`}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.currentTarget.setPointerCapture(e.pointerId);
-                setDragging(r.aweId);
-              }}
-              onPointerMove={(e) => onMove(e, r.aweId)}
-              onPointerUp={() => setDragging(null)}
-              onPointerCancel={() => setDragging(null)}
-              className="logger-cell flex h-12 w-11 shrink-0 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
-            >
-              <GripVertical className="h-5 w-5" />
-            </button>
-            <span className="min-w-0 flex-1 py-2 text-[16px] font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
-              {labelled(labels[r.aweId], names[r.aweId] ?? "")}
-            </span>
-            <button
-              type="button"
-              aria-label={`Move ${names[r.aweId]} up`}
-              disabled={i <= 1}
-              onClick={() => onChange(fromRows(stepRow(rows, r.aweId, -1)))}
-              className="logger-cell flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink disabled:opacity-25"
-            >
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              aria-label={`Move ${names[r.aweId]} down`}
-              disabled={i >= lastItem && i === rows.length - 1}
-              onClick={() => onChange(fromRows(stepRow(rows, r.aweId, 1)))}
-              className="logger-cell flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink disabled:opacity-25"
-            >
-              <ArrowDown className="h-3.5 w-3.5" />
-            </button>
-          </li>
-        )
+    <div className="sr-only flex gap-2 px-3 pb-2 focus-within:not-sr-only">
+      <button type="button" onClick={up} className={cls}>
+        Move {name} up
+      </button>
+      <button type="button" onClick={down} className={cls}>
+        Move {name} down
+      </button>
+      {merge && (
+        <button type="button" onClick={merge} className={cls}>
+          Superset {name} with the one above
+        </button>
       )}
-    </ol>
+    </div>
   );
 }
 
@@ -1916,14 +1858,14 @@ function CollapseButton({ name, onClick }: { name: string; onClick: () => void }
  * A folded exercise: one skinny row with its badge and name, then a tick when every set is
  * logged or "3/4" when some are. Tapping anywhere on it opens the card again.
  */
-function FoldedRow({ label, name, sets, onOpen, onHold }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void; /** Holding the row: reorder. */ onHold?: () => void }) {
-  const press = useLongPress(onHold ?? (() => {}), onOpen);
+function FoldedRow({ label, name, sets, onOpen, hold = {} }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void; /** Holding the row picks the card up (useDragOrder). */ hold?: React.HTMLAttributes<HTMLElement> }) {
   const logged = sets.filter((x) => x.completed).length;
   const done = sets.length > 0 && logged === sets.length;
   return (
     <button
       type="button"
-      {...(onHold ? press : { onClick: onOpen })}
+      {...hold}
+      onClick={onOpen}
       aria-expanded={false}
       aria-label={`Expand ${name}`}
       className="logger-quiet flex w-full select-none items-center gap-2 py-1.5 pl-3 pr-1.5 text-left [-webkit-touch-callout:none]"

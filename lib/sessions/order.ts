@@ -7,11 +7,14 @@
  * Sets follow their exercise without moving: a SetLog points at its
  * AssignedWorkoutExercise, not at a position.
  *
- * Reorder mode is a flat list of rows: a heading for each part (Warm-up,
- * Block 1…n, Cool-down) with the exercises under them.
- * Dragging, or Up/Down, moves an exercise between rows; what heading it ends
- * up under decides its part. Blocks are then renumbered in order, so an
- * emptied block disappears and the labels (1A, 1B, 2…) stay sensible.
+ * Moving is direct, on the cards themselves (no mode):
+ * - a drop **between** rows reorders and never merges (dropAt); a drop inside
+ *   another block's run lands just below that block;
+ * - holding over a row's middle and letting go supersets the two (mergeWith);
+ * - dropping a member outside its block splits it out on its own.
+ * Blocks are then renumbered in order, so an emptied block disappears and the
+ * labels (1A, 1B, 2…) stay sensible. stepOrder is the same for Up/Down buttons
+ * (screen readers).
  *
  * Pure: no I/O.
  */
@@ -24,12 +27,18 @@ import { COOLDOWN, WARMUP, blockSection, canonicalSections, readSection, structu
 export type OrderEntry = { aweId: string; section: string };
 export type PlanEntry = { aweId: string; section: string | null };
 
-export type ReorderRow = { kind: "heading"; section: string; title: string } | { kind: "item"; aweId: string };
-
-/** Sections in canonical form and blocks numbered 1, 2, 3… in the order they appear. */
+/**
+ * Sections in canonical form, blocks numbered 1, 2, 3… in the order they appear, and the
+ * entries in the order they're shown (warm-up, blocks, cool-down), so a position in this list
+ * is a position on the screen.
+ */
 function normalise(entries: OrderEntry[]): OrderEntry[] {
   const sections = canonicalSections(entries, (e) => e.section);
-  return entries.map((e, i) => ({ aweId: e.aweId, section: sections[i] }));
+  const rank = (s: string) => (s === WARMUP ? 0 : s === COOLDOWN ? 2 : 1);
+  return entries
+    .map((e, i) => ({ aweId: e.aweId, section: sections[i], i }))
+    .sort((a, b) => rank(a.section) - rank(b.section) || a.i - b.i)
+    .map(({ aweId, section }) => ({ aweId, section }));
 }
 
 /**
@@ -53,53 +62,86 @@ export function sessionOrder(plan: PlanEntry[], saved: OrderEntry[] | null | und
   return normalise([...kept, ...shifted]);
 }
 
-/** The order as rows for reorder mode: every part's heading and its exercises. */
-export function toRows(order: OrderEntry[]): ReorderRow[] {
-  const s = structure(order, (e) => e.section);
-  const rows: ReorderRow[] = [{ kind: "heading", section: WARMUP, title: "Warm-up" }];
-  for (const it of s.warmup) rows.push({ kind: "item", aweId: it.item.aweId });
-  for (const b of s.blocks) {
-    rows.push({ kind: "heading", section: blockSection(b.n), title: `Block ${b.n}` });
-    for (const it of b.items) rows.push({ kind: "item", aweId: it.item.aweId });
+type Part = "warmup" | "block" | "cooldown";
+const partOf = (section: string): Part => (section === WARMUP ? "warmup" : section === COOLDOWN ? "cooldown" : "block");
+/** A section that makes an exercise a block of its own (renumbered by normalise). */
+const SINGLE = "";
+const same = (a: OrderEntry[], b: OrderEntry[]) => a.length === b.length && a.every((e, i) => e.aweId === b[i].aweId && e.section === b[i].section);
+
+/**
+ * Drop an exercise into a gap between the other exercises: `gap` counts the others above it
+ * (0 = before all of them). Its original place is a no-op. Never merges:
+ * - inside its own block's run: it stays in its block (the halves of a superset swap);
+ * - inside another block's run: it lands just below that block, on its own;
+ * - between parts or blocks: it keeps its part when that's on either side (a warm-up stays a
+ *   warm-up), otherwise it becomes a block of its own; next to only a warm-up or cool-down, it
+ *   joins it (nothing goes above the warm-up or below the cool-down).
+ */
+export function dropAt(order: OrderEntry[], aweId: string, gap: number): OrderEntry[] {
+  const o = normalise(order);
+  const from = o.findIndex((e) => e.aweId === aweId);
+  if (from === -1) return o;
+  const me = o[from];
+  const others = o.filter((e) => e.aweId !== aweId);
+  let at = Math.max(0, Math.min(gap, others.length));
+  if (at === from) return o;
+  const above = others[at - 1];
+  const below = others[at];
+  let section: string;
+  if (above && below && above.section === below.section) {
+    if (partOf(above.section) !== "block") section = above.section;
+    else if (above.section === me.section) section = me.section;
+    else {
+      while (others[at]?.section === above.section) at++;
+      if (at === from) return o;
+      section = SINGLE;
+    }
+  } else {
+    const sides = [above, below].filter((e): e is OrderEntry => e != null).map((e) => partOf(e.section));
+    const mine = partOf(me.section);
+    if (sides.includes(mine)) section = mine === "block" ? SINGLE : me.section;
+    else if (sides.includes("block")) section = SINGLE;
+    else section = sides[0] === "warmup" ? WARMUP : COOLDOWN;
   }
-  rows.push({ kind: "heading", section: COOLDOWN, title: "Cool-down" });
-  for (const it of s.cooldown) rows.push({ kind: "item", aweId: it.item.aweId });
-  return rows;
+  return normalise([...others.slice(0, at), { aweId, section }, ...others.slice(at)]);
 }
 
-/** Rows back to an order: each exercise takes the part of the heading above it. */
-export function fromRows(rows: ReorderRow[]): OrderEntry[] {
-  const out: OrderEntry[] = [];
-  let section = WARMUP;
-  for (const r of rows) {
-    if (r.kind === "heading") section = r.section;
-    else out.push({ aweId: r.aweId, section });
-  }
-  return normalise(out);
+/** Can `aweId` be held over `targetId` to superset them? Only onto a block's exercise. */
+export function canMerge(order: OrderEntry[], aweId: string, targetId: string): boolean {
+  const target = order.find((e) => e.aweId === targetId);
+  return aweId !== targetId && target != null && partOf(target.section) === "block";
 }
 
 /**
- * Move one exercise to a row position (the index it should have once moved).
- * Index 0 is above the Warm-up heading, so it's clamped to just under it.
+ * Superset an exercise with another: it joins the target's block, right after it. Already in
+ * the same block, it takes the target's place instead (the two swap sides).
  */
-export function moveRow(rows: ReorderRow[], aweId: string, to: number): ReorderRow[] {
-  const from = rows.findIndex((r) => r.kind === "item" && r.aweId === aweId);
-  if (from === -1) return rows;
-  const without = rows.filter((_, i) => i !== from);
-  const at = Math.max(1, Math.min(to, without.length));
-  return [...without.slice(0, at), rows[from], ...without.slice(at)];
+export function mergeWith(order: OrderEntry[], aweId: string, targetId: string): OrderEntry[] {
+  const o = normalise(order);
+  if (!canMerge(o, aweId, targetId)) return o;
+  const from = o.findIndex((e) => e.aweId === aweId);
+  const target = o.find((e) => e.aweId === targetId)!;
+  const others = o.filter((e) => e.aweId !== aweId);
+  const t = others.findIndex((e) => e.aweId === targetId);
+  const before = o[from].section === target.section && from > o.indexOf(target);
+  const at = before ? t : t + 1;
+  return normalise([...others.slice(0, at), { aweId, section: target.section }, ...others.slice(at)]);
 }
 
-/** Up or Down one row (crossing a heading moves it into the next part). */
-export function stepRow(rows: ReorderRow[], aweId: string, dir: -1 | 1): ReorderRow[] {
-  const from = rows.findIndex((r) => r.kind === "item" && r.aweId === aweId);
-  if (from === -1) return rows;
-  return moveRow(rows, aweId, from + dir);
-}
-
-/** Moving an exercise: the order after it, ready to save. */
-export function move(order: OrderEntry[], aweId: string, to: number): OrderEntry[] {
-  return fromRows(moveRow(toRows(order), aweId, to));
+/** Up or Down for a screen reader: the nearest drop above or below that changes anything. */
+export function stepOrder(order: OrderEntry[], aweId: string, dir: -1 | 1): OrderEntry[] {
+  const o = normalise(order);
+  const from = o.findIndex((e) => e.aweId === aweId);
+  if (from === -1) return o;
+  // At the edge of its superset: out of it, where it stands, first.
+  const me = o[from];
+  const inGroup = partOf(me.section) === "block" && o.some((e, i) => i !== from && e.section === me.section);
+  if (inGroup && o[from + dir]?.section !== me.section) return normalise(o.map((e, i) => (i === from ? { ...e, section: SINGLE } : e)));
+  for (let g = from + dir; g >= 0 && g < o.length; g += dir) {
+    const next = dropAt(o, aweId, g);
+    if (!same(next, o)) return next;
+  }
+  return o;
 }
 
 /** Each exercise's label in this order: "1A", "2", or "W" / "C". */
