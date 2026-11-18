@@ -169,25 +169,23 @@ Entry: the link → landing (`/`) → **Explore a live demo** (one tap, ~5 s) �
 
 | Control | Where it goes |
 |---|---|
-| Back to today | → /today |
-| Lower AWeek 12 · 0/20 sets · 0:01 | gone, opened a sheet/menu |
-| 1Back Squat0/4 sets | already here / selected |
-| 2Romanian Deadlift0/4 sets | changed the page |
-| 3Dumbbell Lunge0/3 sets | changed the page |
-| 4Leg Curl0/3 sets | changed the page |
-| 5Standing Calf Raise0/3 sets | changed the page |
-| 6Plank0/3 sets | changed the page |
-| Add an exercise | opened a sheet/menu |
-| See Back Squat larger | opened a sheet/menu |
-| Swap | opened a sheet/menu |
-| Change target | changed the page |
+| Back to Today | → /today |
+| Lower AWeek 12 · 0/20 sets · 0:00 | opened a sheet/menu |
+| More | opened a sheet/menu |
+| See Back Squat | opened a sheet/menu |
+| More for Back Squat | opened a sheet/menu |
 | Decrease Set N weight | already here / selected |
 | Increase Set N weight | already here / selected |
 | Decrease Set N reps | already here / selected |
 | Increase Set N reps | already here / selected |
 | Mark set N done | changed the page |
-| Add a set | changed the page |
-| Remove | destructive: gone |
+| Add set | changed the page |
+| Open Romanian Deadlift | gone |
+| Open Dumbbell Lunge | changed the page |
+| Open Leg Curl | changed the page |
+| Open Standing Calf Raise | changed the page |
+| Open Plank | changed the page |
+| Add an exercise | opened a sheet/menu |
 | Atlas home | → /today |
 | Today | → /today |
 | Plan | → /plan |
@@ -195,6 +193,19 @@ Entry: the link → landing (`/`) → **Explore a live demo** (one tap, ~5 s) �
 | You | → /you |
 | Coach | → /log |
 | Me | → /today |
+| Back to today | → /today |
+| Lower AWeek 12 · 0/20 sets · 0:01 | opened a sheet/menu |
+| 1Back Squat0/4 sets | already here / selected |
+| 2Romanian Deadlift0/4 sets | changed the page |
+| 3Dumbbell Lunge0/3 sets | changed the page |
+| 4Leg Curl0/3 sets | changed the page |
+| 5Standing Calf Raise0/3 sets | changed the page |
+| 6Plank0/3 sets | changed the page |
+| See Back Squat larger | opened a sheet/menu |
+| Swap | opened a sheet/menu |
+| Change target | changed the page |
+| Add a set | changed the page |
+| Remove | destructive: gone |
 
 ### `/workouts/new`
 
