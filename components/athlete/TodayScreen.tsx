@@ -5,6 +5,7 @@ import type { Athlete } from "@/lib/athlete/data";
 import type { PlanOverview } from "@/lib/plan/overview";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { PendingPlan } from "@/components/athlete/PendingPlan";
+import { EmptyStart } from "@/components/athlete/EmptyStart";
 
 const label = "text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute";
 
@@ -78,18 +79,18 @@ export function TodayScreen({
         </section>
       )}
 
-      {/* No plan: logging is the action. Someone who can pick their own plan (a self-made account, or a
-          coach on their own training) gets the way to one as secondary text. */}
-      {!plan && (
+      {/* No plan: logging is the action. A coach's athlete is waiting on a plan, so it is one line and the one
+          button. Someone who builds their own (a self-made account, or a coach on their own training) gets
+          the way to a plan as secondary text. */}
+      {!plan && !athlete.selfServe && !athlete.isCoach && <EmptyStart />}
+      {!plan && (athlete.selfServe || athlete.isCoach) && (
         <section className="rise">
           <Link href="/workouts/new" className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
             Log a workout
           </Link>
-          {(athlete.selfServe || athlete.isCoach) && (
-            <Link href="/you?goals=1" className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
-              Choose a plan
-            </Link>
-          )}
+          <Link href="/you?goals=1" className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
+            Choose a plan
+          </Link>
         </section>
       )}
 

@@ -50,11 +50,14 @@ export function nextTarget({
       weight: null,
       reps: repMin,
       kind: "first",
-      headline: `Find your starting ${increment > 0 ? "weight" : "point"}`,
+      headline: `Find your starting ${increment > 0 && unit !== "secs" ? "weight" : "point"}`,
+      // Only a rep-based lift is told to pick a weight for N reps; a hold is timed.
       reason:
-        increment > 0
-          ? `Pick a weight you could lift about ${repMax + 2} times. Today sets your baseline.`
-          : `Stop a rep or two short of failure. Today sets your baseline.`,
+        unit === "secs"
+          ? `Hold as long as you can with good form. Today sets your baseline.`
+          : increment > 0
+            ? `Pick a weight you could lift about ${repMax + 2} times. Today sets your baseline.`
+            : `Stop a rep or two short of failure. Today sets your baseline.`,
     };
   }
 
@@ -78,8 +81,8 @@ export function nextTarget({
     };
   }
 
-  // Unloaded or timed work: progress by reps / seconds only.
-  if (topWeight == null || increment <= 0) {
+  // Unloaded or timed work: progress by reps / seconds only (a hold never works in "reps at a weight").
+  if (topWeight == null || increment <= 0 || unit === "secs") {
     const step = unit === "secs" ? 5 : 1;
     const goal = bestReps + step;
     return {
@@ -254,6 +257,14 @@ export const METRICS: Record<FocusMetric, { label: string; short: string; unit: 
   // thousands. The unit says "total" so it is never read as a weight on the bar.
   volume: { label: "Session volume (weight × reps, all sets)", short: "Volume", unit: (loaded) => (loaded ? "lb total" : "reps total") },
 };
+
+/** The short metric name: a timed exercise's "reps" is its time. */
+export function shortFor(metric: FocusMetric, timed = false): string {
+  return timed && metric === "reps" ? "Time" : METRICS[metric].short;
+}
+
+/** What a personal record is called: a hold's best is its longest. */
+export const recordLabel = (timed: boolean) => (timed ? "Longest hold" : "Personal record");
 
 /** Unit for a charted value. Timed holds (a plank) are measured in seconds, not reps. */
 export function unitFor(metric: FocusMetric, loaded: boolean, timed = false): string {

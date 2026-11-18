@@ -11,6 +11,7 @@ import { createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS } from "@/lib/athlete/data";
+import { displayName } from "@/lib/plan/catalog";
 import {
   LIMITS,
   PlanEditError,
@@ -307,4 +308,38 @@ export async function startMyProgram(raw: { programId: string; startDate: string
   }
   refresh();
   return { ok: true };
+}
+
+
+/** A finished session's sets for the read-only summary: each exercise with what was done, in the order it was done. */
+export type SessionSummary = { lines: Array<{ name: string; sets: string }> };
+
+export async function sessionSummary(workoutLogId: string): Promise<SessionSummary | null> {
+  const { clientId } = await requireAthlete();
+  const id = z.string().min(1).max(64).parse(workoutLogId);
+  const log = await prisma.workoutLog.findFirst({
+    where: { id, clientId },
+    select: {
+      sets: {
+        where: { completed: true },
+        orderBy: [{ createdAt: "asc" }, { setNumber: "asc" }],
+        select: {
+          weight: true,
+          reps: true,
+          exercise: { select: { name: true, slug: true } },
+          assignedWorkoutExercise: { select: { prescribedSets: true } },
+        },
+      },
+    },
+  });
+  if (!log) return null;
+  const byName = new Map<string, string[]>();
+  for (const s of log.sets) {
+    if (!s.exercise || s.reps == null) continue;
+    const name = displayName(s.exercise.slug, s.exercise.name);
+    const timed = ((s.assignedWorkoutExercise?.prescribedSets as Array<{ unit?: string }> | null) ?? [])[0]?.unit === "secs";
+    const text = timed ? `${s.reps} sec` : s.weight != null && s.weight > 0 ? `${s.weight}×${s.reps}` : `${s.reps}`;
+    byName.set(name, [...(byName.get(name) ?? []), text]);
+  }
+  return { lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })) };
 }

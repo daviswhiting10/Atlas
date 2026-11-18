@@ -1,19 +1,22 @@
 "use client";
 
-import { parts, structure } from "@/lib/workouts/structure";
+import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ExercisePicture } from "@/components/ExercisePicture";
+import { ExerciseThumb } from "@/components/ExercisePicture";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
-import { ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Medal, Minus, Plus, Repeat2, SlidersHorizontal, Timer, Trash2, TrendingUp, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
 import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveSet } from "@/lib/actions/athlete";
 import { ExercisePicker } from "./ExercisePicker";
 import { TargetEditor } from "./TargetEditor";
-import { METRICS, formatValue, buildSeries, e1rm, isE1rmBest, isRecord, metricFor, sessionPoint, unitFor } from "@/lib/plan/overload";
-import { ProgressChart } from "./ProgressChart";
+import { e1rm, isE1rmBest, isRecord, recordLabel } from "@/lib/plan/overload";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
+// The coach logger's hold-and-drag (hold a card's header to lift it, drop between cards to reorder,
+// hold over a card to superset). Imported as it is; nothing in that folder is changed.
+import { useDragOrder } from "@/app/(dashboard)/clients/[id]/log/useDragOrder";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
@@ -103,10 +106,18 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const router = useRouter();
   const [sets, setSetsState] = useState<SetMap>(() => Object.fromEntries(data.exercises.map((e) => [e.aweId, e.sets])));
   const setsRef = useRef(sets);
-  const [index, setIndex] = useState(() => {
-    const i = data.exercises.findIndex((e) => e.sets.some((s) => !s.done));
-    return i === -1 ? 0 : i;
+  // Cards that are open: the first exercise with sets left to log. Tap a header to fold or open.
+  const [open, setOpen] = useState<Set<string>>(() => {
+    const first = data.exercises.find((e) => e.sets.some((s) => !s.done)) ?? data.exercises[0];
+    return new Set(first ? [first.aweId] : []);
   });
+  const setOpenFor = (aweId: string, on: boolean) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(aweId);
+      else next.delete(aweId);
+      return next;
+    });
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [records, setRecords] = useState<Record<string, string>>({});
@@ -118,13 +129,43 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const startedAt = useRef(Date.now());
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const debounce = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const railRef = useRef<HTMLDivElement>(null);
-  // Each exercise's place in the workout: "1A", "2", "W" (warm-up), "C" (cool-down).
-  const labels = useMemo(() => {
-    const out = new Map<number, string>();
-    for (const p of parts(structure(data.exercises, (e) => e.role))) for (const it of p.items) out.set(it.index, it.label ?? (p.key === "warmup" ? "W" : "C"));
-    return out;
-  }, [data.exercises]);
+
+  // ── This session's order (hold a card's header and drag it) ─────────────────────
+  // Kept on this phone for the session; the plan is never changed, and sets follow their exercise.
+  const orderKey = `atlas:order:${data.id}`;
+  const [savedOrder, setSavedOrderState] = useState<OrderEntry[] | null>(null);
+  const setSavedOrder = (o: OrderEntry[] | null) => {
+    setSavedOrderState(o);
+    try {
+      if (o) store()?.setItem(orderKey, JSON.stringify(o));
+    } catch {}
+  };
+  useEffect(() => {
+    try {
+      const raw = store()?.getItem(orderKey);
+      if (raw) setSavedOrderState(JSON.parse(raw));
+    } catch {}
+  }, [orderKey]);
+  const order = useMemo(() => sessionOrder(data.exercises.map((e) => ({ aweId: e.aweId, section: e.role })), savedOrder), [data.exercises, savedOrder]);
+  /** The exercises in this session's order, each in the part it was moved to. */
+  const exercises = useMemo(() => {
+    const byId = new Map(data.exercises.map((e) => [e.aweId, e]));
+    return order.flatMap((o) => {
+      const ex = byId.get(o.aweId);
+      return ex ? [{ ...ex, role: o.section }] : [];
+    });
+  }, [data.exercises, order]);
+  const drag = useDragOrder({ order, enabled: data.status !== "LOGGED", onChange: setSavedOrder });
+  /** Up, Down and "superset with the one above", for screen readers (the drag gestures, as buttons). */
+  const moves = (aweId: string) => {
+    const i = order.findIndex((o) => o.aweId === aweId);
+    const above = order[i - 1]?.aweId;
+    return {
+      up: () => setSavedOrder(stepOrder(order, aweId, -1)),
+      down: () => setSavedOrder(stepOrder(order, aweId, 1)),
+      merge: above && canMerge(order, aweId, above) && order[i - 1].section !== order[i].section ? () => setSavedOrder(mergeWith(order, aweId, above)) : undefined,
+    };
+  };
 
   const apply = useCallback((next: SetMap) => {
     setsRef.current = next;
@@ -143,9 +184,10 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const jumpTo = useRef<string | null>(null);
   const swapped = useRef(new Set<string>());
   const [busy, startBusy] = useTransition();
-  const [picker, setPicker] = useState<null | "add" | "swap">(null);
-  const [editingTarget, setEditingTarget] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  /** The picker: adding an exercise, or swapping this one. */
+  const [picker, setPicker] = useState<null | { mode: "add" } | { mode: "swap"; aweId: string }>(null);
+  const [editingTarget, setEditingTarget] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   useEffect(() => {
     const prev = setsRef.current;
@@ -174,11 +216,12 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     }
     apply(next);
     if (jumpTo.current) {
-      const i = data.exercises.findIndex((e) => e.aweId === jumpTo.current);
-      if (i !== -1) setIndex(i);
+      // A new exercise opens; one that's gone from the plan drops out of the open cards.
+      const id = jumpTo.current;
       jumpTo.current = null;
+      setOpen((cur) => new Set([...Array.from(cur).filter((x) => data.exercises.some((e) => e.aweId === x)), id]));
     } else {
-      setIndex((i) => Math.min(i, Math.max(0, data.exercises.length - 1)));
+      setOpen((cur) => new Set(Array.from(cur).filter((x) => data.exercises.some((e) => e.aweId === x))));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.exercises, apply]);
@@ -214,12 +257,6 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([120, 60, 120]);
     }
   }, [now, rest]);
-
-  useEffect(() => {
-    const rail = railRef.current;
-    const el = rail?.querySelector<HTMLElement>("[data-active=true]");
-    if (rail && el) rail.scrollTo({ left: el.offsetLeft - rail.clientWidth / 2 + el.clientWidth / 2, behavior: "smooth" });
-  }, [index]);
 
   // Saves run one at a time, in order, so the first set of a workout always
   // creates the log before the second one looks for it.
@@ -287,8 +324,6 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   );
 
   const deloadWeek = data.deloadWeek;
-  const exercise = data.exercises[index];
-  const current = listOf(exercise);
 
   function edit(ex: LoggerExercise, i: number, patch: Partial<Pick<LoggerSet, "weight" | "reps">>) {
     const list = setsRef.current[ex.aweId] ?? ex.sets;
@@ -343,9 +378,10 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     };
     const mine = { weight: ex.loaded ? s.weight : null, reps: s.reps ?? 0 };
     if (ex.history.length > 0 && !deloadWeek && isRecord(mine, best)) {
-      const label = mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${ex.unit === "secs" ? "sec" : "reps"}`;
+      const timed = ex.unit === "secs";
+      const label = mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${timed ? "sec" : "reps"}`;
       setRecords((r) => ({ ...r, [key]: label }));
-      toast.success(`New record on ${ex.name}`, { description: label });
+      toast.success(`${recordLabel(timed)}: ${ex.name}`, { description: label });
     } else if (ex.history.length > 0 && !deloadWeek && mine.weight != null && mine.reps > 0) {
       // Not heavier, but stronger: more reps at a weight beats the best estimated max.
       const bestE1rm = Math.max(
@@ -375,11 +411,15 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       return;
     }
     setRest({ endsAt: Date.now() + ex.restSeconds * 1000, total: ex.restSeconds });
-    const at = data.exercises.findIndex((e) => e.aweId === ex.aweId);
-    const done = lists.map((l) => l.length > 0 && l.every(Boolean));
-    if (at === -1 || !done[at]) return;
-    const n = nextOpen(done, at);
-    if (n != null) setTimeout(() => setIndex(n), 450);
+    // An exercise's last set folds it and opens the next one with sets left (in the order on screen).
+    const shown = exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).length > 0 && (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));
+    const at = exercises.findIndex((e) => e.aweId === ex.aweId);
+    if (at === -1 || !shown[at]) return;
+    const n = nextOpen(shown, at);
+    setTimeout(() => {
+      setOpenFor(ex.aweId, false);
+      if (n != null) setOpenFor(exercises[n].aweId, true);
+    }, 450);
   }
 
   /** Delete a set that isn't logged (hold its row), with an Undo. Later sets close up. */
@@ -415,9 +455,9 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     finishTimer.current = null;
     toast.dismiss("finish");
   }
-  function scheduleFinish() {
+  function scheduleFinish(message = "All sets logged") {
     cancelFinish();
-    toast.success("Every set logged. Finishing…", {
+    toast.success(message, {
       id: "finish",
       duration: FINISH_DELAY_MS,
       action: { label: "Undo", onClick: () => cancelFinish() },
@@ -512,7 +552,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       try {
         // The last ticks may still be saving: wait for them, and finish only if they all stuck.
         await queue.current;
-        if (!allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) return;
+        // Everything logged, or finished early with at least one set logged.
+        if (!data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done))) return;
         const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
         await finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : minutes });
         setRest(null);
@@ -530,333 +571,280 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const doneCount = all.filter((s) => s.done).length;
   const totalCount = all.length;
   const volume = Math.round(all.reduce((sum, s) => (s.done && s.reps ? sum + (s.weight ?? 0) * s.reps : sum), 0));
-  const exerciseDone = (e: LoggerExercise) => listOf(e).every((s) => s.done);
-
-  const today = new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd in the athlete's own timezone
-  const { series, metric } = useMemo(() => {
-    const live = sessionPoint(today, current.map((s) => ({ weight: s.weight, reps: s.reps, completed: s.done })), deloadWeek);
-    const series = buildSeries(live ? [...exercise.history, live] : exercise.history);
-    return { series, metric: metricFor(data.metric, series.length > 0 ? series : exercise.history) };
-  }, [current, exercise.history, data.metric, today, deloadWeek]);
-  const metricName = !exercise.loaded && (data.metric === "weight" || data.metric === "e1rm") ? "reps" : metric;
-  const latest = series.at(-1)?.[metricName];
+  /** The workout's parts in the order they're done, each exercise with its badge ("1A", "2", "W", "C"). */
+  const blocks = useMemo(
+    () =>
+      parts(structure(exercises, (e) => e.role)).map((p) => ({
+        section: p.key,
+        title: p.title,
+        items: p.items.map((it) => ({ ex: exercises[it.index], label: it.label ?? (p.key === WARMUP ? "W" : "C") })),
+      })),
+    [exercises]
+  );
+  const swapping = picker?.mode === "swap" ? data.exercises.find((e) => e.aweId === picker.aweId) ?? null : null;
 
   const restLeft = rest ? (rest.endsAt - now) / 1000 : 0;
   const elapsed = (now - startedAt.current) / 1000;
 
-  // ── Summary ───────────────────────────────────────────────────────────────
+  // The "all logged" toast must not outlive the screen it belongs to.
+  useEffect(() => {
+    if (summary) toast.dismiss("finish");
+  }, [summary]);
+
+  // ── Done ──────────────────────────────────────────────────────────────────
   if (summary) {
     const recordList = Object.entries(records);
+    const tiles = [
+      [String(doneCount), "sets"],
+      ...(volume > 0 ? [[volume >= 10000 ? `${(volume / 1000).toFixed(1)}k` : volume.toLocaleString(), "lb"]] : []),
+      [String(summary.minutes), "min"],
+    ];
     return (
-      <div className="rise mx-auto max-w-xl pt-6 text-center md:pt-12">
+      <div className="rise mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
         <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
-        <h1 className="mt-6 font-display text-5xl text-ink">{data.name}, done.</h1>
-        <p className="mt-2 text-[15px] text-ink-soft">Every set you logged is already on your charts.</p>
+        <h1 className="mt-6 font-display text-4xl leading-tight text-ink sm:text-5xl">{data.name}, done.</h1>
 
-        <div className="mt-8 grid grid-cols-3 gap-3">
-          {[
-            [String(doneCount), "sets"],
-            [volume >= 10000 ? `${(volume / 1000).toFixed(1)}k` : volume.toLocaleString(), "lb volume, all sets"],
-            [String(summary.minutes), "minutes"],
-          ].map(([value, label]) => (
-            <div key={label} className="surface p-4">
-              <p className="tnum font-display text-4xl leading-none text-ink">{value}</p>
-              <p className="mt-1.5 text-[13px] text-ink-mute">{label}</p>
+        <div className="mt-10 flex justify-center gap-12">
+          {tiles.map(([value, label]) => (
+            <div key={label}>
+              <p className="tnum text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{value}</p>
+              <p className="mt-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{label}</p>
             </div>
           ))}
         </div>
 
         {recordList.length > 0 && (
-          <div className="surface mt-3 p-5 text-left">
-            <p className="eyebrow flex items-center gap-1.5 text-gold">
-              <Medal className="h-3.5 w-3.5" /> {recordList.length} new record{recordList.length > 1 ? "s" : ""}
-            </p>
-            <ul className="mt-3 space-y-2">
-              {recordList.map(([key, label]) => {
-                const ex = data.exercises.find((e) => key.startsWith(e.aweId));
-                return (
-                  <li key={key} className="flex items-baseline justify-between gap-3 text-[15px]">
+          <ul className="mt-10 divide-y divide-line border-y border-line text-left">
+            {recordList.map(([key, label]) => {
+              const ex = data.exercises.find((e) => key.startsWith(e.aweId));
+              return (
+                <li key={key} className="flex items-baseline justify-between gap-3 py-3 text-[15px]">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Medal className="h-4 w-4 shrink-0 text-gold" />
                     <ExerciseName name={ex?.name ?? ""} className="font-medium text-ink" />
-                    <span className="tnum shrink-0 text-ink-soft">{label}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+                  </span>
+                  <span className="tnum shrink-0 text-ink-soft">{label}</span>
+                </li>
+              );
+            })}
+          </ul>
         )}
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Link href="/progress" className="press flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-dusk-button text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85">
-            <TrendingUp className="h-4 w-4" /> See your progress
-          </Link>
-          <Link href="/today" className="press flex h-14 flex-1 items-center justify-center rounded-2xl border border-line bg-paper text-base font-semibold text-ink hover:border-ink/20">
-            Back to today
+        <div className="mt-auto pt-10">
+          <Link href="/today" className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
+            Back to Today
           </Link>
         </div>
       </div>
     );
   }
 
+  const section = "scroll-mt-28 rounded-2xl border border-line bg-paper";
   return (
     <div className="-mt-5 md:mt-0">
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 -mx-4 border-b border-line bg-bone/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-8 sm:px-8 md:top-16">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => router.push("/today")} aria-label="Back to today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+          <button type="button" onClick={() => router.push("/today")} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
             <span className="min-w-0">
               <span className="block truncate font-display text-2xl leading-tight text-ink">{data.name}</span>
               <span className="tnum block text-xs text-ink-mute">
-                Week {data.week} · {doneCount}/{totalCount} sets{data.status === "LOGGED" ? " · logged" : ` · ${clock(elapsed)}`}
+                Week {data.week}
+                {data.deloadWeek ? " · Lighter week" : ""} · {doneCount}/{totalCount} sets{data.status === "LOGGED" ? " · logged" : ` · ${clock(elapsed)}`}
               </span>
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 text-ink-mute" />
           </button>
           {finishing && <Loader2 className="h-5 w-5 shrink-0 animate-spin text-ink-mute" aria-label="Finishing" />}
+          {data.status !== "LOGGED" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger aria-label="More" className="press -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+                <MoreHorizontal className="h-5 w-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                {/* Finishing early: whatever is logged is the workout. The countdown's Undo is the way back. */}
+                <DropdownMenuItem disabled={doneCount === 0} onClick={() => scheduleFinish("Workout finished")}>
+                  Finish
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
           <div className="h-full rounded-full bg-signal transition-[width] duration-500 ease-out" style={{ width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%` }} />
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-8">
-        {/* ── Exercise rail ──────────────────────────────────────────── */}
-        <div ref={railRef} className="no-scrollbar relative -mx-4 flex min-w-0 gap-2 overflow-x-auto px-4 sm:-mx-8 sm:px-8 lg:sticky lg:top-44 lg:mx-0 lg:flex-col lg:self-start lg:overflow-visible lg:px-0" role="tablist" aria-label="Exercises">
-          {data.exercises.map((e, i) => {
-            const done = exerciseDone(e);
-            const label = labels.get(i) ?? String(i + 1);
-            const active = i === index;
-            const count = listOf(e).filter((s) => s.done).length;
+      {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
+      <div className="mt-4 space-y-4">
+        {data.note && <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink-soft">{data.note}</p>}
+
+        <div ref={drag.listRef} className="relative space-y-4">
+          {drag.lineTop != null && (
+            <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+              <span className="h-[3px] flex-1 rounded-full bg-dusk-teal" />
+              <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+            </div>
+          )}
+          {blocks.map((block, bi) => {
+            if (block.items.length === 0) return null;
+            // No block headings: each card's label ("1A: Bench Press") shows the grouping.
+            const isPart = block.section === WARMUP || block.section === COOLDOWN;
             return (
-              <button
-                key={e.aweId}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                data-active={active}
-                onClick={() => setIndex(i)}
-                className={cn(
-                  "press flex shrink-0 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left lg:w-full",
-                  active ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink hover:border-ink/20"
-                )}
-              >
-                <span
-                  className={cn(
-                    "tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                    done ? "bg-signal text-bone" : active ? "bg-ink/15 text-bone" : "bg-ink/5 text-ink-mute"
-                  )}
-                >
-                  {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : label}
-                </span>
-                <span className="min-w-0">
-                  <ExerciseName name={e.name} inControl className="w-max max-w-[150px] text-sm font-semibold leading-tight lg:max-w-none" />
-                  <span className={cn("tnum hidden text-xs lg:block", active ? "text-dusk-selected-text/70" : "text-ink-mute")}>
-                    {count}/{listOf(e).length} sets
-                  </span>
-                </span>
-              </button>
+              <div key={bi} className="space-y-2">
+                {isPart && <PartDivider title={block.title} />}
+                {block.items.map(({ ex, label }) => {
+                  const list = listOf(ex);
+                  const timed = ex.unit === "secs";
+                  const unit = timed ? "sec" : "reps";
+                  if (!open.has(ex.aweId)) {
+                    const logged = list.filter((x) => x.done).length;
+                    return (
+                      <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={section}>
+                        <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                        <MoveButtons name={ex.name} {...moves(ex.aweId)} />
+                      </section>
+                    );
+                  }
+                  return (
+                    <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={cn(section, "px-3 pb-3 pt-2")}>
+                      <div
+                        {...drag.bind(ex.aweId)}
+                        onClick={(e) => {
+                          // A tap folds the card; its own buttons (the picture, the ⋯) do their own thing.
+                          if (!(e.target as HTMLElement).closest("button, [role=menu], [role=menuitem]")) setOpenFor(ex.aweId, false);
+                        }}
+                        className="mb-1 flex cursor-pointer select-none items-center gap-2 [-webkit-touch-callout:none]"
+                      >
+                        <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
+                        <div className="min-w-0 flex-1">
+                          <ExerciseName as="h3" name={labelled(label, ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
+                          <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">
+                            {list.length} × {ex.repMin === ex.repMax ? ex.repMax : `${ex.repMin}–${ex.repMax}`} {unit}
+                          </p>
+                          {/* Only a first time (nothing to go on) gets a word of guidance; a hold is timed, so it never asks for "N reps". */}
+                          {ex.target.kind === "first" && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger aria-label={`More for ${ex.name}`} disabled={busy} className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5">
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[180px]">
+                            <DropdownMenuItem onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
+                            {/* A coach's plan stays the coach's: swap, but no retargeting or removing. */}
+                            {!data.coachPlan && <DropdownMenuItem onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
+                            {!data.coachPlan && data.exercises.length > 1 && (
+                              <DropdownMenuItem onClick={() => setConfirmRemove(ex.aweId)} className="text-destructive focus:text-destructive">
+                                Remove
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <MoveButtons name={ex.name} {...moves(ex.aweId)} />
+
+                      {confirmRemove === ex.aweId && (
+                        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                          <span className="text-ink-soft">{list.some((x) => x.done) ? "Remove? Logged sets stay in your history." : "Remove from this workout?"}</span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setConfirmRemove(null);
+                              change(() => planRemoveExercise({ aweId: ex.aweId, workoutId: data.id }), `${ex.name} removed`);
+                            }}
+                            className="press min-h-11 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text"
+                          >
+                            Remove
+                          </button>
+                          <button type="button" onClick={() => setConfirmRemove(null)} className="press min-h-11 rounded-lg px-3 font-medium text-ink-soft">
+                            Keep
+                          </button>
+                        </div>
+                      )}
+                      {editingTarget === ex.aweId && (
+                        <div className="mb-2">
+                          <TargetEditor
+                            initial={{ sets: list.length, repMin: ex.repMin, repMax: ex.repMax, weight: ex.target.kind === "custom" ? ex.target.weight : null }}
+                            unit={ex.unit}
+                            loaded={ex.loaded}
+                            onCancel={() => setEditingTarget(null)}
+                            onSave={async (values) => {
+                              setEditingTarget(null);
+                              change(() => planSetTargets({ aweId: ex.aweId, workoutId: data.id, ...values }), "Target updated for this session");
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <ul className="space-y-2">
+                        {list.map((s, i) => {
+                          const record = records[`${ex.aweId}:${s.setNumber}`];
+                          return (
+                            <li key={s.setNumber}>
+                              <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-2">
+                                <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} onChange={(v) => edit(ex, i, { weight: v })} />}
+                                <Stepper
+                                  value={s.reps}
+                                  step={timed ? 5 : 1}
+                                  unit={unit}
+                                  label={`Set ${s.setNumber} ${timed ? "seconds" : "reps"}`}
+                                  dim={s.done}
+                                  onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => toggle(ex, i)}
+                                  aria-pressed={s.done}
+                                  aria-label={s.done ? `Set ${s.setNumber} done — tap to undo` : `Mark set ${s.setNumber} done`}
+                                  className={cn(
+                                    "press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border",
+                                    s.done ? "border-signal bg-signal text-bone" : "border-line bg-paper text-ink-mute hover:border-signal hover:text-signal"
+                                  )}
+                                >
+                                  <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
+                                </button>
+                              </HoldRow>
+                              {!s.done && list.length > 1 && (
+                                <button type="button" onClick={() => deleteSet(ex, i)} className="sr-only focus:not-sr-only focus:mt-1 focus:inline-flex focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm">
+                                  Delete set {s.setNumber}
+                                </button>
+                              )}
+                              {record && (
+                                <p className="fade-in tnum ml-7 mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">
+                                  <Medal className="h-3 w-3" /> {recordLabel(timed)} · {record}
+                                </p>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <button type="button" onClick={() => addSet(ex)} className="press logger-quiet mt-2 inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-medium text-ink-soft hover:text-ink">
+                        <Plus className="h-3.5 w-3.5" /> Add set
+                      </button>
+                    </section>
+                  );
+                })}
+              </div>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setPicker("add")}
-            disabled={busy}
-            className="press flex shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 px-3 py-2.5 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink lg:w-full"
-          >
-            <Plus className="h-4 w-4" /> Add an exercise
-          </button>
         </div>
 
-        {/* ── Current exercise ───────────────────────────────────────── */}
-        <div key={exercise.aweId} className="fade-in min-w-0 space-y-4">
-          {index === 0 && data.note && (
-            <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink-soft">
-              <span className="eyebrow mr-2">Note</span>
-              {data.note}
-            </p>
-          )}
-          {index === 0 && data.deloadWeek && <p className="text-[13px] text-ink-mute">Lighter week: same weights, but stop each set two or three reps early and recover.</p>}
-
-          <div>
-            <p className="eyebrow">
-              Exercise {index + 1} of {data.exercises.length}
-              {exercise.muscles.length > 0 ? ` · ${exercise.muscles.slice(0, 2).join(", ")}` : ""}
-            </p>
-            <h1 className="mt-1 font-display text-4xl leading-tight text-ink sm:text-5xl">{exercise.name}</h1>
-            <ExercisePicture picture={exercise.picture} name={exercise.name} className="mt-3 max-w-sm" />
-            <div className="mt-2 flex flex-wrap gap-1 text-sm">
-              <button type="button" onClick={() => setPicker("swap")} disabled={busy} className="press flex items-center gap-1.5 min-h-11 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink">
-                <Repeat2 className="h-4 w-4" /> Swap
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingTarget(!editingTarget)}
-                aria-expanded={editingTarget}
-                disabled={busy}
-                className="press flex items-center gap-1.5 min-h-11 rounded-lg px-2.5 py-1.5 font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
-              >
-                <SlidersHorizontal className="h-4 w-4" /> Change target
-              </button>
-              {confirmRemove ? (
-                <span className="flex items-center gap-1.5 pl-1">
-                  <span className="text-ink-soft">{current.some((x) => x.done) ? "Remove? Logged sets stay in your history." : "Remove from this workout?"}</span>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setConfirmRemove(false);
-                      change(() => planRemoveExercise({ aweId: exercise.aweId, workoutId: data.id }), `${exercise.name} removed`);
-                    }}
-                    className="press min-h-11 rounded-lg bg-dusk-button px-2.5 py-1.5 font-semibold text-dusk-button-text"
-                  >
-                    Remove
-                  </button>
-                  <button type="button" onClick={() => setConfirmRemove(false)} className="press min-h-11 rounded-lg px-2 py-1.5 font-medium text-ink-soft">
-                    Keep
-                  </button>
-                </span>
-              ) : (
-                data.exercises.length > 1 && (
-                  <button type="button" onClick={() => setConfirmRemove(true)} disabled={busy} className="press flex items-center gap-1.5 min-h-11 rounded-lg px-2.5 py-1.5 font-medium text-ink-mute hover:bg-ink/5 hover:text-ink">
-                    <Trash2 className="h-4 w-4" /> Remove
-                  </button>
-                )
-              )}
-              {busy && <Loader2 className="m-1.5 h-4 w-4 animate-spin text-ink-mute" />}
-            </div>
-            {editingTarget && (
-              <div className="mt-2">
-                <TargetEditor
-                  initial={{
-                    sets: current.length,
-                    repMin: exercise.repMin,
-                    repMax: exercise.repMax,
-                    weight: exercise.target.kind === "custom" ? exercise.target.weight : null,
-                  }}
-                  unit={exercise.unit}
-                  loaded={exercise.loaded}
-                  onCancel={() => setEditingTarget(false)}
-                  onSave={async (values) => {
-                    setEditingTarget(false);
-                    change(() => planSetTargets({ aweId: exercise.aweId, workoutId: data.id, ...values }), "Target updated for this session");
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Target */}
-          <div className="surface p-4 sm:p-5">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal text-bone">
-                <TrendingUp className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="eyebrow">Today&apos;s target</p>
-                <p className="tnum mt-0.5 text-xl font-semibold text-ink">{exercise.target.headline}</p>
-                <p className="mt-1 text-sm leading-relaxed text-ink-soft">{exercise.target.reason}</p>
-              </div>
-            </div>
-            {exercise.last && (
-              <p className="mt-3 border-t border-line pt-3 text-[13px] text-ink-soft">
-                <span className="font-semibold text-ink">Last time</span> · {format(parseISO(exercise.last.date), "MMM d")} ·{" "}
-                {exercise.last.sets.map((s) => (s.weight != null ? `${s.weight}×${s.reps}` : `${s.reps}`)).join(", ")}
-              </p>
-            )}
-          </div>
-
-          {/* Sets */}
-          <div className="surface p-3 sm:p-4">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <p className="tnum text-sm font-medium text-ink-soft">
-                {current.length} sets · {exercise.repMin === exercise.repMax ? exercise.repMax : `${exercise.repMin}–${exercise.repMax}`} {exercise.unit === "secs" ? "sec" : "reps"}
-              </p>
-              <p className="tnum flex items-center gap-1 text-[13px] text-ink-mute">
-                <Timer className="h-3.5 w-3.5" /> {clock(exercise.restSeconds)} rest
-              </p>
-            </div>
-            <ul className="space-y-2">
-              {current.map((s, i) => {
-                const record = records[`${exercise.aweId}:${s.setNumber}`];
-                return (
-                  <li key={s.setNumber}>
-                    <HoldRow onHold={() => deleteSet(exercise, i)} className="flex items-center gap-2">
-                      <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                      {exercise.loaded && (
-                        <Stepper value={s.weight} step={exercise.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} onChange={(v) => edit(exercise, i, { weight: v })} />
-                      )}
-                      <Stepper
-                        value={s.reps}
-                        step={exercise.unit === "secs" ? 5 : 1}
-                        unit={exercise.unit === "secs" ? "sec" : "reps"}
-                        label={`Set ${s.setNumber} ${exercise.unit === "secs" ? "seconds" : "reps"}`}
-                        dim={s.done}
-                        onChange={(v) => edit(exercise, i, { reps: v == null ? null : Math.round(v) })}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => toggle(exercise, i)}
-                        aria-pressed={s.done}
-                        aria-label={s.done ? `Set ${s.setNumber} done — tap to undo` : `Mark set ${s.setNumber} done`}
-                        className={cn(
-                          "press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border",
-                          s.done ? "border-signal bg-signal text-bone" : "border-line bg-paper text-ink-mute hover:border-signal hover:text-signal"
-                        )}
-                      >
-                        <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
-                      </button>
-                    </HoldRow>
-                    {!s.done && current.length > 1 && (
-                      <button type="button" onClick={() => deleteSet(exercise, i)} className="sr-only focus:not-sr-only focus:mt-1 focus:inline-flex focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm">
-                        Delete set {s.setNumber}
-                      </button>
-                    )}
-                    {record && (
-                      <p className="fade-in tnum ml-7 mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">
-                        <Medal className="h-3 w-3" /> New record · {record}
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            <button type="button" onClick={() => addSet(exercise)} className="press mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink">
-              <Plus className="h-4 w-4" /> Add a set
-            </button>
-          </div>
-
-          {/* Live chart: on the page, no card */}
-          <div className="rule pt-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg text-ink">{METRICS[metricName].label}</h2>
-                <p className="mt-0.5 text-sm text-ink-mute">
-                  {series.length === 0 ? "Your first set starts this chart." : current.some((s) => s.done) ? "Today's session updates as you log." : "Sessions so far. The dashed point is today's target."}
-                </p>
-              </div>
-              {latest != null && (
-                <p className="shrink-0 text-2xl font-semibold leading-none tracking-tight text-ink">
-                  {formatValue(latest, metricName)}
-                  <span className="ml-1 text-sm font-normal text-ink-mute">{unitFor(metricName, exercise.loaded, exercise.unit === "secs")}</span>
-                </p>
-              )}
-            </div>
-            <div className="mt-3">
-              <ProgressChart
-                series={series}
-                metric={metricName}
-                loaded={exercise.loaded}
-                timed={exercise.unit === "secs"}
-                target={current.some((s) => s.done) ? null : exercise.target}
-                height={190}
-              />
-            </div>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setPicker({ mode: "add" })}
+          disabled={busy}
+          className="press flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink"
+        >
+          <Plus className="h-4 w-4" /> Add an exercise
+        </button>
       </div>
 
       {/* ── Rest timer ───────────────────────────────────────────────── */}
@@ -880,22 +868,22 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
       {picker && (
         <ExercisePicker
-          title={picker === "add" ? "Add an exercise" : `Swap ${exercise.name}`}
+          title={picker.mode === "add" ? "Add an exercise" : `Swap ${swapping?.name ?? ""}`}
           exclude={data.exercises.map((e) => e.slug).filter((x): x is string => x != null)}
-          suggestLike={picker === "swap" ? exercise.slug : null}
+          suggestLike={swapping?.slug ?? null}
           onClose={() => setPicker(null)}
           onPick={(chosen) => {
-            const mode = picker;
+            const at = picker;
             setPicker(null);
-            if (mode === "add") {
+            if (at.mode === "add") {
               change(async () => {
                 const res = await planAddExercise({ workoutId: data.id, slug: chosen.slug });
                 if (res.ok) jumpTo.current = res.aweId;
                 return res;
               }, `${chosen.name} added`);
             } else {
-              swapped.current.add(exercise.aweId);
-              change(() => planSwapExercise({ aweId: exercise.aweId, workoutId: data.id, slug: chosen.slug }), `Swapped for ${chosen.name}`);
+              swapped.current.add(at.aweId);
+              change(() => planSwapExercise({ aweId: at.aweId, workoutId: data.id, slug: chosen.slug }), `Swapped for ${chosen.name}`);
             }
           }}
         />
@@ -971,5 +959,65 @@ function HoldRow({ onHold, className, children }: { onHold: () => void; classNam
     >
       {children}
     </div>
+  );
+}
+
+
+/** "1A: Bench Press". Warm-up and cool-down exercises are just their name (the divider says which). */
+function labelled(label: string, name: string): string {
+  return label === "W" || label === "C" || !label ? name : `${label}: ${name}`;
+}
+
+/** The thin divider above the Warm-up and the Cool-down. */
+function PartDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-mute">{title}</span>
+      <div className="h-px flex-1 bg-line" />
+    </div>
+  );
+}
+
+/** Up, Down and "superset with the one above" for a screen reader or keyboard: the drag, as buttons. Hidden until focused. */
+function MoveButtons({ name, up, down, merge }: { name: string; up: () => void; down: () => void; merge?: () => void }) {
+  const cls = "rounded-lg border border-line-strong px-3 py-2 text-[13px] font-medium text-ink";
+  return (
+    <div className="sr-only flex gap-2 px-3 pb-2 focus-within:not-sr-only">
+      <button type="button" onClick={up} className={cls}>
+        Move {name} up
+      </button>
+      <button type="button" onClick={down} className={cls}>
+        Move {name} down
+      </button>
+      {merge && (
+        <button type="button" onClick={merge} className={cls}>
+          Superset {name} with the one above
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** A folded exercise: one row with its name, a tick when every set is logged or "2/3" when some are. Tap to open; hold to move. */
+function FoldedRow({ label, name, logged, total, onOpen, hold }: { label: string; name: string; logged: number; total: number; onOpen: () => void; hold: React.HTMLAttributes<HTMLElement> }) {
+  const done = total > 0 && logged === total;
+  return (
+    <button type="button" {...hold} onClick={onOpen} aria-expanded={false} aria-label={`Open ${name}`} className="press flex min-h-12 w-full select-none items-center gap-2 py-1.5 pl-3.5 pr-1.5 text-left [-webkit-touch-callout:none]">
+      <ExerciseName name={labelled(label, name)} inControl className="min-w-0 flex-1 text-[16px] font-semibold leading-snug text-ink" />
+      {done ? (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal/20 text-signal">
+          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          <span className="sr-only">Every set logged</span>
+        </span>
+      ) : logged > 0 ? (
+        <span className="tnum shrink-0 text-[13px] font-semibold text-ink-soft">
+          {logged}/{total}
+          <span className="sr-only"> sets logged</span>
+        </span>
+      ) : null}
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
+        <ChevronDown className="h-4 w-4" />
+      </span>
+    </button>
   );
 }

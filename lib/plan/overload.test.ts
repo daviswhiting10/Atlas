@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeries, e1rm, metricFor, nextTarget, sessionPoint, targetValue, unitFor } from "./overload";
+import { buildSeries, e1rm, metricFor, nextTarget, recordLabel, sessionPoint, shortFor, targetValue, unitFor } from "./overload";
 
 const set = (weight: number | null, reps: number, completed = true) => ({ weight, reps, completed });
 const range = { repMin: 6, repMax: 10, increment: 5 };
@@ -186,5 +186,30 @@ describe("unitFor", () => {
     expect(unitFor("reps", false, true)).toBe("sec");
     expect(unitFor("volume", false, true)).toBe("sec total");
     expect(unitFor("weight", true, true)).toBe("lb");
+  });
+});
+
+describe("timed exercises", () => {
+  const base = { repMin: 30, repMax: 60, increment: 5, unit: "secs" as const };
+  it("a first time asks for a hold, never a weight for N reps", () => {
+    const t = nextTarget({ ...base, last: [] });
+    expect(t.kind).toBe("first");
+    expect(t.reason).not.toMatch(/times|lift|reps/i);
+    expect(t.headline).not.toMatch(/weight/i);
+  });
+  it("progress is in seconds, even on a weighted hold", () => {
+    const t = nextTarget({ ...base, last: [{ weight: 25, reps: 40, completed: true }] });
+    expect(t.headline).toBe("Beat 40 sec");
+    expect(t.reason).not.toMatch(/\breps?\b/i);
+  });
+  it("a rep-based lift still gets the weight-for-N-reps line", () => {
+    const t = nextTarget({ last: [], repMin: 8, repMax: 10, increment: 5, unit: "reps" });
+    expect(t.reason).toMatch(/Pick a weight you could lift about 12 times/);
+  });
+  it("names the record for what it is", () => {
+    expect(recordLabel(true)).toBe("Longest hold");
+    expect(recordLabel(false)).toBe("Personal record");
+    expect(shortFor("reps", true)).toBe("Time");
+    expect(shortFor("reps", false)).toBe("Reps");
   });
 });

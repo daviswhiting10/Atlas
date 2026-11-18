@@ -17,7 +17,7 @@ const TABS = [
 
 /** `isCoach`: a coach on their own training gets the Coach | Me toggle (the way back to their clients).
  *  There's no avatar: the person is the You tab. */
-export function AppNav({ isDemo, isCoach = false }: { isDemo: boolean; isCoach?: boolean }) {
+export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo: boolean; isCoach?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -30,6 +30,7 @@ export function AppNav({ isDemo, isCoach = false }: { isDemo: boolean; isCoach?:
     router.refresh();
   }, [router]);
 
+  const tabs = hasProgress ? TABS : TABS.filter((t) => t.href !== "/progress");
   const inWorkout = pathname.startsWith("/workouts/");
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
@@ -42,7 +43,7 @@ export function AppNav({ isDemo, isCoach = false }: { isDemo: boolean; isCoach?:
           </Link>
 
           <nav className="hidden items-center gap-1 rounded-full border border-line bg-paper/80 p-1 md:flex" aria-label="Main">
-            {TABS.map(({ href, label }) => (
+            {tabs.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -71,7 +72,7 @@ export function AppNav({ isDemo, isCoach = false }: { isDemo: boolean; isCoach?:
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           <div className="mx-auto flex max-w-md">
-            {TABS.map(({ href, label, icon: Icon }) => {
+            {tabs.map(({ href, label, icon: Icon }) => {
               const active = isActive(href);
               return (
                 <Link
