@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, ArrowRight, Search, UserPlus } from "lucide-react";
+import { ArrowRight, Search, UserPlus } from "lucide-react";
 
 export type LogRow = { id: string; name: string; hasPlan: boolean; next: string | null; lastLogged: string | null; lastTime: number };
 
@@ -13,18 +13,6 @@ export function LogClientList({ rows }: { rows: LogRow[] }) {
 
   return (
     <div className="rise rise-1 space-y-4">
-      {/* The coach's own training, one tap away too. */}
-      <Link href="/today" className="press flex items-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3.5 text-ink hover:border-ink/20">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-signal/15 text-signal">
-          <Activity className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[16px] font-semibold">My training</span>
-          <span className="block text-[13px] text-ink-soft">Log your own workout</span>
-        </span>
-        <ArrowRight className="h-5 w-5 shrink-0" />
-      </Link>
-
       {rows.length > 6 && (
         <label className="flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-dusk-raised px-3.5 focus-within:border-ink/40">
           <Search className="h-4 w-4 shrink-0 text-ink-mute" />

@@ -13,5 +13,5 @@ export default async function TodayPage() {
   const athlete = await getAthlete();
   preloadTodayGoal(athlete.clientId);
   const plan = await planP;
-  return <TodayScreen athlete={athlete} plan={plan} goal={<GoalToday clientId={athlete.clientId} canStart={!athlete.isGuest} />} />;
+  return <TodayScreen athlete={athlete} plan={plan} goal={<GoalToday clientId={athlete.clientId} />} />;
 }

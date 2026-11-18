@@ -1,304 +1,191 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ArrowRight, Search, TrendingUp, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import type { ExerciseProgress, ProgressData } from "@/lib/athlete/data";
 import type { FocusMetric } from "@/lib/plan/generator";
 import { METRICS, formatValue, metricFor, unitFor } from "@/lib/plan/overload";
 import { overallProgress } from "@/lib/progress/overall";
 import { OverallChart } from "./OverallChart";
 import { ProgressChart } from "./ProgressChart";
-import { StatRow } from "./StatRow";
+import { Sparkline } from "./Sparkline";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
 
-const ORDER: FocusMetric[] = ["weight", "reps", "e1rm", "volume"];
 const day = (iso: string) => format(parseISO(iso), "MMM d");
 
-/** Search the athlete's exercises; picking one opens its chart. */
-function ExerciseSearch({ exercises, value, onChange }: { exercises: ExerciseProgress[]; value: string | null; onChange: (id: string | null) => void }) {
+/** Lifts with at least this many sessions get charts; fewer is too thin to draw a line through. */
+const THIN = 3;
+
+/** "All lifts ▾": a sheet with a search box and every lift, most-trained first. */
+function LiftSheet({ exercises, value, onChange, onClose }: { exercises: ExerciseProgress[]; value: string | null; onChange: (id: string | null) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const selected = exercises.find((e) => e.exerciseId === value) ?? null;
-  // Most-trained first, so an empty search shows the lifts that matter.
   const ranked = useMemo(() => [...exercises].sort((a, b) => b.series.length - a.series.length), [exercises]);
   const q = query.trim().toLowerCase();
-  const matches = (q ? ranked.filter((e) => e.name.toLowerCase().includes(q)) : ranked).slice(0, 8);
-
-  function pick(id: string) {
+  const matches = q ? ranked.filter((e) => e.name.toLowerCase().includes(q)) : ranked;
+  const pick = (id: string | null) => {
     onChange(id);
-    setQuery("");
-    setOpen(false);
-    inputRef.current?.blur();
-  }
-
+    onClose();
+  };
   return (
-    <div className="relative">
-      <div className="flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-dusk-raised px-3.5 focus-within:border-ink/40">
-        <Search className="h-4 w-4 shrink-0 text-ink-mute" />
-        <input
-          ref={inputRef}
-          role="combobox"
-          aria-expanded={open}
-          aria-controls="exercise-options"
-          aria-label="Search exercises"
-          value={open ? query : selected?.name ?? ""}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 120)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && matches[0]) {
-              e.preventDefault();
-              pick(matches[0].exerciseId);
-            }
-            if (e.key === "Escape") inputRef.current?.blur();
-          }}
-          placeholder={`Look at one exercise (${exercises.length})`}
-          className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-mute"
-        />
-        {selected && !open && (
-          <button type="button" onClick={() => onChange(null)} aria-label="Clear" className="press -mr-2.5 flex h-11 w-11 items-center justify-center rounded-full text-ink-mute hover:bg-ink/5 hover:text-ink">
-            <X className="h-4 w-4" />
+    <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose a lift"
+        onClick={(e) => e.stopPropagation()}
+        className="sheet-up flex max-h-[80vh] w-full flex-col rounded-t-[24px] border-t border-line bg-bone px-4 pt-3 sm:mx-auto sm:max-w-md sm:rounded-[24px]"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+      >
+        <div className="flex items-center gap-2">
+          <label className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-xl border border-line-strong bg-dusk-raised px-3.5 focus-within:border-ink/40">
+            <Search className="h-4 w-4 shrink-0 text-ink-mute" />
+            <span className="sr-only">Search lifts</span>
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" className="min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-ink-mute" />
+          </label>
+          <button type="button" onClick={onClose} aria-label="Close" className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft">
+            <X className="h-5 w-5" />
           </button>
-        )}
-      </div>
-      {open && (
-        <ul id="exercise-options" role="listbox" className="absolute inset-x-0 top-[52px] z-20 max-h-80 overflow-y-auto rounded-xl border border-line bg-paper p-1 shadow-lg">
-          {matches.length === 0 ? (
-            <li className="px-3 py-2.5 text-sm text-ink-mute">No exercise matches &ldquo;{query}&rdquo;</li>
-          ) : (
-            matches.map((e) => (
-              <li key={e.exerciseId} role="option" aria-selected={e.exerciseId === value}>
-                <button
-                  type="button"
-                  onMouseDown={(ev) => ev.preventDefault()}
-                  onClick={() => pick(e.exerciseId)}
-                  className="press flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-ink/5"
-                >
-                  <ExerciseName name={e.name} inControl className="text-[15px] text-ink" />
-                  <span className="shrink-0 text-xs text-ink-mute">
-                    {e.series.length} session{e.series.length === 1 ? "" : "s"}
-                  </span>
-                </button>
-              </li>
-            ))
+        </div>
+        <ul className="mt-2 min-h-0 flex-1 divide-y divide-line overflow-y-auto">
+          {!q && (
+            <li>
+              <button type="button" onClick={() => pick(null)} className={cn("press flex min-h-[52px] w-full items-center text-left text-[16px] font-semibold", value == null ? "text-signal" : "text-ink")}>
+                All lifts
+              </button>
+            </li>
           )}
+          {matches.map((e) => (
+            <li key={e.exerciseId}>
+              <button type="button" onClick={() => pick(e.exerciseId)} className={cn("press flex min-h-[52px] w-full items-center text-left text-[16px] font-semibold", e.exerciseId === value ? "text-signal" : "text-ink")}>
+                <ExerciseName name={e.name} inControl />
+              </button>
+            </li>
+          ))}
         </ul>
-      )}
+      </div>
     </div>
   );
 }
 
-export function ProgressView({
-  data,
-  goalMetric,
-  emptyAction = { href: "/today", label: "Log your first workout" },
-  totals = true,
-  records = true,
-}: {
-  data: ProgressData;
-  goalMetric: FocusMetric;
-  /** Where the empty state points: the athlete starts a workout, a coach logs one for the client. */
-  emptyAction?: { href: string; label: string };
-  /** The workouts / sets / records / streak row. Off where the page already shows those numbers. */
-  totals?: boolean;
-  /** Personal records at the end. Off where they have their own tab (the coach's client page). */
-  records?: boolean;
-}) {
+/** A section: one small heading (with an optional control on the right), then one visual. */
+function Section({ title, control, children }: { title: string; control?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{title}</h2>
+        {control}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Big number, tiny label. */
+function Big({ value, label, accent = false }: { value: string; label?: string; accent?: boolean }) {
+  return (
+    <p className="flex items-baseline gap-2">
+      <span className={cn("text-[56px] font-semibold leading-none tracking-[-0.04em]", accent ? "text-signal" : "text-ink")}>{value}</span>
+      {label && <span className="text-[15px] font-medium text-ink-mute">{label}</span>}
+    </p>
+  );
+}
+
+/**
+ * Progress, for the athlete and for the coach's view of a client. Three sections, each one
+ * heading and one visual: Strength (all lifts, or one picked from a sheet), Sessions a week,
+ * and the latest record. A thin history (under three sessions) shows the number alone, or
+ * nothing: never a chart of two points or a row of zeros.
+ */
+export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMetric: FocusMetric }) {
   const [exerciseId, setExerciseId] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<FocusMetric>(goalMetric);
+  const [sheet, setSheet] = useState(false);
   const overall = useMemo(() => overallProgress(data.exercises), [data.exercises]);
-
   const exercise = data.exercises.find((e) => e.exerciseId === exerciseId) ?? null;
-  const metric = exercise ? metricFor(chosen, exercise.series) : chosen;
+  const metric = exercise ? metricFor(goalMetric, exercise.series) : goalMetric;
 
-  const stats = useMemo(() => {
+  const one = useMemo(() => {
     if (!exercise) return null;
-    // A deload session is low on purpose, so it is left out of "latest", "best" and the change.
+    // A deload session is low on purpose, so it is left out of the change.
     const counted = exercise.series.filter((p) => !p.deload && p[metric] != null);
     if (counted.length === 0) return null;
-    const first = counted[0];
-    const latest = counted[counted.length - 1];
-    const firstValue = first[metric] as number;
-    const latestValue = latest[metric] as number;
-    const best = counted.reduce((b, p) => ((p[metric] as number) > (b[metric] as number) ? p : b), counted[0]);
-    return {
-      latest,
-      latestValue,
-      first,
-      change: counted.length > 1 && firstValue ? Math.round(((latestValue - firstValue) / firstValue) * 100) : null,
-      // Only worth showing when it isn't the number already on screen.
-      best: (best[metric] as number) > latestValue ? best : null,
-    };
+    const first = counted[0][metric] as number;
+    const latest = counted[counted.length - 1][metric] as number;
+    return { latest, change: counted.length > 1 && first ? Math.round(((latest - first) / first) * 100) : null, sessions: counted.length };
   }, [exercise, metric]);
 
-  if (data.exercises.length === 0) {
-    return (
-      <div className="rise rise-1">
-        <ProgressChart series={[]} metric={goalMetric} loaded height={260} legend={false} />
-        <Link href={emptyAction.href} className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
-          {emptyAction.label} <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    );
-  }
+  const sessions = data.totals.sessions;
+  const thisWeek = data.weeks.at(-1)?.sessions ?? 0;
+  const record = data.recentPRs[0] ?? null;
+  const chooser =
+    data.exercises.length > 0 ? (
+      <button type="button" onClick={() => setSheet(true)} className="press inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-ink-soft hover:text-ink">
+        <span className="max-w-[180px] truncate">{exercise?.name ?? "All lifts"}</span> <ChevronDown className="h-4 w-4" />
+      </button>
+    ) : undefined;
 
-  const unit = exercise ? unitFor(metric, exercise.loaded, exercise.timed) : "";
-  const anyLoaded = data.exercises.some((e) => e.loaded);
+  // Nothing logged yet: nothing to show.
+  if (sessions === 0) return null;
 
   return (
-    <div className="space-y-10">
-      {totals && (
-        <StatRow
-          className="rise rise-1"
-          stats={[
-            { label: "Workouts", value: String(data.totals.sessions) },
-            { label: "Sets", value: data.totals.sets.toLocaleString() },
-            { label: "Records", value: String(data.totals.prs) },
-            { label: "Streak", value: String(data.totals.streak), unit: data.totals.streak === 1 ? "week" : "weeks" },
-          ]}
-        />
+    <div className="space-y-14">
+      {exercise ? (
+        <Section title="Strength" control={chooser}>
+          {one && (
+            <Big
+              value={one.change != null && one.sessions >= THIN ? `${one.change > 0 ? "+" : ""}${one.change}%` : formatValue(one.latest, metric)}
+              label={one.change != null && one.sessions >= THIN ? METRICS[metric].short : unitFor(metric, exercise.loaded, exercise.timed)}
+              accent={one.change != null && one.change > 0 && one.sessions >= THIN}
+            />
+          )}
+          {exercise.series.length >= THIN && (
+            <div className="mt-5">
+              <ProgressChart series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} />
+            </div>
+          )}
+        </Section>
+      ) : (
+        overall.change != null &&
+        overall.since && (
+          <Section title="Strength" control={chooser}>
+            <Big value={`${overall.change > 0 ? "+" : ""}${overall.change}%`} label={`since ${day(overall.since)}`} accent={overall.change > 0} />
+            {sessions >= THIN && (
+              <div className="mt-5">
+                <OverallChart points={overall.points} height={200} />
+              </div>
+            )}
+          </Section>
+        )
+      )}
+      {/* No overall line yet (nothing logged twice), but the lifts can still be looked at one by one. */}
+      {!exercise && (overall.change == null || !overall.since) && data.exercises.length > 0 && (
+        <Section title="Strength" control={chooser}>
+          {null}
+        </Section>
       )}
 
-      {/* ── At a glance: every lift at once ──────────────────────────── */}
-      <section className="rise rise-2">
-        <h2 className="text-3xl leading-none text-ink">Overall progress</h2>
-        {overall.change != null && overall.since ? (
-          <>
-            <div className="mt-6 flex flex-wrap items-end gap-x-10 gap-y-3">
-              <p className={cn("text-5xl font-semibold leading-none tracking-tight", overall.change > 0 ? "text-signal" : "text-ink")}>
-                {overall.change > 0 ? "+" : ""}
-                {overall.change}%
-              </p>
-              <p className="pb-0.5 text-sm text-ink-soft">
-                across {overall.lifts} exercise{overall.lifts === 1 ? "" : "s"} since {day(overall.since)} · {anyLoaded ? "estimated 1-rep max" : "best reps"}
-              </p>
-            </div>
-            <div className="mt-6">
-              <OverallChart points={overall.points} height={280} />
-            </div>
-          </>
-        ) : (
-          <p className="rule mt-5 pt-4 text-[15px] leading-relaxed text-ink-soft">
-            Starts once an exercise is logged twice.
-          </p>
-        )}
-      </section>
-
-      {/* ── One exercise, on demand ──────────────────────────────────── */}
-      <section className="rise rise-3 rule relative z-10 pt-8">
-        <ExerciseSearch exercises={data.exercises} value={exerciseId} onChange={setExerciseId} />
-
-        {exercise && (
-          <div className="fade-in">
-            <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="min-w-0">
-                <h2 className="text-3xl leading-none text-ink">{exercise.name}</h2>
-                <p className="mt-2 text-sm text-ink-mute">
-                  {METRICS[metric].label}
-                  {metric === goalMetric ? " · the number your goal is measured by" : ""}
-                </p>
-              </div>
-              <div className="flex self-start rounded-lg border border-line bg-paper p-0.5 sm:self-auto" role="radiogroup" aria-label="Metric">
-                {ORDER.map((m) => {
-                  const disabled = !exercise.loaded && (m === "weight" || m === "e1rm");
-                  const active = m === metric;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      disabled={disabled}
-                      onClick={() => setChosen(m)}
-                      className={cn(
-                        "press whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-medium",
-                        active ? "bg-ink text-bone" : "text-ink-mute hover:text-ink",
-                        disabled && "opacity-30"
-                      )}
-                    >
-                      {METRICS[m].short}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {stats && (
-              <div className="mt-6 flex flex-wrap items-end gap-x-10 gap-y-3">
-                <div>
-                  <p className="eyebrow">Latest session · {day(stats.latest.date)}</p>
-                  <p className="mt-1.5 text-5xl font-semibold leading-none tracking-tight text-ink">
-                    {formatValue(stats.latestValue, metric)}
-                    <span className="ml-1.5 text-base font-normal text-ink-mute">{unit}</span>
-                  </p>
-                </div>
-                <dl className="flex gap-8 pb-0.5 text-sm">
-                  {stats.change != null && (
-                    <div>
-                      <dt className="text-ink-mute">Since {day(stats.first.date)}</dt>
-                      <dd className={cn("mt-0.5 font-semibold", stats.change > 0 ? "text-signal" : "text-ink")}>
-                        {stats.change > 0 ? "+" : ""}
-                        {stats.change}%
-                      </dd>
-                    </div>
-                  )}
-                  {stats.best && (
-                    <div>
-                      <dt className="text-ink-mute">Best · {day(stats.best.date)}</dt>
-                      <dd className="mt-0.5 font-semibold text-ink">
-                        {formatValue(stats.best[metric] as number, metric)} {unit}
-                      </dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt className="text-ink-mute">Sessions</dt>
-                    <dd className="mt-0.5 font-semibold text-ink">{exercise.series.length}</dd>
-                  </div>
-                </dl>
-              </div>
-            )}
-
-            <div className="mt-6">
-              <ProgressChart
-                series={exercise.series}
-                metric={metric}
-                loaded={exercise.loaded}
-                timed={exercise.timed}
-                target={exercise.target}
-                height={280}
-                chartKey={`${exercise.exerciseId}-${metric}`}
-              />
-            </div>
-
-            {exercise.target && (
-              <div className="surface mt-6 flex items-start gap-3 p-4">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-bone">
-                  <TrendingUp className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="eyebrow">Next session</p>
-                  <p className="mt-0.5 text-lg font-semibold tracking-tight text-ink">{exercise.target.headline}</p>
-                  <p className="mt-0.5 text-sm leading-relaxed text-ink-soft">{exercise.target.reason}</p>
-                </div>
-              </div>
-            )}
+      <Section title="Sessions a week">
+        <Big value={String(thisWeek)} label="this week" />
+        {sessions >= THIN && (
+          <div className="mt-5">
+            <Sparkline values={data.weeks.map((w) => w.sessions)} label={`Sessions in each of the last ${data.weeks.length} weeks`} />
           </div>
         )}
-      </section>
+      </Section>
 
-      {records && (
-        <section className="rise rise-4 rule pt-8">
-          <h2 className="text-xl text-ink">Personal records</h2>
-          <RecordsList prs={data.recentPRs.slice(0, 6)} />
-        </section>
+      {record && (
+        <Section title="Records">
+          <div className="flex items-baseline justify-between gap-3 border-t border-line py-3.5">
+            <ExerciseName name={record.exercise} className="text-[17px] font-semibold text-ink" />
+            <span className="shrink-0 text-[17px] text-ink-soft">
+              {formatValue(record.value, "weight")} {record.unit}
+            </span>
+          </div>
+        </Section>
       )}
+
+      {sheet && <LiftSheet exercises={data.exercises} value={exerciseId} onChange={setExerciseId} onClose={() => setSheet(false)} />}
     </div>
   );
 }
