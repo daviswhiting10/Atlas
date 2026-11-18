@@ -95,8 +95,8 @@ function Big({ value, label, accent = false }: { value: string; label?: string; 
  * Progress, for the athlete and for the coach's view of a client. Three sections, each one
  * heading and one visual: Strength (all lifts, or one picked from a sheet), History (the
  * calendar, passed in as `history`; the coach has it on the Sessions tab instead), and the
- * latest record. A thin history (under three sessions) shows the number alone, or
- * nothing: never a chart of two points or a row of zeros.
+ * latest record. A section with nothing to show renders nothing, heading included (no
+ * overall line yet means no Strength section): never a chart of two points or a row of zeros.
  */
 export function ProgressView({ data, goalMetric, history }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode }) {
   const [exerciseId, setExerciseId] = useState<string | null>(null);
@@ -156,12 +156,6 @@ export function ProgressView({ data, goalMetric, history }: { data: ProgressData
             )}
           </Section>
         )
-      )}
-      {/* No overall line yet (nothing logged twice), but the lifts can still be looked at one by one. */}
-      {!exercise && (overall.change == null || !overall.since) && data.exercises.length > 0 && (
-        <Section title="Strength" control={chooser}>
-          {null}
-        </Section>
       )}
 
       {history}
