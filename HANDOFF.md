@@ -1,30 +1,21 @@
 # Atlas handoff
 
-Last updated 2026-11-15. Read this, then `CLAUDE.md`. Design docs are in `docs/`.
+Last updated 2026-11-17. Read this, then `CLAUDE.md`. Design docs are in `docs/`.
 
 ## Where things stand (read before running anything)
 - **Live:** https://atlas-red-eight.vercel.app. Pushing `main` deploys it, so commit or push only when the user asks.
-- **`origin/main` = `0dc0cd4`,** and that's what's live. On top of steps 1–4 and 75 Hard:
-  - `lib/history/` (pure code, no screens yet);
-  - the Dusk design pass;
-  - auth deploy 1 (`ff73030`, set-password step off);
-  - the date-field fix (`9a78a02`);
-  - W2's simplification pass (`0dc0cd4`: one-tap workout rows, no separate page for a running goal, a simpler Today, Progress and You).
-- **Rollback point** for the last deploy: `9a78a02`.
-- **Local `main`** may be ahead with docs commits (this one included). Pushing deploys them; ask first.
-- **Branch `auth-wip`:** merged into `main` on 2026-11-15 (see "Auth"). Nothing left on it.
-- **Production database:** migrations up to `20261114012242_sign_in_safety` (the auth migration, applied 2026-11-14 with the user's OK, before any auth code). The live code doesn't read the new columns or tables yet. That's harmless because they're additive: nullable columns and two empty tables.
-- **`dev-sessions` and production both have the auth migration** `20261114012242_sign_in_safety`, and `main` has its file since the auth merge.
-  - On `main`, `prisma migrate status` will report a migration that's applied but missing.
-  - **Never run `prisma migrate dev` on `main` against `dev-sessions`:** it would offer to reset (wipe) the database.
-  - Database work can be done from `main` again.
-- **Uncommitted files:** `Untitled` in the repo is the user's draft prompt about smoother transitions. Leave it.
-- **Design docs** now on `main`:
-  - `docs/review-and-v1-scope.md` (the review of the first four docs);
-  - `docs/screenshot-to-session.md`;
-  - `docs/training-types.md` (see "Training types" below).
-- **The user's 75 Hard is live on production:** started Nov 4, Nov 4–14 carried in, Day 12 on Nov 15. It was moved from a mistaken Nov 15 start on 2026-11-15 (backup and undo file under "Backups and branches").
-- **Local dev server:** may still be running on port 3000 against `dev-sessions`.
+- **`origin/main` = `a3d6057`, live.** Shipped 2026-11-17: Batch A (UI cuts: dead screens, roster and exercise-page controls, Records/Milestones under Progress, one Import plan for sheets or photos, new plans from the client's Plan tab, Today leads with Start workout, outdoors by press-and-hold, the logging bar hides after 3 h idle, e1RM in whole lb) and W2's `readability` (coach logger redesign and the six cuts). **Rollback: `198e527`** (main before Batch A; it already had the readability merge). Earlier rollback points are in the table below.
+- **Principles:** `docs/principles.md` (Musk lens, Tesla app patterns, targets, how we cut safely). `CLAUDE.md` says to read it before any task. Audit result: coach path is 2 taps to the first set, about 2 s; both loggers cost 1 tap per set plus 1 per new exercise.
+- **Production database:** migrations up to `20261117010000_session_source_import` (additive: `IMPORT` added to `SessionSource`; backup `prod-before-import-source-20261116-201345.dump`). `dev-sessions` has the same. Never run `prisma migrate dev` on `main` against `dev-sessions`: it would offer to reset the database.
+- **In flight (W2, not on `main`):**
+  - **Batch B**, branch `logger-batch-b` (worktree `~/Documents/atlas-readability`): auto-advance after an exercise's last set and auto-finish.
+  - **Design pass 1:** client page, Coach/Me toggle, jump bar removed, long-press reorder. I haven't seen its branch.
+  - Merge them only when W2 says they're ready, then run the usual checks. Don't touch W2's logger files meanwhile.
+- **Still unconfirmed:** whether Vercel's `DATABASE_URL` uses the Neon `-pooler` host (the Vercel CLI login here has expired), and the Body/Measurements cut (0 measurements ever; left in until the user decides).
+- **Not done:** the speed ideas left over (Progress still reads every set a client has logged; Neon's 5-minute idle sleep).
+- **Uncommitted files:** `Untitled` in the repo is the user's draft prompt. Leave it.
+- **Design docs** on `main`: `docs/review-and-v1-scope.md`, `docs/screenshot-to-session.md`, `docs/training-types.md` (see "Training types" below).
+- **The user's 75 Hard is live on production** (started Nov 4, carried in; a day count appears on Today).
 
 ## The work so far: the logged session is the core
 | Step | What shipped | Commit |
@@ -224,6 +215,8 @@ Check this order against `docs/review-and-v1-scope.md` before planning.
 ## Open questions
 - Two set-less sessions on production from a churned client added May 21: real client or test data?
 - Body measurements are still entered in kg; does "lb everywhere" cover body weight?
+- Cut the Body/Measurements screens (0 measurements ever)? Left in until the user decides.
+- Is Vercel's `DATABASE_URL` the Neon `-pooler` host? Needs the user's Vercel settings or a fresh `vercel login`.
 - Plan imports still link a name to a library name that contains it (`lib/programs/resolve-exercise.ts`, step 3). Replace that with a pick-from-close-matches screen?
 - Whether picking a library exercise after typing something else should save an alternate name.
 - 47 imported names no one uses are still in the shared library.
