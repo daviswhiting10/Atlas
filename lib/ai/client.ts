@@ -16,7 +16,7 @@ function getClient(): Anthropic {
 }
 
 export const MODELS = {
-  sonnet: "claude-sonnet-4-6",
+  sonnet: "claude-sonnet-5-5",
   haiku: "claude-haiku-4-5-20251001",
 } as const;
 
@@ -46,10 +46,10 @@ function estimateCostCents(
 ): number {
   const pricing: Record<string, { in: number; out: number }> = {
     "claude-haiku-4-5-20251001": { in: 0.8, out: 4.0 },
-    "claude-sonnet-4-6": { in: 3.0, out: 15.0 },
+    "claude-sonnet-5-5": { in: 2.0, out: 10.0 },
     "claude-opus-4-6": { in: 15.0, out: 75.0 },
   };
-  const p = pricing[model] ?? { in: 3.0, out: 15.0 };
+  const p = pricing[model] ?? { in: 2.0, out: 10.0 };
   return Math.round(
     ((inputTokens * p.in + outputTokens * p.out) / 1_000_000) * 100
   );
