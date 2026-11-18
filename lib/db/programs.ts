@@ -373,17 +373,6 @@ export async function getAssignment(id: string, workspaceId: string) {
   return assignment;
 }
 
-export async function getClientAssignments(clientId: string, workspaceId: string) {
-  return prisma.programAssignment.findMany({
-    where: { clientId, workspaceId },
-    orderBy: { startDate: "desc" },
-    include: {
-      sourceProgram: { select: { id: true, name: true } },
-      _count: { select: { assignedWorkouts: true } },
-    },
-  });
-}
-
 export async function updateAssignedWorkout(
   id: string,
   workspaceId: string,

@@ -89,30 +89,3 @@ export async function deleteClient(id: string, workspaceId: string) {
     data: { deletedAt: new Date() },
   });
 }
-
-const AT_RISK_DAYS = 21;
-
-/**
- * Heuristic run on inbox load: any ACTIVE client with no contact in AT_RISK_DAYS
- * gets flipped to AT_RISK. Fire-and-forget safe to call on every page load.
- */
-export async function runRetentionHeuristic(workspaceId: string): Promise<void> {
-  const cutoff = new Date(Date.now() - AT_RISK_DAYS * 24 * 60 * 60 * 1000);
-
-  await prisma.clientProfile.updateMany({
-    where: {
-      workspaceId,
-      deletedAt: null,
-      status: "ACTIVE",
-      AND: [ROSTER],
-      OR: [
-        { lastContactAt: { lt: cutoff } },
-        { lastContactAt: null, createdAt: { lt: cutoff } },
-      ],
-    },
-    data: {
-      status: "AT_RISK",
-      retentionFlag: `No contact in ${AT_RISK_DAYS}+ days`,
-    },
-  });
-}
