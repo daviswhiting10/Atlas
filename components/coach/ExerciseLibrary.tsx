@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ImageOff, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { onTablistKeyDown } from "@/lib/ui/tab-keys";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import type { Picture } from "@/lib/exercises/pictures";
 import { ExerciseName } from "@/components/ExerciseName";
@@ -34,20 +35,23 @@ export function ExerciseLibrary({ rows }: { rows: LibraryRow[] }) {
     { id: "all", label: `All · ${counts.all}` },
   ];
 
+  function pick(id: Filter) {
+    setFilter(id);
+    setQuery("");
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
-          {tabs.map((t) => (
+        <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1" onKeyDown={(e) => onTablistKeyDown(e, (i) => pick(tabs[i].id))}>
+          {tabs.map((t, i) => (
             <button
               key={t.id}
               type="button"
               role="tab"
               aria-selected={!query && filter === t.id}
-              onClick={() => {
-                setFilter(t.id);
-                setQuery("");
-              }}
+              tabIndex={(!query && filter === t.id) || (query && i === 0) ? 0 : -1}
+              onClick={() => pick(t.id)}
               className={cn("press h-10 shrink-0 rounded-xl px-4 text-sm font-medium", !query && filter === t.id ? "bg-dusk-selected text-dusk-selected-text shadow-sm" : "text-ink-soft hover:text-ink")}
             >
               {t.label}

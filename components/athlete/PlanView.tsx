@@ -14,6 +14,7 @@ import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { ExercisePicker } from "./ExercisePicker";
 import { TargetEditor, type TargetValues } from "./TargetEditor";
 import { cn } from "@/lib/utils";
+import { onTablistKeyDown } from "@/lib/ui/tab-keys";
 import { ExerciseName } from "@/components/ExerciseName";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -487,7 +488,7 @@ export function PlanView({
       )}
 
       {/* Week picker */}
-      <div className="no-scrollbar rise rise-2 relative -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="tablist" aria-label="Week">
+      <div className="no-scrollbar rise rise-2 relative -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="tablist" aria-label="Week" onKeyDown={(e) => onTablistKeyDown(e, (i) => setWeek(weeks[i]))}>
         {weeks.map((n) => {
           const ws = plan.workouts.filter((w) => w.week === n);
           const done = ws.length > 0 && ws.every((w) => w.status === "LOGGED" || w.status === "SKIPPED");
@@ -499,6 +500,7 @@ export function PlanView({
               type="button"
               role="tab"
               aria-selected={selected}
+              tabIndex={selected ? 0 : -1}
               onClick={() => setWeek(n)}
               className={cn(
                 "press relative flex h-[58px] w-[50px] shrink-0 flex-col items-center justify-center rounded-xl border text-center",

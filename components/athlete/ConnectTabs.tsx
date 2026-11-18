@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { onTablistKeyDown } from "@/lib/ui/tab-keys";
 
 export type ConnectOption = { label: string; code: string; note: string };
 
@@ -11,6 +12,11 @@ export function ConnectTabs({ options }: { options: ConnectOption[] }) {
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
   const current = options[active];
+
+  function pick(i: number) {
+    setActive(i);
+    setCopied(false);
+  }
 
   async function copy() {
     try {
@@ -24,17 +30,15 @@ export function ConnectTabs({ options }: { options: ConnectOption[] }) {
 
   return (
     <div>
-      <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Client">
+      <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Client" onKeyDown={(e) => onTablistKeyDown(e, pick)}>
         {options.map((o, i) => (
           <button
             key={o.label}
             type="button"
             role="tab"
             aria-selected={i === active}
-            onClick={() => {
-              setActive(i);
-              setCopied(false);
-            }}
+            tabIndex={i === active ? 0 : -1}
+            onClick={() => pick(i)}
             className={cn(
               "press -mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium",
               i === active ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink"
