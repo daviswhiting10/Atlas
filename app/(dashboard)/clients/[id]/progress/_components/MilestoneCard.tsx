@@ -1,6 +1,7 @@
 import { Trophy, Flame, TrendingUp, Target, Award, Dumbbell, Star } from "lucide-react";
 import { format } from "date-fns";
 import type { MilestoneRecord } from "./ProgressShell";
+import { shownValue } from "@/lib/progress/format";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   first_session: Star,
@@ -117,7 +118,7 @@ export function MilestoneCard({ milestone, compact = false }: Props) {
         </p>
         {milestone.metricValue != null && (
           <p className="font-body text-xs mt-1" style={{ color: "var(--ink-mute)", opacity: 0.7 }}>
-            {milestone.metricValue} {milestone.metricUnit}
+            {shownValue(milestone.metricValue, milestone.metricUnit)} {milestone.metricUnit}
             {milestone.exerciseName && ` · ${milestone.exerciseName}`}
           </p>
         )}

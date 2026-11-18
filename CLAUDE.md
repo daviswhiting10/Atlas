@@ -27,7 +27,7 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 | `rehearsal-goal-start` | Production copy where the 75 Hard start-day fix was rehearsed (2026-11-15) | 2026-11-20 |
 | `rehearsal-import-source` | Production copy (2026-11-17) with `20261117010000_session_source_import` applied (adds `IMPORT` to `SessionSource`); every table's count matched | Until the user says |
 
-Git branches: `main` (deploys); `auth-wip`, the sign-in work (merged into `main` 2026-11-15); `atlas-goals` (worktree at `~/Documents/atlas-goals`, merged into `main` up to `8754384`, the design pass).
+Git branches: `main` (deploys; `a3d6057` on 2026-11-17, rollback `198e527`); `auth-wip` and `readability` are merged into `main`. W2's in-flight work: `logger-batch-b` (worktree `~/Documents/atlas-readability`, auto-advance and auto-finish) and Design pass 1 (client page, Coach/Me toggle, jump bar removal, long-press reorder). `atlas-goals` (worktree `~/Documents/atlas-goals`) is merged up to its last commit. Don't touch W2's logger files; merge their branches only when W2 says they're ready.
 
 CLI: `npx --yes neonctl@2 <cmd> --project-id mute-breeze-39649971` (the user is signed in). Make a rehearsal copy with `branches create --name <name> --parent production`, then `connection-string <name> --pooled`. Never print connection strings.
 
