@@ -17,6 +17,18 @@ describe("lifetimeStats: totals", () => {
     expect(s.since).toBe("2026-03-02");
   });
 
+  it("a history of set-less sessions (walks, time-only workouts) still counts everywhere", () => {
+    const s = stats(onDays(["2026-02-23", "2026-02-24", "2026-03-02", "2026-03-04"]).map((x) => ({ ...x, durationMin: 45 })));
+    expect(s.sessions).toBe(4);
+    expect(s.sets).toBe(0);
+    expect(s.since).toBe("2026-02-23");
+    expect(s.activeWeeks).toEqual({ active: 2, of: 2 });
+    expect(s.longestRun).toMatchObject({ weeks: 2 });
+    expect(s.bestStretch).toMatchObject({ sessions: 4 });
+    expect(s.time).toEqual({ minutes: 180, fromSessions: 4, ofSessions: 4 });
+    expect(s.records).toBe(0);
+  });
+
   it("moved is tonnage for loaded sets; bodyweight, band and timed reps are counted apart, not dropped", () => {
     const s = stats([
       sess("a", "2026-03-02T12:00:00Z", [
