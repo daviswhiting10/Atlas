@@ -4,7 +4,7 @@ import { memo, useCallback, useMemo } from "react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { format, parseISO } from "date-fns";
 import type { FocusMetric } from "@/lib/plan/generator";
-import { chartKind, formatValue, targetValue, unitFor, type SessionPoint, type Target } from "@/lib/plan/overload";
+import { chartKind, formatValue, recordLabel, targetValue, unitFor, type SessionPoint, type Target } from "@/lib/plan/overload";
 
 type Row = {
   key: string;
@@ -27,11 +27,13 @@ function ChartTooltip({
   payload,
   metric,
   unit,
+  timed,
 }: {
   active?: boolean;
   payload?: Array<{ payload: Row }>;
   metric: FocusMetric;
   unit: string;
+  timed: boolean;
 }) {
   const row = active ? payload?.[0]?.payload : null;
   if (!row) return null;
@@ -43,7 +45,7 @@ function ChartTooltip({
       <p className="text-sm font-semibold text-ink">
         {formatValue(v, metric)} <span className="font-normal text-ink-mute">{unit}</span>
       </p>
-      {row.record && <p className="text-[11px] font-medium text-gold">Personal record</p>}
+      {row.record && <p className="text-[11px] font-medium text-gold">{recordLabel(timed)}</p>}
       {row.best && <p className="text-[11px] font-medium text-signal">Best estimated 1RM yet</p>}
       {row.deload && <p className="text-[11px] text-ink-mute">Deload week — lighter on purpose</p>}
     </div>
@@ -76,11 +78,11 @@ function GhostDot(props: { cx?: number; cy?: number; payload?: Row }) {
 }
 
 /** One legend for every chart in the app, so the marks always mean the same thing. */
-export function ChartLegend({ deload, target, best = false, loaded = true }: { deload: boolean; target: boolean; best?: boolean; loaded?: boolean }) {
+export function ChartLegend({ deload, target, best = false, loaded = true, timed = false }: { deload: boolean; target: boolean; best?: boolean; loaded?: boolean; timed?: boolean }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-ink-mute">
       <li className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full bg-gold" /> Personal record ({loaded ? "heaviest weight yet" : "best set yet"})
+        <span className="h-2 w-2 rounded-full bg-gold" /> {timed ? "Longest hold yet" : `Personal record (${loaded ? "heaviest weight yet" : "best set yet"})`}
       </li>
       {best && (
         <li className="flex items-center gap-1.5">
@@ -208,7 +210,7 @@ export const ProgressChart = memo(function ProgressChart({
               allowDecimals={false}
             />
             <Tooltip
-              content={<ChartTooltip metric={metric} unit={unit} />}
+              content={<ChartTooltip metric={metric} unit={unit} timed={timed} />}
               cursor={bars ? { fill: "color-mix(in srgb, var(--ink) 4%, transparent)" } : { stroke: "color-mix(in srgb, var(--ink) 20%, transparent)", strokeDasharray: "3 3" }}
             />
             {bars ? (
@@ -251,7 +253,7 @@ export const ProgressChart = memo(function ProgressChart({
       </div>
       {legend && (
         <div className="mt-3">
-          <ChartLegend deload={series.some((p) => p.deload)} target={hasGhost} best={series.some((p) => p.best)} loaded={loaded} />
+          <ChartLegend deload={series.some((p) => p.deload)} target={hasGhost} best={series.some((p) => p.best)} loaded={loaded} timed={timed} />
         </div>
       )}
     </div>

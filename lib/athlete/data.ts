@@ -69,6 +69,8 @@ export type Athlete = {
   selfServe: boolean;
   /** A coach in My training: their own profile, opened from the coach side. */
   isCoach: boolean;
+  /** At least one finished session: until then there is nothing for Progress to show. */
+  hasHistory: boolean;
 };
 
 export const getAthlete = cache(async (): Promise<Athlete> => {
@@ -83,7 +85,7 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
   const [profile, coach] = await Promise.all([
     prisma.clientProfile.findUnique({
       where: { id: clientId },
-      select: { fullName: true, goalTargets: true },
+      select: { fullName: true, goalTargets: true, _count: { select: { workoutLogs: { where: { completedAt: { not: null } } } } } },
     }),
     isCoach ? prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } }) : Promise.resolve(null),
   ]);
@@ -105,6 +107,7 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
     isGuest: (session.user.email ?? "").endsWith(`@${GUEST_EMAIL_DOMAIN}`),
     selfServe: meta != null,
     isCoach,
+    hasHistory: profile._count.workoutLogs > 0,
   };
 });
 
@@ -337,6 +340,8 @@ export type LoggerData = {
   exercises: LoggerExercise[];
   /** True in one of the plan's lighter weeks: no progression is asked for, and nothing counts as a record. */
   deloadWeek: boolean;
+  /** The plan came from a coach: the athlete may swap an exercise but not retarget or remove it. */
+  coachPlan: boolean;
   /** Other workouts from the same week, for quick switching. */
   siblings: Array<{ id: string; name: string; status: WorkoutSummary["status"]; date: string }>;
   metric: FocusMetric;
@@ -510,6 +515,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     workoutLogId: workout.workoutLog?.id ?? null,
     deloadWeek,
     exercises,
+    coachPlan: !athlete.selfServe,
     siblings: siblings.map((s) => ({ id: s.id, name: s.name, status: planWorkoutStatus(s.status, s.workoutLog), date: iso(s.scheduledDate) })),
     metric: athlete.metric,
   };

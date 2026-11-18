@@ -134,21 +134,16 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
   }
 
   return (
-    <section className={cn("rounded-2xl border border-line bg-paper p-5", className)}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[17px] font-semibold text-ink">{has ? "Password" : "Set a password"}</p>
-          <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">
-            {done
-              ? `Saved. Sign in any time with your email and this password.${done === "changed" ? " Other devices were signed out." : ""}`
-              : has
-                ? `You sign in as ${email} with a password.`
-                : `So you can sign in as ${email} any time, without waiting for an email link.`}
-          </p>
-        </div>
-        {has && !open && (
-          <button type="button" onClick={() => setOpen(true)} className="press -my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 text-sm font-semibold text-signal hover:underline">
-            Change
+    <section className={cn("rounded-2xl border border-line bg-paper px-5", open ? "py-4" : "py-1.5", className)}>
+      {/* One line: the word, and its one action. */}
+      <div className="flex min-h-11 items-center justify-between gap-4">
+        <p className="flex items-baseline gap-2 text-[17px] font-semibold text-ink">
+          Password
+          {done && <span className="text-sm font-medium text-ink-mute">Saved</span>}
+        </p>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="press -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 text-sm font-semibold text-signal hover:underline">
+            {has ? "Change" : "Set"}
           </button>
         )}
       </div>

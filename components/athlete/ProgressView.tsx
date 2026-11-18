@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import { ChevronDown, Search, X } from "lucide-react";
 import type { ExerciseProgress, ProgressData } from "@/lib/athlete/data";
 import type { FocusMetric } from "@/lib/plan/generator";
-import { METRICS, formatValue, metricFor, unitFor } from "@/lib/plan/overload";
+import { formatValue, metricFor, shortFor, unitFor } from "@/lib/plan/overload";
 import { overallProgress } from "@/lib/progress/overall";
 import { OverallChart } from "./OverallChart";
 import { ProgressChart } from "./ProgressChart";
@@ -134,7 +134,7 @@ export function ProgressView({ data, goalMetric, history }: { data: ProgressData
           {one && (
             <Big
               value={one.change != null && one.sessions >= THIN ? `${one.change > 0 ? "+" : ""}${one.change}%` : formatValue(one.latest, metric)}
-              label={one.change != null && one.sessions >= THIN ? METRICS[metric].short : unitFor(metric, exercise.loaded, exercise.timed)}
+              label={one.change != null && one.sessions >= THIN ? shortFor(metric, exercise.timed) : unitFor(metric, exercise.loaded, exercise.timed)}
               accent={one.change != null && one.change > 0 && one.sessions >= THIN}
             />
           )}
