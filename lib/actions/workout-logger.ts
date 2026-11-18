@@ -216,7 +216,9 @@ export async function completeSession(input: {
       where: { id: input.workoutLogId },
       data: {
         rpeAvg,
-        clientNotes: input.clientNotes ?? null,
+        // Notes can be saved again after finishing; a call without notes (the logger finishing by
+        // itself) leaves any already saved alone, and "" clears them.
+        ...(input.clientNotes === undefined ? {} : { clientNotes: input.clientNotes.trim() || null }),
         completedAt: workoutLog.completedAt ?? new Date(),
       },
     }),
