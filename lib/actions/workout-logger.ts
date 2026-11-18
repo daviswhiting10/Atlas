@@ -91,31 +91,48 @@ export async function logSet(input: {
     } else {
       // The day it was done: the coach's date if given, otherwise today.
       const logDate = input.date ? requestDay(input.date) : new Date();
-      const created = await prisma.workoutLog.create({
-        data: {
-          clientId: input.clientId,
-          assignedWorkoutId: input.assignedWorkoutId,
-          source: planSessionSource(assignedWorkout.programAssignment.sourceProgram),
-          date: logDate,
-        },
-        select: { id: true },
-      });
+      const created = await prisma.workoutLog
+        .create({
+          data: {
+            clientId: input.clientId,
+            assignedWorkoutId: input.assignedWorkoutId,
+            source: planSessionSource(assignedWorkout.programAssignment.sourceProgram),
+            date: logDate,
+          },
+          select: { id: true },
+        })
+        // Two first sets at once (two devices): the loser of the race reuses the winner's session.
+        .catch(() => prisma.workoutLog.findUnique({ where: { assignedWorkoutId: input.assignedWorkoutId }, select: { id: true } }));
+      if (!created) throw new Error("Couldn't start the session");
       workoutLogId = created.id;
     }
   }
 
   // ── Upsert SetLog ──────────────────────────────────────────────────────────
+  // Without a setLogId, the set may still be saved already: a save that reached the server while
+  // the page was reloading, or a retry after a lost answer. Same session, exercise and set number:
+  // it's that row, updated, never a second one.
   let setLogId: string;
+  const known =
+    input.setLogId ??
+    (input.assignedWorkoutExerciseId
+      ? (
+          await prisma.setLog.findFirst({
+            where: { workoutLogId, assignedWorkoutExerciseId: input.assignedWorkoutExerciseId, setNumber: input.setNumber },
+            select: { id: true },
+          })
+        )?.id
+      : undefined);
 
-  if (input.setLogId) {
+  if (known) {
     // Update existing set (trainer edited weight/reps after initial save)
     const ownedSet = await prisma.setLog.findFirst({
-      where: { id: input.setLogId, workoutLogId },
+      where: { id: known, workoutLogId },
       select: { id: true },
     });
     if (!ownedSet) throw new Error("Set not found");
     await prisma.setLog.update({
-      where: { id: input.setLogId },
+      where: { id: known },
       data: {
         weight: input.weight,
         bandColor: input.bandColor,
@@ -125,7 +142,7 @@ export async function logSet(input: {
         completed: input.completed,
       },
     });
-    setLogId = input.setLogId;
+    setLogId = known;
   } else {
     // Create new set
     const created = await prisma.setLog.create({
