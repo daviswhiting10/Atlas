@@ -9,7 +9,6 @@ import { METRICS, formatValue, metricFor, unitFor } from "@/lib/plan/overload";
 import { overallProgress } from "@/lib/progress/overall";
 import { OverallChart } from "./OverallChart";
 import { ProgressChart } from "./ProgressChart";
-import { Sparkline } from "./Sparkline";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
 
@@ -94,11 +93,12 @@ function Big({ value, label, accent = false }: { value: string; label?: string; 
 
 /**
  * Progress, for the athlete and for the coach's view of a client. Three sections, each one
- * heading and one visual: Strength (all lifts, or one picked from a sheet), Sessions a week,
- * and the latest record. A thin history (under three sessions) shows the number alone, or
- * nothing: never a chart of two points or a row of zeros.
+ * heading and one visual: Strength (all lifts, or one picked from a sheet), History (the
+ * calendar, passed in as `history`; the coach has it on the Sessions tab instead), and the
+ * latest record. A section with nothing to show renders nothing, heading included (no
+ * overall line yet means no Strength section): never a chart of two points or a row of zeros.
  */
-export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMetric: FocusMetric }) {
+export function ProgressView({ data, goalMetric, history }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode }) {
   const [exerciseId, setExerciseId] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
   const overall = useMemo(() => overallProgress(data.exercises), [data.exercises]);
@@ -116,7 +116,6 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
   }, [exercise, metric]);
 
   const sessions = data.totals.sessions;
-  const thisWeek = data.weeks.at(-1)?.sessions ?? 0;
   const record = data.recentPRs[0] ?? null;
   const chooser =
     data.exercises.length > 0 ? (
@@ -158,21 +157,8 @@ export function ProgressView({ data, goalMetric }: { data: ProgressData; goalMet
           </Section>
         )
       )}
-      {/* No overall line yet (nothing logged twice), but the lifts can still be looked at one by one. */}
-      {!exercise && (overall.change == null || !overall.since) && data.exercises.length > 0 && (
-        <Section title="Strength" control={chooser}>
-          {null}
-        </Section>
-      )}
 
-      <Section title="Sessions a week">
-        <Big value={String(thisWeek)} label="this week" />
-        {sessions >= THIN && (
-          <div className="mt-5">
-            <Sparkline values={data.weeks.map((w) => w.sessions)} label={`Sessions in each of the last ${data.weeks.length} weeks`} />
-          </div>
-        )}
-      </Section>
+      {history}
 
       {record && (
         <Section title="Records">
