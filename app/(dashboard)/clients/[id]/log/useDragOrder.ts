@@ -86,12 +86,23 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
   }, []);
 
   // A lifted card owns the finger: the page mustn't scroll under it. (Non-passive, so it can cancel.)
+  // And from the moment a hold starts, it isn't a text selection or the phone's long-press menu,
+  // wherever the finger goes (holds start only on headers, so typing in a set is untouched).
   useEffect(() => {
-    const h = (e: TouchEvent) => {
+    const scroll = (e: TouchEvent) => {
       if (dragRef.current && e.cancelable) e.preventDefault();
     };
-    document.addEventListener("touchmove", h, { passive: false });
-    return () => document.removeEventListener("touchmove", h);
+    const holding = (e: Event) => {
+      if (press.current || dragRef.current) e.preventDefault();
+    };
+    document.addEventListener("touchmove", scroll, { passive: false });
+    document.addEventListener("selectstart", holding);
+    document.addEventListener("contextmenu", holding);
+    return () => {
+      document.removeEventListener("touchmove", scroll);
+      document.removeEventListener("selectstart", holding);
+      document.removeEventListener("contextmenu", holding);
+    };
   }, []);
 
   /** Where card k of the others shows now: pushed down or pulled up by the open slot. */
@@ -262,6 +273,7 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     const y = clientY.current + window.scrollY;
     // The page's own end, less the height the carried card gives up.
     const maxScroll = Math.max(window.scrollY, document.documentElement.scrollHeight - window.innerHeight - closeUp);
+    window.getSelection()?.removeAllRanges();
     if (swallowTimer.current) clearTimeout(swallowTimer.current);
     swallowClick.current = true;
     buzz(10);
@@ -294,8 +306,6 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
             window.addEventListener("pointerup", listeners.up);
             window.addEventListener("pointercancel", listeners.cancel);
           },
-          // The phone's own long-press menu would cover the card.
-          onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
         }
       : {};
 
@@ -327,6 +337,13 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     };
   }
 
+  /** A heading's look while something is lifted: it slides with the card under it (`id`). */
+  function headingStyle(id: string): React.CSSProperties | undefined {
+    const d = drag;
+    if (!d || id === d.id) return undefined;
+    return { translate: `0 ${shiftOf(d, d.others.indexOf(id))}px`, transition: "translate 160ms cubic-bezier(0.2, 0.8, 0.2, 1)" };
+  }
+
   /** Where the insertion line goes, relative to the list (null: no line). */
   let lineTop: number | null = null;
   if (drag && !drag.merge && drag.gap !== drag.from && listRef.current) {
@@ -339,5 +356,5 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     lineTop = y - listTop;
   }
 
-  return { listRef, bind, styleFor, lineTop, lifted: drag?.id ?? null, mergeTarget: drag?.merge ?? null };
+  return { listRef, bind, styleFor, headingStyle, lineTop, lifted: drag?.id ?? null, mergeTarget: drag?.merge ?? null };
 }

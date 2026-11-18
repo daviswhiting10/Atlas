@@ -1419,12 +1419,15 @@ export default function WorkoutLogger({
         )}
         {groupIntoBlocks(exercises).map((block, bi) => {
           if (block.exIndices.length === 0) return null;
-          // No block headings: each card's label ("1A: Bench Press") shows the grouping.
-          // Warm-up and Cool-down keep a thin divider.
+          // A thin divider over Warm-up, Cool-down, and a superset ("Block 2" over 2A/2B; it goes
+          // when the group splits back to singles). A single needs none: its label says it all.
           const isPart = block.section === WARMUP || block.section === COOLDOWN;
           return (
             <div key={bi} className="space-y-2">
-              {isPart && <PartDivider title={block.title} />}
+              {(isPart || block.exIndices.length > 1) && (
+                // Slides with the block's first card still in place while one is carried.
+                <PartDivider title={block.title} style={drag.headingStyle(block.exIndices.map((i) => exercises[i].aweId).find((id) => id !== drag.lifted) ?? "")} />
+              )}
               {block.exIndices.map((exI, k) => {
                 const ex = exercises[exI];
                 const state = stateFor(ex);
@@ -1796,7 +1799,7 @@ function CompactHeader({
           // A tap folds the card; its own buttons (the picture, the chevron) do their own thing.
           if (!(e.target as HTMLElement).closest("button")) onFold();
         }}
-        className="-mr-1.5 flex cursor-pointer select-none items-center gap-2 [-webkit-touch-callout:none]"
+        className="no-select -mr-1.5 flex cursor-pointer items-center gap-2"
       >
         <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
         <div className="min-w-0 flex-1">
@@ -1820,9 +1823,9 @@ function labelled(label: string, name: string): string {
 }
 
 /** The thin divider above the Warm-up and the Cool-down. */
-function PartDivider({ title }: { title: string }) {
+function PartDivider({ title, style }: { title: string; style?: React.CSSProperties }) {
   return (
-    <div className="flex items-center gap-2 pt-1">
+    <div className="flex items-center gap-2 pt-1" style={style}>
       <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
       <div className="h-px flex-1 bg-border" />
     </div>
@@ -1881,7 +1884,7 @@ function FoldedRow({ label, name, sets, onOpen, hold = {} }: { label: string; na
       onClick={onOpen}
       aria-expanded={false}
       aria-label={`Expand ${name}`}
-      className="logger-quiet flex w-full select-none items-center gap-2 py-1.5 pl-3 pr-1.5 text-left [-webkit-touch-callout:none]"
+      className="logger-quiet no-select flex w-full items-center gap-2 py-1.5 pl-3 pr-1.5 text-left"
     >
       <ExerciseName name={labelled(label, name)} inControl className="min-w-0 flex-1 text-[16px] font-semibold leading-snug text-ink" />
       {done ? (
