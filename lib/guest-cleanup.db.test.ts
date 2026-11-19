@@ -23,10 +23,10 @@ describe.skipIf(!RUN)("guest cleanup and the demo cap (dev database)", () => {
   const seededUsers: string[] = [];
   const guestEmail = (n: string) => `${tag}-${n}@guest.atlas.app`;
 
-  async function workspace(key: string, emails: string[], ageHours: number, withRows = true) {
+  async function workspace(key: string, emails: string[], ageHours: number, withRows = true, role: "CLIENT" | "TRAINER" = "CLIENT") {
     const ws = await prisma.workspace.create({ data: { name: `${tag} ${key}`, createdAt: new Date(Date.now() - ageHours * H) }, select: { id: true } });
     const users: string[] = [];
-    for (let i = 0; i < emails.length; i++) users.push((await prisma.user.create({ data: { email: emails[i], name: `${tag}${i}`, role: "CLIENT", workspaceId: ws.id, emailVerified: new Date() }, select: { id: true } })).id);
+    for (let i = 0; i < emails.length; i++) users.push((await prisma.user.create({ data: { email: emails[i], name: `${tag}${i}`, role, workspaceId: ws.id, emailVerified: new Date() }, select: { id: true } })).id);
     let client: string | undefined;
     if (users.length && withRows) {
       client = (await prisma.clientProfile.create({ data: { workspaceId: ws.id, userId: users[0], fullName: `${tag} ${key}`, status: "ACTIVE" }, select: { id: true } })).id;
@@ -56,11 +56,13 @@ describe.skipIf(!RUN)("guest cleanup and the demo cap (dev database)", () => {
     guestLib = await import("@/lib/guest");
     throttle = await import("@/lib/auth/throttle");
     exerciseId = (await prisma.exercise.findFirstOrThrow({ where: { workspaceId: null }, select: { id: true } })).id;
-    await workspace("oldGuest", [guestEmail("a")], 25);
-    await workspace("oldMixed", [guestEmail("b"), `${tag}-real-b@example.com`], 48);
-    await workspace("oldReal", [`${tag}-real-c@example.com`], 24 * 90);
+    await workspace("oldDemo", [guestEmail("a")], 7, true, "TRAINER");
+    await workspace("youngDemo", [guestEmail("y")], 5, true, "TRAINER");
+    await workspace("oldTryIt", [guestEmail("t")], 24 * 30);
+    await workspace("oldMixed", [guestEmail("b"), `${tag}-real-b@example.com`], 48, true, "TRAINER");
+    await workspace("oldReal", [`${tag}-real-c@example.com`], 24 * 90, true, "TRAINER");
     await workspace("oldEmpty", [], 48, false);
-    await workspace("recentGuest", [guestEmail("e")], 1);
+    await workspace("recentGuest", [guestEmail("e")], 1, true, "TRAINER");
   }, 120_000);
 
   afterAll(async () => {
@@ -78,14 +80,16 @@ describe.skipIf(!RUN)("guest cleanup and the demo cap (dev database)", () => {
     await prisma.$disconnect();
   }, 120_000);
 
-  it("only an old workspace whose every user is a guest is selected", async () => {
+  const others = ["youngDemo", "oldTryIt", "oldMixed", "oldReal", "oldEmpty", "recentGuest"];
+
+  it("only a demo older than 6 hours, with every user a guest, is selected", async () => {
     const ids = (await cleanup.findExpiredGuestWorkspaces(100_000)).map((w) => w.id);
-    expect(ids).toContain(mine.oldGuest.ws);
-    for (const k of ["oldMixed", "oldReal", "oldEmpty", "recentGuest"]) expect(ids, k).not.toContain(mine[k].ws);
+    expect(ids).toContain(mine.oldDemo.ws);
+    for (const k of others) expect(ids, k).not.toContain(mine[k].ws);
   }, 60_000);
 
   it("refuses to delete any other workspace, even when asked by id, and changes nothing", async () => {
-    for (const k of ["oldMixed", "oldReal", "oldEmpty", "recentGuest"]) {
+    for (const k of others) {
       const before = await fingerprint(k);
       await expect(cleanup.deleteGuestWorkspace(mine[k].ws), k).rejects.toThrow();
       await expect(cleanup.deleteGuestWorkspace(mine[k].ws, { dryRun: true }), k).rejects.toThrow();
@@ -93,42 +97,58 @@ describe.skipIf(!RUN)("guest cleanup and the demo cap (dev database)", () => {
     }
   }, 60_000);
 
-  it("a dry run reports exact counts and deletes nothing; a real run deletes only the guest workspace", async () => {
-    const before = await Promise.all(["oldMixed", "oldReal", "oldEmpty", "recentGuest"].map(fingerprint));
-    const guestBefore = await fingerprint("oldGuest");
-    const dry = await cleanup.deleteGuestWorkspace(mine.oldGuest.ws, { dryRun: true });
+  it("a dry run reports exact counts and deletes nothing; a real run deletes only the old demo", async () => {
+    const before = await Promise.all(others.map(fingerprint));
+    const demoBefore = await fingerprint("oldDemo");
+    const dry = await cleanup.deleteGuestWorkspace(mine.oldDemo.ws, { dryRun: true });
     expect(dry.dryRun).toBe(true);
     expect(dry.deleted).toMatchObject({ SetLog: 2, WorkoutLog: 1, ClientProfile: 1, User: 1, Workspace: 1 });
-    expect(await fingerprint("oldGuest")).toBe(guestBefore);
+    expect(await fingerprint("oldDemo")).toBe(demoBefore);
 
-    const real = await cleanup.deleteGuestWorkspace(mine.oldGuest.ws);
+    const real = await cleanup.deleteGuestWorkspace(mine.oldDemo.ws);
     expect(real.deleted).toEqual(dry.deleted);
-    expect(await prisma.workspace.findUnique({ where: { id: mine.oldGuest.ws } })).toBeNull();
-    expect(await prisma.user.count({ where: { id: { in: mine.oldGuest.users } } })).toBe(0);
-    expect(await prisma.setLog.count({ where: { workoutLog: { clientId: mine.oldGuest.client } } })).toBe(0);
-    expect(await Promise.all(["oldMixed", "oldReal", "oldEmpty", "recentGuest"].map(fingerprint))).toEqual(before);
+    expect(await prisma.workspace.findUnique({ where: { id: mine.oldDemo.ws } })).toBeNull();
+    expect(await prisma.user.count({ where: { id: { in: mine.oldDemo.users } } })).toBe(0);
+    expect(await prisma.setLog.count({ where: { workoutLog: { clientId: mine.oldDemo.client } } })).toBe(0);
+    expect(await Promise.all(others.map(fingerprint))).toEqual(before);
   }, 60_000);
 
-  it("a real demo and a real try-it guest are removed completely, and a real workspace is untouched", async () => {
-    const recentDemos = await prisma.user.count({ where: { role: "TRAINER", email: { endsWith: "@guest.atlas.app" }, createdAt: { gte: new Date(Date.now() - H) } } });
-    if (recentDemos >= 9) return console.warn("skipped: the dev database already has 9+ demos from the last hour (the cap would refuse)");
+  it("a real demo older than 6 h is deleted completely; a real try-it athlete older than 24 h is not", async () => {
     const realBefore = await fingerprint("oldReal");
-    const demo = await guestLib.createGuest({ demo: true });
-    const athlete = await guestLib.createGuest({ name: "Cleanup test" });
-    const ids = [demo.workspaceId, athlete.workspaceId];
-    const rows = async (ws: string) => (await prisma.assignedWorkoutExercise.count({ where: { workspaceId: ws } })) + (await prisma.clientProfile.count({ where: { workspaceId: ws } })) + (await prisma.program.count({ where: { workspaceId: ws } })) + (await prisma.setLog.count({ where: { workoutLog: { client: { workspaceId: ws } } } }));
-    expect(await rows(demo.workspaceId)).toBeGreaterThan(1000);
-    for (const ws of ids) await prisma.workspace.update({ where: { id: ws }, data: { createdAt: new Date(Date.now() - 25 * H) } });
+    const { randomUUID } = await import("crypto");
+    const demo = await guestLib.createDemo(`${randomUUID()}@guest.atlas.app`); // made directly: the demo cap may be full on a dev database
+    const tryIt = await guestLib.createGuest({ name: "Cleanup test" });
+    const rows = async (ws: string) => (await prisma.assignedWorkoutExercise.count({ where: { workspaceId: ws } })) + (await prisma.clientProfile.count({ where: { workspaceId: ws } })) + (await prisma.program.count({ where: { workspaceId: ws } })) + (await prisma.setLog.count({ where: { workoutLog: { client: { workspaceId: ws } } } })) + (await prisma.goal.count({ where: { workspaceId: ws } }));
+    const age = (ws: string, h: number) => prisma.workspace.update({ where: { id: ws }, data: { createdAt: new Date(Date.now() - h * H) } });
+    const demoRows = await rows(demo.workspaceId);
+    const tryItRows = await rows(tryIt.workspaceId);
+    expect(demoRows).toBeGreaterThan(1000);
+    expect(tryItRows).toBeGreaterThan(100);
     try {
-      for (const ws of ids) {
-        const r = await cleanup.deleteGuestWorkspace(ws);
-        expect(r.deleted.Workspace).toBe(1);
-        expect(await prisma.workspace.findUnique({ where: { id: ws } })).toBeNull();
-        expect(await rows(ws)).toBe(0);
-        expect(await prisma.goal.count({ where: { workspaceId: ws } })).toBe(0);
-      }
+      // 5 h: not yet. 7 h: gone, completely.
+      await age(demo.workspaceId, 5);
+      await expect(cleanup.deleteGuestWorkspace(demo.workspaceId)).rejects.toThrow();
+      expect(await rows(demo.workspaceId)).toBe(demoRows);
+      await age(demo.workspaceId, 7);
+      await age(tryIt.workspaceId, 25);
+      const found = (await cleanup.findExpiredGuestWorkspaces(100_000)).map((w) => w.id);
+      expect(found).toContain(demo.workspaceId);
+      expect(found).not.toContain(tryIt.workspaceId);
+
+      const r = await cleanup.deleteGuestWorkspace(demo.workspaceId);
+      expect(r.deleted.Workspace).toBe(1);
+      expect(await prisma.workspace.findUnique({ where: { id: demo.workspaceId } })).toBeNull();
+      expect(await prisma.user.count({ where: { workspaceId: demo.workspaceId } })).toBe(0);
+      expect(await rows(demo.workspaceId)).toBe(0);
+      expect(await prisma.workoutLog.count({ where: { client: { workspaceId: demo.workspaceId } } })).toBe(0);
+
+      // The try-it athlete (25 h old) is left alone, whether the cleanup finds it or is asked for it by id.
+      await expect(cleanup.deleteGuestWorkspace(tryIt.workspaceId)).rejects.toThrow();
+            expect(await rows(tryIt.workspaceId)).toBe(tryItRows);
+      expect(await prisma.user.count({ where: { workspaceId: tryIt.workspaceId } })).toBe(1);
     } finally {
-      for (const ws of ids) if (await prisma.workspace.findUnique({ where: { id: ws } })) await cleanup.deleteGuestWorkspace(ws, { now: new Date(Date.now() + 48 * H) }).catch(() => {});
+      const later = new Date(Date.now() + 48 * H);
+      for (const ws of [demo.workspaceId, tryIt.workspaceId]) if (await prisma.workspace.findUnique({ where: { id: ws } })) await cleanup.deleteGuestWorkspace(ws, { now: later, includeAthletes: true }).catch(() => {});
     }
     expect(await fingerprint("oldReal")).toBe(realBefore);
   }, 180_000);

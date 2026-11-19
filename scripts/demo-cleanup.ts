@@ -1,9 +1,9 @@
 /**
- * Remove expired demo and guest workspaces (see lib/guest-cleanup.ts), by hand.
+ * Remove expired demo workspaces (a guest coach's, older than 6 hours; try-it guest athletes are never selected) (see lib/guest-cleanup.ts), by hand.
  *
  *   npx tsx scripts/demo-cleanup.ts                 dry run: lists what would be deleted, with exact counts (the delete runs and is rolled back)
  *   npx tsx scripts/demo-cleanup.ts --apply         really delete
- *   --hours <n>   age threshold in hours (default 24)
+ *   --hours <n>   age threshold in hours (default 6)
  *   --limit <n>   at most this many workspaces (default all)
  *
  * Before and after, it counts every table's rows for every workspace, and the
@@ -21,7 +21,7 @@ const arg = (name: string) => {
   return i > 0 ? process.argv[i + 1] : undefined;
 };
 const apply = process.argv.includes("--apply");
-const hours = Number(arg("--hours") ?? 24);
+const hours = Number(arg("--hours") ?? 6);
 const limit = Number(arg("--limit") ?? 100000);
 if (isProductionDatabase(process.env.DATABASE_URL) && process.env.ALLOW_PROD !== "1") throw new Error("That is production — refusing to run without ALLOW_PROD=1");
 
@@ -56,7 +56,7 @@ const kindOf = (users: Array<{ role: string }>, name: string) => (name.endsWith(
 
 async function main() {
   const host = new URL(process.env.DATABASE_URL!).hostname.replace(/^(ep-[a-z]+-[a-z]+)-.*$/, "$1…");
-  console.log(`${apply ? "APPLY" : "DRY RUN"} on ${host}; workspaces older than ${hours} h whose every user is a guest login\n`);
+  console.log(`${apply ? "APPLY" : "DRY RUN"} on ${host}; demo workspaces older than ${hours} h whose every user is a guest login\n`);
 
   const before = await snapshot();
   const now = new Date();

@@ -5,13 +5,28 @@
  */
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 
-export const GUEST_TTL_MS = 24 * 60 * 60 * 1000;
+/** A demo is disposable: it goes after 6 hours. Try-it guest athletes are not touched by the cleanup. */
+export const DEMO_TTL_MS = 6 * 60 * 60 * 1000;
 
 export const isGuestEmail = (email: string) => email.toLowerCase().endsWith(`@${GUEST_EMAIL_DOMAIN}`);
 
-/** Old enough, at least one user, and every user a guest login. Never true for a workspace with any real login. */
-export function isExpiredGuestWorkspace(ws: { createdAt: Date; users: Array<{ email: string }> }, now: Date, ttlMs = GUEST_TTL_MS): boolean {
-  return ws.users.length > 0 && ws.users.every((u) => isGuestEmail(u.email)) && now.getTime() - ws.createdAt.getTime() >= ttlMs;
+/**
+ * Old enough, at least one user, every user a guest login, and (a demo) a
+ * guest coach in it. Never true for a workspace with any real login, and never
+ * for a try-it guest athlete's workspace unless `includeAthletes` (tests only).
+ */
+export function isExpiredGuestWorkspace(
+  ws: { createdAt: Date; users: Array<{ email: string; role: string }> },
+  now: Date,
+  ttlMs = DEMO_TTL_MS,
+  includeAthletes = false
+): boolean {
+  return (
+    ws.users.length > 0 &&
+    ws.users.every((u) => isGuestEmail(u.email)) &&
+    (includeAthletes || ws.users.some((u) => u.role === "TRAINER")) &&
+    now.getTime() - ws.createdAt.getTime() >= ttlMs
+  );
 }
 
 /**

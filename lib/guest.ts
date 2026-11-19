@@ -86,7 +86,7 @@ export async function createGuest(input: {
 
   const email = `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`;
   const guest = input.demo === true ? await createDemo(email) : await createAthlete({ ...input, email, passwordHash: null });
-  // Old demo and guest workspaces are removed a couple at a time, as new ones arrive (no job to schedule).
+  // Old demos (6 h+) are removed a couple at a time, as new guests arrive (no job to schedule). Try-it athletes are left alone.
   await cleanupExpiredGuests();
   return guest;
 }
@@ -188,7 +188,7 @@ const DEMO_ROSTER: Array<{ name: string; prefs: Prefs; weeksIn: number | null; s
  * different points (one brand new), with sessions the coach hasn't seen yet.
  * Nobody here has an email or a login, so nothing can reach a real person.
  */
-async function createDemo(email: string): Promise<NewDemo> {
+export async function createDemo(email: string): Promise<NewDemo> {
   const name = "Alex";
   const today = new Date();
   today.setHours(0, 0, 0, 0);

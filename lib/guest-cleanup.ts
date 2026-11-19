@@ -1,13 +1,13 @@
 /**
- * Demo and guest workspaces don't live forever: a demo is about 5,500 rows, and
- * nobody comes back to most of them. Once a workspace is more than a day old,
- * and every login in it is a @guest.atlas.app address, it and everything under
- * it is deleted. It runs lazily, a couple of workspaces each time a new guest
+ * Demo workspaces don't live forever: a demo is about 5,500 rows, and nobody
+ * comes back to most of them. Once a demo (a guest coach's workspace) is more
+ * than 6 hours old, and every login in it is a @guest.atlas.app address, it and
+ * everything under it is deleted. Try-it guest athletes are left alone. It runs lazily, a couple of workspaces each time a new guest
  * is created, so there's no job to schedule.
  *
  * Two safety properties:
- * - A workspace is only ever chosen if it has at least one user and EVERY user
- *   is a guest login (`isExpiredGuestWorkspace`). A workspace with any real
+ * - A workspace is only ever chosen if it has at least one user, EVERY user is
+ *   a guest login, and one of them is a guest coach (`isExpiredGuestWorkspace`). A workspace with any real
  *   login, however old, is never touched. The check is made again inside the
  *   transaction that deletes it.
  * - Each workspace goes in one transaction, leaf rows first. Foreign keys are
@@ -21,20 +21,20 @@
 
 import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
-import { GUEST_TTL_MS, isExpiredGuestWorkspace, isGuestEmail } from "@/lib/guest-rules";
+import { DEMO_TTL_MS, isExpiredGuestWorkspace, isGuestEmail } from "@/lib/guest-rules";
 
-export { GUEST_TTL_MS, isExpiredGuestWorkspace, isGuestEmail };
+export { DEMO_TTL_MS, isExpiredGuestWorkspace, isGuestEmail };
 /** Workspaces removed per call: small, so a new visitor never waits long. */
 export const CLEANUP_BATCH = 2;
 
 type Candidate = { id: string; createdAt: Date; users: Array<{ email: string; role: string }> };
 
 /** The oldest expired guest workspaces (the query narrows; the pure check decides). */
-export async function findExpiredGuestWorkspaces(limit: number, now = new Date(), ttlMs = GUEST_TTL_MS): Promise<Candidate[]> {
+export async function findExpiredGuestWorkspaces(limit: number, now = new Date(), ttlMs = DEMO_TTL_MS): Promise<Candidate[]> {
   const rows = await prisma.workspace.findMany({
     where: {
       createdAt: { lt: new Date(now.getTime() - ttlMs) },
-      users: { some: {}, every: { email: { endsWith: `@${GUEST_EMAIL_DOMAIN}`, mode: "insensitive" } } },
+      users: { some: { role: "TRAINER" }, every: { email: { endsWith: `@${GUEST_EMAIL_DOMAIN}`, mode: "insensitive" } } },
     },
     select: { id: true, createdAt: true, users: { select: { email: true, role: true } } },
     orderBy: { createdAt: "asc" },
@@ -70,14 +70,14 @@ class NotAGuestWorkspace extends Error {}
  * all of it and then rolls back, so the counts are exactly what a real run
  * would delete.
  */
-export async function deleteGuestWorkspace(workspaceId: string, opts: { dryRun?: boolean; now?: Date; ttlMs?: number } = {}): Promise<CleanupResult> {
+export async function deleteGuestWorkspace(workspaceId: string, opts: { dryRun?: boolean; now?: Date; ttlMs?: number; includeAthletes?: boolean } = {}): Promise<CleanupResult> {
   const dryRun = opts.dryRun === true;
   try {
     const deleted = await prisma.$transaction(
       async (tx) => {
         // Decided again inside the transaction: a guest who saved their account a moment ago is a real user now.
-        const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { id: true, createdAt: true, users: { select: { id: true, email: true } } } });
-        if (!ws || !isExpiredGuestWorkspace(ws, opts.now ?? new Date(), opts.ttlMs ?? GUEST_TTL_MS)) throw new NotAGuestWorkspace(workspaceId);
+        const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { id: true, createdAt: true, users: { select: { id: true, email: true, role: true } } } });
+        if (!ws || !isExpiredGuestWorkspace(ws, opts.now ?? new Date(), opts.ttlMs ?? DEMO_TTL_MS, opts.includeAthletes === true)) throw new NotAGuestWorkspace(workspaceId);
 
         const W = workspaceId;
         const userIds = ws.users.map((u) => u.id);

@@ -66,8 +66,8 @@ describe.skipIf(!RUN)("a guest can't reach another workspace", () => {
   const guestWorkspaces: string[] = [];
   afterAll(async () => {
     const { deleteGuestWorkspace } = await import("@/lib/guest-cleanup");
-    for (const ws of guestWorkspaces) await deleteGuestWorkspace(ws, { ttlMs: 0 }).catch((e) => console.error("cleanup of a test guest failed", e));
-    if (qa?.ws) await deleteGuestWorkspace(qa.ws, { ttlMs: 0 }).catch((e) => console.error("cleanup of the other workspace failed", e));
+    for (const ws of guestWorkspaces) await deleteGuestWorkspace(ws, { ttlMs: 0, includeAthletes: true }).catch((e) => console.error("cleanup of a test guest failed", e));
+    if (qa?.ws) await deleteGuestWorkspace(qa.ws, { ttlMs: 0, includeAthletes: true }).catch((e) => console.error("cleanup of the other workspace failed", e));
   }, 60_000);
 
   async function call(persona: string, action: string, fn: () => Promise<unknown>) {
