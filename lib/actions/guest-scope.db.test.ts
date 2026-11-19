@@ -5,9 +5,9 @@
  *
  * Runs against a dev database only:
  *   set -a; . ./.env.local; set +a; ATLAS_DB_TEST=1 npx vitest run lib/actions/guest-scope.db.test.ts
- * It needs the QA workspace (users qa-w1-trainer@example.com / qa-w1-client@example.com).
+ * It makes its own "other" workspace (a client with a plan and one session) and removes it afterwards.
  */
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const current = vi.hoisted(() => ({ user: null as null | Record<string, unknown> }));
 const sendEmail = vi.hoisted(() => vi.fn());
@@ -19,6 +19,8 @@ vi.mock("next/headers", () => ({ headers: () => new Headers({ "x-forwarded-for":
 vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirect"); } }));
 vi.mock("react", async (orig) => ({ ...(await orig<typeof import("react")>()), cache: <T,>(fn: T) => fn }));
 vi.mock("@/lib/email", () => ({ sendEmail }));
+// createGuest would otherwise clear out old guests on the dev database as a side effect.
+vi.mock("@/lib/guest-cleanup", async (orig) => ({ ...(await orig<typeof import("@/lib/guest-cleanup")>()), cleanupExpiredGuests: vi.fn(async () => 0) }));
 vi.mock("@/lib/ai/client", () => new Proxy({}, { get: () => aiCalls }));
 
 const RUN = !!process.env.ATLAS_DB_TEST;
@@ -49,20 +51,24 @@ describe.skipIf(!RUN)("a guest can't reach another workspace", () => {
     ({ prisma } = await import("@/lib/db/client"));
     const { createPlanForClient } = await import("@/lib/plan/persist");
     const { DEMO_PREFS } = await import("@/lib/guest");
-    const owner = await prisma.user.findUniqueOrThrow({ where: { email: "qa-w1-trainer@example.com" }, select: { workspaceId: true } });
-    const ws = owner.workspaceId!;
-    const profile = await prisma.clientProfile.findFirstOrThrow({ where: { workspaceId: ws, fullName: "QA Client" } });
-    let a = await prisma.programAssignment.findFirst({ where: { workspaceId: ws, clientId: profile.id } });
-    if (!a) {
-      const made = await createPlanForClient({ workspaceId: ws, clientId: profile.id, prefs: DEMO_PREFS, startDate: new Date() });
-      a = await prisma.programAssignment.findFirstOrThrow({ where: { id: made.assignmentId } });
-    }
+    const ws = (await prisma.workspace.create({ data: { name: "scope-test other workspace" }, select: { id: true } })).id;
+    const owner = await prisma.user.create({ data: { email: `${Date.now().toString(36)}-other@guest.atlas.app`, name: "Other", role: "CLIENT", workspaceId: ws, emailVerified: new Date() }, select: { id: true } });
+    const profile = await prisma.clientProfile.create({ data: { workspaceId: ws, userId: owner.id, fullName: "QA Client", status: "ACTIVE" } });
+    const made = await createPlanForClient({ workspaceId: ws, clientId: profile.id, prefs: DEMO_PREFS, startDate: new Date() });
+    const a = await prisma.programAssignment.findFirstOrThrow({ where: { id: made.assignmentId } });
     const awe = await prisma.assignedWorkoutExercise.findFirstOrThrow({ where: { workspaceId: ws }, select: { id: true, exerciseId: true, assignedWorkoutId: true } });
     const log = await prisma.workoutLog.create({ data: { clientId: profile.id, assignedWorkoutId: awe.assignedWorkoutId, source: "GENERATED", date: new Date(), completedAt: new Date() }, select: { id: true } }).catch(() => null);
     qa = {
       ws, client: profile.id, assignment: a.id, workout: awe.assignedWorkoutId, awe: awe.id, exercise: awe.exerciseId, program: a.sourceProgramId, log: log?.id ?? "none", fullName: "QA Client",
     };
   }, 120_000);
+
+  const guestWorkspaces: string[] = [];
+  afterAll(async () => {
+    const { deleteGuestWorkspace } = await import("@/lib/guest-cleanup");
+    for (const ws of guestWorkspaces) await deleteGuestWorkspace(ws, { ttlMs: 0 }).catch((e) => console.error("cleanup of a test guest failed", e));
+    if (qa?.ws) await deleteGuestWorkspace(qa.ws, { ttlMs: 0 }).catch((e) => console.error("cleanup of the other workspace failed", e));
+  }, 60_000);
 
   async function call(persona: string, action: string, fn: () => Promise<unknown>) {
     let outcome: string;
@@ -148,7 +154,17 @@ describe.skipIf(!RUN)("a guest can't reach another workspace", () => {
   for (const persona of ["demo coach", "guest athlete"] as const) {
     it(`${persona}: every action refused, nothing changes, no email, no AI`, async () => {
       const { createGuest } = await import("@/lib/guest");
-      const guest = await createGuest(persona === "demo coach" ? { demo: true } : { name: "QA guest" });
+      // The demo coach is a guest TRAINER in their own workspace. (Not made with createGuest({ demo: true }): the demo cap may be full on a dev database.)
+      const guest =
+        persona === "demo coach"
+          ? await (async () => {
+              const email = `${Date.now().toString(36)}-coach@guest.atlas.app`;
+              const workspaceId = (await prisma.workspace.create({ data: { name: "scope-test demo coach" }, select: { id: true } })).id;
+              const u = await prisma.user.create({ data: { email, name: "Alex", role: "TRAINER", workspaceId, emailVerified: new Date() }, select: { id: true } });
+              return { id: u.id, email, name: "Alex", role: "TRAINER" as const, workspaceId };
+            })()
+          : await createGuest({ name: "QA guest" });
+      guestWorkspaces.push(guest.workspaceId);
       current.user = { id: guest.id, email: guest.email, name: guest.name, role: guest.role, workspaceId: guest.workspaceId };
       const before = await fingerprint();
       sendEmail.mockClear();

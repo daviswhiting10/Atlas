@@ -6,18 +6,29 @@ import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import type { Prefs } from "@/lib/plan/generator";
 import { cn } from "@/lib/utils";
+import { useEscape } from "@/hooks/use-escape";
+
+type GuestInput = { name?: string; prefs?: Prefs; demo?: boolean };
 
 /** Creates a guest account (optionally pre-filled with demo history) and enters the app. */
 export function useGuestSignIn() {
   const [pending, setPending] = useState<null | "plan" | "demo">(null);
+  /** The demo is at its hourly cap: what to retry with. */
+  const [busy, setBusy] = useState<GuestInput | null>(null);
 
-  const start = useCallback(async (input: { name?: string; prefs?: Prefs; demo?: boolean }) => {
+  const start = useCallback(async (input: GuestInput) => {
+    setBusy(null);
     setPending(input.demo ? "demo" : "plan");
     try {
       // Loaded on demand: importing next-auth/react at module level breaks
       // server rendering of any page that includes this component.
       const { signIn } = await import("next-auth/react");
       const res = await signIn("guest", { payload: JSON.stringify(input), redirect: false });
+      if (res?.code === "demo_busy") {
+        setPending(null);
+        setBusy(input);
+        return;
+      }
       if (!res || res.error) throw new Error(res?.error ?? "Sign-in failed");
       window.location.assign("/today");
     } catch {
@@ -26,7 +37,35 @@ export function useGuestSignIn() {
     }
   }, []);
 
-  return { pending, start };
+  return { pending, start, busy, dismissBusy: () => setBusy(null) };
+}
+
+/** "The demo is busy": never a raw error. A retry button, and a way out. */
+export function DemoBusy({ input, onRetry, onClose }: { input: GuestInput | null; onRetry: (input: GuestInput) => void; onClose: () => void }) {
+  useEscape(input != null, onClose);
+  if (!input) return null;
+  return createPortal(
+    <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="The demo is busy"
+        onClick={(e) => e.stopPropagation()}
+        className="sheet-up w-full rounded-t-[24px] border-t border-line bg-bone px-5 pt-6 sm:mx-auto sm:max-w-md sm:rounded-[24px] sm:border"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
+      >
+        <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">The demo is busy</h2>
+        <p className="mt-2 text-[16px] leading-relaxed text-ink-soft">Try again in a few minutes.</p>
+        <button type="button" onClick={() => onRetry(input)} className="press mt-6 h-14 w-full rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
+          Try again
+        </button>
+        <button type="button" onClick={onClose} className="press mt-1 min-h-11 w-full text-[15px] font-medium text-ink-soft hover:text-ink">
+          Close
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
 }
 
 const STEPS = {
@@ -76,13 +115,14 @@ export function BuildingOverlay({ mode }: { mode: null | "plan" | "demo" }) {
 }
 
 export function DemoButton({ className, children }: { className?: string; children: React.ReactNode }) {
-  const { pending, start } = useGuestSignIn();
+  const { pending, start, busy, dismissBusy } = useGuestSignIn();
   return (
     <>
       <button type="button" disabled={pending != null} onClick={() => start({ demo: true })} className={className}>
         {children}
       </button>
       <BuildingOverlay mode={pending} />
+      <DemoBusy input={busy} onRetry={start} onClose={dismissBusy} />
     </>
   );
 }

@@ -8,6 +8,11 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db/client";
 import { GOALS, normalizePrefs, resolvePrefs, type Prefs } from "@/lib/plan/generator";
+import { POLICIES, record, throttleKey, waitFor } from "@/lib/auth/throttle";
+import { cleanupExpiredGuests } from "@/lib/guest-cleanup";
+import { DEMO_CAPS, DemoBusyError, demoBusy } from "@/lib/guest-rules";
+
+export { DEMO_CAPS, DemoBusyError, demoBusy };
 import { createPlanForClient, ensureCatalog, seedDemoHistory } from "@/lib/plan/persist";
 import { sealNow } from "@/lib/goals/data";
 
@@ -35,6 +40,17 @@ function underIpLimit(ip: string | null): boolean {
   return true;
 }
 
+/** Refuses (and counts nothing) when the demo is at its cap; otherwise counts this visit against the connection. */
+export async function assertDemoCapacity(ip: string | null, perHour = DEMO_CAPS.perHour, now = new Date()): Promise<void> {
+  const ipKey = ip ? throttleKey("demoIp", ip) : null;
+  const [recent, ipWait] = await Promise.all([
+    prisma.user.count({ where: { role: "TRAINER", email: { endsWith: `@${GUEST_EMAIL_DOMAIN}` }, createdAt: { gte: new Date(now.getTime() - HOUR_MS) } } }),
+    ipKey ? waitFor(ipKey, now) : Promise.resolve(0),
+  ]);
+  if (demoBusy(recent, ipWait, perHour)) throw new DemoBusyError();
+  if (ipKey) await record(ipKey, POLICIES.demoIp, now);
+}
+
 export const DEMO_PREFS: Prefs = {
   goal: "muscle",
   experience: "intermediate",
@@ -55,18 +71,24 @@ export async function createGuest(input: {
   /** Caller's IP, when known, for the per-visitor limit. */
   ip?: string | null;
 }): Promise<NewAthlete | NewDemo> {
-  if (!underIpLimit(input.ip ?? null)) throw new Error("Too many new accounts from this connection. Try again later.");
-
-  const recent = await prisma.user.count({
-    where: {
-      email: { endsWith: `@${GUEST_EMAIL_DOMAIN}` },
-      createdAt: { gte: new Date(Date.now() - HOUR_MS) },
-    },
-  });
-  if (recent >= MAX_GUESTS_PER_HOUR) throw new Error("Too many new accounts right now. Try again shortly.");
+  if (input.demo === true) {
+    await assertDemoCapacity(input.ip ?? null);
+  } else {
+    if (!underIpLimit(input.ip ?? null)) throw new Error("Too many new accounts from this connection. Try again later.");
+    const recent = await prisma.user.count({
+      where: {
+        email: { endsWith: `@${GUEST_EMAIL_DOMAIN}` },
+        createdAt: { gte: new Date(Date.now() - HOUR_MS) },
+      },
+    });
+    if (recent >= MAX_GUESTS_PER_HOUR) throw new Error("Too many new accounts right now. Try again shortly.");
+  }
 
   const email = `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`;
-  return input.demo === true ? createDemo(email) : createAthlete({ ...input, email, passwordHash: null });
+  const guest = input.demo === true ? await createDemo(email) : await createAthlete({ ...input, email, passwordHash: null });
+  // Old demo and guest workspaces are removed a couple at a time, as new ones arrive (no job to schedule).
+  await cleanupExpiredGuests();
+  return guest;
 }
 
 /**
