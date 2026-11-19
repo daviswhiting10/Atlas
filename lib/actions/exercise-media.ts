@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 import { blobConfigured, removeMedia, saveMedia } from "@/lib/exercises/media";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -13,6 +14,8 @@ async function scope(exerciseId: string) {
   const session = await auth();
   const workspaceId = session?.user?.workspaceId;
   if (!session?.user?.id || !workspaceId || session.user.role === "CLIENT") throw new Error("Only a coach can change exercise pictures.");
+  // The demo coach is a guest: uploads are off for them (the upload route refuses too).
+  if (session.user.email?.endsWith(`@${GUEST_EMAIL_DOMAIN}`)) throw new Error("Not available in the demo.");
   const ex = await prisma.exercise.findFirst({ where: { id: exerciseId, OR: [{ workspaceId: null }, { workspaceId }] }, select: { id: true } });
   if (!ex) throw new Error("That exercise couldn't be found.");
   return { workspaceId };
