@@ -116,3 +116,24 @@ describe("mergeCookieHeader", () => {
     expect(mergeCookieHeader("", ["t=abc==; Path=/"], now)).toBe("t=abc==");
   });
 });
+
+describe("decide: guests and the demo", () => {
+  const demoCoach = { role: "TRAINER", needsPassword: false, guest: true };
+  const guestAthlete = { role: "CLIENT", needsPassword: false, guest: true };
+  const no = { kind: "json", status: 403, error: "Not available in the demo" };
+  it("can't send an invite, call AI, upload, or reach outreach, leads or MCP", () => {
+    for (const p of ["/api/clients/abc/invite", "/api/clients/abc/plan-from-sheet", "/api/ai/program-generate", "/api/ai", "/api/exercise-media/upload", "/api/outreach", "/api/leads/x", "/api/mcp"]) expect(decide(p, demoCoach)).toEqual(no);
+    expect(decide("/api/mcp", guestAthlete)).toEqual(no);
+  });
+  it("keeps everything else in their own workspace", () => {
+    expect(decide("/api/clients", demoCoach)).toEqual(next);
+    expect(decide("/api/clients/abc", demoCoach)).toEqual(next);
+    expect(decide("/api/programs", demoCoach)).toEqual(next);
+    expect(decide("/log", demoCoach)).toEqual(next);
+    expect(decide("/today", demoCoach)).toEqual(next);
+  });
+  it("leaves real accounts alone", () => {
+    expect(decide("/api/clients/abc/invite", coach)).toEqual(next);
+    expect(decide("/api/ai/program-generate", coach)).toEqual(next);
+  });
+});

@@ -7,6 +7,7 @@ import { ClipboardPen, LogOut, MoreHorizontal, Settings, Users, X } from "lucide
 import { Logo } from "@/components/athlete/Logo";
 import { ModeToggle } from "@/components/ModeToggle";
 import { cn } from "@/lib/utils";
+import { useEscape } from "@/hooks/use-escape";
 
 /**
  * Logging comes first: it's what the coach opens the app to do. Items with an
@@ -29,6 +30,7 @@ const MORE: Array<{ href: string; label: string }> = [...ITEMS.filter((i) => !("
 export function CoachNav() {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
+  useEscape(more, () => setMore(false));
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   useEffect(() => setMore(false), [pathname]);

@@ -1,4 +1,4 @@
-import NextAuth from "next-auth"
+import NextAuth, { CredentialsSignin } from "next-auth"
 import Email from "next-auth/providers/email"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
@@ -6,6 +6,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
 import { GUEST_EMAIL_DOMAIN, createGuest, createOAuthAthlete } from "@/lib/guest"
+import { DemoBusyError } from "@/lib/guest-rules"
 import { Email as EmailAddress, hashPassword, needsRehash, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
 import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle"
 import { RECHECK_MS, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
@@ -38,6 +39,11 @@ const adapter = {
     })
     return baseAdapter.createVerificationToken!(verificationToken)
   },
+}
+
+/** The demo is at its cap: the sign-in page gets this code and shows "busy, try again" instead of a raw error. */
+class DemoBusy extends CredentialsSignin {
+  code = "demo_busy"
 }
 
 export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
@@ -101,6 +107,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
           return await createGuest({ name: input.name, prefs: input.prefs, demo: input.demo === true, ip })
         } catch (err) {
+          if (err instanceof DemoBusyError) throw new DemoBusy()
           console.error("[guest sign-in]", err)
           return null
         }

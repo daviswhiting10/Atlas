@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { decide, mergeCookieHeader, needsRecheck, type RouteUser } from "./lib/auth/route-policy";
+import { GUEST_EMAIL_DOMAIN, decide, mergeCookieHeader, needsRecheck, type RouteUser } from "./lib/auth/route-policy";
 
 /**
  * Reads the session cookie, and every 10 minutes has the server re-check it
@@ -18,7 +18,8 @@ export default async function middleware(req: NextRequest) {
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   const token = await getToken({ req, secret, secureCookie: secure }).catch(() => null);
 
-  let user: RouteUser = token ? { role: String(token.role ?? "TRAINER"), needsPassword: token.np === true } : null;
+  const guest = typeof token?.email === "string" && token.email.endsWith(`@${GUEST_EMAIL_DOMAIN}`);
+  let user: RouteUser = token ? { role: String(token.role ?? "TRAINER"), needsPassword: token.np === true, guest } : null;
   let setCookies: string[] = [];
 
   if (token && needsRecheck(token.chk, Date.now())) {
@@ -30,7 +31,7 @@ export default async function middleware(req: NextRequest) {
       if (res.ok) {
         const session = (await res.json()) as { user?: { role?: string; needsPassword?: boolean } } | null;
         setCookies = res.headers.getSetCookie();
-        user = session?.user ? { role: String(session.user.role ?? "TRAINER"), needsPassword: session.user.needsPassword === true } : null;
+        user = session?.user ? { role: String(session.user.role ?? "TRAINER"), needsPassword: session.user.needsPassword === true, guest } : null;
       }
     } catch (err) {
       // Can't reach the server: go on with the cookie as it is, and try again next request.

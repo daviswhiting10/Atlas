@@ -47,6 +47,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
               <Link
                 key={href}
                 href={href}
+                prefetch
                 aria-current={isActive(href) ? "page" : undefined}
                 className={cn(
                   "press rounded-full px-4 py-1.5 text-sm font-medium",
@@ -78,6 +79,8 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
                 <Link
                   key={href}
                   href={href}
+                  // Each tab's whole screen is fetched ahead, so the first tap to it is as instant as the second.
+                  prefetch
                   aria-current={active ? "page" : undefined}
                   className={cn("press flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-medium", active ? "text-signal" : "text-ink-mute")}
                 >

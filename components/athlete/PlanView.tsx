@@ -218,11 +218,16 @@ function WorkoutCard({
             <p className="py-2 text-[15px] text-ink-mute">No exercises yet.</p>
           ) : (
             <ol className="divide-y divide-line">
-              {/* Warm-up, Block 1, 2…, Cool-down: only the parts that have something in them. */}
+              {/* Warm-up, Cool-down and a superset ("Block 2" over 2A/2B) get a heading; a single exercise
+                  doesn't (its number says it), as in the logger. Only parts with something in them. */}
               {parts(structure(w.exercises, (x) => x.section)).filter((part) => part.items.length > 0).flatMap((part) => [
-                <li key={part.key} className="pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-ink-mute first:pt-0">
-                  {part.title}
-                </li>,
+                ...(part.items.length > 1 || !part.key.startsWith("block")
+                  ? [
+                      <li key={part.key} className="pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-ink-mute first:pt-0">
+                        {part.title}
+                      </li>,
+                    ]
+                  : []),
                 ...part.items.map(({ item: e, label }) => {
                 const cat = CATALOG_BY_SLUG[e.slug];
                 const loaded = cat ? cat.tool !== "bodyweight" : true;

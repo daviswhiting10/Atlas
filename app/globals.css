@@ -8,6 +8,13 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Something you press and hold (a card's header): no text selection or iPhone callout.
+     Safari only reads the -webkit- spelling, and there's no autoprefixer here. */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 }
 
 /* ── Mobile nav clearance ──────────────────────────────────────────────────

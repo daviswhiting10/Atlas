@@ -34,11 +34,6 @@ export function TodayScreen({
     <div className="space-y-14 pt-4">
       {!plan && athlete.selfServe && <PendingPlan />}
 
-      {athlete.isDemo && (
-        <Link href="/agents#demo" className="press inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-paper px-3 text-[13px] font-medium text-ink-soft hover:text-ink">
-          Demo account <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      )}
       {athlete.isGuest && !athlete.isDemo && (
         <Link href="/you" className="press inline-flex min-h-11 items-center gap-1.5 rounded-full border border-signal/30 bg-signal/5 px-3 text-[13px] font-medium text-signal">
           Save your account <ArrowRight className="h-3.5 w-3.5" />

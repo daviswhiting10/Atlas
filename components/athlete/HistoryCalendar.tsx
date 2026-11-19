@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { SessionSummary } from "@/lib/actions/athlete";
 import { shortDay, type CalendarDay, type CalendarSession, type HistoryCalendar as Calendar } from "@/lib/history/calendar";
+import { useEscape } from "@/hooks/use-escape";
 
 /** Dot fill for each level: the accent at rising strength. Level 0 is a hairline ring. */
 const FILL = ["transparent", "32%", "54%", "78%", "100%"].map((p, i) => (i === 0 ? p : `color-mix(in srgb, var(--dusk-teal) ${p}, transparent)`));
@@ -135,6 +136,7 @@ function SummaryView({ s, load, onBack, onClose }: { s: CalendarSession; load: (
 /** A day's sessions in a bottom sheet: the day, then each session; with `summary`, tapping one shows what was done. */
 function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: CalendarSession[]; summary?: (id: string) => Promise<SessionSummary | null>; onClose: () => void }) {
   const [view, setView] = useState<CalendarSession | null>(sessions.length === 1 && summary ? sessions[0] : null);
+  useEscape(true, onClose);
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm" onClick={onClose}>
       <div

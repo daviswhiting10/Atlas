@@ -14,7 +14,16 @@ export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you
 /** The set-password step: signed in, any role. */
 export const SET_PASSWORD_PATH = "/set-password";
 
-export type RouteUser = { role: string; needsPassword: boolean } | null;
+/** Guest and demo logins: a made-up address on this domain, no email, no password. */
+export const GUEST_EMAIL_DOMAIN = "guest.atlas.app";
+/**
+ * What a guest (the demo, or someone trying the app) may not call: anything that
+ * reaches a real person (an invite email) or costs money per call (AI, uploads, outreach).
+ * Everything inside their own workspace still works.
+ */
+const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/];
+
+export type RouteUser = { role: string; needsPassword: boolean; guest?: boolean } | null;
 
 export type Decision =
   | { kind: "next" }
@@ -35,6 +44,7 @@ export function decide(path: string, user: RouteUser): Decision {
   }
 
   if (matches(path, SHARED_PATHS)) return next;
+  if (user.guest && GUEST_BLOCKED.some((re) => re.test(path))) return { kind: "json", status: 403, error: "Not available in the demo" };
 
   const isAthlete = user.role === "CLIENT";
   const home = isAthlete ? "/today" : "/log";
