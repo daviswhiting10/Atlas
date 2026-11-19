@@ -81,7 +81,7 @@ function Stepper({
   };
   return (
     <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised transition-colors", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
-      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press flex h-full w-11 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
+      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
         <Minus className="h-4 w-4" />
       </button>
       <label className="flex min-w-0 flex-1 flex-col items-center justify-center self-stretch">
@@ -96,11 +96,11 @@ function Stepper({
           aria-label={label}
           onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
           onFocus={(e) => e.target.select()}
-          className="tnum w-full bg-transparent text-center text-lg font-semibold leading-none text-ink outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="tnum w-full bg-transparent text-center text-[17px] font-semibold leading-none text-ink outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
       </label>
-      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press flex h-full w-11 shrink-0 items-center justify-center text-ink-mute hover:text-ink">
+      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
         <Plus className="h-4 w-4" />
       </button>
     </div>
@@ -467,20 +467,18 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
   // ── Finishing: by itself, FINISH_DELAY_MS after the last set, unless Undo is tapped ─────
   const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The countdown bar at the bottom (not a toast: a toast sits over the title and the back arrow).
+  const [countdown, setCountdown] = useState<{ message: string; key: number } | null>(null);
   const finishRef = useRef<() => void>(() => {});
   function cancelFinish() {
     if (!finishTimer.current) return;
     clearTimeout(finishTimer.current);
     finishTimer.current = null;
-    toast.dismiss("finish");
+    setCountdown(null);
   }
-  function scheduleFinish(message = "All sets logged") {
+  function scheduleFinish(message = "All sets logged · finishing") {
     cancelFinish();
-    toast.success(message, {
-      id: "finish",
-      duration: FINISH_DELAY_MS,
-      action: { label: "Undo", onClick: () => cancelFinish() },
-    });
+    setCountdown({ message, key: Date.now() });
     finishTimer.current = setTimeout(() => {
       finishTimer.current = null;
       finishRef.current();
@@ -566,7 +564,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   }
 
   function finish() {
-    toast.dismiss("finish");
+    setCountdown(null);
     startFinish(async () => {
       try {
         // The last ticks may still be saving: wait for them, and finish only if they all stuck.
@@ -605,10 +603,6 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const restLeft = rest ? (rest.endsAt - now) / 1000 : 0;
   const elapsed = (now - startedAt.current) / 1000;
 
-  // The "all logged" toast must not outlive the screen it belongs to.
-  useEffect(() => {
-    if (summary) toast.dismiss("finish");
-  }, [summary]);
 
   // ── Done ──────────────────────────────────────────────────────────────────
   if (summary) {
@@ -687,7 +681,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[180px]">
                 {/* Finishing early: whatever is logged is the workout. The countdown's Undo is the way back. */}
-                <DropdownMenuItem disabled={doneCount === 0} onClick={() => scheduleFinish("Workout finished")}>
+                <DropdownMenuItem className="min-h-11" disabled={doneCount === 0} onClick={() => scheduleFinish("Finishing workout")}>
                   Finish
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -741,7 +735,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                         }}
                         className="mb-1 flex cursor-pointer select-none items-center gap-2 [-webkit-touch-callout:none]"
                       >
-                        <ExerciseThumb picture={ex.picture} name={ex.name} className="h-8 w-8" />
+                        <ExerciseThumb picture={ex.picture} name={ex.name} />
                         <div className="min-w-0 flex-1">
                           <ExerciseName as="h3" name={labelled(label, ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
                           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">
@@ -751,15 +745,15 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                           {ex.target.kind === "first" && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
                         </div>
                         <DropdownMenu>
-                          <DropdownMenuTrigger aria-label={`More for ${ex.name}`} disabled={busy} className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5">
+                          <DropdownMenuTrigger aria-label={`More for ${ex.name}`} disabled={busy} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5">
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[180px]">
-                            <DropdownMenuItem onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
+                            <DropdownMenuItem className="min-h-11" onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
                             {/* A coach's plan stays the coach's: swap, but no retargeting or removing. */}
-                            {!data.coachPlan && <DropdownMenuItem onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
+                            {!data.coachPlan && <DropdownMenuItem className="min-h-11" onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
                             {!data.coachPlan && data.exercises.length > 1 && (
-                              <DropdownMenuItem onClick={() => setConfirmRemove(ex.aweId)} className="text-destructive focus:text-destructive">
+                              <DropdownMenuItem onClick={() => setConfirmRemove(ex.aweId)} className="min-h-11 text-destructive focus:text-destructive">
                                 Remove
                               </DropdownMenuItem>
                             )}
@@ -807,8 +801,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                           const record = records[`${ex.aweId}:${s.setNumber}`];
                           return (
                             <li key={s.setNumber}>
-                              <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-2">
-                                <span className={cn("tnum w-5 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
+                              <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
+                                <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
                                 {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
                                 <Stepper
                                   value={s.reps}
@@ -867,10 +861,23 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         </button>
       </div>
 
+      {/* ── Finishing countdown: the bar empties over FINISH_DELAY_MS; Undo cancels it ── */}
+      {countdown && (
+        <div className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${rest ? 84 : 16}px)` }}>
+          <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full border border-line-strong bg-dusk-raised py-2 pl-5 pr-2 shadow-[0_20px_40px_-16px_rgba(0,0,0,0.7)]">
+            <div key={countdown.key} className="finish-bar absolute inset-y-0 left-0 bg-signal/35" style={{ animationDuration: `${FINISH_DELAY_MS}ms` }} />
+            <p className="relative flex-1 text-sm font-medium text-ink">{countdown.message}</p>
+            <button type="button" onClick={cancelFinish} className="press relative h-11 rounded-full bg-dusk-button px-5 text-sm font-semibold text-dusk-button-text">
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Rest timer ───────────────────────────────────────────────── */}
       {rest && (
         <div className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
-          <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full bg-night py-2 pl-5 pr-2 text-ink shadow-[0_20px_40px_-16px_rgba(0,0,0,0.7)]">
+          <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full border border-line-strong bg-dusk-raised py-2 pl-5 pr-2 text-ink shadow-[0_20px_40px_-16px_rgba(0,0,0,0.7)]">
             <div className="absolute inset-y-0 left-0 bg-signal/35 transition-[width] duration-500 ease-linear" style={{ width: `${Math.max(0, Math.min(100, (restLeft / rest.total) * 100))}%` }} />
             <Timer className="relative h-4 w-4 text-ink-soft" />
             <p className="relative flex-1 text-sm text-ink-soft">
