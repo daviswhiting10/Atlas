@@ -69,10 +69,11 @@ async function main() {
   for (const w of found) {
     const kind = kindOf(w.users, names.get(w.id) ?? "");
     kinds[kind] = (kinds[kind] ?? 0) + 1;
+    const t0 = Date.now();
     const r = await deleteGuestWorkspace(w.id, { dryRun: !apply, now, ttlMs: hours * 3_600_000 });
     const rows = Object.values(r.deleted).reduce((a, b) => a + b, 0);
     for (const [t, n] of Object.entries(r.deleted)) totals[t] = (totals[t] ?? 0) + n;
-    console.log(`  ${w.id.slice(0, 8)}…  ${w.createdAt.toISOString().slice(0, 16)}  ${String(Math.round((now.getTime() - w.createdAt.getTime()) / 3_600_000)).padStart(3)} h  ${kind.padEnd(14)} users: ${w.users.length}  rows: ${rows}`);
+    console.log(`  ${w.id.slice(0, 8)}…  ${w.createdAt.toISOString().slice(0, 16)}  ${String(Math.round((now.getTime() - w.createdAt.getTime()) / 3_600_000)).padStart(3)} h  ${kind.padEnd(14)} users: ${w.users.length}  rows: ${rows}  ${Date.now() - t0} ms`);
   }
   console.log(`\n${apply ? "Deleted" : "Would delete"}: ${found.length} workspaces (${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(", ") || "none"})`);
   const sum = Object.values(totals).reduce((a, b) => a + b, 0);

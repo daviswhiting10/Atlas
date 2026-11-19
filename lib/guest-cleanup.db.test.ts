@@ -182,11 +182,11 @@ describe.skipIf(!RUN)("guest cleanup and the demo cap (dev database)", () => {
     await expect(guestLib.assertDemoCapacity(null, baseline + 4)).resolves.toBeUndefined();
   }, 60_000);
 
-  it("the demo cap is counted in the database: 3 an hour per connection, the 4th is refused", async () => {
+  it("the demo cap is counted in the database: 6 an hour per connection, the 7th is refused", async () => {
     const ip = `198.51.100.${Math.floor(Math.random() * 250)}`;
     const key = throttle.throttleKey("demoIp", ip);
     try {
-      for (let i = 0; i < 3; i++) await expect(guestLib.assertDemoCapacity(ip, 1_000_000), `demo ${i + 1}`).resolves.toBeUndefined();
+      for (let i = 0; i < 6; i++) await expect(guestLib.assertDemoCapacity(ip, 1_000_000), `demo ${i + 1}`).resolves.toBeUndefined();
       await expect(guestLib.assertDemoCapacity(ip, 1_000_000)).rejects.toBeInstanceOf(guestLib.DemoBusyError);
       // another connection is unaffected
       await expect(guestLib.assertDemoCapacity("198.51.100.251", 1_000_000)).resolves.toBeUndefined();

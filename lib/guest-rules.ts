@@ -33,7 +33,7 @@ export function isExpiredGuestWorkspace(
  * The demo writes about 5,500 rows, so it is capped harder than a plain guest
  * (a plan and no history). The counting is done in the database by
  * lib/guest.ts, so every server instance shares it: 10 new demos an hour
- * overall, and 3 an hour per connection (POLICIES.demoIp).
+ * overall, and 6 an hour per connection (POLICIES.demoIp).
  */
 export const DEMO_CAPS = { perHour: 10 };
 
