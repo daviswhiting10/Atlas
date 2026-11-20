@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
  */
 export function ModeToggle({ mode }: { mode: "coach" | "me" }) {
   const item = (on: boolean) =>
-    cn("press flex h-8 items-center rounded-full px-3.5 text-[14px] font-semibold", on ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft hover:text-ink");
+    cn("press flex h-11 items-center rounded-full px-4 text-[14px] font-semibold", on ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft hover:text-ink");
   return (
-    <nav aria-label="Coach or my training" className="flex shrink-0 rounded-full border border-line-strong p-[3px]">
+    <nav aria-label="Coach or my training" className="flex shrink-0 rounded-full border border-line-strong p-0.5">
       <Link href="/log" aria-current={mode === "coach" ? "page" : undefined} className={item(mode === "coach")}>
         Coach
       </Link>

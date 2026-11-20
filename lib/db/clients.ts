@@ -4,7 +4,7 @@ import { ROSTER } from "./roster";
 export async function getClients(workspaceId: string) {
   return prisma.clientProfile.findMany({
     where: { workspaceId, deletedAt: null, ...ROSTER },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ fullName: "asc" }, { id: "asc" }],
     include: {
       _count: { select: { sessionNotes: true, programAssignments: true, workoutLogs: true } },
     },

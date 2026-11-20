@@ -9,7 +9,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db/client";
 import { GOALS, normalizePrefs, resolvePrefs, type Prefs } from "@/lib/plan/generator";
 import { POLICIES, record, throttleKey, waitFor } from "@/lib/auth/throttle";
-import { cleanupExpiredGuests } from "@/lib/guest-cleanup";
+import { cleanupAfterResponse } from "@/lib/guest-cleanup";
 import { DEMO_CAPS, DemoBusyError, demoBusy } from "@/lib/guest-rules";
 
 export { DEMO_CAPS, DemoBusyError, demoBusy };
@@ -86,8 +86,8 @@ export async function createGuest(input: {
 
   const email = `${randomUUID()}@${GUEST_EMAIL_DOMAIN}`;
   const guest = input.demo === true ? await createDemo(email) : await createAthlete({ ...input, email, passwordHash: null });
-  // Old demos (6 h+) are removed a couple at a time, as new guests arrive (no job to schedule). Try-it athletes are left alone.
-  await cleanupExpiredGuests();
+  // Old demos (6 h+) are removed a couple at a time, as new guests arrive (no job to schedule), after the response, so the visitor never waits. Try-it athletes are left alone.
+  cleanupAfterResponse();
   return guest;
 }
 
