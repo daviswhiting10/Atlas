@@ -83,17 +83,3 @@ export function ExerciseThumb({ picture, name, className }: { picture: Picture |
     </>
   );
 }
-
-/** A larger, moving picture, for the one exercise on screen. Tap for full size. */
-export function ExercisePicture({ picture, name, className }: { picture: Picture | null | undefined; name: string; className?: string }) {
-  const [open, setOpen] = useState(false);
-  if (!picture) return null;
-  return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} aria-label={`See ${name} larger`} className={cn("press block w-full overflow-hidden rounded-2xl border border-line", className)}>
-        <Frames picture={picture} running className="aspect-[4/3] w-full" />
-      </button>
-      {open && <Viewer picture={picture} name={name} onClose={() => setOpen(false)} />}
-    </>
-  );
-}

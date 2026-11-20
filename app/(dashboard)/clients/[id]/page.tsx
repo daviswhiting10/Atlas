@@ -10,6 +10,8 @@ import { safeTimeZone } from "@/lib/athlete/sessions";
 import { TZ_COOKIE } from "@/lib/athlete/data";
 import { loadCalendar } from "@/lib/history/load";
 import { hasProgressToShow } from "@/lib/progress/overall";
+import { listReports } from "@/lib/report/load";
+import { ReportLink } from "@/components/report/ReportLink";
 import { ClientDetail } from "./ClientDetail";
 
 
@@ -23,10 +25,12 @@ export default async function ClientPage({ params }: { params: { id: string } })
   // The client's details load with the charts, on the server: the page no longer waits for a second fetch from the browser.
   // The calendar's read is scoped to this workspace too, and isn't shown unless the client is found.
   const timeZone = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
-  const [progress, details, calendar] = await Promise.all([
+  const [progress, details, calendar, reports] = await Promise.all([
     loadClientProgress(params.id, workspaceId),
     getClient(params.id, workspaceId),
     loadCalendar({ clientId: params.id, workspaceId, timeZone, viewer: { kind: "coach", clientId: params.id } }),
+    // The latest finished block with a report, as one row under "Log session".
+    listReports(params.id, workspaceId, timeZone),
   ]);
   if (!progress || !details) notFound();
   const { data, metric } = progress;
@@ -39,6 +43,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       progress={hasProgressToShow(data) ? <ProgressView data={data} goalMetric={metric} /> : null}
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
       history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : null}
+      report={reports[0] ? <ReportLink entry={reports[0]} className="sm:max-w-sm" /> : null}
     />
   );
 }

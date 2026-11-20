@@ -10,7 +10,7 @@ export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/for
 /** Public pages a signed-in visitor may also read, whatever their role. */
 export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password"];
 /** The athlete app. Coaches use it too, for their own training ("My training"). */
-export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals"];
+export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals", "/report"];
 /** The set-password step: signed in, any role. */
 export const SET_PASSWORD_PATH = "/set-password";
 
