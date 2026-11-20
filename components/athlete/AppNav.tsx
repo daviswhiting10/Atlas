@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
 import { Logo } from "./Logo";
+import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +61,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
           </nav>
 
           <div className="flex items-center gap-2">
-            {isDemo && <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-medium text-ink-mute">Demo data</span>}
+            {isDemo && <DemoChip />}
             {isCoach && <ModeToggle mode="me" />}
           </div>
         </div>

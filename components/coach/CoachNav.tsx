@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardPen, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
+import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
 import { cn } from "@/lib/utils";
 import { useEscape } from "@/hooks/use-escape";
@@ -27,7 +28,7 @@ const ITEMS = [
 const TABS = ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Users }>;
 const MORE: Array<{ href: string; label: string }> = [...ITEMS.filter((i) => !("icon" in i)), { href: "/settings", label: "Settings" }];
 
-export function CoachNav() {
+export function CoachNav({ demo = false }: { demo?: boolean }) {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
   useEscape(more, () => setMore(false));
@@ -64,7 +65,8 @@ export function CoachNav() {
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-2">
+            {demo && <DemoChip />}
             <Link
               href="/settings"
               aria-label="Settings"
