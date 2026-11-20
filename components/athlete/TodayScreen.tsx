@@ -18,11 +18,14 @@ export function TodayScreen({
   athlete,
   plan,
   goal,
+  report,
 }: {
   athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe">;
   plan: PlanOverview | null;
   /** The running goal's card (nothing when there isn't one). */
   goal: ReactNode;
+  /** The latest progress report, for a week after a block ends (nothing otherwise). */
+  report?: ReactNode;
 }) {
   const next = plan?.nextUp ?? null;
   const lighterWeek = plan != null && plan.lighterWeeks && next != null && next.week % BLOCK_WEEKS === 0;
@@ -77,6 +80,8 @@ export function TodayScreen({
       {/* No plan: logging is the action. A coach's athlete is waiting on a plan, so it is one line and the one
           button. Someone who builds their own (a self-made account, or a coach on their own training) gets
           the way to a plan as secondary text. */}
+      {report}
+
       {!plan && !athlete.selfServe && !athlete.isCoach && <EmptyStart />}
       {!plan && (athlete.selfServe || athlete.isCoach) && (
         <section className="rise">
