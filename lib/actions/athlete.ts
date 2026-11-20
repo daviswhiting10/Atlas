@@ -215,9 +215,16 @@ export async function rebuildPlan(rawPrefs: unknown): Promise<void> {
 
 export type EditResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string };
 
-async function edit<T extends object>(run: (scope: PlanScope) => Promise<T | void>, workoutId?: string): Promise<EditResult<T>> {
+/** Only someone who makes their own plan may restructure it: a coach's client keeps the plan as the coach wrote it. */
+async function makesOwnPlan(clientId: string): Promise<boolean> {
+  const profile = await prisma.clientProfile.findUnique({ where: { id: clientId }, select: { goalTargets: true } });
+  return !!(profile?.goalTargets as { athlete?: unknown } | null)?.athlete;
+}
+
+async function edit<T extends object>(run: (scope: PlanScope) => Promise<T | void>, workoutId?: string, own = false): Promise<EditResult<T>> {
   try {
     const { clientId, workspaceId } = await requireAthlete();
+    if (own && !(await makesOwnPlan(clientId))) return { ok: false, error: "Your plan is managed by your coach." };
     const result = await run({ clientId, workspaceId });
     refresh();
     if (workoutId) revalidatePath(`/workouts/${workoutId}`);
@@ -240,21 +247,21 @@ const Targets = z.object({
 
 export async function planAddWorkout(raw: { week: number; name: string; copyFromWorkoutId?: string }) {
   const input = z.object({ week: z.number().int().min(1).max(52), name: z.string().max(200), copyFromWorkoutId: Ref.optional() }).parse(raw);
-  return edit((scope) => addWorkout(scope, input));
+  return edit((scope) => addWorkout(scope, input), undefined, true);
 }
 
 export async function planRemoveWorkout(workoutId: string) {
-  return edit((scope) => removeWorkout(scope, Ref.parse(workoutId)));
+  return edit((scope) => removeWorkout(scope, Ref.parse(workoutId)), undefined, true);
 }
 
 export async function planAddExercise(raw: { workoutId: string; slug?: string; exerciseId?: string } & z.input<typeof Targets>) {
   const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() }).refine((v) => v.slug || v.exerciseId).parse(raw);
-  return edit((scope) => addExercise(scope, input), input.workoutId);
+  return edit((scope) => addExercise(scope, input), input.workoutId, true);
 }
 
 export async function planRemoveExercise(raw: { aweId: string; workoutId: string }) {
   const input = z.object({ aweId: Ref, workoutId: Ref }).parse(raw);
-  return edit((scope) => removeExercise(scope, input.aweId), input.workoutId);
+  return edit((scope) => removeExercise(scope, input.aweId), input.workoutId, true);
 }
 
 export async function planSwapExercise(raw: { aweId: string; slug?: string; exerciseId?: string; workoutId: string }) {
@@ -264,7 +271,7 @@ export async function planSwapExercise(raw: { aweId: string; slug?: string; exer
 
 export async function planSetTargets(raw: { aweId: string; workoutId: string } & z.input<typeof Targets>) {
   const input = Targets.extend({ aweId: Ref, workoutId: Ref }).parse(raw);
-  return edit((scope) => setTargets(scope, input), input.workoutId);
+  return edit((scope) => setTargets(scope, input), input.workoutId, true);
 }
 
 export async function planSetWorkoutNote(raw: { workoutId: string; text: string }) {
@@ -273,7 +280,7 @@ export async function planSetWorkoutNote(raw: { workoutId: string; text: string 
 }
 
 export async function planSetLighterWeeks(on: boolean) {
-  return edit((scope) => setLighterWeeks(scope, z.boolean().parse(on)));
+  return edit((scope) => setLighterWeeks(scope, z.boolean().parse(on)), undefined, true);
 }
 
 export async function planSetNote(text: string) {
