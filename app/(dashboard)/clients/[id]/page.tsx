@@ -12,6 +12,8 @@ import { loadCalendar } from "@/lib/history/load";
 import { hasProgressToShow } from "@/lib/progress/overall";
 import { listReports } from "@/lib/report/load";
 import { ReportLink } from "@/components/report/ReportLink";
+import { prisma } from "@/lib/db/client";
+import { loginStatus } from "@/lib/coach/login-status";
 import { ClientDetail } from "./ClientDetail";
 
 
@@ -33,6 +35,9 @@ export default async function ClientPage({ params }: { params: { id: string } })
     listReports(params.id, workspaceId, timeZone),
   ]);
   if (!progress || !details) notFound();
+  // Where the client is with the app: invited, opened, password set (worked out from their login; nothing stored).
+  const login = await prisma.user.findFirst({ where: { id: details.userId ?? "-", workspaceId }, select: { emailVerified: true, passwordHash: true } });
+  const access = loginStatus({ hasEmail: !!details.email }, login ? { emailVerified: login.emailVerified, hasPassword: login.passwordHash != null } : null);
   const { data, metric } = progress;
 
   return (
@@ -43,6 +48,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       progress={hasProgressToShow(data) ? <ProgressView data={data} goalMetric={metric} /> : null}
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
       history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : null}
+      access={access}
       report={reports[0] ? <ReportLink entry={reports[0]} className="sm:max-w-sm" /> : null}
     />
   );

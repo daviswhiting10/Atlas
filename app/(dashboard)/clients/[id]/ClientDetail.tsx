@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { shareInvite } from "@/lib/coach/invite-share";
+import type { LoginStatus } from "@/lib/coach/login-status";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
 import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
@@ -102,7 +103,7 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, history, report, initial }: { /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ progress, history, report, access, initial }: { /** Invited, opened, password set: where the client is with the app. */ access?: LoginStatus | null; /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -253,6 +254,17 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Where they are with the app, and the way to a fresh link at any time (reset emails may not reach them) */}
+      {access && (
+        <p className="-mt-3 mb-5 flex flex-wrap items-center gap-x-3 text-[13px] text-ink-soft">
+          <span data-testid="login-status">{access.label}</span>
+          {/* A fresh link at any time, even after a password is set: reset emails may not reach them */}
+          <button type="button" onClick={inviteClient} className="press inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2">
+            {access.key === "not_invited" ? "Invite" : "New link"}
+          </button>
+        </p>
+      )}
 
       {/* Retention flag banner */}
       {client.retentionFlag && (
