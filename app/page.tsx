@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ChartNoAxesCombined, ListChecks, Play, Sparkles, Target } from "lucide-react";
+import { ArrowRight, ChartNoAxesCombined, ListChecks, Sparkles, Target } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
 import { HOW_IT_WORKS as STEPS } from "@/lib/how-it-works";
@@ -43,7 +43,7 @@ export default function LandingPage() {
           <Link href="/login" className="press inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-ink-soft hover:text-ink">
             Sign in
           </Link>
-          <Link href="/start" className="press inline-flex min-h-11 items-center rounded-full bg-dusk-button px-4 text-sm font-semibold text-dusk-button-text hover:bg-dusk-button/85">
+          <Link href="/start" className="press inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold text-ink hover:border-ink/25">
             Get started
           </Link>
         </nav>
@@ -64,15 +64,13 @@ export default function LandingPage() {
               chart that keeps climbing.
             </p>
             <div className="rise rise-3 mt-8 flex flex-col gap-3 sm:flex-row">
+              <DemoButton className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60" />
               <Link
                 href="/start"
-                className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85"
+                className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-7 text-base font-semibold text-ink hover:border-ink/20"
               >
                 Build my plan <ArrowRight className="h-4 w-4" />
               </Link>
-              <DemoButton className="press flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-7 text-base font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
-                <Play className="h-4 w-4 fill-current" /> Explore a live demo
-              </DemoButton>
             </div>
             <p className="rise rise-4 mt-4 text-sm text-ink-mute">
               Your plan is ready in under a minute. The demo needs no account and opens with five months already logged.
@@ -159,12 +157,10 @@ export default function LandingPage() {
         <section className="surface-night mb-12 px-6 py-12 text-center sm:px-12 sm:py-16">
           <h2 className="mx-auto max-w-2xl font-display text-4xl leading-tight sm:text-5xl">Your first workout is ready in thirty seconds.</h2>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/start" className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:w-auto">
+            <DemoButton className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/90 disabled:opacity-60 sm:w-auto" />
+            <Link href="/start" className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-line px-7 text-base font-semibold text-ink hover:bg-ink/10 sm:w-auto">
               Build my plan <ArrowRight className="h-4 w-4" />
             </Link>
-            <DemoButton className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-line px-7 text-base font-semibold text-ink hover:bg-ink/10 disabled:opacity-60 sm:w-auto">
-              <Play className="h-4 w-4 fill-current" /> Explore a live demo
-            </DemoButton>
           </div>
         </section>
       </main>

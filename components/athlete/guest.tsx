@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Check, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Check, Loader2, Play } from "lucide-react";
 import type { Prefs } from "@/lib/plan/generator";
 import { cn } from "@/lib/utils";
 import { useEscape } from "@/hooks/use-escape";
+import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 
 type GuestInput = { name?: string; prefs?: Prefs; demo?: boolean };
 
@@ -114,12 +116,42 @@ export function BuildingOverlay({ mode }: { mode: null | "plan" | "demo" }) {
   );
 }
 
-export function DemoButton({ className, children }: { className?: string; children: React.ReactNode }) {
+/** Already in a demo (or any guest session) in this browser? Checked again when Back restores this page from the browser's cache. */
+function useInGuestSession() {
+  const [guest, setGuest] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const check = () =>
+      fetch("/api/auth/session", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((s) => live && setGuest(typeof s?.user?.email === "string" && s.user.email.endsWith(`@${GUEST_EMAIL_DOMAIN}`)))
+        .catch(() => {});
+    check();
+    const show = (e: PageTransitionEvent) => e.persisted && check();
+    window.addEventListener("pageshow", show);
+    return () => {
+      live = false;
+      window.removeEventListener("pageshow", show);
+    };
+  }, []);
+  return guest;
+}
+
+/** "Explore a live demo", or, with a demo already open in this browser, "Continue demo": straight to Today, no new workspace. */
+export function DemoButton({ className }: { className?: string }) {
   const { pending, start, busy, dismissBusy } = useGuestSignIn();
+  const inGuest = useInGuestSession();
+  if (inGuest) {
+    return (
+      <Link href="/today" className={className}>
+        <Play className="h-4 w-4 fill-current" /> Continue demo
+      </Link>
+    );
+  }
   return (
     <>
       <button type="button" disabled={pending != null} onClick={() => start({ demo: true })} className={className}>
-        {children}
+        <Play className="h-4 w-4 fill-current" /> Explore a live demo
       </button>
       <BuildingOverlay mode={pending} />
       <DemoBusy input={busy} onRetry={start} onClose={dismissBusy} />
