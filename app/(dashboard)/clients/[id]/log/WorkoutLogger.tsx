@@ -39,7 +39,8 @@ import {
   updateSessionDate,
 } from "@/lib/actions/workout-logger";
 import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
-import { ExercisePicker, type ExerciseOption } from "@/app/(dashboard)/programs/_components/ExercisePicker";
+import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
+import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
@@ -390,6 +391,8 @@ export default function WorkoutLogger({
   // Each change is saved to this one workout; the rest of the plan stays as written.
   const [editingAweId, setEditingAweId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  /** The exercise whose swap sheet is open. */
+  const [swapFor, setSwapFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // ── Live session: the "currently logging" bar on other screens, and coming back to this exact place ──
@@ -940,7 +943,7 @@ export default function WorkoutLogger({
   }
 
   /** Swap for another exercise. Sets already logged stay with the one they were done on. */
-  function handleSwapExercise(aweId: string, newEx: ExerciseOption) {
+  function handleSwapExercise(aweId: string, newEx: PickerExercise) {
     return change(
       () => coachSwapExercise(clientId, assignmentId, { aweId, workoutId: assignedWorkoutId, exerciseId: newEx.id }),
       `Switched to ${newEx.name}`
@@ -971,13 +974,21 @@ export default function WorkoutLogger({
     return change(() => coachRemoveExercise(clientId, assignmentId, { aweId: ex.aweId, workoutId: assignedWorkoutId }), `Dropped ${ex.name} from today`);
   }
 
-  async function handleAddExercise(newEx: ExerciseOption) {
+  async function handleAddExercise(newEx: PickerExercise) {
     const ok = await change(
       () => coachAddExercise(clientId, assignmentId, { workoutId: assignedWorkoutId, exerciseId: newEx.id, sets: 3 }),
       `Added ${newEx.name}`
     );
     if (ok) setAdding(false);
   }
+
+  // An exercise typed with no connection is put in (or swapped in) when it's back.
+  const offline = usePendingExercises(assignedWorkoutId, async (op, newEx) => {
+    if (exercises.some((e) => e.exerciseId === newEx.id)) return true; // already in: an earlier send got through
+    return op.target.mode === "swap"
+      ? change(() => coachSwapExercise(clientId, assignmentId, { aweId: op.target.mode === "swap" ? op.target.aweId : "", workoutId: assignedWorkoutId, exerciseId: newEx.id }), `Switched to ${newEx.name}`)
+      : change(() => coachAddExercise(clientId, assignmentId, { workoutId: assignedWorkoutId, exerciseId: newEx.id, sets: 3 }), `Added ${newEx.name}`);
+  });
 
   // ── Structure SOAP note ───────────────────────────────────────────────────
   async function structureNote() {
@@ -1182,29 +1193,39 @@ export default function WorkoutLogger({
   // ── Add an exercise that isn't in the plan (both layouts) ─────────────────
   const addExercise = (
     <div className="mt-4">
-      {adding ? (
-        <div className="rounded-[18px] p-3" style={{ border: "1px solid var(--line)" }}>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">Add an exercise to today</p>
-            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <ExercisePicker onSelect={(newEx) => handleAddExercise(newEx)} placeholder="Search exercises…" />
-          {busy && <p className="mt-2 text-xs text-muted-foreground">Adding…</p>}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          disabled={busy}
-          className="flex h-11 w-full items-center justify-center gap-1.5 rounded-[18px] border border-dashed border-ink/20 text-sm font-medium text-muted-foreground hover:border-ink/40 hover:text-foreground disabled:opacity-50 touch-manipulation"
-        >
-          <Plus className="h-4 w-4" /> Add exercise
-        </button>
-      )}
+      <PendingExercises pending={offline.pending} />
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        disabled={busy}
+        className="mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-[18px] border border-dashed border-ink/20 text-sm font-medium text-muted-foreground hover:border-ink/40 hover:text-foreground disabled:opacity-50 touch-manipulation"
+      >
+        <Plus className="h-4 w-4" /> Add exercise
+      </button>
     </div>
   );
+
+  // The one picker sheet: adding to today, or swapping one exercise.
+  const swapping = swapFor ? exercises.find((e) => e.aweId === swapFor) ?? null : null;
+  const pickerSheet =
+    adding || swapping ? (
+      <ExercisePicker
+        title={swapping ? `Swap ${swapping.name}` : "Add an exercise to today"}
+        exclude={exercises.map((e) => e.exerciseId)}
+        suggestLike={null}
+        onClose={() => {
+          setAdding(false);
+          setSwapFor(null);
+        }}
+        onPick={(newEx) => {
+          if (swapping) {
+            setSwapFor(null);
+            void handleSwapExercise(swapping.aweId, newEx);
+          } else void handleAddExercise(newEx);
+        }}
+        onOffline={(name) => offline.add(name, swapping ? { mode: "swap", aweId: swapping.aweId } : { mode: "add" })}
+      />
+    ) : null;
 
   // ── Shared SOAP panel (used in both layouts) ──────────────────────────────
   const soapPanel = (
@@ -1488,7 +1509,7 @@ export default function WorkoutLogger({
                           ex={ex}
                           setCount={state.sets.length}
                           busy={busy}
-                          onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                          onSwap={() => setSwapFor(ex.aweId)}
                           onTargets={(t) => handleSetTargets(ex, t)}
                           onRemove={() => handleRemoveExercise(ex)}
                           media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
@@ -1715,7 +1736,7 @@ export default function WorkoutLogger({
                     ex={ex}
                     setCount={state.sets.length}
                     busy={busy}
-                    onSwap={(newEx) => handleSwapExercise(ex.aweId, newEx)}
+                    onSwap={() => setSwapFor(ex.aweId)}
                     onTargets={(t) => handleSetTargets(ex, t)}
                     onRemove={() => handleRemoveExercise(ex)}
                     media={uploadsEnabled ? <ExerciseMediaUpload workspaceId={workspaceId} exerciseId={ex.exerciseId} picture={ex.picture} /> : null}
@@ -1772,6 +1793,7 @@ export default function WorkoutLogger({
     <>
       {mobileView}
       {desktopView}
+      {pickerSheet}
     </>
   );
 }
@@ -2231,7 +2253,7 @@ function ChangePanel({
   ex: LoggerExercise;
   setCount: number;
   busy: boolean;
-  onSwap: (ex: ExerciseOption) => void;
+  onSwap: () => void;
   onTargets: (t: { sets: number; repMin: number; repMax: number }) => void;
   onRemove: () => void;
 }) {
@@ -2249,8 +2271,9 @@ function ChangePanel({
   return (
     <div className="mt-2 space-y-4 rounded-xl bg-muted/40 p-3">
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Swap for another exercise</p>
-        <ExercisePicker onSelect={onSwap} placeholder="Search exercises…" />
+        <button type="button" onClick={onSwap} className="press flex min-h-11 items-center rounded-lg border border-line px-3.5 text-sm font-medium text-ink hover:border-ink/25">
+          Swap for another exercise
+        </button>
       </div>
 
       <div>

@@ -8,10 +8,10 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, Clock, Dumbbell, Loader2, Plus, RotateCcw, SkipForward, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
-import type { CatalogExercise } from "@/lib/plan/catalog";
 import { CATALOG_BY_SLUG } from "@/lib/plan/catalog";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
-import { ExercisePicker } from "./ExercisePicker";
+import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
+import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { TargetEditor, type TargetValues } from "./TargetEditor";
 import { cn } from "@/lib/utils";
 import { onTablistKeyDown } from "@/lib/ui/tab-keys";
@@ -27,9 +27,9 @@ type Result = { ok: true } | { ok: false; error: string };
 export type PlanActions = {
   addWorkout: (input: { week: number; name: string; copyFromWorkoutId?: string }) => Promise<Result>;
   removeWorkout: (workoutId: string) => Promise<Result>;
-  addExercise: (input: { workoutId: string; slug: string }) => Promise<Result>;
+  addExercise: (input: { workoutId: string; exerciseId: string }) => Promise<Result>;
   removeExercise: (input: { aweId: string; workoutId: string }) => Promise<Result>;
-  swapExercise: (input: { aweId: string; workoutId: string; slug: string }) => Promise<Result>;
+  swapExercise: (input: { aweId: string; workoutId: string; exerciseId: string }) => Promise<Result>;
   setTargets: (input: { aweId: string; workoutId: string } & TargetValues) => Promise<Result>;
   setWorkoutNote: (input: { workoutId: string; text: string }) => Promise<Result>;
   setPlanNote: (text: string) => Promise<Result>;
@@ -167,13 +167,22 @@ function WorkoutCard({
     });
   }
 
-  function pick(exercise: CatalogExercise) {
+  function pick(exercise: PickerExercise) {
     const p = picker;
     setPicker(null);
     if (!p) return;
-    if (p.mode === "add") change(() => actions.addExercise({ workoutId: w.id, slug: exercise.slug }), `${exercise.name} added`);
-    else change(() => actions.swapExercise({ aweId: p.aweId, workoutId: w.id, slug: exercise.slug }), `Swapped for ${exercise.name}`);
+    if (p.mode === "add") change(() => actions.addExercise({ workoutId: w.id, exerciseId: exercise.id }), `${exercise.name} added`);
+    else change(() => actions.swapExercise({ aweId: p.aweId, workoutId: w.id, exerciseId: exercise.id }), `Swapped for ${exercise.name}`);
   }
+
+  // Typed with no connection: kept on the phone, put in when it's back.
+  const offline = usePendingExercises(w.id, async (op, exercise) => {
+    if (w.exercises.some((e) => e.exerciseId === exercise.id)) return true; // already in (an earlier send got through)
+    const res = op.target.mode === "swap" ? await actions.swapExercise({ aweId: op.target.aweId, workoutId: w.id, exerciseId: exercise.id }) : await actions.addExercise({ workoutId: w.id, exerciseId: exercise.id });
+    if (!res.ok) toast.error(res.error);
+    else router.refresh();
+    return res.ok;
+  });
 
   function toggleSkip() {
     if (!actions.setSkipped) return;
@@ -291,6 +300,8 @@ function WorkoutCard({
             </ol>
           )}
 
+          <PendingExercises pending={offline.pending} />
+
           <button
             type="button"
             onClick={() => setPicker({ mode: "add" })}
@@ -350,9 +361,10 @@ function WorkoutCard({
       {picker && (
         <ExercisePicker
           title={picker.mode === "add" ? `Add to ${w.name}` : "Swap exercise"}
-          exclude={w.exercises.map((e) => e.slug)}
+          exclude={w.exercises.map((e) => e.exerciseId)}
           suggestLike={picker.mode === "swap" ? picker.slug : null}
           onPick={pick}
+          onOffline={(name) => offline.add(name, picker.mode === "swap" ? { mode: "swap", aweId: picker.aweId } : { mode: "add" })}
           onClose={() => setPicker(null)}
         />
       )}

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/client";
-import { MovementPattern } from "@/app/generated/prisma/client";
 import { CATALOG } from "@/lib/plan/catalog";
+import { createCustomExercise } from "@/lib/exercises/create";
 import { findExerciseByName, liveExercise, visibleTo } from "@/lib/exercises/find";
 
 /**
@@ -44,24 +44,10 @@ export async function resolveExercise(name: string, workspaceId: string): Promis
     if (ex) return ex;
   }
 
-  // 4) create it, private to this workspace
-  const slug =
-    name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") +
-    "-" +
-    Date.now();
-  return prisma.exercise.create({
-    data: {
-      name,
-      slug,
-      movementPattern: MovementPattern.LOCOMOTION, // placeholder
-      equipment: "other",
-      primaryMuscles: [],
-      secondaryMuscles: [],
-      instructions: [],
-      workspaceId,
-    },
-    select: { id: true, name: true },
-  });
+  // 4) create it, private to this workspace (the same path the picker uses)
+  const created = await createCustomExercise(workspaceId, name);
+  if (!created) throw new Error("That exercise has no name.");
+  return { id: created.id, name: created.name };
 }
 
 const SHORTHAND: Array<[RegExp, string]> = [

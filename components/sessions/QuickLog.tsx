@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
+import { cleanName } from "@/lib/exercises/custom";
+import { nameKey } from "@/lib/exercises/names";
 import { lastTime, quickLogStart, saveQuickSession, searchQuickExercises, type QuickExercise } from "@/lib/actions/quick-log";
 import { describeLast, describeLogged, prefillSets, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
 import { ExerciseName } from "@/components/ExerciseName";
@@ -187,7 +189,9 @@ export function QuickLog({
   const added = useMemo(() => new Set(items.map((i) => i.exerciseId ?? `new:${i.name.toLowerCase()}`)), [items]);
   const shownResults = results.filter((r) => !added.has(r.id));
   const typed = query.trim().replace(/\s+/g, " ");
-  const exactExists = results.some((r) => r.name.toLowerCase() === typed.toLowerCase()) || items.some((i) => i.name.toLowerCase() === typed.toLowerCase());
+  // The same name however it's written (case, plural, spacing, shorthand) is the same exercise.
+  const typedKey = nameKey(typed);
+  const exactExists = results.some((r) => nameKey(r.name) === typedKey) || items.some((i) => nameKey(i.name) === typedKey);
 
   // ── Adding ──────────────────────────────────────────────────────────────────
   const add = useCallback(
@@ -510,7 +514,7 @@ export function QuickLog({
               </button>
             </li>
           ))}
-          {!searching && !exactExists && (
+          {!searching && !exactExists && cleanName(typed) && (
             <li>
               <button type="button" onClick={() => add({ id: null, name: typed })} className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px] text-ink-soft hover:bg-ink/[0.03]">
                 <Plus className="h-4 w-4" /> Add &ldquo;{typed}&rdquo; as typed

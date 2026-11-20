@@ -11,9 +11,10 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { athleteIdentity } from "@/lib/athlete/identity";
 import { prisma } from "@/lib/db/client";
-import { MovementPattern, Prisma } from "@/app/generated/prisma/client";
+import { Prisma } from "@/app/generated/prisma/client";
 import { displayName } from "@/lib/plan/catalog";
-import { findExerciseByName, liveExercise, visibleTo } from "@/lib/exercises/find";
+import { createCustomExercise } from "@/lib/exercises/create";
+import { liveExercise, visibleTo } from "@/lib/exercises/find";
 import { hasBlockLabel, nameKey } from "@/lib/exercises/names";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { requestDay } from "@/lib/sessions/request-day";
@@ -156,15 +157,9 @@ export async function loadQuickSession(raw: { clientId?: string | null; sessionI
 
 /** A typed name: the exercise it means (exact, a saved alternate name, or the same name written differently), else a new private one. */
 async function exerciseForName(name: string, workspaceId: string, tx: Prisma.TransactionClient): Promise<string> {
-  const same = await findExerciseByName(name, workspaceId, tx);
-  if (same) return same.id;
-  const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now()}`;
-  const created = await tx.exercise.create({
-    // Placeholders: step 4's matching fills in the real details (or merges it into the library's).
-    data: { workspaceId, name, slug, movementPattern: MovementPattern.LOCOMOTION, equipment: "other", primaryMuscles: [], secondaryMuscles: [], instructions: [] },
-    select: { id: true },
-  });
-  return created.id;
+  const exercise = await createCustomExercise(workspaceId, name, tx);
+  if (!exercise) throw new Error("That exercise has no name.");
+  return exercise.id;
 }
 
 export type QuickSaveResult = { ok: true; sessionId: string } | { ok: false; error: string };
