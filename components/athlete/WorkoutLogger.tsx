@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
 import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveSet } from "@/lib/actions/athlete";
-import { ExercisePicker } from "./ExercisePicker";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
+import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { TargetEditor } from "./TargetEditor";
 import { e1rm, isE1rmBest, isRecord, recordLabel } from "@/lib/plan/overload";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -254,6 +255,21 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       router.refresh();
     });
   }
+
+  // An exercise typed with no connection is put in (or swapped in) when it's back.
+  const offline = usePendingExercises(data.id, async (op, exercise) => {
+    if (data.exercises.some((e) => e.exerciseId === exercise.id)) return true; // already in: an earlier send got through
+    await queue.current;
+    const res = op.target.mode === "swap" ? await planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await planAddExercise({ workoutId: data.id, exerciseId: exercise.id });
+    if (!res.ok) {
+      toast.error(res.error);
+      return false;
+    }
+    if ("aweId" in res && typeof res.aweId === "string") jumpTo.current = res.aweId;
+    toast.success(op.target.mode === "swap" ? `Swapped for ${exercise.name}` : `${exercise.name} added`);
+    router.refresh();
+    return true;
+  });
 
   // Escape closes the workout switcher.
   useEffect(() => {
@@ -851,6 +867,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           })}
         </div>
 
+        <PendingExercises pending={offline.pending} />
+
         <button
           type="button"
           onClick={() => setPicker({ mode: "add" })}
@@ -896,21 +914,22 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {picker && (
         <ExercisePicker
           title={picker.mode === "add" ? "Add an exercise" : `Swap ${swapping?.name ?? ""}`}
-          exclude={data.exercises.map((e) => e.slug).filter((x): x is string => x != null)}
+          exclude={data.exercises.map((e) => e.exerciseId)}
           suggestLike={swapping?.slug ?? null}
           onClose={() => setPicker(null)}
+          onOffline={(name) => offline.add(name, picker.mode === "swap" ? { mode: "swap", aweId: picker.aweId } : { mode: "add" })}
           onPick={(chosen) => {
             const at = picker;
             setPicker(null);
             if (at.mode === "add") {
               change(async () => {
-                const res = await planAddExercise({ workoutId: data.id, slug: chosen.slug });
+                const res = await planAddExercise({ workoutId: data.id, exerciseId: chosen.id });
                 if (res.ok) jumpTo.current = res.aweId;
                 return res;
               }, `${chosen.name} added`);
             } else {
               swapped.current.add(at.aweId);
-              change(() => planSwapExercise({ aweId: at.aweId, workoutId: data.id, slug: chosen.slug }), `Swapped for ${chosen.name}`);
+              change(() => planSwapExercise({ aweId: at.aweId, workoutId: data.id, exerciseId: chosen.id }), `Swapped for ${chosen.name}`);
             }
           }}
         />

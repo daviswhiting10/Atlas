@@ -247,8 +247,8 @@ export async function planRemoveWorkout(workoutId: string) {
   return edit((scope) => removeWorkout(scope, Ref.parse(workoutId)));
 }
 
-export async function planAddExercise(raw: { workoutId: string; slug: string } & z.input<typeof Targets>) {
-  const input = Targets.extend({ workoutId: Ref, slug: Ref }).parse(raw);
+export async function planAddExercise(raw: { workoutId: string; slug?: string; exerciseId?: string } & z.input<typeof Targets>) {
+  const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() }).refine((v) => v.slug || v.exerciseId).parse(raw);
   return edit((scope) => addExercise(scope, input), input.workoutId);
 }
 
@@ -257,8 +257,8 @@ export async function planRemoveExercise(raw: { aweId: string; workoutId: string
   return edit((scope) => removeExercise(scope, input.aweId), input.workoutId);
 }
 
-export async function planSwapExercise(raw: { aweId: string; slug: string; workoutId: string }) {
-  const input = z.object({ aweId: Ref, slug: Ref, workoutId: Ref }).parse(raw);
+export async function planSwapExercise(raw: { aweId: string; slug?: string; exerciseId?: string; workoutId: string }) {
+  const input = z.object({ aweId: Ref, slug: Ref.optional(), exerciseId: Ref.optional(), workoutId: Ref }).refine((v) => v.slug || v.exerciseId).parse(raw);
   return edit((scope) => swapExercise(scope, input), input.workoutId);
 }
 

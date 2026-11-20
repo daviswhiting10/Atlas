@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, SlidersHorizontal } from "lucide-react";
-import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
+import { cookies } from "next/headers";
+import { TZ_COOKIE, getAthlete, getPlanOverview } from "@/lib/athlete/data";
+import { safeTimeZone } from "@/lib/athlete/sessions";
+import { listReports } from "@/lib/report/load";
+import { ReportLink } from "@/components/report/ReportLink";
 import { EQUIPMENT, EXPERIENCE, GOALS, resolvePrefs } from "@/lib/plan/generator";
 import { CONDITIONS } from "@/lib/plan/goal";
 import {
@@ -35,7 +39,20 @@ const ACTIONS: PlanActions = {
 };
 
 export default async function PlanPage() {
-  const [athlete, plan] = await Promise.all([getAthlete(), getPlanOverview()]);
+  // Finished blocks with a report, newest first: a row each, under the plan. Loaded alongside the plan.
+  const timeZone = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
+  const [athlete, plan, reports] = await Promise.all([
+    getAthlete(),
+    getPlanOverview(),
+    getAthlete().then((a) => listReports(a.clientId, a.workspaceId, timeZone)),
+  ]);
+  const reportRows = reports.length > 0 && (
+    <div className="mt-10 max-w-3xl space-y-2">
+      {reports.map((r) => (
+        <ReportLink key={`${r.assignmentId}-${r.block}`} entry={r} />
+      ))}
+    </div>
+  );
 
   if (!plan) {
     return (
@@ -51,6 +68,7 @@ export default async function PlanPage() {
         ) : (
           <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Your coach hasn&apos;t assigned a program yet. It will show up here as soon as they do.</p>
         )}
+        {reportRows}
       </div>
     );
   }
@@ -94,6 +112,7 @@ export default async function PlanPage() {
       <div className="max-w-3xl">
         <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" />
       </div>
+      {reportRows}
     </div>
   );
 }

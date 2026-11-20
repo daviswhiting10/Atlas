@@ -47,7 +47,6 @@ export default async function LogSessionPage() {
         name: c.fullName,
         hasPlan: plan != null,
         next: next && plan ? `${next.name} · week ${weekOf(next.scheduledDate.getTime(), plan.startDate.getTime())}` : null,
-        lastLogged: last ? format(last, "MMM d") : null,
         lastTime: last?.getTime() ?? 0,
       };
     })

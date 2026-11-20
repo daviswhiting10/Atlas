@@ -1,0 +1,52 @@
+/* A one-page report in newspaper style: black ink on off-white paper, double and single rules.
+   On screen it is a page that fits a phone; printed it is exactly one Letter page. */
+.screen { min-height: 100dvh; background: #d8d3c6; color: #111; padding: 12px 0 40px; }
+.bar { display: flex; justify-content: space-between; align-items: center; max-width: 8.5in; margin: 0 auto; padding: 0 16px 12px; }
+.bar button { min-height: 44px; padding: 0 18px; border: 1px solid #111; background: #111; color: #F7F3EA; font: 700 13px var(--font-report-head), Georgia, serif; border-radius: 999px; cursor: pointer; }
+.bar button.quiet { background: transparent; color: #111; border-color: transparent; padding: 0 8px; }
+.page { max-width: 8.5in; margin: 0 auto; background: #F7F3EA; padding: 28px 20px 36px; font-family: var(--font-report-body), Georgia, serif; box-shadow: 0 2px 24px rgba(0, 0, 0, 0.16); }
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; padding-bottom: 10px; }
+.dbl { border-top: 4px double #111; }
+.thin { border-top: 1px solid #111; }
+.page h1 { font-family: var(--font-report-head), Georgia, serif; font-weight: 900; font-size: clamp(30px, 9vw, 50px); line-height: 1.05; text-align: center; letter-spacing: -0.01em; padding: 32px 4px 30px; margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(var(--stats), 1fr); padding: 26px 0; }
+.stat { text-align: center; padding: 0 6px; }
+.stat + .stat { border-left: 1px solid #111; }
+.stat b { display: block; font-family: var(--font-report-head), Georgia, serif; font-weight: 700; font-size: clamp(26px, 7.4vw, 44px); line-height: 1; }
+.stat span { display: block; margin-top: 10px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); padding-top: 30px; row-gap: 32px; }
+.grid figure { margin: 0; padding: 0 14px; }
+.grid figure:nth-child(odd) { padding-left: 0; }
+.grid figure:nth-child(even) { padding-right: 0; border-left: 1px solid #111; }
+.grid figcaption b { display: block; font-family: var(--font-report-head), Georgia, serif; font-weight: 700; font-size: 14px; line-height: 1.25; min-height: 35px; }
+.grid figcaption span { display: block; margin: 4px 0 10px; font-size: 11px; font-style: italic; }
+.chart { position: relative; height: 96px; border-bottom: 1px solid #111; }
+.chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chart i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #111; transform: translate(-50%, -50%); }
+
+/* Wide screens and print: one row of up to four columns, divided by thin rules. */
+@media (min-width: 720px), print {
+  .page { padding: 0.7in 0.65in; }
+  .grid { grid-template-columns: repeat(var(--cols), 1fr); padding-top: 38px; row-gap: 44px; }
+  .grid figure, .grid figure:nth-child(odd), .grid figure:nth-child(even) { padding: 0 14px; border-left: 1px solid #111; }
+  .c1 figure:nth-child(1n + 1),
+  .c2 figure:nth-child(2n + 1),
+  .c3 figure:nth-child(3n + 1),
+  .c4 figure:nth-child(4n + 1) { padding-left: 0; border-left: 0; }
+  .c1 figure:nth-child(1n),
+  .c2 figure:nth-child(2n),
+  .c3 figure:nth-child(3n),
+  .c4 figure:nth-child(4n) { padding-right: 0; }
+  .chart { height: var(--chart-h); }
+}
+
+@page { size: letter; margin: 0; }
+@media print {
+  .screen { background: #F7F3EA; padding: 0; min-height: 0; }
+  .bar { display: none; }
+  .page { width: 8.5in; height: 11in; max-width: none; margin: 0; box-shadow: none; overflow: hidden; break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page h1 { font-size: 50px; padding: 44px 40px 40px; }
+  .stats { padding: 34px 0; }
+  .stat b { font-size: 44px; }
+  .stat span { font-size: 10px; }
+}

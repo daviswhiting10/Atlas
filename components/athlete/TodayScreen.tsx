@@ -18,11 +18,14 @@ export function TodayScreen({
   athlete,
   plan,
   goal,
+  report,
 }: {
   athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe">;
   plan: PlanOverview | null;
   /** The running goal's card (nothing when there isn't one). */
   goal: ReactNode;
+  /** The latest progress report, for a week after a block ends (nothing otherwise). */
+  report?: ReactNode;
 }) {
   const next = plan?.nextUp ?? null;
   const lighterWeek = plan != null && plan.lighterWeeks && next != null && next.week % BLOCK_WEEKS === 0;
@@ -50,7 +53,7 @@ export function TodayScreen({
           <p className="mt-3 text-[15px] text-ink-mute">
             {next.exercises.length} exercises · {next.estMinutes} min
           </p>
-          <Link href={`/workouts/${next.id}`} className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
+          <Link href={`/workouts/${next.id}`} prefetch className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
             Start
           </Link>
           <Link href="/workouts/new" className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
@@ -77,6 +80,8 @@ export function TodayScreen({
       {/* No plan: logging is the action. A coach's athlete is waiting on a plan, so it is one line and the one
           button. Someone who builds their own (a self-made account, or a coach on their own training) gets
           the way to a plan as secondary text. */}
+      {report}
+
       {!plan && !athlete.selfServe && !athlete.isCoach && <EmptyStart />}
       {!plan && (athlete.selfServe || athlete.isCoach) && (
         <section className="rise">

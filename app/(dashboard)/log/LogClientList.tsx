@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Search, UserPlus } from "lucide-react";
 
-export type LogRow = { id: string; name: string; hasPlan: boolean; next: string | null; lastLogged: string | null; lastTime: number };
+export type LogRow = { id: string; name: string; hasPlan: boolean; next: string | null; lastTime: number };
 
 export function LogClientList({ rows }: { rows: LogRow[] }) {
   const [query, setQuery] = useState("");
@@ -40,10 +40,7 @@ export function LogClientList({ rows }: { rows: LogRow[] }) {
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/10 text-sm font-semibold text-ink">{r.name.charAt(0).toUpperCase()}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[16px] font-semibold text-ink">{r.name}</span>
-                  <span className="block truncate text-[13px] text-ink-mute">
-                    {r.hasPlan ? (r.next ? `Next: ${r.next}` : "Plan finished") : "No plan yet"}
-                    {r.lastLogged ? ` · last ${r.lastLogged}` : ""}
-                  </span>
+                  <span className="block text-[13px] text-ink-mute">{r.hasPlan ? (r.next ?? "Plan finished") : "No plan yet"}</span>
                 </span>
                 <span className={r.hasPlan ? "flex h-9 shrink-0 items-center gap-1 rounded-lg bg-dusk-button px-3 text-sm font-semibold text-dusk-button-text" : "flex h-9 shrink-0 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink-soft"}>
                   {r.hasPlan ? (

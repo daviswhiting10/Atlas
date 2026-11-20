@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Loader2, Play } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
 import { CredentialFields, GoogleButton, inputClass, signInWithPassword } from "@/components/athlete/account";
@@ -120,9 +120,7 @@ export default function LoginPage() {
             <Link href="/start" className={primary}>
               Create an account <ArrowRight className="h-4 w-4" />
             </Link>
-            <DemoButton className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper text-[15px] font-semibold text-ink hover:border-ink/20 disabled:opacity-60">
-              <Play className="h-4 w-4 fill-current" /> Explore a live demo
-            </DemoButton>
+            <DemoButton className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper text-[15px] font-semibold text-ink hover:border-ink/20 disabled:opacity-60" />
             <p className="text-center text-[13px] text-ink-mute">Answer a few questions and your plan is ready in under a minute.</p>
           </div>
         </div>

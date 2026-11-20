@@ -102,7 +102,7 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, history, initial }: { /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ progress, history, report, initial }: { /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -271,6 +271,7 @@ export function ClientDetail({ progress, history, initial }: { /** null: nothing
       >
         Log session
       </Link>
+      {report && <div className="-mt-3 mb-8">{report}</div>}
       <div className="mb-12">
         <div role="tablist" className="flex w-full max-w-md gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
           {views.map((v) => (
