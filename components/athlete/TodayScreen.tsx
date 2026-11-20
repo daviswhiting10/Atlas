@@ -53,7 +53,7 @@ export function TodayScreen({
           <p className="mt-3 text-[15px] text-ink-mute">
             {next.exercises.length} exercises · {next.estMinutes} min
           </p>
-          <Link href={`/workouts/${next.id}`} className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
+          <Link href={`/workouts/${next.id}`} prefetch className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
             Start
           </Link>
           <Link href="/workouts/new" className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
