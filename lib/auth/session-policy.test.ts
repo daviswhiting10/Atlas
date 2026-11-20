@@ -8,8 +8,8 @@ const after = new Date(PASSWORD_REQUIRED_FROM.getTime() + 1);
 const base: StepInput = { email: "sam@example.com", hasPassword: false, createdAt: before, passwordPromptAfter: null, googleLinked: false };
 
 describe("passwordStepEnabled", () => {
-  it("is off by default (release 1; release 2 turns it on)", () => {
-    expect(passwordStepEnabled({})).toBe(false);
+  it("is on by default", () => {
+    expect(passwordStepEnabled({})).toBe(true);
   });
   it("AUTH_PASSWORD_STEP turns it on or off, in any case", () => {
     expect(passwordStepEnabled({ AUTH_PASSWORD_STEP: "on" })).toBe(true);
@@ -17,7 +17,7 @@ describe("passwordStepEnabled", () => {
     expect(passwordStepEnabled({ AUTH_PASSWORD_STEP: "off" })).toBe(false);
   });
   it("ignores values it doesn't know", () => {
-    expect(passwordStepEnabled({ AUTH_PASSWORD_STEP: "yes" })).toBe(false); // falls back to the default
+    expect(passwordStepEnabled({ AUTH_PASSWORD_STEP: "yes" })).toBe(true);
   });
   it("the kill switch still turns it off", () => {
     expect(passwordStepEnabled({ AUTH_PASSWORD_STEP: "Off" })).toBe(false);
