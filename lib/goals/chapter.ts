@@ -107,6 +107,3 @@ export function freezeChapter(goal: ChapterGoal, sessions: ChapterSession[], che
     }),
   };
 }
-
-/** When a goal that ran its length ended: the end of its last day. */
-export { endOfDay } from "./days";

@@ -5,9 +5,6 @@
 @tailwind utilities;
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
   /* Something you press and hold (a card's header): no text selection or iPhone callout.
      Safari only reads the -webkit- spelling, and there's no autoprefixer here. */
   .no-select {
@@ -19,11 +16,6 @@
 
 /* ── Mobile nav clearance ──────────────────────────────────────────────────
    96px clears the 64px tab bar + 32px breathing room (spec: 96px bottom). */
-@media (max-width: 767px) {
-  .pb-nav-safe {
-    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
-  }
-}
 
 /* ── Card hover lift — apply .card-lift to any card for the effect ─────── */
 .card-lift {
@@ -128,15 +120,6 @@
     --ring:                  var(--dusk-teal);
     --radius:                0.5rem;
 
-    /* ── Sidebar (shadcn) ────────────────────────────────────── */
-    --sidebar:                    var(--dusk-bg);
-    --sidebar-foreground:         var(--dusk-soft);
-    --sidebar-primary:            var(--dusk-teal);
-    --sidebar-primary-foreground: var(--dusk-button-text);
-    --sidebar-accent:             var(--dusk-raised);
-    --sidebar-accent-foreground:  var(--dusk-text);
-    --sidebar-border:             var(--dusk-line);
-    --sidebar-ring:               var(--dusk-teal);
   }
 
   html {
