@@ -3,7 +3,8 @@
  * comes back to most of them. Once a demo (a guest coach's workspace) is more
  * than 6 hours old, and every login in it is a @guest.atlas.app address, it and
  * everything under it is deleted. Try-it guest athletes are left alone. It runs lazily, a couple of workspaces each time a new guest
- * is created, so there's no job to schedule.
+ * is created, so there's no job to schedule. It runs after the response is sent
+ * (`cleanupAfterResponse`): deleting one demo takes seconds, and a visitor never waits on it.
  *
  * Two safety properties:
  * - A workspace is only ever chosen if it has at least one user, EVERY user is
@@ -19,6 +20,7 @@
  * No schema change.
  */
 
+import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 import { DEMO_TTL_MS, isExpiredGuestWorkspace, isGuestEmail } from "@/lib/guest-rules";
@@ -161,4 +163,13 @@ export async function cleanupExpiredGuests(limit = CLEANUP_BATCH): Promise<numbe
     console.error("[guest cleanup]", err instanceof Error ? err.message.slice(0, 200) : err);
   }
   return removed;
+}
+
+/**
+ * What sign-in calls: hand the cleanup to the platform to run after the
+ * response is sent, and return at once. (Outside Vercel, in dev, it simply runs in the background.)
+ * `cleanupExpiredGuests` never throws, so there's nothing for the caller to catch.
+ */
+export function cleanupAfterResponse(limit = CLEANUP_BATCH): void {
+  waitUntil(cleanupExpiredGuests(limit));
 }

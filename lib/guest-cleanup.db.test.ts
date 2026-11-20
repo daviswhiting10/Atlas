@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // createGuest would otherwise clear out old guests on the dev database as a side effect.
-vi.mock("@/lib/guest-cleanup", async (orig) => ({ ...(await orig<typeof import("@/lib/guest-cleanup")>()), cleanupExpiredGuests: vi.fn(async () => 0) }));
+vi.mock("@/lib/guest-cleanup", async (orig) => ({ ...(await orig<typeof import("@/lib/guest-cleanup")>()), cleanupExpiredGuests: vi.fn(async () => 0), cleanupAfterResponse: vi.fn() }));
 
 const RUN = !!process.env.ATLAS_DB_TEST;
 const H = 3_600_000;
