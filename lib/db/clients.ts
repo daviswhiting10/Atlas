@@ -7,6 +7,8 @@ export async function getClients(workspaceId: string) {
     orderBy: [{ fullName: "asc" }, { id: "asc" }],
     include: {
       _count: { select: { sessionNotes: true, programAssignments: true, workoutLogs: true } },
+      // The latest finished session, for "Logged today" on the roster.
+      workoutLogs: { where: { completedAt: { not: null } }, orderBy: { date: "desc" }, take: 1, select: { date: true } },
     },
   });
 }
@@ -32,6 +34,7 @@ export async function getClient(id: string, workspaceId: string) {
         include: {
           assignedWorkout: {
             select: {
+              name: true,
               scheduledDate: true,
               programAssignment: { select: { name: true } },
             },

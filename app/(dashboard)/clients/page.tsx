@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { Plus, Search, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { lastLogged } from "@/lib/coach/last-logged";
 
 type Client = {
   id: string;
@@ -35,6 +36,8 @@ type Client = {
   retentionScore: number | null;
   updatedAt: string;
   _count: { sessionNotes: number; programAssignments: number; workoutLogs?: number };
+  /** The latest finished session (at most one). */
+  workoutLogs?: Array<{ date: string }>;
 };
 
 const GOAL_LABELS: Record<string, string> = {
@@ -236,18 +239,23 @@ export default function ClientsPage() {
                       href={`/clients/${client.id}`}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 px-5 min-h-[60px] active:bg-muted/60"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="w-9 h-9 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
                           {client.fullName.charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold">{client.fullName}</p>
-                          <p className="text-xs text-muted-foreground">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{client.fullName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
                             {[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
+                        {/* When she last logged: a date, or "Logged today" in teal. On a phone too. */}
+                        {(() => {
+                          const last = lastLogged(client.workoutLogs?.[0]?.date);
+                          return last && <p className={cn("shrink-0 whitespace-nowrap text-xs", last.today ? "font-semibold text-primary" : "text-muted-foreground")}>{last.label}</p>;
+                        })()}
                         <div className="text-right hidden sm:block">
                           <p className="text-xs text-muted-foreground">
                             {client._count.workoutLogs ?? 0} workout{(client._count.workoutLogs ?? 0) === 1 ? "" : "s"} logged

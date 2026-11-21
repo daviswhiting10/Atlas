@@ -70,6 +70,7 @@ type Client = {
     title: string | null;
     _count: { sets: number };
     assignedWorkout: {
+      name?: string;
       scheduledDate: string;
       programAssignment: { name: string };
     } | null;
@@ -348,7 +349,7 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
                           <span className="mr-1.5 rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">Off-plan</span>
                         )}
                         {/* No "0 sets": a session with none shows its name (its minutes are on the right), or nothing. */}
-                        {[s.title, s._count.sets > 0 ? `${s._count.sets} set${s._count.sets === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
+                        {[s.title ?? s.assignedWorkout?.name, s._count.sets > 0 ? `${s._count.sets} set${s._count.sets === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
                       </p>
                       {s.clientNotes && (
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>
