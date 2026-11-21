@@ -13,3 +13,6 @@ export async function signOutAndForget(callbackUrl: string): Promise<void> {
   const { signOut } = await import("next-auth/react");
   await signOut({ callbackUrl });
 }
+
+/** The coach's sign-out (header, More sheet): forget this browser's live session, then back to the sign-in page. */
+export const signOutToLogin = () => signOutAndForget(`${window.location.origin}/login`);

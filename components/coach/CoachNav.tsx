@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardPen, LogOut, MoreHorizontal, Settings, Users, X } from "lucide-react";
+import { ClipboardPen, MoreHorizontal, Users, X } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
-import { DemoChip } from "@/components/DemoChip";
-import { ModeToggle } from "@/components/ModeToggle";
+import { HeaderActions } from "@/components/nav/HeaderActions";
+import { signOutToLogin } from "@/lib/sign-out";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
 import { cn } from "@/lib/utils";
 import { useEscape } from "@/hooks/use-escape";
@@ -38,11 +38,6 @@ export function CoachNav({ demo = false }: { demo?: boolean }) {
 
   useEffect(() => setMore(false), [pathname]);
 
-  async function signOut() {
-    const { signOutAndForget } = await import("@/lib/sign-out");
-    await signOutAndForget(`${window.location.origin}/login`);
-  }
-
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl">
@@ -68,20 +63,7 @@ export function CoachNav({ demo = false }: { demo?: boolean }) {
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {demo && <DemoChip />}
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              className={cn("press hidden h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5 hover:text-ink md:flex", isActive("/settings") && "bg-ink/5 text-ink")}
-            >
-              <Settings className="h-[18px] w-[18px]" />
-            </Link>
-            <button type="button" onClick={signOut} aria-label="Sign out" className="press hidden h-9 w-9 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5 hover:text-ink md:flex">
-              <LogOut className="h-[18px] w-[18px]" />
-            </button>
-            <ModeToggle mode="coach" />
-          </div>
+          <HeaderActions side="coach" demo={demo} isCoach />
         </div>
       </header>
 
@@ -140,7 +122,7 @@ export function CoachNav({ demo = false }: { demo?: boolean }) {
                 </li>
               ))}
               <li>
-                <button type="button" onClick={signOut} className="press block w-full py-3.5 text-left text-[15px] font-medium text-ink-soft">
+                <button type="button" onClick={() => void signOutToLogin()} className="press block w-full py-3.5 text-left text-[15px] font-medium text-ink-soft">
                   Sign out
                 </button>
               </li>
