@@ -29,6 +29,8 @@ export async function saveSheetPlan(input: {
   context?: PlanContext;
   /** Import the weeks the sheet shows as done as finished sessions. */
   history: boolean;
+  /** A load in a week's cell is that week's target weight (an athlete's own plan), not a session done. */
+  loadsAsTargets?: boolean;
   today?: Date;
 }): Promise<SavedSheetPlan> {
   const { weeks, lastLoggedWeek } = shapeSheet(input.grid, input.context ?? NO_CONTEXT);
@@ -57,7 +59,7 @@ export async function saveSheetPlan(input: {
           section: e.section,
           prescribedSets: Array.from({ length: e.rx.sets }, (_, k) => ({
             setNumber: k + 1,
-            weight: null,
+            weight: input.loadsAsTargets ? e.load?.weight ?? null : null,
             unit: e.rx.unit,
             repMin: e.rx.repMin,
             repMax: e.rx.repMax,

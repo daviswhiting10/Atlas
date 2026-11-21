@@ -8,13 +8,37 @@ import { cn } from "@/lib/utils";
 import { readFile } from "@/components/coach/SheetPlanUpload";
 import { PHOTO_TYPES } from "@/lib/programs/screenshot-program";
 import type { ImportPreview } from "@/lib/athlete/plan-import";
+import { MAX_UPLOAD_BYTES, fitWithin, tooBigMessage } from "@/lib/athlete/upload-limits";
 
 const ACCEPT = ".pdf,application/pdf,.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv," + PHOTO_TYPES.join(",");
-/** One request: Vercel takes 4.5 MB. */
-const MAX_UPLOAD_BYTES = 4_000_000;
+/** What the read step returned. The grid goes back, as read, to be saved. */
+type Read = { grid: unknown; preview: ImportPreview; warnings: string[] };
 
-/** What the read step returned. It goes back, as read, to be saved. */
-type Read = { kind: "program" | "grid"; program?: unknown; grid?: unknown; context?: unknown; preview: ImportPreview; warnings: string[] };
+/** A screenshot made smaller before upload (a phone photo is often 3–5 MB; this is a few hundred KB). Kept as is if it can't be. */
+async function shrink(f: File): Promise<File> {
+  if (f.type === "image/gif" || f.size < 500_000) return f;
+  try {
+    const bmp = await createImageBitmap(f);
+    const { width, height } = fitWithin(bmp.width, bmp.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, width, height);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    return blob && blob.size < f.size ? new File([blob], f.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : f;
+  } catch {
+    return f;
+  }
+}
+
+/** The server's answer, or a plain message when there isn't one (the host refused the upload, or the server failed). */
+async function answer(res: Response): Promise<Record<string, unknown>> {
+  const data = await res.json().catch(() => null);
+  if (data) return data;
+  if (res.status === 413) return { error: "That's bigger than Atlas can take in one go. Try screenshots of the pages, a few at a time." };
+  return { error: "Couldn't read that plan. Try screenshots of its pages instead." };
+}
 
 const today = () => {
   const d = new Date();
@@ -45,8 +69,11 @@ export function AthleteImport() {
       const ext = first.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
       const visual = files.every((f) => f.type === "application/pdf" || ext === "pdf" || PHOTO_TYPES.includes(f.type));
       if (visual) {
-        if (files.reduce((n, f) => n + f.size, 0) > MAX_UPLOAD_BYTES) throw new Error("That's too big to read. Try fewer pages, or screenshots.");
-        files.forEach((f, i) => form.append(`file${i}`, f));
+        const pdf = files.some((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+        const sending = pdf ? files : await Promise.all(files.map(shrink));
+        const bytes = sending.reduce((n, f) => n + f.size, 0);
+        if (bytes > MAX_UPLOAD_BYTES) throw new Error(tooBigMessage(bytes, pdf));
+        sending.forEach((f, i) => form.append(`file${i}`, f));
         setName(files.length === 1 ? first.name : `${files.length} files`);
       } else {
         if (files.length > 1) throw new Error("Choose one spreadsheet, or a PDF, or screenshots.");
@@ -55,9 +82,9 @@ export function AthleteImport() {
       }
       setBusy("read");
       const res = await fetch("/api/athlete/plan-import", { method: "POST", body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't read that plan.");
-      setRead(data as Read);
+      const data = await answer(res);
+      if (!res.ok) throw new Error(String(data.error ?? "Couldn't read that plan."));
+      setRead(data as unknown as Read);
     } catch (err) {
       setName(null);
       setError(err instanceof Error ? err.message : "Couldn't read that plan.");
@@ -74,10 +101,10 @@ export function AthleteImport() {
       const res = await fetch("/api/athlete/plan-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "save", startDate: today(), ...(read.kind === "grid" ? { grid: read.grid, context: read.context } : { program: read.program }) }),
+        body: JSON.stringify({ step: "save", startDate: today(), grid: read.grid }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't save the plan.");
+      const data = await answer(res);
+      if (!res.ok) throw new Error(String(data.error ?? "Couldn't save the plan."));
       toast.success("Your plan is saved");
       router.refresh();
     } catch (err) {
@@ -98,6 +125,19 @@ export function AthleteImport() {
             <li key={l}>{l}</li>
           ))}
         </ul>
+        {read.preview.weekly && (
+          <div className="rounded-xl border border-line px-3.5 py-3 text-[13px]">
+            <p className="font-semibold text-ink">{read.preview.weekly.exercise}, week by week</p>
+            <ul className="mt-1 space-y-0.5 text-ink-soft">
+              {read.preview.weekly.weeks.map((w) => (
+                <li key={w} className="tnum">
+                  {w}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {read.preview.sameEveryWeek && <p className="text-[13px] text-ink-mute">Every week is the same in this plan.</p>}
         {read.warnings.map((w) => (
           <p key={w} className="text-[13px] text-warn">
             {w}

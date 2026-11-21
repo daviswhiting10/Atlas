@@ -76,7 +76,32 @@ The JSON must follow this exact structure:
  */
 export function buildProgramSheetPrompt(csv: string, notes?: string) {
   return {
-    system: `You transcribe a fitness coach's workout plan from a spreadsheet (given as CSV) into JSON. Copy cells exactly; do not interpret, convert, correct or invent anything.
+    system: sheetSystem("You transcribe a fitness coach's workout plan from a spreadsheet (given as CSV) into JSON. Copy cells exactly; do not interpret, convert, correct or invent anything.", notes),
+    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The spreadsheet, as CSV:\n\n${csv}`,
+  };
+}
+
+/**
+ * The same transcription, from images: the pages of a PDF or screenshots of a plan. Into the same grid as a spreadsheet,
+ * so each week keeps its own sets, reps and loads (lib/programs/sheet-plan reads them the same way).
+ */
+export function buildProgramPagesPrompt(imageCount: number) {
+  return {
+    system: sheetSystem(
+      `You transcribe a workout plan from ${imageCount === 1 ? "an image" : `${imageCount} images`} (the pages of a PDF, or screenshots) into JSON. Copy what is written exactly; do not interpret, convert, correct or invent anything.
+
+## Weeks on separate pages
+- A plan often gives each week its own page or section ("Week 1", "Week 2", …) with the same days and exercises. Merge them: one entry per training day, and for each exercise one "weeks" entry per week, taken from that week's page or section.
+- Match an exercise across weeks by its day and name. An exercise that appears only in some weeks still gets an entry; its other weeks have "" cells.
+- A table column for sets and one for reps go together in "setsReps" as written ("3" and "8-10" is "3x8-10"). A weight or load column goes in "load" ("135", "60 kg", "BW").`,
+      undefined
+    ).replace("## Typical layout (yours may differ)", "## Typical spreadsheet layout (a page may look like this, or not)"),
+    user: `The plan is in the ${imageCount === 1 ? "image" : `${imageCount} images`} above, in order.`,
+  };
+}
+
+function sheetSystem(intro: string, notes?: string) {
+  return `${intro}
 
 ## Typical layout (yours may differ)
 - A training day starts with a label like "Day 1" (often in the first column of a header row).
@@ -112,7 +137,5 @@ Respond ONLY with JSON, no markdown fences, no commentary:
 - If the sheet has no week columns, treat the single set of columns as week 1.
 - Skip rows that aren't exercises: titles, headers, totals, blank rows, the client's name, dates.
 - "programName": a short name from the sheet's title if it has one, otherwise "".
-- Transcribe the grid exactly even when the coach's note says otherwise: the note is applied afterwards.${contextPromptSection(notes)}`,
-    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The spreadsheet, as CSV:\n\n${csv}`,
-  };
+- Transcribe the grid exactly even when the coach's note says otherwise: the note is applied afterwards.${contextPromptSection(notes)}`;
 }

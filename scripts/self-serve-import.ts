@@ -22,7 +22,11 @@ const args = process.argv.slice(2);
 const RUN = args.includes("--run");
 const arg = (n: string, d: string) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const BASE = arg("--base", "http://localhost:3900").replace(/\/$/, "");
-const PDF = resolve(arg("--pdf", join(homedir(), "Documents/atlas-screenshots/self-serve/strength-base-4wk.pdf")));
+const DIR = join(homedir(), "Documents/atlas-screenshots/self-serve");
+const PDF = resolve(arg("--pdf", join(DIR, "strength-base-4wk.pdf")));
+/** The default PDF's heavier week 3 and deload week 4, for the bench press: what must be saved, week by week. */
+const BENCH_WEEKS = PDF.endsWith("strength-base-4wk.pdf") ? ["3x8-10@135", "3x8-10@140", "4x6-8@155", "2x8-10@115"] : null;
+const TOO_BIG = join(DIR, "too-big-6mb.pdf");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const OUT = join(homedir(), "Documents", "atlas-screenshots", "self-serve", new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -176,6 +180,64 @@ async function main() {
       const a = await prisma.programAssignment.findMany({ where: { clientId: prof.id }, select: { status: true, name: true, _count: { select: { assignedWorkouts: true } } } });
       if (a.length !== 1 || a[0].status !== "ACTIVE") throw new Error(`assignments: ${JSON.stringify(a)}`);
       return `1 active plan "${a[0].name}", ${a[0]._count.assignedWorkouts} workouts`;
+    });
+
+    if (BENCH_WEEKS) {
+      await step("each week saved as written: the bench press's sets, reps and weight per week", async () => {
+        const prof = await prisma.clientProfile.findFirstOrThrow({ where: { userId: self.userId }, select: { id: true } });
+        const rows = await prisma.assignedWorkoutExercise.findMany({
+          where: { assignedWorkout: { programAssignment: { clientId: prof.id } }, exercise: { name: { contains: "Bench", mode: "insensitive" } } },
+          orderBy: { assignedWorkout: { scheduledDate: "asc" } },
+          select: { prescribedSets: true },
+        });
+        const got = rows.map((r) => {
+          const sets = r.prescribedSets as Array<{ repMin: number; repMax: number; weight: number | null }>;
+          return `${sets.length}x${sets[0].repMin}-${sets[0].repMax}@${sets[0].weight}`;
+        });
+        if (JSON.stringify(got) !== JSON.stringify(BENCH_WEEKS)) throw new Error(`bench by week: ${got.join(", ")} (expected ${BENCH_WEEKS.join(", ")})`);
+        return got.join(" · ");
+      });
+    }
+
+    await step("Atlas builds it lands on Today with Start", async () => {
+      const a = await mk("self");
+      const ph = await open("atlas");
+      await ph.nav("/login", 1500);
+      if (!(await ph.signIn(a.email, pw))) throw new Error("sign-in failed");
+      await ph.nav("/today", 3000);
+      await ph.tap("button", "Atlas builds it");
+      await sleep(600);
+      // Through the wizard with what it starts with, to its last button.
+      for (let i = 0; i < 8; i++) {
+        if (await ph.rect("button", "Build my plan")) break;
+        await ph.tap("button", "Continue");
+        await sleep(400);
+      }
+      if (await ph.rect("button", "Rebuild my plan")) throw new Error('a first plan says "Rebuild"');
+      await ph.tap("button", "Build my plan");
+      await ph.until(`location.pathname==='/today' && [...document.querySelectorAll('a')].some(a=>a.innerText.trim()==='Start')`, 30000);
+      await ph.shot("today-after-atlas");
+      return `on ${await ph.url()} with Start`;
+    });
+
+    await step("too big: a 6 MB PDF gets a clear message, in the browser and from the server", async () => {
+      const b = await mk("self");
+      const ph = await open("toobig");
+      await ph.nav("/login", 1500);
+      if (!(await ph.signIn(b.email, pw))) throw new Error("sign-in failed");
+      await ph.nav("/today", 3000);
+      await ph.tap("button", "Import");
+      await ph.until(`document.querySelector('[data-testid="plan-file"]')`);
+      ph.chooseFile(TOO_BIG);
+      await ph.tap("button", "choose a file");
+      await ph.until(`document.querySelector('[role=alert]')`, 10000);
+      const shown = await ph.ev<string>(`document.querySelector('[role=alert]').innerText`);
+      if (!/6\.2 MB.*screenshots/.test(shown)) throw new Error(`message: ${shown}`);
+      await ph.shot("too-big");
+      // Past the browser (a script, or an older page): the server says the same, before any reading.
+      const server = await ph.ev<{ status: number; error?: string }>(`(async()=>{const f=new FormData();f.append('file0',new File([new Uint8Array(6158018)],'big.pdf',{type:'application/pdf'}));const r=await fetch('/api/athlete/plan-import',{method:'POST',body:f});return {status:r.status,...(await r.json().catch(()=>({})))}})()`);
+      if (server.status !== 413) throw new Error(`server ${server.status}`);
+      return `browser: "${shown}" · server ${server.status}: "${server.error}"`;
     });
 
     const post = (ph: Phone, body: string) => ph.ev<{ status: number; error?: string }>(`fetch('/api/athlete/plan-import',{method:'POST',body:(()=>{const f=new FormData();f.append('csv',${JSON.stringify(body)});return f})()}).then(async r=>({status:r.status,...(await r.json().catch(()=>({})))}))`);

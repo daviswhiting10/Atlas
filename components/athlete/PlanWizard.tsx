@@ -131,10 +131,16 @@ export function PlanWizard({
   mode,
   initial,
   initialName = "",
+  after = "/plan",
+  first = false,
 }: {
   mode: "signup" | "rebuild";
   initial: Prefs;
   initialName?: string;
+  /** Where a rebuilt plan lands (Today's empty card sends it back to Today). */
+  after?: string;
+  /** There is no plan yet: it is built, not rebuilt. */
+  first?: boolean;
 }) {
   const router = useRouter();
   const [prefs, setPrefs] = useState<Prefs>(initial);
@@ -322,7 +328,8 @@ export function PlanWizard({
       try {
         await rebuildPlan(prefs);
         toast.success("Your new plan is ready");
-        router.push("/plan");
+        router.push(after);
+        if (after === location.pathname) router.refresh();
       } catch {
         toast.error("Couldn't rebuild your plan. Please try again.");
       }
@@ -368,7 +375,7 @@ export function PlanWizard({
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : last ? (
-                <>{mode === "signup" ? "Create account & build my plan" : "Rebuild my plan"} <Sparkles className="h-4 w-4" /></>
+                <>{mode === "signup" ? "Create account & build my plan" : first ? "Build my plan" : "Rebuild my plan"} <Sparkles className="h-4 w-4" /></>
               ) : (
                 <>Continue <ArrowRight className="h-4 w-4" /></>
               )}
@@ -382,7 +389,7 @@ export function PlanWizard({
               </button>
             </p>
           )}
-          {mode === "rebuild" && (
+          {mode === "rebuild" && !first && (
             <p className="mt-4 text-[13px] leading-relaxed text-ink-mute">
               Rebuilding starts a fresh 12 weeks from today. Everything you&apos;ve logged stays, so your charts carry on.
             </p>

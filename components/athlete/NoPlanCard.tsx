@@ -53,7 +53,7 @@ export function NoPlanCard({ prefs }: { prefs: Prefs }) {
                 )}
               </div>
             )}
-            {door === "atlas" && <PlanWizard mode="rebuild" initial={prefs} />}
+            {door === "atlas" && <PlanWizard mode="rebuild" initial={prefs} after="/today" first />}
           </>
         )}
       />
