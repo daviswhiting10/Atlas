@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HowItWorks } from "@/components/HowItWorks";
 import { ArrowRight } from "lucide-react";
 import type { Athlete } from "@/lib/athlete/data";
+import { isCoached } from "@/lib/athlete/coached";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
 import { PasswordPanel, SaveAccountPanel } from "@/components/athlete/account";
 import { OwnProgramPicker, type LibraryProgram } from "@/components/athlete/OwnProgramPicker";
@@ -31,7 +32,8 @@ export function YouScreen({
     <div className="rise">
       <h1 className="truncate text-3xl leading-none text-ink sm:text-4xl">{athlete.name}</h1>
 
-      <HowItWorks className="mt-8" />
+      {/* How it works and Start a goal describe the self-serve flow: a coached client's plan comes from her coach. */}
+      {!isCoached(athlete) && <HowItWorks className="mt-8" />}
 
       {canStartGoal && (
         <Link href="/goals/new" className="press flex min-h-[56px] items-center justify-between gap-3 border-y border-line text-[17px] font-semibold text-ink hover:text-ink-soft">

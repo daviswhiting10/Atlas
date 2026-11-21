@@ -4,6 +4,7 @@ import { YouScreen } from "@/components/athlete/YouScreen";
 import { libraryForPicker } from "@/lib/programs/library";
 import { prisma } from "@/lib/db/client";
 import { activeGoalId } from "@/lib/goals/data";
+import { isCoached } from "@/lib/athlete/coached";
 
 export const metadata: Metadata = { title: "You" };
 
@@ -17,7 +18,7 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
     athlete.isCoach ? getPlanOverview() : null,
     athlete.isCoach ? libraryForPicker(athlete.workspaceId) : [],
     // Starting a goal lives here (Today shows the goal's card once one is running).
-    athlete.isGuest ? null : activeGoalId(athlete.clientId),
+    athlete.isGuest || isCoached(athlete) ? null : activeGoalId(athlete.clientId),
   ]);
-  return <YouScreen athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !goalId} />;
+  return <YouScreen athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} />;
 }
