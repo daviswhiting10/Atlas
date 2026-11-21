@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { Plus, Search, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { lastLogged } from "@/lib/coach/last-logged";
+import { SwipeRow } from "@/components/coach/SwipeRow";
+import { DeleteClientSheet, type DeletePreview } from "@/components/coach/DeleteClientSheet";
 
 type Client = {
   id: string;
@@ -54,6 +56,9 @@ const sel = (setter: (v: string) => void) => (v: string | null) => { if (v) sett
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
+  // Swipe left on a row: Delete. One row open at a time; the sheet says exactly what goes.
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<(DeletePreview & { id: string }) | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const phase = useContentFade(loading);
@@ -78,6 +83,31 @@ export default function ClientsPage() {
   const filtered = clients.filter(
     (c) => c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
+
+  async function askDelete(id: string) {
+    const res = await fetch(`/api/clients/${id}/erase`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Can't delete this client");
+      setOpenRow(null);
+      return;
+    }
+    setToDelete({ id, ...(body as DeletePreview) });
+  }
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    const res = await fetch(`/api/clients/${toDelete.id}/erase`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Couldn't delete");
+      return;
+    }
+    setClients((prev) => prev.filter((c) => c.id !== toDelete.id));
+    toast.success(`${toDelete.name} deleted`);
+    setToDelete(null);
+    setOpenRow(null);
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -241,7 +271,8 @@ export default function ClientsPage() {
               <Card>
                 <div className="divide-y divide-border">
                   {filtered.map((client) => (
-                    <div key={client.id} className="group flex items-center hover:bg-muted/40 transition-colors">
+                    <SwipeRow key={client.id} open={openRow === client.id} onOpenChange={(o) => setOpenRow(o ? client.id : null)} onDelete={() => void askDelete(client.id)}>
+                    <div className="group flex items-center hover:bg-muted/40 transition-colors">
                     <Link
                       href={`/clients/${client.id}`}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 px-5 min-h-[60px] active:bg-muted/60"
@@ -276,6 +307,7 @@ export default function ClientsPage() {
                       </div>
                     </Link>
                     </div>
+                    </SwipeRow>
                   ))}
                 </div>
               </Card>
@@ -283,6 +315,7 @@ export default function ClientsPage() {
           </div>
         )}
       </div>
+      {toDelete && <DeleteClientSheet preview={toDelete} onDelete={confirmDelete} onClose={() => { setToDelete(null); setOpenRow(null); }} />}
     </div>
   );
 }
