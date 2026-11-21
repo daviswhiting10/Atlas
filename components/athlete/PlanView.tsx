@@ -252,7 +252,7 @@ function WorkoutCard({
                       {locked ? (
                         <span className="shrink-0 px-2 py-1 text-[14px] text-ink-soft">
                           {e.sets} × {e.reps}
-                          {e.weight != null ? ` @ ${e.weight} lb` : ""}
+                          {e.weightLabel ? ` @ ${e.weightLabel}` : e.weight != null ? ` @ ${e.weight} lb` : ""}
                         </span>
                       ) : (
                         <button
@@ -263,7 +263,7 @@ function WorkoutCard({
                           className="press shrink-0 rounded-md px-2 py-1 text-[14px] max-md:min-h-11 text-ink-soft underline decoration-line decoration-dotted underline-offset-4 hover:bg-ink/5 hover:text-ink"
                         >
                           {e.sets} × {e.reps}
-                          {e.weight != null ? ` @ ${e.weight} lb` : ""}
+                          {e.weightLabel ? ` @ ${e.weightLabel}` : e.weight != null ? ` @ ${e.weight} lb` : ""}
                         </button>
                       )}
                       <button
@@ -286,6 +286,12 @@ function WorkoutCard({
                         </button>
                       )}
                     </div>
+                    {(e.rpe || e.rest || e.note) && (
+                      <div className="mt-1 pl-[84px] text-[13px] leading-snug text-ink-mute">
+                        {(e.rpe || e.rest) && <p className="tnum">{[e.rpe && `RPE ${e.rpe}`, e.rest].filter(Boolean).join(" · ")}</p>}
+                        {e.note && <p className="mt-0.5 text-ink-soft">{e.note}</p>}
+                      </div>
+                    )}
                     {!locked && editing === e.aweId && (
                       <div className="mt-2 pl-6">
                         <TargetEditor

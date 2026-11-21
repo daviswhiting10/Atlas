@@ -431,21 +431,21 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       }
     }
 
-    afterChange(ex);
+    afterChange(ex, s.plan?.rest ?? undefined);
   }
 
   /**
    * After a set is logged or deleted: the workout's last set finishes it (a few seconds later,
    * with an Undo); an exercise's last set moves on to the next exercise with sets left.
    */
-  function afterChange(ex: LoggerExercise) {
+  function afterChange(ex: LoggerExercise, restSeconds = ex.restSeconds) {
     const lists = data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done));
     if (allDone(lists)) {
       setRest(null);
       scheduleFinish();
       return;
     }
-    setRest({ endsAt: Date.now() + ex.restSeconds * 1000, total: ex.restSeconds });
+    setRest({ endsAt: Date.now() + restSeconds * 1000, total: restSeconds });
     // An exercise's last set folds it and opens the next one with sets left (in the order on screen).
     const shown = exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).length > 0 && (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));
     const at = exercises.findIndex((e) => e.aweId === ex.aweId);
@@ -759,6 +759,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                           </p>
                           {/* Only a first time (nothing to go on) gets a word of guidance; a hold is timed, so it never asks for "N reps". */}
                           {ex.target.kind === "first" && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
+                          {/* The coach's note on the exercise, as written. */}
+                          {ex.note && <p className="mt-1 text-[13px] leading-snug text-ink-soft">{ex.note}</p>}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger aria-label={`More for ${ex.name}`} disabled={busy} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft hover:bg-ink/5">
@@ -842,6 +844,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                                   <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
                                 </button>
                               </HoldRow>
+                              {/* What the coach wrote for this set beyond weight and reps: the target RPE, the rest after it, a note. */}
+                              {s.plan && (
+                                <p className="tnum ml-[26px] mt-1 text-[12px] leading-snug text-ink-mute">
+                                  {[s.plan.rpe != null && `RPE ${s.plan.rpe}`, s.plan.rest != null && clock(s.plan.rest)].filter(Boolean).join(" · ")}
+                                  {s.plan.note && <span className="text-ink-soft">{s.plan.rpe != null || s.plan.rest != null ? " · " : ""}{s.plan.note}</span>}
+                                </p>
+                              )}
                               {!s.done && list.length > 1 && (
                                 <button type="button" onClick={() => deleteSet(ex, i)} className="sr-only focus:not-sr-only focus:mt-1 focus:inline-flex focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm">
                                   Delete set {s.setNumber}
