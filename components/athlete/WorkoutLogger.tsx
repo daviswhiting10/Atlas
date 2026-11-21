@@ -12,7 +12,8 @@ import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, pla
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { TargetEditor } from "./TargetEditor";
-import { e1rm, isE1rmBest, isRecord, recordLabel } from "@/lib/plan/overload";
+import { isRecord } from "@/lib/plan/overload";
+import { FOLD_DELAY_MS, RECORD_RING, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
 // The coach logger's hold-and-drag (hold a card's header to lift it, drop between cards to reorder,
@@ -82,7 +83,7 @@ function Stepper({
     onChange(unit === "lb" ? Math.min(next, MAX_WEIGHT_LB) : next);
   };
   return (
-    <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised transition-colors", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
+    <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
       <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
         <Minus className="h-4 w-4" />
       </button>
@@ -137,8 +138,18 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [records, setRecords] = useState<Record<string, string>>({});
-  /** Exercises that already got a "new best" toast this session: once is enough. */
-  const bestToasted = useRef(new Set<string>());
+  /** Sets whose save failed, or has waited offline a while: one small amber dot on that row. Never shown for a save that worked. */
+  const [unsaved, setUnsaved] = useState<Record<string, true>>({});
+  const stuckTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const markUnsaved = useCallback((key: string, on: boolean) => setUnsaved((u) => (on === (key in u) ? u : on ? { ...u, [key]: true } : Object.fromEntries(Object.entries(u).filter(([k]) => k !== key)))), []);
+  const clearStuck = useCallback(
+    (key: string) => {
+      clearTimeout(stuckTimers.current.get(key));
+      stuckTimers.current.delete(key);
+      markUnsaved(key, false);
+    },
+    [markUnsaved]
+  );
   const [switching, setSwitching] = useState(false);
   const [summary, setSummary] = useState<null | { minutes: number }>(null);
   const [finishing, startFinish] = useTransition();
@@ -326,6 +337,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           // A failed answer can come back as nothing rather than an error: that's a refusal too.
           if (!res?.setLogId) throw new Error("The set wasn't saved");
           serverDone.current.set(key, s.done);
+          clearStuck(key);
           // Confirmed while the page is closing: the next page may have read the server before this
           // landed, so it stays pending there (that page clears it, or resends it harmlessly).
           if (!leaving) clearPending(store(), data.id, key, s.done);
@@ -340,6 +352,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           // from the server puts the set back.
           if (isNetworkError(e)) {
             setNoSignal(true);
+            if (!stuckTimers.current.has(key)) stuckTimers.current.set(key, setTimeout(() => markUnsaved(key, true), STUCK_MS));
             return;
           }
           if (left > 0) return;
@@ -354,11 +367,11 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
             cancelFinish();
           }
-          toast.error(`Set ${setNumber} didn't save. Check your connection and tap it again.`, { id: `save-${key}` });
+          markUnsaved(key, true);
         }
       });
     },
-    [apply, data.id]
+    [apply, data.id, clearStuck, markUnsaved]
   );
 
   const deloadWeek = data.deloadWeek;
@@ -391,6 +404,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     }
     // The server's state before the screen first changes it (for a rollback if a save fails).
     const key0 = `${ex.aweId}:${s.setNumber}`;
+    clearStuck(key0);
     if (!serverDone.current.has(key0)) serverDone.current.set(key0, s.setLogId ? s.done : false);
     // The weight starts at the target when there is one; with none (a new lift), a blank is fine.
     const next = list.map((x, j) => (j === i ? { ...x, done } : x));
@@ -420,19 +434,6 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       const timed = ex.unit === "secs";
       const label = mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${timed ? "sec" : "reps"}`;
       setRecords((r) => ({ ...r, [key]: label }));
-      toast.success(`${recordLabel(timed)}: ${ex.name}`, { description: label });
-    } else if (ex.history.length > 0 && !deloadWeek && mine.weight != null && mine.reps > 0) {
-      // Not heavier, but stronger: more reps at a weight beats the best estimated max.
-      const bestE1rm = Math.max(
-        0,
-        ...ex.history.filter((p) => !p.deload).map((p) => p.e1rm ?? 0),
-        ...earlier.filter((x) => x.weight != null && (x.reps ?? 0) > 0).map((x) => e1rm(x.weight as number, x.reps as number))
-      );
-      const est = Math.round(e1rm(mine.weight, mine.reps) * 10) / 10;
-      if (isE1rmBest({ e1rm: est }, bestE1rm) && !bestToasted.current.has(ex.aweId)) {
-        bestToasted.current.add(ex.aweId);
-        toast(`New best on ${ex.name}`, { description: `${mine.weight} lb × ${mine.reps} · est. 1RM ${Math.round(est)} lb, your highest yet` });
-      }
     }
 
     afterChange(ex, s.plan?.rest ?? undefined);
@@ -458,7 +459,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     setTimeout(() => {
       setOpenFor(ex.aweId, false);
       if (n != null) setOpenFor(exercises[n].aweId, true);
-    }, 450);
+    }, FOLD_DELAY_MS);
   }
 
   /** Delete a set that isn't logged (hold its row), with an Undo. Later sets close up. */
@@ -761,7 +762,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                     const logged = list.filter((x) => x.done).length;
                     return (
                       <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={section}>
-                        <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                        <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} unsaved={list.some((s) => `${ex.aweId}:${s.setNumber}` in unsaved)} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
                         <MoveButtons name={ex.name} {...moves(ex.aweId)} />
                       </section>
                     );
@@ -861,12 +862,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                                   onClick={() => toggle(ex, i)}
                                   aria-pressed={s.done}
                                   aria-label={s.done ? `Set ${s.setNumber} done — tap to undo` : `Mark set ${s.setNumber} done`}
+                                  style={{ transition: "none", ...(s.done && record != null ? RECORD_RING : null) }}
                                   className={cn(
-                                    "press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border",
+                                    "press relative flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border",
                                     s.done ? "border-signal bg-signal text-bone" : "border-line bg-paper text-ink-mute hover:border-signal hover:text-signal"
                                   )}
                                 >
-                                  <Check className={cn("h-6 w-6", s.done && "pop")} strokeWidth={3} />
+                                  <Check className="h-6 w-6" strokeWidth={3} />
+                                  <UnsavedDot show={`${ex.aweId}:${s.setNumber}` in unsaved} />
                                 </button>
                               </HoldRow>
                               {/* What the coach wrote for this set beyond weight and reps: the target RPE, the rest after it, a note. */}
@@ -880,11 +883,6 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                                 <button type="button" onClick={() => deleteSet(ex, i)} className="sr-only focus:not-sr-only focus:mt-1 focus:inline-flex focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm">
                                   Delete set {s.setNumber}
                                 </button>
-                              )}
-                              {record && (
-                                <p className="fade-in tnum ml-7 mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">
-                                  <Medal className="h-3 w-3" /> {recordLabel(timed)} · {record}
-                                </p>
                               )}
                             </li>
                           );
@@ -1079,7 +1077,7 @@ function MoveButtons({ name, up, down, merge }: { name: string; up: () => void; 
 }
 
 /** A folded exercise: one row with its name, a tick when every set is logged or "2/3" when some are. Tap to open; hold to move. */
-function FoldedRow({ label, name, logged, total, onOpen, hold }: { label: string; name: string; logged: number; total: number; onOpen: () => void; hold: React.HTMLAttributes<HTMLElement> }) {
+function FoldedRow({ label, name, logged, total, unsaved, onOpen, hold }: { label: string; name: string; logged: number; total: number; /** A set inside it hasn't saved. */ unsaved: boolean; onOpen: () => void; hold: React.HTMLAttributes<HTMLElement> }) {
   const done = total > 0 && logged === total;
   return (
     <button type="button" {...hold} onClick={onOpen} aria-expanded={false} aria-label={`Open ${name}`} className="press flex min-h-12 w-full select-none items-center gap-2 py-1.5 pl-3.5 pr-1.5 text-left [-webkit-touch-callout:none]">
@@ -1095,8 +1093,9 @@ function FoldedRow({ label, name, logged, total, onOpen, hold }: { label: string
           <span className="sr-only"> sets logged</span>
         </span>
       ) : null}
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
         <ChevronDown className="h-4 w-4" />
+        <UnsavedDot show={unsaved} />
       </span>
     </button>
   );

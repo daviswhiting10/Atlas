@@ -41,6 +41,7 @@ import {
 import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
 import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
+import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
@@ -393,6 +394,15 @@ export default function WorkoutLogger({
   const [adding, setAdding] = useState(false);
   /** The exercise whose swap sheet is open. */
   const [swapFor, setSwapFor] = useState<string | null>(null);
+  /** Sets (by uid) whose save failed, or has waited offline a while: one small amber dot on that row. Never shown for a save that worked. */
+  const [unsaved, setUnsaved] = useState<Record<string, true>>({});
+  const stuckTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const markUnsaved = (uid: string, on: boolean) => setUnsaved((u) => (on === (uid in u) ? u : on ? { ...u, [uid]: true } : Object.fromEntries(Object.entries(u).filter(([k]) => k !== uid))));
+  const clearStuck = (uid: string) => {
+    clearTimeout(stuckTimers.current.get(uid));
+    stuckTimers.current.delete(uid);
+    markUnsaved(uid, false);
+  };
   const [busy, setBusy] = useState(false);
 
   // ── Live session: the "currently logging" bar on other screens, and coming back to this exact place ──
@@ -653,6 +663,7 @@ export default function WorkoutLogger({
     // A set un-ticked: the session isn't over after all.
     if (!nowDone) cancelFinish();
     noteServer(entry);
+    clearStuck(entry.uid);
     // Only this set's tick changes (nothing carried forward), and the ref changes with it, so a
     // second tap before React re-renders sees it.
     setSet(aweId, entry.uid, { completed: nowDone });
@@ -667,18 +678,7 @@ export default function WorkoutLogger({
       scheduleFinish();
       return;
     }
-    // Undo un-logs it (the same toggle, the other way), on the server too.
-    toast.success(`Set ${idx + 1} logged`, {
-      id: `logged-${entry.uid}`,
-      action: { label: "Undo", onClick: () => toggleByUid(aweId, exerciseId, entry.uid) },
-    });
     afterExerciseChange(aweId, lists);
-  }
-
-  /** Toggle a set found by its id (a toast's Undo: the set may have moved since). */
-  function toggleByUid(aweId: string, exerciseId: string, uid: string) {
-    const i = exStateRef.current[aweId]?.sets.findIndex((x) => x.uid === uid) ?? -1;
-    if (i !== -1) handleComplete(aweId, exerciseId, i);
   }
 
   /** Change one set by its id, in state and in the ref at once. */
@@ -732,6 +732,7 @@ export default function WorkoutLogger({
         if (!result?.setLogId || !result.workoutLogId) throw new Error("The set wasn't saved");
         logIdRef.current = result.workoutLogId;
         serverSets.current.set(uid, { setLogId: result.setLogId, completed: want.completed });
+        clearStuck(uid);
         // Confirmed while the page is closing: the next page may have read the server before this
         // landed, so it stays pending there (that page clears it, or resends it harmlessly).
         if (!leaving) clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1), want.completed);
@@ -743,16 +744,15 @@ export default function WorkoutLogger({
         // No connection: the tick stays (it's the truth on this phone) and is sent when the
         // connection is back. Only a refusal from the server puts the set back.
         if (isNetworkError(e)) {
-          toast("You're offline. Sets save when you're back.", { id: "offline" });
+          if (!stuckTimers.current.has(uid)) stuckTimers.current.set(uid, setTimeout(() => markUnsaved(uid, true), STUCK_MS));
           return;
         }
         // Refused: put the set back the way the server has it, unless a newer tap for it is still on its way.
         if (left > 0) return;
         clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
         setSet(aweId, uid, { completed: server.completed });
-        toast.dismiss(`logged-${uid}`);
         if (!server.completed) cancelFinish();
-        toast.error(`Set ${idx + 1} didn't save. Check your connection and tap it again.`, { id: `save-${uid}` });
+        markUnsaved(uid, true);
       }
     });
   }
@@ -766,18 +766,24 @@ export default function WorkoutLogger({
     });
   }
 
-  /** An exercise just finished: fold it and go to the next one with sets left. */
+  /**
+   * An exercise just finished: its card stays open for a moment, so the check that finished it is seen (the
+   * athlete logger waits the same 450 ms), then it folds and the next one with sets left opens.
+   */
   function afterExerciseChange(aweId: string, lists: boolean[][]) {
     const i = exercises.findIndex((e) => e.aweId === aweId);
     const done = lists.map((l) => l.length > 0 && l.every(Boolean));
     if (i === -1 || !done[i]) return;
-    setFoldOverride((prev) => {
-      const next = { ...prev };
-      delete next[aweId];
-      return next;
-    });
+    setFoldOverride((prev) => ({ ...prev, [aweId]: false }));
     const n = nextOpen(done, i);
-    if (n != null) setTimeout(() => jumpTo(exercises[n]), 350);
+    setTimeout(() => {
+      setFoldOverride((prev) => {
+        const next = { ...prev };
+        delete next[aweId];
+        return next;
+      });
+      if (n != null) setTimeout(() => jumpTo(exercises[n]), 0);
+    }, FOLD_DELAY_MS);
   }
 
   /** Delete a set that isn't logged (a long-press on its row, or Delete in its details), with an Undo. */
@@ -863,7 +869,6 @@ export default function WorkoutLogger({
   finishedRef.current = finished;
   const onOnline = useRef(() => {});
   onOnline.current = () => {
-    toast.dismiss("offline");
     resendPending();
     // Everything logged while offline: finish now that it can.
     saveChain.current.then(() => {
@@ -1459,7 +1464,7 @@ export default function WorkoutLogger({
                 if (isFolded(ex)) {
                   return (
                     <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} style={drag.styleFor(ex.aweId)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
-                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} hold={drag.bind(ex.aweId)} />
+                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} hold={drag.bind(ex.aweId)} />
                       {!completed && <MoveButtons name={ex.name} {...moves(ex.aweId)} />}
                     </section>
                   );
@@ -1475,6 +1480,7 @@ export default function WorkoutLogger({
                       last={ex.lastSets}
                       prescribed={ex.prescribedSets}
                       onChange={(idx, patch) => updateSet(ex.aweId, idx, patch)}
+                      unsaved={unsaved}
                       onComplete={(idx) => settled() && handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
                       onRemove={(idx) => deleteSet(ex.aweId, idx)}
@@ -1686,7 +1692,7 @@ export default function WorkoutLogger({
               )}
             {isFolded(ex) ? (
               <div className="mt-2 rounded-xl border border-line bg-paper">
-                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} />
+                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} />
               </div>
             ) : (
             <Card>
@@ -1714,6 +1720,7 @@ export default function WorkoutLogger({
                       idx={idx}
                       entry={entry}
                       onChange={(patch) => updateSet(ex.aweId, idx, patch)}
+                      unsaved={entry.uid in unsaved}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
                     />
@@ -1899,7 +1906,7 @@ function CollapseButton({ name, onClick }: { name: string; onClick: () => void }
  * A folded exercise: one skinny row with its badge and name, then a tick when every set is
  * logged or "3/4" when some are. Tapping anywhere on it opens the card again.
  */
-function FoldedRow({ label, name, sets, onOpen, hold = {} }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void; /** Holding the row picks the card up (useDragOrder). */ hold?: React.HTMLAttributes<HTMLElement> }) {
+function FoldedRow({ label, name, sets, unsaved, onOpen, hold = {} }: { label: string; name: string; sets: SetEntry[]; /** A set inside it hasn't saved. */ unsaved: boolean; onOpen: () => void; /** Holding the row picks the card up (useDragOrder). */ hold?: React.HTMLAttributes<HTMLElement> }) {
   const logged = sets.filter((x) => x.completed).length;
   const done = sets.length > 0 && logged === sets.length;
   return (
@@ -1923,8 +1930,9 @@ function FoldedRow({ label, name, sets, onOpen, hold = {} }: { label: string; na
           <span className="sr-only"> sets logged</span>
         </span>
       ) : null}
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
         <ChevronDown className="h-4 w-4" />
+        <UnsavedDot show={unsaved} />
       </span>
     </button>
   );
@@ -1979,12 +1987,14 @@ function SetTable({
   sets,
   last,
   prescribed,
+  unsaved,
   onChange,
   onComplete,
   onBlurPersist,
   onRemove,
 }: {
   secs: boolean;
+  unsaved: Record<string, true>;
   sets: SetEntry[];
   last: LoggerExercise["lastSets"];
   prescribed: PrescribedSet[];
@@ -2085,11 +2095,12 @@ function SetTable({
                   aria-pressed={entry.completed}
                   aria-label={entry.completed ? `Set ${idx + 1} logged — tap to undo` : `Log set ${idx + 1}`}
                   className={cn(
-                    "logger-cell flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
+                    "logger-cell relative flex h-10 w-10 items-center justify-center rounded-lg border",
                     entry.completed ? "border-[var(--success)] bg-[var(--success)] text-dusk-button-text" : "border-line-strong text-ink-mute"
                   )}
                 >
                   <Check className="h-4 w-4" strokeWidth={2.5} />
+                  <UnsavedDot show={entry.uid in unsaved} />
                 </button>
               </HoldRow>
               {open && (
@@ -2326,10 +2337,12 @@ function ChangePanel({
 function DesktopSetRow({
   idx,
   entry,
+  unsaved,
   onChange,
   onComplete,
   onRemove,
 }: {
+  unsaved: boolean;
   onRemove?: () => void;
   idx: number;
   entry: SetEntry;
@@ -2339,7 +2352,7 @@ function DesktopSetRow({
 
   return (
     <div className="space-y-0.5">
-      <div className={cn("flex items-center gap-1.5 transition-opacity", entry.completed && "opacity-60")}>
+      <div className={cn("flex items-center gap-1.5", entry.completed && "opacity-60")}>
         <span className="text-xs text-muted-foreground w-5 shrink-0 text-right">{idx + 1}</span>
 
         {/* Load type: weight / BW / band */}
@@ -2435,13 +2448,14 @@ function DesktopSetRow({
           type="button"
           onClick={onComplete}
           className={cn(
-            "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
+            "relative ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 border",
             entry.completed
               ? "bg-[var(--success)] border-[var(--success)] text-dusk-button-text"
               : "border-border text-muted-foreground hover:border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] hover:text-[var(--success)]"
           )}
         >
           <Check className="w-3 h-3" />
+          <UnsavedDot show={unsaved} />
         </button>
         {onRemove ? (
           <button type="button" onClick={onRemove} title="Remove set" aria-label={`Remove set ${idx + 1}`} className="w-6 h-7 flex items-center justify-center shrink-0 text-muted-foreground hover:text-[var(--destructive)]">
