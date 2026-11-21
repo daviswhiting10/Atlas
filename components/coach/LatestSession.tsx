@@ -92,7 +92,7 @@ export function LatestSession({ clientId, session: s, prs }: { clientId: string;
       {counts.met > 0 && (
         <p className="mt-2 flex items-center justify-between border-t border-line text-[13px] text-ink-mute">
           <span>
-            <span className="tnum font-semibold text-ink-soft">{counts.met}</span> sets, as written
+            <span className="tnum font-semibold text-ink-soft">{counts.met}</span> {counts.met === 1 ? "set" : "sets"}, as written
           </span>
           <Link href={`/clients/${clientId}/sessions/${s.logId}`} className="-mr-2 inline-flex min-h-11 items-center gap-0.5 px-2 font-medium text-ink-soft">
             All sets <ChevronRight className="h-3.5 w-3.5" />
