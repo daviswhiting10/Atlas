@@ -7,6 +7,7 @@
  */
 
 import type { FocusMetric } from "./generator";
+import { timedFirstReason, type TimedKind } from "@/lib/plan/timed";
 
 export type LoggedSet = { weight: number | null; reps: number | null; completed: boolean };
 
@@ -26,6 +27,7 @@ export function nextTarget({
   repMax,
   increment,
   unit = "reps",
+  timed = "hold",
   deload = false,
 }: {
   /**
@@ -39,6 +41,8 @@ export function nextTarget({
   /** Load jump in lb. 0 = bodyweight / unloaded. */
   increment: number;
   unit?: "reps" | "secs";
+  /** What a timed exercise is: a hold, steady cardio or intervals. It only changes the first-time wording. */
+  timed?: TimedKind;
   /** True when today falls in a lighter (deload) week. */
   deload?: boolean;
 }): Target {
@@ -54,7 +58,7 @@ export function nextTarget({
       // Only a rep-based lift is told to pick a weight for N reps; a hold is timed.
       reason:
         unit === "secs"
-          ? `Hold as long as you can with good form. Today sets your baseline.`
+          ? timedFirstReason(timed)
           : increment > 0
             ? `Pick a weight you could lift about ${repMax + 2} times. Today sets your baseline.`
             : `Stop a rep or two short of failure. Today sets your baseline.`,
