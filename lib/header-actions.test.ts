@@ -58,4 +58,9 @@ describe("both headers use the one component", () => {
     expect(coach).not.toContain("async function signOut");
   });
   it("the menu items are at least 44 px tall", () => expect(shared.match(/min-h-11/g)?.length).toBe(2));
+  it("the demo chip is short on a phone (so the Me header isn't cramped) but still reads Demo data to a screen reader", () => {
+    const chip = read("components/DemoChip.tsx");
+    expect(chip).toContain("max-sm:sr-only");
+    expect(chip).toMatch(/Demo<span[^>]*> data<\/span>/);
+  });
 });
