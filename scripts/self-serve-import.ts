@@ -20,6 +20,8 @@ import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 const args = process.argv.slice(2);
 const RUN = args.includes("--run");
+/** Leave out the file import (the one step that costs an AI call). */
+const SKIP_IMPORT = args.includes("--skip-import");
 const arg = (n: string, d: string) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const BASE = arg("--base", "http://localhost:3900").replace(/\/$/, "");
 const DIR = join(homedir(), "Documents/atlas-screenshots/self-serve");
@@ -85,6 +87,7 @@ async function openPhone(label: string) {
       while (Date.now() - t0 < maxMs) { if (await ev<boolean>(`!!(${js})`).catch(() => false)) return Date.now() - t0; await sleep(every); }
       throw new Error(`timed out after ${maxMs} ms waiting for: ${js.slice(0, 90)}`);
     },
+    shotFull: async (name: string) => { const r = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }); writeFileSync(join(OUT, `${label}-${name}.png`), Buffer.from(r.result.data, "base64")); },
     shot: async (name: string) => { const r = await send("Page.captureScreenshot", { format: "png" }); writeFileSync(join(OUT, `${label}-${name}.png`), Buffer.from(r.result.data, "base64")); },
     signIn: (email: string, password: string) =>
       ev<boolean>(`(async()=>{const c=await fetch('/api/auth/csrf').then(r=>r.json());await fetch('/api/auth/callback/password',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrfToken:c.csrfToken,email:${JSON.stringify(email)},password:${JSON.stringify(password)},json:'true',callbackUrl:'/'})});const s=await fetch('/api/auth/session').then(r=>r.json());return !!(s&&s.user)})()`),
@@ -146,6 +149,7 @@ async function main() {
       return "No plan yet + three doors + Log another workout";
     });
 
+    if (!SKIP_IMPORT) {
     let tFirst = 0, tReadDone = 0, tStart = 0;
     await step("Import the file (a multi-week PDF by default): tap Import, choose it, read, check, Save, Start", async () => {
       p.resetTaps();
@@ -199,6 +203,8 @@ async function main() {
       });
     }
 
+    }
+
     await step("Atlas builds it lands on Today with Start", async () => {
       const a = await mk("self");
       const ph = await open("atlas");
@@ -217,7 +223,30 @@ async function main() {
       await ph.tap("button", "Build my plan");
       await ph.until(`location.pathname==='/today' && [...document.querySelectorAll('a')].some(a=>a.innerText.trim()==='Start')`, 30000);
       await ph.shot("today-after-atlas");
-      return `on ${await ph.url()} with Start`;
+      // A past session of Upper A with a note, so the Plan tab has history to show.
+      const prof = await prisma.clientProfile.findFirstOrThrow({ where: { userId: a.userId }, select: { id: true } });
+      const upper = await prisma.assignedWorkout.findFirstOrThrow({ where: { programAssignment: { clientId: prof.id, status: "ACTIVE" } }, orderBy: [{ scheduledDate: "asc" }, { order: "asc" }], select: { id: true, name: true } });
+      await prisma.workoutLog.create({ data: { clientId: prof.id, assignedWorkoutId: upper.id, source: "GENERATED", date: new Date(), completedAt: new Date(), clientNotes: "Bench felt heavy on set 3" } });
+
+      // The Plan tab: no explainer text up top, no open note box, history under the workout.
+      await ph.nav("/plan", 3000);
+      const plan = await ph.text(4000);
+      if (/every 4th week|Groove the lifts|Lighter week — recover|never count as a record/.test(plan)) throw new Error("an explainer line is still there");
+      await ph.tap("button", upper.name);
+      await sleep(500);
+      const boxes = await ph.ev<number>(`[...document.querySelectorAll('textarea')].filter(t=>t.getBoundingClientRect().height>0&&!t.placeholder.startsWith('Anything about the plan')).length`);
+      if (boxes !== 0) throw new Error(`${boxes} workout note box(es) open before Add note`);
+      if (!(await ph.text(6000)).includes("Bench felt heavy on set 3")) throw new Error("past session's note not shown");
+      await ph.shotFull("plan-tab");
+      const add = await ph.tap("button", "Add note");
+      await ph.until(`document.activeElement && document.activeElement.tagName==='TEXTAREA'`, 3000);
+      await ph.send("Input.insertText", { text: "Swap rows for chest-supported rows" });
+      await ph.ev(`document.activeElement.blur()`);
+      await ph.until(`[...document.querySelectorAll('p')].some(p=>p.innerText==='Swap rows for chest-supported rows') && !document.querySelector('textarea:focus')`, 8000);
+      const saved = await prisma.assignedWorkout.findUniqueOrThrow({ where: { id: upper.id }, select: { notes: true } });
+      if (saved.notes !== "Swap rows for chest-supported rows") throw new Error(`saved note: ${saved.notes}`);
+      await ph.shot("plan-note-saved");
+      return `on /today with Start; Plan tab: no explainer, note box closed, history shown; Add note ${add.w}x${add.h} -> saved and shown`;
     });
 
     await step("too big: a 6 MB PDF gets a clear message, in the browser and from the server", async () => {
