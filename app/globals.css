@@ -191,6 +191,13 @@
 /* Press feedback for anything tappable */
 .press { transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1), background-color 160ms, border-color 160ms, box-shadow 160ms, color 160ms, opacity 160ms; }
 .press:active { transform: scale(0.97); }
+/* The same, for touch screens that never paint :active (Safari on an iPhone): PressFeedback sets data-pressed from the first touch. */
+.press[data-pressed="true"] { transform: scale(0.97); transition: none; }
+nav a[data-pressed="true"], nav button[data-pressed="true"], header a[data-pressed="true"], header button[data-pressed="true"], [role="tab"][data-pressed="true"] {
+  transform: scale(0.95);
+  opacity: 0.6;
+  transition: none;
+}
 
 /* Entrance on a screen or tab change: 240 ms, stagger 0 to 60 ms, so everything is in by about 300 ms. */
 .rise { animation: rise 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }

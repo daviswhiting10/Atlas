@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
 import { Logo } from "./Logo";
 import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
+import { useTabSwitch } from "@/components/nav/useTabSwitch";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -33,13 +34,14 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
 
   const tabs = hasProgress ? TABS : TABS.filter((t) => t.href !== "/progress");
   const inWorkout = pathname.startsWith("/workouts/");
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = useCallback((href: string) => pathname === href || pathname.startsWith(href + "/"), [pathname]);
+  const { onClick, chosen } = useTabSwitch(pathname, isActive);
 
   return (
     <>
       <header className={cn("sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl", inWorkout && "hidden md:block")}>
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-8 md:h-16">
-          <Link href="/today" aria-label="Atlas home" className="flex min-h-11 items-center">
+          <Link href="/today" prefetch aria-label="Atlas home" className="flex min-h-11 items-center">
             <Logo />
           </Link>
 
@@ -49,10 +51,11 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
                 key={href}
                 href={href}
                 prefetch
-                aria-current={isActive(href) ? "page" : undefined}
+                onClick={(e) => onClick(e, href)}
+                aria-current={chosen(href) ? "page" : undefined}
                 className={cn(
                   "press rounded-full px-4 py-1.5 text-sm font-medium",
-                  isActive(href) ? "bg-ink text-bone" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
+                  chosen(href) ? "bg-ink text-bone" : "text-ink-soft hover:bg-ink/5 hover:text-ink"
                 )}
               >
                 {label}
@@ -75,11 +78,12 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
         >
           <div className="mx-auto flex max-w-md">
             {tabs.map(({ href, label, icon: Icon }) => {
-              const active = isActive(href);
+              const active = chosen(href);
               return (
                 <Link
                   key={href}
                   href={href}
+                  onClick={(e) => onClick(e, href)}
                   // Each tab's whole screen is fetched ahead, so the first tap to it is as instant as the second.
                   prefetch
                   aria-current={active ? "page" : undefined}
