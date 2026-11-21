@@ -608,7 +608,22 @@ export default function WorkoutLogger({
   // Load-related keys that auto-carry forward to uncompleted subsequent sets
   const CARRY_KEYS: (keyof SetEntry)[] = ["weight", "isBodyweight", "isBand", "bandColor", "reps", "isSeconds"];
 
+  // Weights carried down into sets that had none (muted until ticked or edited). Still editable; logged only when ticked.
+  const [filled, setFilled] = useState<Set<string>>(() => new Set());
   function updateSet(aweId: string, idx: number, patch: Partial<SetEntry>) {
+    if (patch.weight !== undefined) {
+      const cur = exStateRef.current[aweId]?.sets;
+      const before = cur?.[idx];
+      if (cur && before) {
+        const mark = new Set(filled);
+        mark.delete(before.uid);
+        cur.forEach((x, j) => {
+          if (j > idx && !x.completed && x.weight === before.weight && before.weight === "" && patch.weight !== "") mark.add(x.uid);
+          else if (j > idx && !x.completed && x.weight === before.weight) mark.delete(x.uid);
+        });
+        setFilled(mark);
+      }
+    }
     setExState((prev) => {
       const sets = [...prev[aweId].sets];
       sets[idx] = { ...sets[idx], ...patch };
@@ -769,7 +784,7 @@ export default function WorkoutLogger({
   // ── Check all / Uncheck all (one exercise, or the whole workout) ──────────────
   // Each set goes through what a single tick does: on screen at once, kept on the phone until the server
   // confirms it, saved in set order. The rest timer restarts once. No toast, no flash.
-  const [confirmAll, setConfirmAll] = useState<number | null>(null);
+  const [confirmAll, setConfirmAll] = useState<{ mode: BulkMode; count: number } | null>(null);
   function applyBulk(groups: Array<{ ex: LoggerExercise; idx: number[] }>, mode: BulkMode) {
     const done = mode === "check";
     const calls: Array<{ aweId: string; exerciseId: string; entry: SetEntry; idx: number }> = [];
@@ -819,7 +834,11 @@ export default function WorkoutLogger({
         <MoreHorizontal className="h-5 w-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
-        <DropdownMenuItem className="min-h-11" onClick={() => (wb.mode === "check" ? setConfirmAll(wb.count) : bulkAll("uncheck"))}>
+        <DropdownMenuItem className="min-h-11" onClick={() => {
+                    // Asking to uncheck during the finishing countdown stops it: the sheet must not race the auto-finish.
+                    cancelFinish();
+                    setConfirmAll({ mode: wb.mode, count: wb.count });
+                  }}>
           {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -1567,6 +1586,7 @@ export default function WorkoutLogger({
                       prescribed={ex.prescribedSets}
                       onChange={(idx, patch) => updateSet(ex.aweId, idx, patch)}
                       unsaved={unsaved}
+                      filled={filled}
                       onComplete={(idx) => settled() && handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
                       onRemove={(idx) => deleteSet(ex.aweId, idx)}
@@ -1895,11 +1915,13 @@ export default function WorkoutLogger({
       {desktopView}
       {confirmAll != null && (
         <CheckAllSheet
-          count={confirmAll}
+          mode={confirmAll.mode}
+          count={confirmAll.count}
           onCancel={() => setConfirmAll(null)}
           onConfirm={() => {
+            const mode = confirmAll.mode;
             setConfirmAll(null);
-            bulkAll("check");
+            bulkAll(mode);
           }}
         />
       )}
@@ -2058,6 +2080,7 @@ function NumField({
   label,
   decimal,
   placeholder,
+  muted = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -2065,6 +2088,8 @@ function NumField({
   label: string;
   decimal: boolean;
   placeholder?: string;
+  /** A weight carried down from an earlier set: shown muted until it is ticked or edited. */
+  muted?: boolean;
 }) {
   return (
     <input
@@ -2078,7 +2103,7 @@ function NumField({
       onBlur={onBlur}
       aria-label={label}
       placeholder={placeholder}
-      className="logger-cell h-10 w-full min-w-0 rounded-lg border border-line-strong bg-dusk-raised px-1 text-center text-[16px] font-semibold tabular-nums text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/70"
+      className={cn("logger-cell h-10 w-full min-w-0 rounded-lg border border-line-strong bg-dusk-raised px-1 text-center text-[16px] tabular-nums outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/70", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
     />
   );
 }
@@ -2091,6 +2116,7 @@ function SetTable({
   last,
   prescribed,
   unsaved,
+  filled,
   onChange,
   onComplete,
   onBlurPersist,
@@ -2098,6 +2124,8 @@ function SetTable({
 }: {
   secs: boolean;
   unsaved: Record<string, true>;
+  /** Sets whose weight was carried down from an earlier set (by uid). */
+  filled: Set<string>;
   sets: SetEntry[];
   last: LoggerExercise["lastSets"];
   prescribed: PrescribedSet[];
@@ -2177,6 +2205,7 @@ function SetTable({
                       onBlur={persist}
                       label={`Set ${idx + 1} weight in pounds`}
                       decimal
+                      muted={!entry.completed && filled.has(entry.uid)}
                       placeholder={prescribed[idx]?.weight != null ? String(prescribed[idx].weight) : "lb"}
                     />
                   )}

@@ -487,7 +487,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       .filter((g) => g.idx.length > 0);
     if (groups.length) applyBulk(groups, mode);
   }
-  const [confirmAll, setConfirmAll] = useState<number | null>(null);
+  const [confirmAll, setConfirmAll] = useState<{ mode: BulkMode; count: number } | null>(null);
 
   function toggle(ex: LoggerExercise, i: number) {
     if (!settled()) return;
@@ -840,7 +840,11 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 <MoreHorizontal className="h-5 w-5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[180px]">
-                <DropdownMenuItem className="min-h-11" onClick={() => (wb.mode === "check" ? setConfirmAll(wb.count) : bulkAll("uncheck"))}>
+                <DropdownMenuItem className="min-h-11" onClick={() => {
+                    // Asking to uncheck during the finishing countdown stops it: the sheet must not race the auto-finish.
+                    cancelFinish();
+                    setConfirmAll({ mode: wb.mode, count: wb.count });
+                  }}>
                   {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1123,11 +1127,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
       {confirmAll != null && (
         <CheckAllSheet
-          count={confirmAll}
+          mode={confirmAll.mode}
+          count={confirmAll.count}
           onCancel={() => setConfirmAll(null)}
           onConfirm={() => {
+            const mode = confirmAll.mode;
             setConfirmAll(null);
-            bulkAll("check");
+            bulkAll(mode);
           }}
         />
       )}

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { bulkIndices, checkAllText, exerciseBulk, queueBulk, workoutBulk } from "./check-all";
+import { bulkConfirmText, bulkIndices, checkAllText, exerciseBulk, queueBulk, workoutBulk } from "./check-all";
 import { pendingKey, readPending } from "./pending";
 
 const mem = () => {
@@ -32,6 +32,9 @@ describe("workout Check all", () => {
     expect(workoutBulk([[false, false, false], [true, false], [false]])).toEqual({ mode: "check", count: 5 });
     expect(checkAllText(14)).toBe("Check all 14 sets?");
     expect(checkAllText(1)).toBe("Check all 1 set?");
+    expect(bulkConfirmText("uncheck", 14)).toBe("Uncheck all 14 sets?");
+    expect(bulkConfirmText("uncheck", 1)).toBe("Uncheck all 1 set?");
+    expect(bulkConfirmText("check", 3)).toBe("Check all 3 sets?");
   });
   it("mixed: only the unticked are counted", () => {
     expect(workoutBulk([[true, true], [true, false]])).toEqual({ mode: "check", count: 1 });
@@ -82,9 +85,17 @@ describe("both loggers", () => {
     expect(athlete.match(/CheckAllButton/g)!.length).toBeGreaterThanOrEqual(2);
     expect(coach.match(/<CheckAllButton/g)!.length).toBe(2);
   });
-  it("the whole-workout option is in the ⋯ menu behind a confirm, not in the header", () => {
-    expect(athlete).toContain("setConfirmAll(wb.count)");
-    expect(coach).toContain("setConfirmAll(wb.count)");
-    expect(athlete).toMatch(/DropdownMenuItem[^>]*onClick=\{\(\) => \(wb\.mode/);
+  it("the whole-workout option is in the ⋯ menu, and both directions ask first with the count", () => {
+    for (const src of [athlete, coach]) {
+      expect(src).toContain("setConfirmAll({ mode: wb.mode, count: wb.count })");
+      expect(src).not.toContain('bulkAll("uncheck"))');
+      expect(src).toContain("bulkAll(mode)");
+    }
+  });
+  it("asking to uncheck stops the finishing countdown so the sheet can't race it", () => {
+    for (const src of [athlete, coach]) expect(src).toMatch(/cancelFinish\(\);\s*setConfirmAll\(/);
+  });
+  it("the coach logger shows a carried-down weight muted too", () => {
+    expect(coach).toContain("muted={!entry.completed && filled.has(entry.uid)}");
   });
 });

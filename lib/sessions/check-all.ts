@@ -35,6 +35,9 @@ export function workoutBulk(lists: boolean[][]): { mode: BulkMode; count: number
 }
 
 export const checkAllText = (n: number) => `Check all ${n} ${n === 1 ? "set" : "sets"}?`;
+export const uncheckAllText = (n: number) => `Uncheck all ${n} ${n === 1 ? "set" : "sets"}?`;
+/** The confirm sheet's title for either direction. */
+export const bulkConfirmText = (mode: BulkMode, n: number) => (mode === "check" ? checkAllText(n) : uncheckAllText(n));
 
 /** Keep each set's tick on the phone until the server confirms it, in set order (what a single tick does). */
 export function queueBulk(
