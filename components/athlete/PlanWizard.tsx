@@ -9,6 +9,7 @@ import { interpretGoal } from "@/lib/plan/goal";
 import type { Equipment } from "@/lib/plan/catalog";
 import { rebuildPlan } from "@/lib/actions/athlete";
 import { createAccount } from "@/lib/actions/account";
+import { Problem } from "@/components/auth/problem";
 import { BuildingOverlay, useGuestSignIn } from "./guest";
 import { CredentialFields, GoogleButton, PENDING_PLAN_KEY, inputClass, signInWithPassword } from "./account";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,7 @@ export function PlanWizard({
   const [password, setPassword] = useState("");
   const [creating, setCreating] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountWeak, setAccountWeak] = useState(false);
 
   const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setPrefs((p) => ({ ...p, [key]: value }));
   const reading = useMemo(() => interpretGoal(prefs.goalText), [prefs.goalText]);
@@ -270,12 +272,8 @@ export function PlanWizard({
                   <span className="sr-only">First name</span>
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" required maxLength={40} autoComplete="given-name" className={inputClass} />
                 </label>
-                <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} newPassword />
-                {accountError && (
-                  <p role="alert" className="text-sm leading-relaxed text-destructive">
-                    {accountError}
-                  </p>
-                )}
+                <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={(v) => { setPassword(v); setAccountWeak(false); }} newPassword />
+                <Problem text={accountError} weak={accountWeak} onUseAnyway={() => void signUp(true)} busy={creating} />
                 <GoogleButton
                   callbackUrl="/today"
                   label="Or continue with Google"
@@ -296,12 +294,14 @@ export function PlanWizard({
   const last = step === steps.length - 1;
   const busy = saving || creating || pending != null;
 
-  async function signUp() {
+  async function signUp(allowWeak = false) {
     setAccountError(null);
+    setAccountWeak(false);
     setCreating(true);
-    const res = await createAccount({ name, email, password, prefs });
+    const res = await createAccount({ name, email, password, prefs, allowWeak });
     if (!res.ok) {
       setAccountError(res.error);
+      setAccountWeak(res.weak === true);
       setCreating(false);
       return;
     }

@@ -21,7 +21,7 @@ const MESSAGES: Record<string, string> = {
 };
 
 export function errorCopy(code: string | null | undefined): ErrorCopy {
-  if (code === "Verification") return { title: "This link has expired.", message: "Ask your trainer for a new one.", action: "sign-in" };
+  if (code === "Verification") return { title: "This link has expired.", message: "Ask your coach for a new one.", action: "sign-in" };
   if (code === "NoAccess") return { title: "No access", message: MESSAGES.NoAccess, action: "sign-out" };
   return { title: "Sign-in failed", message: (code && MESSAGES[code]) || MESSAGES.Default, action: "sign-in" };
 }

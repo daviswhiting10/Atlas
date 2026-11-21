@@ -93,7 +93,7 @@ async function main() {
   const tty = { input: new ReadStream(fd), output: new WriteStream(fd) };
 
   const { prisma } = await import("@/lib/db/client");
-  const { hashPassword, passwordProblem } = await import("@/lib/password");
+  const { hashPassword, passwordBlock, passwordWarning } = await import("@/lib/password");
   const { GUEST_EMAIL_DOMAIN } = await import("@/lib/guest");
   const { clear, throttleKey } = await import("@/lib/auth/throttle");
 
@@ -108,8 +108,10 @@ async function main() {
     if (isProd ? ok !== "production" : !/^y(es)?$/i.test(ok)) fail("Nothing changed.");
 
     const password = await ask(tty, "New password (hidden): ", true);
-    const problem = passwordProblem(password, email);
+    const problem = passwordBlock(password);
     if (problem) fail(`${problem} Nothing changed.`);
+    const warning = passwordWarning(password, email); // a warning only: it is their account
+    if (warning) tty.output.write(`${warning} Setting it anyway.\n`);
     if ((await ask(tty, "Again (hidden): ", true)) !== password) fail("The two didn't match. Nothing changed.");
 
     const passwordHash = await hashPassword(password);

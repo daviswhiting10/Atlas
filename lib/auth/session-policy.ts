@@ -20,11 +20,10 @@ export const SNOOZE_MS = 7 * DAY;
 export const PASSWORD_REQUIRED_FROM = new Date("2026-11-14T00:00:00Z");
 
 /**
- * The set-password step is OFF by default for the first deploy of the invite work; a second, small
- * release turns it on (CLAUDE.md, Sign-in). AUTH_PASSWORD_STEP ("on" / "off") overrides the default
- * either way, as a kill switch.
+ * The set-password step is ON (the second release of the invite work, after the first shipped it off and was
+ * checked). AUTH_PASSWORD_STEP ("on" / "off") overrides the default either way, as a kill switch.
  */
-const STEP_DEFAULT = false;
+const STEP_DEFAULT = true;
 export function passwordStepEnabled(env: Record<string, string | undefined> = process.env): boolean {
   const v = env.AUTH_PASSWORD_STEP?.toLowerCase();
   return v === "on" ? true : v === "off" ? false : STEP_DEFAULT;

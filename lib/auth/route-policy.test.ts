@@ -8,7 +8,7 @@ const next = { kind: "next" };
 
 describe("decide: signed out", () => {
   it("lets the public pages through, including the two password pages", () => {
-    for (const p of ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password"]) expect(decide(p, null)).toEqual(next);
+    for (const p of ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password", "/invite", "/api/invite/continue"]) expect(decide(p, null)).toEqual(next);
   });
   it("sends everything else to sign in, and answers APIs with 401", () => {
     expect(decide("/today", null)).toEqual(go("/login"));
@@ -22,7 +22,7 @@ describe("decide: signed out", () => {
 
 describe("decide: signed in", () => {
   it("lets either role read the shared pages", () => {
-    for (const u of [coach, athlete]) for (const p of ["/forgot-password", "/reset-password", "/error", "/agents"]) expect(decide(p, u)).toEqual(next);
+    for (const u of [coach, athlete]) for (const p of ["/forgot-password", "/reset-password", "/error", "/agents", "/invite", "/api/invite/continue"]) expect(decide(p, u)).toEqual(next);
   });
   it("sends the marketing and sign-in pages home", () => {
     expect(decide("/login", coach)).toEqual(go("/log"));

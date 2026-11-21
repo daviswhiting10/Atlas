@@ -5,20 +5,11 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { requestPasswordReset, resetPassword, setAccountPassword, snoozePasswordStep } from "@/lib/actions/account";
 import { inputClass, signInWithPassword } from "@/components/athlete/account";
-import { PASSWORD_MIN } from "@/lib/password-rules";
+import { Problem } from "@/components/auth/problem";
 
 const primary =
   "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60";
 const quiet = "inline-flex min-h-11 items-center text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline";
-
-function Problem({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="text-sm leading-relaxed text-destructive">
-      {text}
-    </p>
-  );
-}
 
 function NewPasswordInput({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
   return (
@@ -28,9 +19,8 @@ function NewPasswordInput({ value, onChange, autoFocus }: { value: string; onCha
         type="password"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={`New password (${PASSWORD_MIN}+ characters)`}
+        placeholder="New password"
         required
-        minLength={PASSWORD_MIN}
         maxLength={200}
         autoComplete="new-password"
         autoFocus={autoFocus}
@@ -98,20 +88,27 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState(!token);
+  const [weak, setWeak] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function run(allowWeak: boolean) {
     setBusy(true);
     setError(null);
-    const res = await resetPassword({ token, password });
+    setWeak(false);
+    const res = await resetPassword({ token, password, allowWeak });
     if (!res.ok) {
       setBusy(false);
       setError(res.error);
+      setWeak(res.weak === true);
       if (res.expired) setExpired(true);
       return;
     }
     if (await signInWithPassword(res.email, password)) window.location.assign("/");
     else window.location.assign("/login");
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    void run(false);
   }
 
   if (expired) {
@@ -131,8 +128,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <h1 className="font-display text-4xl text-ink">Choose a new password</h1>
       <p className="mt-2 text-[15px] text-ink-soft">You&apos;ll be signed out everywhere else.</p>
       <form onSubmit={submit} className="mt-7 space-y-3">
-        <NewPasswordInput value={password} onChange={setPassword} autoFocus />
-        <Problem text={error} />
+        <NewPasswordInput value={password} onChange={(v) => { setPassword(v); setWeak(false); }} autoFocus />
+        <Problem text={error} weak={weak} onUseAnyway={() => void run(true)} busy={busy} />
         <button type="submit" disabled={busy} className={primary}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save and sign in"}
         </button>
@@ -146,18 +143,25 @@ export function SetPasswordStep({ email, canSnooze }: { email: string; canSnooze
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"save" | "snooze" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [weak, setWeak] = useState(false);
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function run(allowWeak: boolean) {
     setBusy("save");
     setError(null);
-    const res = await setAccountPassword({ password });
+    setWeak(false);
+    const res = await setAccountPassword({ password, allowWeak });
     if (!res.ok) {
       setBusy(null);
       setError(res.error);
+      setWeak(res.weak === true);
       return;
     }
     window.location.assign("/");
+  }
+
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    void run(false);
   }
 
   async function snooze() {
@@ -183,8 +187,8 @@ export function SetPasswordStep({ email, canSnooze }: { email: string; canSnooze
       <form onSubmit={save} className="mt-7 space-y-3">
         {/* Lets password managers file the new password under the right account. */}
         <input type="email" value={email} readOnly autoComplete="username" className="sr-only" tabIndex={-1} aria-hidden />
-        <NewPasswordInput value={password} onChange={setPassword} autoFocus />
-        <Problem text={error} />
+        <NewPasswordInput value={password} onChange={(v) => { setPassword(v); setWeak(false); }} autoFocus />
+        <Problem text={error} weak={weak} onUseAnyway={() => void run(true)} busy={busy !== null} />
         <button type="submit" disabled={busy !== null} className={primary}>
           {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save password"}
         </button>

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { errorCopy } from "./error-copy";
 
 describe("errorCopy", () => {
-  it("a used or expired link says so and sends the client back to their trainer", () => {
-    expect(errorCopy("Verification")).toEqual({ title: "This link has expired.", message: "Ask your trainer for a new one.", action: "sign-in" });
+  it("a used or expired link says so and sends the client back to their coach", () => {
+    expect(errorCopy("Verification")).toEqual({ title: "This link has expired.", message: "Ask your coach for a new one.", action: "sign-in" });
   });
   it("no access offers to sign out", () => {
     expect(errorCopy("NoAccess").action).toBe("sign-out");

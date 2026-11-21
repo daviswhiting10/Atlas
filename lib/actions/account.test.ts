@@ -114,13 +114,16 @@ describe("resetPassword", () => {
     expect(u.passwordPromptAfter).toBeNull();
   }, 10_000);
 
-  it("checks the rules before using up the link, so a refused password doesn't cost it", async () => {
+  it("warns about a weak password without using up the link; the person can use it anyway", async () => {
     addUser({ id: "u1", email: "sam@example.com", passwordHash: oldHash });
     const token = await linkFor("sam@example.com");
-    expect(await resetPassword({ token, password: "password123" })).toMatchObject({ ok: false, error: expect.stringMatching(/too common/) });
-    expect(await resetPassword({ token, password: "short" })).toMatchObject({ ok: false, error: expect.stringMatching(/at least/) });
+    expect(await resetPassword({ token, password: "password123" })).toMatchObject({ ok: false, weak: true, error: expect.stringMatching(/common/) });
+    expect(await resetPassword({ token, password: "short" })).toMatchObject({ ok: false, weak: true, error: expect.stringMatching(/short/) });
+    expect(await resetPassword({ token, password: "" })).toMatchObject({ ok: false, error: expect.stringMatching(/Choose a password/) });
     expect(db.users.get("u1")!.passwordHash).toBe(oldHash);
-    expect(await resetPassword({ token, password: GOOD })).toMatchObject({ ok: true });
+    // "Use it anyway": the very same weak password is accepted, and the link is used up only now.
+    expect(await resetPassword({ token, password: "short", allowWeak: true })).toMatchObject({ ok: true });
+    expect(db.users.get("u1")!.passwordHash).not.toBe(oldHash);
   }, 10_000);
 
   it("refuses the same link a second time", async () => {
@@ -180,11 +183,20 @@ describe("setAccountPassword", () => {
     expect(env.updates).toEqual([{}]); // this session re-reads the account, so the step lets go
   });
 
-  it("applies the rules, including the email's name", async () => {
+  it("warns about a weak password (common, short, the email's name) and saves nothing until the person says to use it anyway", async () => {
     addUser({ id: "u1", email: "jordanlee@example.com" });
     env.session = { user: { id: "u1", role: "TRAINER" } };
-    expect(await setAccountPassword({ password: "qwertyuiop" })).toMatchObject({ ok: false, error: expect.stringMatching(/too common/) });
-    expect(await setAccountPassword({ password: "jordanlee-squats" })).toMatchObject({ ok: false, error: expect.stringMatching(/email/) });
+    expect(await setAccountPassword({ password: "qwertyuiop" })).toMatchObject({ ok: false, weak: true, error: expect.stringMatching(/common/) });
+    expect(await setAccountPassword({ password: "jordanlee-squats" })).toMatchObject({ ok: false, weak: true, error: expect.stringMatching(/email/) });
+    expect(await setAccountPassword({ password: "abc" })).toMatchObject({ ok: false, weak: true, error: expect.stringMatching(/short/) });
+    expect(db.users.get("u1")!.passwordHash).toBeNull();
+    expect(await setAccountPassword({ password: "abc", allowWeak: true })).toEqual({ ok: true });
+    expect(db.users.get("u1")!.passwordHash).not.toBeNull();
+  }, 10_000);
+  it("refuses only an empty password, whatever allowWeak says", async () => {
+    addUser({ id: "u1", email: "jordanlee@example.com" });
+    env.session = { user: { id: "u1", role: "TRAINER" } };
+    expect(await setAccountPassword({ password: "", allowWeak: true })).toMatchObject({ ok: false, error: expect.stringMatching(/Choose a password/) });
     expect(db.users.get("u1")!.passwordHash).toBeNull();
   });
 
