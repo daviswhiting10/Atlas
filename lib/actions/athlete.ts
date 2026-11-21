@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { athleteIdentity } from "@/lib/athlete/identity";
 import { prisma } from "@/lib/db/client";
 import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
-import { createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
+import { createHandBuiltPlan, createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS } from "@/lib/athlete/data";
@@ -205,6 +205,22 @@ export async function rebuildPlan(rawPrefs: unknown): Promise<void> {
   );
   refresh();
   revalidatePath("/you");
+}
+
+/** "Build it myself": an empty plan to fill in the plan editor. Only someone who makes their own plan, and only with no live plan. */
+export async function startOwnPlan(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId, workspaceId } = await requireAthlete();
+  if (!(await makesOwnPlan(clientId))) return { ok: false, error: "Your plan is managed by your coach." };
+  const live = await prisma.programAssignment.count({ where: { clientId, status: "ACTIVE" } });
+  if (live > 0) return { ok: false, error: "You already have a plan." };
+  try {
+    await createHandBuiltPlan({ workspaceId, clientId, startDate: new Date() });
+  } catch (err) {
+    console.error("[own plan]", err);
+    return { ok: false, error: "Couldn't start a plan. Please try again." };
+  }
+  refresh();
+  return { ok: true };
 }
 
 // ── Editing the plan ─────────────────────────────────────────────────────────

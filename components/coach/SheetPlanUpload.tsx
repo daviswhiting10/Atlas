@@ -14,7 +14,7 @@ import { draftFromTemplate } from "@/lib/actions/coach-plan";
 /** What the file picker offers. */
 const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv," + PHOTO_TYPES.join(",");
 /** Photos go up in one request: Vercel takes 4.5 MB. */
-const MAX_PHOTO_BYTES = 4_000_000;
+export const MAX_PHOTO_BYTES = 4_000_000;
 /** A plan is a few hundred KB at most. */
 const MAX_FILE_BYTES = 5_000_000;
 
@@ -29,7 +29,7 @@ const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString
  * Turn a dropped or chosen file into CSV text, or say what to do instead.
  * .xlsx is read here in the browser (lib/programs/xlsx), so the server only sees CSV.
  */
-async function readFile(f: File): Promise<Picked> {
+export async function readFile(f: File): Promise<Picked> {
   const ext = f.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
   if (ext === "numbers") throw new Error("That's a Numbers file. In Numbers, File → Export To → Excel, then drop the .xlsx here.");
   if (ext === "xls") throw new Error("That's an old .xls file. Open it in Excel and save it as .xlsx.");
