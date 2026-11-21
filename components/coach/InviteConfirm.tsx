@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import { useEscape } from "@/hooks/use-escape";
 import { emailTypo } from "@/lib/email-typos";
@@ -50,7 +51,9 @@ export function InviteConfirm({
   const primary = "press flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60";
   const quiet = "press inline-flex min-h-11 items-center text-sm font-medium text-ink-soft underline-offset-4 hover:text-ink hover:underline";
 
-  return (
+  // Drawn on <body>: inside the page's animated container it would sit under the live-session bar.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div
         role="dialog"
@@ -124,6 +127,7 @@ export function InviteConfirm({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

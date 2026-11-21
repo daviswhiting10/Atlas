@@ -19,8 +19,8 @@ function ErrorContent() {
         <button
           type="button"
           onClick={async () => {
-            const { signOut } = await import("next-auth/react");
-            await signOut({ callbackUrl: `${window.location.origin}/login` });
+            const { signOutAndForget } = await import("@/lib/sign-out");
+            await signOutAndForget(`${window.location.origin}/login`);
           }}
           className={button}
         >

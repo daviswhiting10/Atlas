@@ -4,7 +4,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
-import { LIVE_EVENT, clearLive, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
+import { LIVE_EVENT, clearLive, mergeDraft, readLiveFor, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
 import { useRouter } from "next/navigation";
@@ -291,6 +291,7 @@ function localToday(): string {
 }
 
 export default function WorkoutLogger({
+  ownerId,
   clientId,
   clientName,
   assignedWorkoutId,
@@ -319,6 +320,8 @@ export default function WorkoutLogger({
   completed: boolean;
   /** Blob storage is connected: coaches can upload their own exercise photos and clips. */
   uploadsEnabled: boolean;
+  /** The signed-in coach: the "currently logging" bar is theirs alone. */
+  ownerId: string;
   workspaceId: string;
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
@@ -418,15 +421,16 @@ export default function WorkoutLogger({
     } catch {
       return;
     }
-    const prev = readLive(store);
-    const live = startLive(prev, {
+    // Only this coach's own earlier session counts (another account's on this browser is ignored).
+    const prev = readLiveFor(store, ownerId);
+    const live: LiveSession = { ...startLive(prev, {
       assignedWorkoutId,
       clientId,
       clientName,
       workoutName,
       href: `/clients/${clientId}/log?workoutId=${assignedWorkoutId}`,
       workoutLogId: existingWorkoutLogId,
-    });
+    }), owner: ownerId };
     liveRef.current = live;
     writeLive(store, live);
     window.dispatchEvent(new Event(LIVE_EVENT));

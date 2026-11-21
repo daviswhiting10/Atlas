@@ -25,6 +25,8 @@ export const liveIsFresh = (s: Pick<LiveSession, "updatedAt">, now = Date.now())
 export const LIVE_EVENT = "atlas:live-session";
 
 export type LiveSession = {
+  /** The signed-in coach whose session this is. Another account on the same browser never sees it. */
+  owner?: string;
   assignedWorkoutId: string;
   clientId: string;
   clientName: string;
@@ -62,6 +64,33 @@ export function readLive(storage: Storage | null | undefined, now = Date.now()):
     return s;
   } catch {
     return null;
+  }
+}
+
+/**
+ * The live session, only if it belongs to this coach. One left by another account on this browser (or from before
+ * sessions carried an owner) is cleared, so it never shows up for someone else.
+ */
+export function readLiveFor(storage: Storage | null | undefined, owner: string, now = Date.now()): LiveSession | null {
+  const s = readLive(storage, now);
+  if (!s) return null;
+  if (s.owner !== owner) {
+    try {
+      storage?.removeItem(LIVE_KEY);
+    } catch {
+      // Private mode: nothing to clear.
+    }
+    return null;
+  }
+  return s;
+}
+
+/** On sign-out: the place in the logger is this coach's, so it goes with them. */
+export function forgetLive(storage: Storage | null | undefined): void {
+  try {
+    storage?.removeItem(LIVE_KEY);
+  } catch {
+    // Private mode: nothing to clear.
   }
 }
 

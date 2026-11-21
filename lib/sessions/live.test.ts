@@ -95,3 +95,33 @@ describe("idle limit", () => {
     expect(liveIsFresh({ updatedAt: 4 * 3600_000 + 50 * 60_000 }, 5 * 3600_000)).toBe(true);
   });
 });
+
+describe("a live session belongs to the coach who started it", () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), m };
+  };
+  const session = (owner?: string): LiveSession => ({ owner, assignedWorkoutId: "w1", clientId: "c1", clientName: "Chris", workoutName: "Upper A", href: "/clients/c1/log?workoutId=w1", startedAt: Date.now(), updatedAt: Date.now(), workoutLogId: null, scrollY: 0, draft: null });
+
+  it("shows only for its owner; another account on the same browser never sees it, and it's cleared", async () => {
+    const { readLiveFor } = await import("./live");
+    const s = mem();
+    writeLive(s, session("coach-a"));
+    expect(readLiveFor(s, "coach-a")?.clientName).toBe("Chris");
+    expect(readLiveFor(s, "coach-b")).toBeNull();
+    expect(s.m.has(LIVE_KEY)).toBe(false);
+  });
+  it("one saved before sessions had an owner is treated as someone else's", async () => {
+    const { readLiveFor } = await import("./live");
+    const s = mem();
+    writeLive(s, session(undefined));
+    expect(readLiveFor(s, "coach-a")).toBeNull();
+  });
+  it("sign-out forgets it", async () => {
+    const { forgetLive, readLiveFor } = await import("./live");
+    const s = mem();
+    writeLive(s, session("coach-a"));
+    forgetLive(s);
+    expect(readLiveFor(s, "coach-a")).toBeNull();
+  });
+});

@@ -9,8 +9,8 @@ export function SignOutButton({ isGuest }: { isGuest: boolean }) {
 
   async function leave() {
     setLeaving(true);
-    const { signOut } = await import("next-auth/react");
-    await signOut({ callbackUrl: `${window.location.origin}/` });
+    const { signOutAndForget } = await import("@/lib/sign-out");
+    await signOutAndForget(`${window.location.origin}/`);
   }
 
   if (isGuest && confirming) {
