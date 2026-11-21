@@ -15,7 +15,7 @@ import { answer, planForm } from "@/components/plan/plan-file";
 type Picked = { name: string; form: FormData };
 
 /** What the read step returned: shown to the coach, then sent back to save. */
-type Read = { grid: unknown; context: unknown; summary: ImportSummary; weekOneStart: string | null };
+type Read = { grid: unknown; context: unknown; summary: ImportSummary; weekOneStart: string | null; targets: boolean };
 
 const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -73,11 +73,11 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
         body = JSON.stringify({ step: "read", sheetUrl: link.trim(), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) });
       }
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, { method: "POST", headers, body });
-      const data = (await answer(res)) as { error?: string; warnings?: string[]; grid?: unknown; context?: unknown; summary?: ImportSummary };
+      const data = (await answer(res)) as { error?: string; warnings?: string[]; grid?: unknown; context?: unknown; summary?: ImportSummary; targets?: boolean };
       setBusy(false);
       if (!res.ok) return void setError(data?.error ?? "Couldn't read that plan.");
       for (const w of data.warnings ?? []) toast.warning(w, { duration: 10_000 });
-      setRead({ grid: data.grid, context: data.context, summary: data.summary!, weekOneStart: weekOne || null });
+      setRead({ grid: data.grid, context: data.context, summary: data.summary!, weekOneStart: weekOne || null, targets: data.targets === true });
       setHistory(true);
     } catch {
       setError("Couldn't reach the server. Please try again.");
@@ -94,7 +94,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "save", grid: read_.grid, context: read_.context, history: withHistory, ...(read_.weekOneStart ? { weekOneStart: read_.weekOneStart } : {}) }),
+        body: JSON.stringify({ step: "save", grid: read_.grid, context: read_.context, history: withHistory, targets: read_.targets, ...(read_.weekOneStart ? { weekOneStart: read_.weekOneStart } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

@@ -32,6 +32,8 @@ const Body = z.object({
   context: Context.optional(),
   /** save: import the weeks the sheet shows as done as finished sessions (source IMPORT). */
   history: z.boolean().default(false),
+  /** save: loads in the plan are each week's target weights (a PDF or screenshots of a plan), not sessions done. */
+  targets: z.boolean().default(false),
   /** When week 1 began. Left out, it's worked out from the weeks the sheet shows as done. */
   weekOneStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   name: z.string().trim().max(120).optional(),
@@ -67,7 +69,7 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
     // The grid as read in step 1, run through the same checks as the model's reply.
     const grid = parsed.data.grid ? readGrid(JSON.stringify(parsed.data.grid)) : null;
     if (!grid) return NextResponse.json({ error: "Read the sheet again, then save." }, { status: 400 });
-    return save(client, { workspaceId, grid, name: parsed.data.name, weekOneStart, context: parsed.data.context ?? NO_CONTEXT, history: parsed.data.history });
+    return save(client, { workspaceId, grid, name: parsed.data.name, weekOneStart, context: parsed.data.context ?? NO_CONTEXT, history: parsed.data.history, targets: parsed.data.targets });
   }
 
   if (!parsed.data.sheetUrl && !parsed.data.csv) {
@@ -120,7 +122,7 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
 
 async function save(
   client: { id: string; fullName: string; primaryGoal: string | null },
-  input: { workspaceId: string; grid: NonNullable<ReturnType<typeof readGrid>>; name?: string; weekOneStart: Date | null; context: PlanContext; history: boolean }
+  input: { workspaceId: string; grid: NonNullable<ReturnType<typeof readGrid>>; name?: string; weekOneStart: Date | null; context: PlanContext; history: boolean; targets: boolean }
 ) {
   // Into the library under the client's goal, then a draft for the client (and, if asked, the weeks already done as history).
   const category = CATEGORIES.find((c) => c.goalCode === client.primaryGoal)?.tag;
@@ -135,6 +137,7 @@ async function save(
       weekOneStart: input.weekOneStart,
       context: input.context,
       history: input.history,
+      loadsAsTargets: input.targets,
     });
     return NextResponse.json({
       ...saved,
@@ -159,9 +162,13 @@ async function readFiles(req: Request, id: string, who: { workspaceId: string; u
     const file = planFileFromForm(form);
     if (!perWorkspace(who.workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
     const { grid, warnings } = await readPlanFile(file, { ...who, feature: file.csv ? "program-sheet-import" : "program-import", notes });
-    const context = notes ? contextFromText(notes) : NO_CONTEXT;
+    // A spreadsheet keeps the sheet rule (a filled-in load is a week done). A PDF or screenshots show a plan: its loads
+    // are each week's targets and it starts at week 1, as photo imports always did, unless the coach's note says otherwise.
+    const pages = !file.csv;
+    const noted = notes ? contextFromText(notes) : NO_CONTEXT;
+    const context = pages && noted.startAtWeek == null ? { ...noted, startAtWeek: 1 } : noted;
     const summary = summarizeSheetImport({ grid, context, weekOneStart, today: new Date() });
-    return NextResponse.json({ grid, context, summary, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
+    return NextResponse.json({ grid, context, summary, targets: pages, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
   } catch (err) {
     if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;

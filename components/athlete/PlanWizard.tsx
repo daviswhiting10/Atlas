@@ -408,7 +408,8 @@ export function PlanWizard({
           )}
         </div>
 
-        <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />
+        {/* While a plan read from a file is showing, that is the plan: no generated one beside it. */}
+        {!imported && <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />}
       </div>
       <BuildingOverlay mode={creating ? "plan" : pending} />
     </>

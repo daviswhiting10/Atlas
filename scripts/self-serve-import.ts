@@ -22,6 +22,8 @@ const args = process.argv.slice(2);
 const RUN = args.includes("--run");
 /** Leave out the file import (the one step that costs an AI call). */
 const SKIP_IMPORT = args.includes("--skip-import");
+/** Only the importers beyond Today (You, a client's Plan tab, the library): three AI reads instead of four. */
+const ONLY_OTHERS = args.includes("--only-other-importers");
 const arg = (n: string, d: string) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const BASE = arg("--base", "http://localhost:3900").replace(/\/$/, "");
 const DIR = join(homedir(), "Documents/atlas-screenshots/self-serve");
@@ -149,7 +151,7 @@ async function main() {
       return "No plan yet + three doors + Log another workout";
     });
 
-    if (!SKIP_IMPORT) {
+    if (!SKIP_IMPORT && !ONLY_OTHERS) {
     let tFirst = 0, tReadDone = 0, tStart = 0;
     await step("Import the file (a multi-week PDF by default): tap Import, choose it, read, check, Save, Start", async () => {
       p.resetTaps();
@@ -271,6 +273,103 @@ async function main() {
       if (server.status !== 413) throw new Error(`server ${server.status}`);
       return `browser: "${shown}" · server ${server.status}: "${server.error}"`;
     });
+
+    /** The bench press's prescription week by week, as saved. */
+    const benchWeeks = (rows: Array<{ prescribedSets: unknown }>) =>
+      rows.map((r) => {
+        const sets = r.prescribedSets as Array<{ repMin: number; repMax: number; weight: number | null }>;
+        return `${sets.length}x${sets[0].repMin}-${sets[0].repMax}@${sets[0].weight}`;
+      });
+    const benchWhere = { exercise: { name: { contains: "Bench", mode: "insensitive" as const } } };
+
+    if (!SKIP_IMPORT && BENCH_WEEKS) {
+      await step("You tab: Change goals offers 'bring your own plan'; the PDF shows in the preview; Continue saves it and lands on Today", async () => {
+        const y = await mk("self");
+        const ph = await open("you");
+        await ph.nav("/login", 1500);
+        if (!(await ph.signIn(y.email, pw))) throw new Error("sign-in failed");
+        // A plan to change first (Atlas builds it), so the You tab shows Change goals.
+        await ph.nav("/today", 3000);
+        await ph.tap("button", "Atlas builds it");
+        await sleep(500);
+        for (let i = 0; i < 8 && !(await ph.rect("button", "Build my plan")); i++) { await ph.tap("button", "Continue"); await sleep(350); }
+        await ph.tap("button", "Build my plan");
+        await ph.until(`location.pathname==='/today' && [...document.querySelectorAll('a')].some(a=>a.innerText.trim()==='Start')`, 30000);
+        await ph.nav("/you?goals=1", 3000);
+        ph.resetTaps();
+        const t0 = Date.now();
+        if (!/bring your own plan/i.test(await ph.text(3000))) throw new Error("no 'bring your own plan' on the wizard");
+        ph.chooseFile(PDF);
+        await ph.tap("button", "Drop your plan here");
+        await ph.until(`document.querySelector('[aria-label="Check your plan"]') || document.querySelector('[role=alert]')`, 150000, 250);
+        const alert = await ph.ev<string | null>(`(document.querySelector('[role=alert]')||{}).innerText||null`);
+        if (alert) throw new Error(`read failed: ${alert}`);
+        const tRead = Date.now();
+        if (/YOUR PLAN, LIVE|Your plan, live/.test(await ph.text(6000))) throw new Error("the generated plan's preview shows beside the imported one");
+        await ph.shot("you-preview");
+        await ph.tap("button", "Continue");
+        await ph.until(`location.pathname==='/today' && [...document.querySelectorAll('a')].some(a=>a.innerText.trim()==='Start')`, 30000, 50);
+        const tStart = Date.now();
+        await ph.shot("you-today");
+        const prof = await prisma.clientProfile.findFirstOrThrow({ where: { userId: y.userId }, select: { id: true } });
+        const live = await prisma.programAssignment.findFirstOrThrow({ where: { clientId: prof.id, status: "ACTIVE" }, select: { id: true, name: true } });
+        const got = benchWeeks(await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkout: { programAssignmentId: live.id }, ...benchWhere }, orderBy: { assignedWorkout: { scheduledDate: "asc" } }, select: { prescribedSets: true } }));
+        if (JSON.stringify(got) !== JSON.stringify(BENCH_WEEKS)) throw new Error(`bench by week: ${got.join(", ")}`);
+        return `taps ${ph.taps()}; read ${((tRead - t0) / 1000).toFixed(1)} s, Continue to Start ${((tStart - tRead) / 1000).toFixed(1)} s; live plan "${live.name}"; bench ${got.join(" · ")}`;
+      });
+
+      // A coach (with a client) for the coach-side importers.
+      const coachWs = (await prisma.workspace.create({ data: { name: "self-serve test coach" }, select: { id: true } })).id;
+      workspaces.push(coachWs);
+      const coachEmail = `ss-coach-${tag}@example.test`;
+      const coachUser = await prisma.user.create({ data: { email: coachEmail, name: "Coach Test", role: "TRAINER", workspaceId: coachWs, passwordHash: await hashPassword(pw), emailVerified: new Date() }, select: { id: true } });
+      await prisma.trainerProfile.create({ data: { userId: coachUser.id } });
+      const cl = await prisma.clientProfile.create({ data: { workspaceId: coachWs, fullName: "Pat Client", status: "ACTIVE" }, select: { id: true } });
+      const coach = await open("coach");
+      await coach.nav("/login", 1500);
+      if (!(await coach.signIn(coachEmail, pw))) throw new Error("coach sign-in failed");
+
+      await step("coach client Plan tab: the same drop zone reads a PDF week by week (weights as targets, from week 1)", async () => {
+        await coach.nav(`/clients/${cl.id}?tab=import`, 4000);
+        coach.chooseFile(PDF);
+        await coach.tap("button", "Drag a plan in");
+        await coach.until(`[...document.querySelectorAll('button')].some(b=>/Read .*plan/.test(b.innerText))`, 10000);
+        const t0 = Date.now();
+        await coach.tap("button", "Read Pat");
+        await coach.until(`[...document.querySelectorAll('button')].some(b=>/^Save plan/.test(b.innerText.trim())) || document.querySelector('[role=alert]')`, 150000, 250);
+        const alert = await coach.ev<string | null>(`(document.querySelector('[role=alert]')||{}).innerText||null`);
+        if (alert) throw new Error(`read failed: ${alert}`);
+        const tRead = Date.now();
+        await coach.shot("coach-client-read");
+        await coach.tap("button", "Save plan");
+        await coach.until(`location.pathname.includes('/programs/')`, 30000, 100);
+        const draft = await prisma.programAssignment.findFirstOrThrow({ where: { clientId: cl.id }, orderBy: { createdAt: "desc" }, select: { id: true, status: true } });
+        const got = benchWeeks(await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkout: { programAssignmentId: draft.id }, ...benchWhere }, orderBy: { assignedWorkout: { scheduledDate: "asc" } }, select: { prescribedSets: true } }));
+        if (JSON.stringify(got) !== JSON.stringify(BENCH_WEEKS)) throw new Error(`bench by week: ${got.join(", ")}`);
+        const imported = await prisma.workoutLog.count({ where: { clientId: cl.id } });
+        if (imported !== 0) throw new Error(`${imported} sessions imported as history from a plan PDF`);
+        return `read ${((tRead - t0) / 1000).toFixed(1)} s, save to draft ${((Date.now() - tRead) / 1000).toFixed(1)} s; draft ${draft.status}; no history; bench ${got.join(" · ")}`;
+      });
+
+      await step("Programs library: the same drop zone reads a PDF, shows it, saves a 4-week program", async () => {
+        await coach.nav("/programs/import", 3000);
+        coach.chooseFile(PDF);
+        const t0 = Date.now();
+        await coach.tap("button", "Drag a plan in");
+        await coach.until(`document.querySelector('[aria-label="Check your plan"]') || document.querySelector('[role=alert]')`, 150000, 250);
+        const alert = await coach.ev<string | null>(`(document.querySelector('[role=alert]')||{}).innerText||null`);
+        if (alert) throw new Error(`read failed: ${alert}`);
+        const tRead = Date.now();
+        await coach.shot("library-preview");
+        await coach.tap("button", "Save to library");
+        await coach.until(`location.pathname.startsWith('/programs/') && location.pathname!=='/programs/import'`, 30000, 100);
+        const id = (await coach.url()).split("/").pop()!.split("?")[0];
+        const program = await prisma.program.findUniqueOrThrow({ where: { id }, select: { name: true, blocks: { select: { order: true } } } });
+        const got = benchWeeks(await prisma.workoutExercise.findMany({ where: { workout: { block: { programId: id } }, ...benchWhere }, orderBy: { workout: { block: { order: "asc" } } }, select: { prescribedSets: true } }));
+        if (program.blocks.length !== 4 || JSON.stringify(got) !== JSON.stringify(BENCH_WEEKS)) throw new Error(`${program.blocks.length} blocks; bench ${got.join(", ")}`);
+        return `read ${((tRead - t0) / 1000).toFixed(1)} s, save ${((Date.now() - tRead) / 1000).toFixed(1)} s; "${program.name}", 4 weekly blocks; bench ${got.join(" · ")}`;
+      });
+    }
 
     const post = (ph: Phone, body: string) => ph.ev<{ status: number; error?: string }>(`fetch('/api/athlete/plan-import',{method:'POST',body:(()=>{const f=new FormData();f.append('csv',${JSON.stringify(body)});return f})()}).then(async r=>({status:r.status,...(await r.json().catch(()=>({})))}))`);
     const CSV = "Day,Exercise,Sets,Reps\nMon,Bench Press,3,8\nMon,Row,3,8\nTue,Squat,3,8";
