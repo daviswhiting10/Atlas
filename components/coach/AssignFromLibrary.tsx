@@ -3,22 +3,24 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ArrowRight, Check, ChevronRight, Loader2 } from "lucide-react";
 import { draftFromTemplate } from "@/lib/actions/coach-plan";
+import { cn } from "@/lib/utils";
 
-type LibraryProgram = { id: string; name: string; durationWeeks: number; isTemplate: boolean };
+type LibraryProgram = { id: string; name: string; isTemplate: boolean; durationWeeks: number };
 
-function todayIso(): string {
+function todayIso() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** How many programs show before "All programs". */
+const SHOWN = 5;
+
 /**
- * Give a client a program from the coach's library. It opens as a draft
- * starting today, to check and assign (the same path as the library's
- * "Use for a client"). Unstyled beyond the shared tokens: the coach screens'
- * redesign owns the look.
+ * Start a client's plan from a program in the coach's library: tap one, then "Use for X" (the same two steps as
+ * before, the same action). Drafts are not visible to the client until the coach assigns them.
  */
 export function AssignFromLibrary({ clientId, firstName }: { clientId: string; firstName: string }) {
   const router = useRouter();
@@ -44,38 +46,54 @@ export function AssignFromLibrary({ clientId, firstName }: { clientId: string; f
     router.push(`/clients/${clientId}/programs/${res.assignmentId}`);
   }
 
+  const row = "press flex min-h-[56px] w-full items-center gap-3 border-t border-line px-1 text-left";
   return (
-    <div className="space-y-2">
-      <label className="block text-xs font-medium text-ink-soft" htmlFor={`library-${clientId}`}>
-        From your library
-      </label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <select
-          id={`library-${clientId}`}
-          value={programId}
-          onChange={(e) => setProgramId(e.target.value)}
-          disabled={busy || programs == null}
-          className="h-11 min-w-0 flex-1 rounded-lg border border-line-strong bg-dusk-raised px-3 text-[15px] text-ink outline-none focus:border-ink/40"
-        >
-          <option value="">{programs == null ? "Loading…" : programs.length === 0 ? "No programs in your library yet" : "Choose a program"}</option>
-          {programs?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} · {p.durationWeeks} wk
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={assign}
-          disabled={busy || !programId}
-          className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40"
-        >
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-          Use for {firstName}
-        </button>
-      </div>
-      <Link href="/programs" className="press inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink">
-        Open the program library <ArrowRight className="h-3.5 w-3.5" />
+    <div>
+      {programs == null ? (
+        <p className="flex min-h-11 items-center gap-2 text-sm text-ink-mute">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading your programs…
+        </p>
+      ) : programs.length === 0 ? (
+        <p className="flex min-h-11 items-center text-sm text-ink-mute">No programs in your library yet</p>
+      ) : (
+        <>
+          <p className="eyebrow mb-1">From a program</p>
+          {programs.slice(0, SHOWN).map((p) => {
+            const on = programId === p.id;
+            return (
+              <div key={p.id} className={cn(on && "rounded-xl bg-ink/[0.04]")}>
+                <button type="button" onClick={() => setProgramId(on ? "" : p.id)} disabled={busy} aria-pressed={on} className={row}>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[16px] font-semibold text-ink">{p.name}</span>
+                    <span className="block text-xs text-ink-mute">{p.durationWeeks} wk</span>
+                  </span>
+                  {on ? <Check className="h-5 w-5 shrink-0 text-signal" strokeWidth={3} /> : <ChevronRight className="h-5 w-5 shrink-0 text-ink-mute" />}
+                </button>
+                {on && (
+                  <div className="px-1 pb-3">
+                    <button
+                      type="button"
+                      onClick={assign}
+                      disabled={busy}
+                      className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60"
+                    >
+                      {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Use for {firstName}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+      <Link href="/programs" className={cn(row, "text-[15px] font-medium text-ink-soft hover:text-ink")}>
+        <span className="flex-1">All programs</span>
+        <ArrowRight className="h-4 w-4 shrink-0" />
+      </Link>
+      <Link href="/programs/new" className={cn(row, "text-[15px] font-medium text-ink-soft hover:text-ink")}>
+        <span className="flex-1">Build a program from scratch</span>
+        <ArrowRight className="h-4 w-4 shrink-0" />
       </Link>
     </div>
   );
