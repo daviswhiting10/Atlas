@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+import { clearFinish, queueFinish, queuedFinish } from "@/lib/sessions/pending-finish";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -299,6 +300,9 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   // only rolls the set back to the server's state when no newer one is coming (that one sends the
   // latest state anyway).
   const serverDone = useRef(new Map<string, boolean>());
+  // No connection: said in the header, not in a toast (a toast sits over the title and the ⋯).
+  const [noSignal, setNoSignal] = useState(false);
+  const [finishQueued, setFinishQueued] = useState(() => false);
   const pending = useRef(new Map<string, number>());
   const persist = useCallback(
     (aweId: string, setNumber: number) => {
@@ -335,7 +339,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           // No connection: the tick stays and is sent when the connection is back. Only a refusal
           // from the server puts the set back.
           if (isNetworkError(e)) {
-            toast("You're offline. Sets save when you're back.", { id: "offline" });
+            setNoSignal(true);
             return;
           }
           if (left > 0) return;
@@ -539,15 +543,20 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   summaryRef.current = summary != null;
   const onOnline = useRef(() => {});
   onOnline.current = () => {
-    toast.dismiss("offline");
+    setNoSignal(false);
     resendPending();
-    // Everything logged while offline: finish now that it can.
+    // A finish tapped while offline goes through now; otherwise, everything logged while offline finishes if it was all of it.
     queue.current.then(() => {
+      if (!summaryRef.current && queuedFinish(store(), data.id)) return void finishRef.current();
       if (!summaryRef.current && data.status !== "LOGGED" && !finishTimer.current && allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) scheduleFinish();
     });
   };
   useEffect(() => {
-    const t = setTimeout(resendPending, 0);
+    const t = setTimeout(() => {
+      resendPending();
+      // A finish queued while offline, and the page opened again (or the app reloaded on reconnect): send it.
+      if (queuedFinish(store(), data.id) && navigator.onLine) queue.current.then(() => finishRef.current());
+    }, 0);
     const online = () => onOnline.current();
     window.addEventListener("online", online);
     return () => {
@@ -588,10 +597,21 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         // Everything logged, or finished early with at least one set logged.
         if (!data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done))) return;
         const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
-        await finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : minutes });
+        // Offline, the finish is queued (with its length) and goes through when the connection is back.
+        const queued = queuedFinish(store(), data.id)?.minutes;
+        const length = queued ?? minutes;
+        await finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : length });
+        clearFinish(store(), data.id);
+        setFinishQueued(false);
         setRest(null);
-        setSummary({ minutes });
-      } catch {
+        setSummary({ minutes: length });
+      } catch (e) {
+        if (isNetworkError(e)) {
+          if (!queuedFinish(store(), data.id)) queueFinish(store(), data.id, Math.max(1, Math.round((Date.now() - startedAt.current) / 60000)));
+          setNoSignal(true);
+          setFinishQueued(true);
+          return;
+        }
         toast.error("Couldn't finish the workout. Please try again.");
       }
     });
@@ -707,6 +727,11 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
           <div className="h-full rounded-full bg-signal transition-[width] duration-500 ease-out" style={{ width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%` }} />
         </div>
+        {noSignal && (
+          <p role="status" className="mt-2 text-[12px] leading-tight text-ink-mute">
+            {finishQueued ? "Offline. Finishes when you're back." : "Offline. Sets save when you're back."}
+          </p>
+        )}
       </div>
 
       {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
