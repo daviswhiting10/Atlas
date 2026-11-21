@@ -5,6 +5,17 @@
  */
 export const FINISHED_BY_CLIENT = "Finished by client";
 
-export function finishedByClient(s: { loggedBy?: string | null; completedAt?: Date | string | null } | null | undefined): boolean {
-  return !!s && s.loggedBy === "CLIENT" && s.completedAt != null;
+/**
+ * Before this date the coach's own finish left loggedBy as it was (and every generated plan starts as CLIENT), so an
+ * older CLIENT can't be trusted. Only sessions finished from here on get the marker.
+ * SET THIS TO THE DAY THE CHANGE SHIPS (the deploy of this commit). It is the first day the stored value means it.
+ */
+export const FINISHED_BY_RELIABLE_FROM = new Date("2026-11-22T00:00:00Z");
+
+export function finishedByClient(
+  s: { loggedBy?: string | null; completedAt?: Date | string | null } | null | undefined,
+  since: Date = FINISHED_BY_RELIABLE_FROM
+): boolean {
+  if (!s || s.loggedBy !== "CLIENT" || s.completedAt == null) return false;
+  return new Date(s.completedAt).getTime() >= since.getTime();
 }

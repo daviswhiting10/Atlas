@@ -63,13 +63,33 @@ describe.skipIf(!RUN)("the latest session, judged against the plan", () => {
     expect(s!.review.exercises[1].sets.map((x) => x.outcome)).toEqual(["met", "short", "skipped"]);
   });
 
-  it("says finished by the client only when the workout's loggedBy is CLIENT", async () => {
+  it("says finished by the client only when loggedBy is CLIENT and it was finished after the fix shipped", async () => {
     const { loadLatestSession } = await import("./latest-session");
-    const log = await prisma.workoutLog.findUniqueOrThrow({ where: { id: logId }, select: { assignedWorkoutId: true } });
+    const { FINISHED_BY_RELIABLE_FROM } = await import("./finished-by");
+    const log = await prisma.workoutLog.findUniqueOrThrow({ where: { id: logId }, select: { assignedWorkoutId: true, completedAt: true } });
+    const was = log.completedAt;
+    // Finished before the cut-off: never marked, whatever loggedBy says.
+    await prisma.workoutLog.update({ where: { id: logId }, data: { completedAt: new Date(FINISHED_BY_RELIABLE_FROM.getTime() - 60_000) } });
+    await prisma.assignedWorkout.update({ where: { id: log.assignedWorkoutId! }, data: { loggedBy: "CLIENT" } });
+    expect((await loadLatestSession({ clientId, workspaceId: ws, timeZone: "UTC" }))!.finishedByClient).toBe(false);
+    await prisma.workoutLog.update({ where: { id: logId }, data: { completedAt: new Date(FINISHED_BY_RELIABLE_FROM.getTime() + 60_000) } });
     await prisma.assignedWorkout.update({ where: { id: log.assignedWorkoutId! }, data: { loggedBy: "CLIENT" } });
     expect((await loadLatestSession({ clientId, workspaceId: ws, timeZone: "UTC" }))!.finishedByClient).toBe(true);
     await prisma.assignedWorkout.update({ where: { id: log.assignedWorkoutId! }, data: { loggedBy: "TRAINER" } });
     expect((await loadLatestSession({ clientId, workspaceId: ws, timeZone: "UTC" }))!.finishedByClient).toBe(false);
+    await prisma.workoutLog.update({ where: { id: logId }, data: { completedAt: was } });
+  });
+
+  it("a coach marking a plan workout done records the coach as the one who finished it", async () => {
+    const { updateAssignedWorkout } = await import("@/lib/db/programs");
+    const log = await prisma.workoutLog.findUniqueOrThrow({ where: { id: logId }, select: { assignedWorkout: { select: { programAssignmentId: true } } } });
+    // Another workout of the plan, still to do, as a generated plan writes it (CLIENT).
+    const next = await prisma.assignedWorkout.findFirstOrThrow({ where: { programAssignmentId: log.assignedWorkout!.programAssignmentId, workoutLog: null }, select: { id: true } });
+    await prisma.assignedWorkout.update({ where: { id: next.id }, data: { loggedBy: "CLIENT" } });
+    await updateAssignedWorkout(next.id, ws, { status: "LOGGED" } as never);
+    const after = await prisma.assignedWorkout.findUniqueOrThrow({ where: { id: next.id }, select: { loggedBy: true, workoutLog: { select: { completedAt: true } } } });
+    expect(after.workoutLog?.completedAt).not.toBeNull();
+    expect(after.loggedBy).toBe("TRAINER");
   });
 
   it("is nothing for a client in another workspace", async () => {
