@@ -34,6 +34,8 @@ type Client = {
   fullName: string;
   email: string | null;
   phone: string | null;
+  /** Set once she has a login of her own. */
+  userId?: string | null;
   status: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
   primaryGoal: string | null;
   retentionScore: number | null;
@@ -41,6 +43,8 @@ type Client = {
   _count: { sessionNotes: number; programAssignments: number; workoutLogs?: number };
   /** The latest finished session (at most one). */
   workoutLogs?: Array<{ date: string }>;
+  /** Workouts done of those planned in her plan's current week. */
+  thisWeek?: { done: number; planned: number } | null;
 };
 
 const GOAL_LABELS: Record<string, string> = {
@@ -283,21 +287,29 @@ export default function ClientsPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{client.fullName}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {client.userId && <span className="shrink-0 rounded-full border border-line-strong px-1.5 py-px text-[10px] font-medium text-ink-soft">Logs own</span>}
+                            <span className="truncate">{[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}</span>
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {/* When she last logged: a date, or "Logged today" in teal. On a phone too. */}
+                        {/* When she last logged ("Logged today" in teal) and the plan week so far (3/4), on a phone too. */}
                         {(() => {
                           const last = lastLogged(client.workoutLogs?.[0]?.date);
-                          return last && <p className={cn("shrink-0 whitespace-nowrap text-xs", last.today ? "font-semibold text-primary" : "text-muted-foreground")}>{last.label}</p>;
+                          if (!last && !client.thisWeek) return null;
+                          return (
+                            <div className="flex shrink-0 flex-col items-end gap-0.5 whitespace-nowrap">
+                              {last && <p className={cn("text-xs", last.today ? "font-semibold text-primary" : "text-muted-foreground")}>{last.label}</p>}
+                              {client.thisWeek && (
+                                <p className="text-sm font-semibold tabular-nums" title="Workouts done this week of those planned">
+                                  {client.thisWeek.done}/{client.thisWeek.planned}
+                                </p>
+                              )}
+                            </div>
+                          );
                         })()}
                         <div className="text-right hidden sm:block">
-                          <p className="text-xs text-muted-foreground">
-                            {client._count.workoutLogs ?? 0} workout{(client._count.workoutLogs ?? 0) === 1 ? "" : "s"} logged
-                          </p>
                           {client.retentionScore != null && (
                             <p className="text-xs font-mono text-muted-foreground">
                               Retention: {client.retentionScore}/100
@@ -305,6 +317,14 @@ export default function ClientsPage() {
                           )}
                         </div>
                       </div>
+                    </Link>
+                    {/* The direct way to the logger; the row itself opens the profile. */}
+                    <Link
+                      href={`/clients/${client.id}/log`}
+                      aria-label={`Log a session for ${client.fullName}`}
+                      className="press flex min-h-[60px] min-w-[64px] shrink-0 items-center justify-center pr-5 text-sm font-semibold text-primary"
+                    >
+                      Log →
                     </Link>
                     </div>
                     </SwipeRow>
