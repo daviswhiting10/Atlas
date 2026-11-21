@@ -1,10 +1,8 @@
 /**
  * Password rules shared by the server and the forms (no Node imports here).
  *
- * Following NIST SP 800-63B: a minimum length, a long maximum, no "must
- * include a symbol" rules, spaces and pasting allowed, and a refusal of
- * passwords that are common or easy to guess. Existing shorter passwords
- * keep working; these rules apply when a password is set.
+ * Any password may be set (the person's account, the person's call). A password that is short, common or like
+ * the email gets a warning with "Use it anyway"; only an empty or over-long one is refused.
  */
 
 export const PASSWORD_MIN = 10;
@@ -34,14 +32,26 @@ function isPattern(p: string): boolean {
   return SEQUENCES.some(runOf);
 }
 
-/** Why a new password isn't acceptable, or null if it is. */
-export function passwordProblem(password: string, email?: string | null): string | null {
-  if (password.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`;
+/**
+ * The only reasons a password is refused: nothing typed, or longer than the hashing limit. Everything else is
+ * the person's choice (see passwordWarning).
+ */
+export function passwordBlock(password: string): string | null {
+  if (password.length < 1) return "Choose a password.";
   if (password.length > PASSWORD_MAX) return "That password is too long.";
+  return null;
+}
+
+/**
+ * A reason a password is easy to guess, or null. This only WARNS: the person may use it anyway, so no password
+ * is ever refused for being short, common or like their email (their account, their call).
+ */
+export function passwordWarning(password: string, email?: string | null): string | null {
+  if (password.length < PASSWORD_MIN) return `That's short (under ${PASSWORD_MIN} characters), so it's easy to guess.`;
   const lower = password.toLowerCase();
   const squashed = lower.replace(/\s+/g, "");
-  if (COMMON.has(squashed) || isPattern(squashed)) return "That password is too common. Try a few words that mean something to you.";
+  if (COMMON.has(squashed) || isPattern(squashed)) return "That's a common password, so it's easy to guess.";
   const name = email?.split("@")[0]?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
-  if (name.length >= 4 && squashed.replace(/[^a-z0-9]/g, "").includes(name)) return "Don't use your email address in your password.";
+  if (name.length >= 4 && squashed.replace(/[^a-z0-9]/g, "").includes(name)) return "That contains your email address, so it's easy to guess.";
   return null;
 }

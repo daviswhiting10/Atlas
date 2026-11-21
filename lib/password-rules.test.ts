@@ -1,45 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { PASSWORD_MAX, PASSWORD_MIN, passwordProblem } from "./password-rules";
+import { PASSWORD_MAX, PASSWORD_MIN, passwordBlock, passwordWarning } from "./password-rules";
 
-describe("passwordProblem", () => {
-  it("accepts a long, ordinary passphrase", () => {
-    expect(passwordProblem("blue kettle on the stove", "sam@example.com")).toBeNull();
-    expect(passwordProblem("Tr41n!ng-at-dawn", "sam@example.com")).toBeNull();
+describe("passwordBlock: the only things that are refused", () => {
+  it("nothing typed, or past the hashing limit", () => {
+    expect(passwordBlock("")).toMatch(/Choose a password/);
+    expect(passwordBlock("x".repeat(PASSWORD_MAX + 1))).toMatch(/too long/);
   });
+  it("anything else may be set: one character, a common word, the email", () => {
+    for (const p of ["a", "1234", "password", "qwertyuiop", "jordan", "x".repeat(PASSWORD_MAX)]) expect(passwordBlock(p)).toBeNull();
+  });
+});
 
-  it("needs at least the minimum length, and allows exactly it", () => {
-    expect(passwordProblem("kq7xm2vp9")).toMatch(/at least/);
-    expect(passwordProblem("kq7xm2vp9z")).toBeNull();
+describe("passwordWarning: only ever a warning, never a refusal", () => {
+  it("is quiet for an ordinary passphrase", () => {
+    expect(passwordWarning("blue kettle on the stove", "sam@example.com")).toBeNull();
+    expect(passwordWarning("Tr41n!ng-at-dawn", "sam@example.com")).toBeNull();
+  });
+  it("warns when short, and not at exactly the minimum", () => {
+    expect(passwordWarning("kq7xm2vp9")).toMatch(/short/);
+    expect(passwordWarning("kq7xm2vp9z")).toBeNull();
     expect("kq7xm2vp9z").toHaveLength(PASSWORD_MIN);
   });
-
-  it("refuses anything past the maximum", () => {
-    expect(passwordProblem("kq7xm2vp9z".repeat(21))).toMatch(/too long/);
-    expect(passwordProblem("kq7xm2vp9z".repeat(20))).toBeNull();
-    expect(PASSWORD_MAX).toBe(200);
+  it("warns about common passwords, whatever the case or spacing", () => {
+    for (const p of ["password123", "PassWord123", "pass word 123", "atlas12345"]) expect(passwordWarning(p)).toMatch(/common/);
   });
-
-  it("refuses common passwords, whatever the case or spacing", () => {
-    expect(passwordProblem("password123")).toMatch(/too common/);
-    expect(passwordProblem("PassWord123")).toMatch(/too common/);
-    expect(passwordProblem("pass word 123")).toMatch(/too common/);
-    expect(passwordProblem("atlas12345")).toMatch(/too common/);
+  it("warns about runs, keyboard rows and one repeated character", () => {
+    for (const p of ["1234567890", "0987654321", "abcdefghijk", "qwertyuiop", "zzzzzzzzzzzz"]) expect(passwordWarning(p)).toMatch(/common/);
+    expect(passwordWarning("lkjhgfdsa1")).toBeNull(); // a row plus something else is fine
   });
-
-  it("refuses runs, keyboard rows and one repeated character", () => {
-    expect(passwordProblem("1234567890")).toMatch(/too common/);
-    expect(passwordProblem("0987654321")).toMatch(/too common/);
-    expect(passwordProblem("abcdefghijk")).toMatch(/too common/);
-    expect(passwordProblem("qwertyuiop")).toMatch(/too common/);
-    expect(passwordProblem("lkjhgfdsa1")).toBeNull(); // a row plus something else is fine
-    expect(passwordProblem("zzzzzzzzzzzz")).toMatch(/too common/);
-  });
-
-  it("refuses the email's name inside the password", () => {
-    expect(passwordProblem("jordan-lifts-heavy", "jordan@example.com")).toMatch(/email/);
-    expect(passwordProblem("my jordanlee rocks", "jordan.lee@example.com")).toMatch(/email/);
-    // Names shorter than 4 characters aren't checked (too many false alarms).
-    expect(passwordProblem("joe likes squats", "joe@example.com")).toBeNull();
-    expect(passwordProblem("jordan-lifts-heavy")).toBeNull();
+  it("warns when it contains the email's name, only for names of 4+ letters", () => {
+    expect(passwordWarning("jordan-lifts-heavy", "jordan@example.com")).toMatch(/email/);
+    expect(passwordWarning("my jordanlee rocks", "jordan.lee@example.com")).toMatch(/email/);
+    expect(passwordWarning("joe likes squats", "joe@example.com")).toBeNull();
+    expect(passwordWarning("jordan-lifts-heavy")).toBeNull();
   });
 });
