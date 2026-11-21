@@ -104,7 +104,7 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, history, report, latest, access, initial }: { /** Invited, opened, password set: where the client is with the app. */ access?: LoginStatus | null; /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** The latest finished session, judged against the plan (nothing until she has finished one). */ latest?: React.ReactNode; /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ week, progress, history, report, latest, access, initial }: { /** Invited, opened, password set: where the client is with the app. */ access?: LoginStatus | null; /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** The latest finished session, judged against the plan (nothing until she has finished one). */ latest?: React.ReactNode; /** The week so far and the main lifts, shown above the progress charts on the first tab (null: nothing to show yet). */ week?: React.ReactNode; /** null: nothing to chart yet. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -115,7 +115,7 @@ export function ClientDetail({ progress, history, report, latest, access, initia
   const [view, setView] = useState<View>(() => {
     const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
     if (tab === "import" || tab === "build") return "plan";
-    return tab === "plan" || tab === "sessions" ? tab : progress ? "progress" : "sessions";
+    return tab === "plan" || tab === "sessions" ? tab : progress || week ? "progress" : "sessions";
   });
   // "Build with Atlas" opens its form here on the Plan tab (it had a page of its own). ?tab=build opens it.
   const [buildOpen, setBuildOpen] = useState(
@@ -221,9 +221,9 @@ export function ClientDetail({ progress, history, report, latest, access, initia
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
   const redFlags = intakes[0]?.redFlags ?? null;
   // Progress open but nothing to chart any more (sessions deleted): show Sessions, not a blank tab.
-  const shown: View = view === "progress" && !progress ? "sessions" : view;
+  const shown: View = view === "progress" && !progress && !week ? "sessions" : view;
   const views: Array<{ id: View; label: string }> = [
-    ...(progress ? [{ id: "progress" as const, label: "Progress" }] : []),
+    ...(progress || week ? [{ id: "progress" as const, label: "Week" }] : []),
     { id: "sessions", label: "Sessions" },
     { id: "plan", label: "Plan" },
     // Intake and imported details, only when there are some.
@@ -307,7 +307,10 @@ export function ClientDetail({ progress, history, report, latest, access, initia
       </div>
 
       {shown === "progress" && (
-        <div className="fade-in">{progress}</div>
+        <div className="fade-in space-y-10">
+          {week}
+          {progress}
+        </div>
       )}
 
 

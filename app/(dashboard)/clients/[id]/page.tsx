@@ -13,6 +13,9 @@ import { hasProgressToShow, newestIsLighter } from "@/lib/progress/overall";
 import { listReports } from "@/lib/report/load";
 import { ReportLink } from "@/components/report/ReportLink";
 import { prisma } from "@/lib/db/client";
+import { WeekView } from "@/components/coach/WeekView";
+import { loadWeek } from "@/lib/coach/week-data";
+import { mainLifts } from "@/lib/coach/week";
 import { LatestSession } from "@/components/coach/LatestSession";
 import { loadLatestSession } from "@/lib/coach/latest-session";
 import { sessionPrs } from "@/lib/coach/review";
@@ -30,7 +33,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
   // The client's details load with the charts, on the server: the page no longer waits for a second fetch from the browser.
   // The calendar's read is scoped to this workspace too, and isn't shown unless the client is found.
   const timeZone = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
-  const [progress, details, calendar, reports, latest] = await Promise.all([
+  const [progress, details, calendar, reports, latest, week] = await Promise.all([
     loadClientProgress(params.id, workspaceId),
     getClient(params.id, workspaceId),
     loadCalendar({ clientId: params.id, workspaceId, timeZone, viewer: { kind: "coach", clientId: params.id } }),
@@ -38,6 +41,8 @@ export default async function ClientPage({ params }: { params: { id: string } })
     listReports(params.id, workspaceId, timeZone),
     // The latest finished plan session, judged against what was prescribed, one tap from the roster.
     loadLatestSession({ clientId: params.id, workspaceId, timeZone }),
+    // This plan week: workouts done of planned, and the lifts the plan leads with.
+    loadWeek({ clientId: params.id, workspaceId }),
   ]);
   if (!progress || !details) notFound();
   // Where the client is with the app: invited, opened, password set (worked out from their login; nothing stored).
@@ -50,6 +55,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       // The same JSON /api/clients/[id] sends (dates as strings).
       initial={JSON.parse(JSON.stringify(details))}
       // Nothing to chart yet (a thin history): no Progress tab; the page opens on Sessions.
+      week={week || hasProgressToShow(data) ? <WeekView week={week} lifts={week ? mainLifts(data.exercises, week.mainIds) : []} /> : null}
       progress={
         hasProgressToShow(data) ? (
           <>
