@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { InviteConfirm } from "@/components/coach/InviteConfirm";
+import { DeleteClientSheet, type DeletePreview } from "@/components/coach/DeleteClientSheet";
 import { shareInvite } from "@/lib/coach/invite-share";
 import type { LoginStatus } from "@/lib/coach/login-status";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
@@ -113,6 +114,8 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
   const [invite, setInvite] = useState<InviteResult | null>(null);
   /** The "Sending to … — is that right?" step, before any link is made. */
   const [confirmInvite, setConfirmInvite] = useState(false);
+  /** ⋯ Delete client: what would go, shown before anything is deleted. */
+  const [toDelete, setToDelete] = useState<DeletePreview | null>(null);
   // ?tab=plan opens the Plan view (the log page links there when there's no plan);
   // ?tab=sessions opens Sessions (after logging a workout); ?tab=import opens Plan with the importer open.
   const [view, setView] = useState<View>(() => {
@@ -169,10 +172,25 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
     if (outcome === "unavailable") setInvite(result);
   }
 
-  async function deleteClient() {
-    if (!confirm(`Delete ${client?.fullName}? This cannot be undone.`)) return;
-    await fetch(`/api/clients/${id}`, { method: "DELETE" });
-    toast.success("Client deleted");
+  /** ⋯ Delete client: the same sheet as the roster's swipe (exactly what goes, then a red Delete). */
+  async function askDelete() {
+    const res = await fetch(`/api/clients/${id}/erase`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Can't delete this client");
+      return;
+    }
+    setToDelete(body as DeletePreview);
+  }
+
+  async function confirmDelete() {
+    const res = await fetch(`/api/clients/${id}/erase`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Couldn't delete");
+      return;
+    }
+    toast.success(`${client?.fullName ?? "Client"} deleted`);
     router.push("/clients");
   }
 
@@ -260,7 +278,7 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
               <UserCheck className="mr-2 h-3.5 w-3.5" />
               {client.userId ? "New sign-in link" : "Invite to the app"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={deleteClient} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem onClick={() => void askDelete()} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-3.5 w-3.5" />
               Delete client
             </DropdownMenuItem>
@@ -288,6 +306,7 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
       )}
 
       {confirmInvite && <InviteConfirm email={client.email} onConfirm={inviteClient} onSaveEmail={saveEmail} onClose={() => setConfirmInvite(false)} />}
+      {toDelete && <DeleteClientSheet preview={toDelete} onDelete={confirmDelete} onClose={() => setToDelete(null)} />}
       {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
 
       {/* ── The one action: log ─────────────────────────────────────────── */}

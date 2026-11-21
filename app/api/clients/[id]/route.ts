@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
-import { getClient, updateClient, deleteClient } from "@/lib/db/clients";
+import { getClient, updateClient } from "@/lib/db/clients";
 import { changeClientEmail } from "@/lib/clients/change-email";
 
 const UpdateSchema = z.object({
@@ -46,10 +46,5 @@ export const PATCH = withWorkspace<{ id: string }>(
   }
 );
 
-export const DELETE = withWorkspace<{ id: string }>(
-  async (_req, { workspaceId }, { params }) => {
-    const { id } = await params;
-    await deleteClient(id, workspaceId);
-    return NextResponse.json({ ok: true });
-  }
-);
+// Deleting a client: POST /api/clients/[id]/erase (deletes her for good, with a confirm sheet first). The old
+// hide-only DELETE here is gone.

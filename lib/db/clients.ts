@@ -86,9 +86,3 @@ export async function updateClient(
   });
 }
 
-export async function deleteClient(id: string, workspaceId: string) {
-  return prisma.clientProfile.updateMany({
-    where: { id, workspaceId },
-    data: { deletedAt: new Date() },
-  });
-}
