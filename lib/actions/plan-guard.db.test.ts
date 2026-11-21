@@ -1,6 +1,6 @@
 /**
  * A coach's client keeps the plan as the coach wrote it: from the athlete app she can't add or remove
- * workouts and exercises, change targets or the lighter weeks. She can still swap an exercise and write notes.
+ * workouts and exercises, change targets or the lighter weeks, or overwrite the coach's notes. She can still swap an exercise.
  * Someone who makes their own plan can restructure it.
  *
  * Runs against a dev database only:
@@ -56,9 +56,10 @@ describe.skipIf(!RUN)("a coach's client can't restructure the plan", () => {
     expect(await prisma.assignedWorkout.count({ where: { id: workoutId } })).toBe(1);
   });
 
-  it("can still write a note on the workout", async () => {
+  it("can't overwrite the coach's notes either", async () => {
     const a = await import("./athlete");
-    expect(await a.planSetWorkoutNote({ workoutId, text: "Felt strong" })).toMatchObject({ ok: true });
+    expect(await a.planSetWorkoutNote({ workoutId, text: "Felt strong" })).toMatchObject({ ok: false });
+    expect(await a.planSetNote("x")).toMatchObject({ ok: false });
   });
 
   it("someone who makes their own plan can restructure it", async () => {

@@ -137,6 +137,7 @@ function WorkoutCard({
   actions,
   workoutHref,
   startLabel,
+  locked = false,
 }: {
   w: WorkoutSummary;
   isNext: boolean;
@@ -145,6 +146,8 @@ function WorkoutCard({
   actions: PlanActions;
   workoutHref?: (workoutId: string) => string;
   startLabel: string;
+  /** The coach's plan: read-only here (no adding, removing or retargeting); swap, skip and start still work. */
+  locked?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -246,16 +249,23 @@ function WorkoutCard({
                       <span className="w-6 shrink-0 text-[13px] text-ink-mute">{label ?? (part.key === "warmup" ? "W" : "C")}</span>
                       <ExerciseThumb picture={e.picture} name={e.name} className="h-11 w-11" />
                       <ExerciseName name={e.name} className="flex-1 text-[15px] leading-snug text-ink" />
-                      <button
-                        type="button"
-                        onClick={() => setEditing(editing === e.aweId ? null : e.aweId)}
-                        aria-expanded={editing === e.aweId}
-                        aria-label={`Edit target for ${e.name}`}
-                        className="press shrink-0 rounded-md px-2 py-1 text-[14px] max-md:min-h-11 text-ink-soft underline decoration-line decoration-dotted underline-offset-4 hover:bg-ink/5 hover:text-ink"
-                      >
-                        {e.sets} × {e.reps}
-                        {e.weight != null ? ` @ ${e.weight} lb` : ""}
-                      </button>
+                      {locked ? (
+                        <span className="shrink-0 px-2 py-1 text-[14px] text-ink-soft">
+                          {e.sets} × {e.reps}
+                          {e.weight != null ? ` @ ${e.weight} lb` : ""}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditing(editing === e.aweId ? null : e.aweId)}
+                          aria-expanded={editing === e.aweId}
+                          aria-label={`Edit target for ${e.name}`}
+                          className="press shrink-0 rounded-md px-2 py-1 text-[14px] max-md:min-h-11 text-ink-soft underline decoration-line decoration-dotted underline-offset-4 hover:bg-ink/5 hover:text-ink"
+                        >
+                          {e.sets} × {e.reps}
+                          {e.weight != null ? ` @ ${e.weight} lb` : ""}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setPicker({ mode: "swap", aweId: e.aweId, slug: e.slug })}
@@ -264,17 +274,19 @@ function WorkoutCard({
                       >
                         Swap
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => change(() => actions.removeExercise({ aweId: e.aweId, workoutId: w.id }), `${e.name} removed`)}
-                        disabled={pending}
-                        aria-label={`Remove ${e.name}`}
-                        className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-ink/5 hover:text-ink md:h-7 md:w-7"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                      {!locked && (
+                        <button
+                          type="button"
+                          onClick={() => change(() => actions.removeExercise({ aweId: e.aweId, workoutId: w.id }), `${e.name} removed`)}
+                          disabled={pending}
+                          aria-label={`Remove ${e.name}`}
+                          className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-ink/5 hover:text-ink md:h-7 md:w-7"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
-                    {editing === e.aweId && (
+                    {!locked && editing === e.aweId && (
                       <div className="mt-2 pl-6">
                         <TargetEditor
                           initial={{ sets: e.sets, repMin: e.repMin, repMax: e.repMax, weight: e.weight }}
@@ -302,24 +314,30 @@ function WorkoutCard({
 
           <PendingExercises pending={offline.pending} />
 
-          <button
-            type="button"
-            onClick={() => setPicker({ mode: "add" })}
-            disabled={pending}
-            className="press mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink"
-          >
-            <Plus className="h-4 w-4" /> Add an exercise
-          </button>
+          {!locked && (
+            <button
+              type="button"
+              onClick={() => setPicker({ mode: "add" })}
+              disabled={pending}
+              className="press mt-2 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink"
+            >
+              <Plus className="h-4 w-4" /> Add an exercise
+            </button>
+          )}
 
-          <div className="mt-4">
-            <NoteField
-              key={w.id}
-              label="Notes for this workout"
-              value={w.note}
-              placeholder="How it felt, what to change next time, anything to remember."
-              onSave={(text) => actions.setWorkoutNote({ workoutId: w.id, text })}
-            />
-          </div>
+          {locked ? (
+            w.note && <p className="mt-4 whitespace-pre-line rounded-xl border border-line bg-paper px-4 py-3 text-[15px] leading-relaxed text-ink-soft">{w.note}</p>
+          ) : (
+            <div className="mt-4">
+              <NoteField
+                key={w.id}
+                label="Notes for this workout"
+                value={w.note}
+                placeholder="How it felt, what to change next time, anything to remember."
+                onSave={(text) => actions.setWorkoutNote({ workoutId: w.id, text })}
+              />
+            </div>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-2">
             {workoutHref && (
@@ -339,21 +357,22 @@ function WorkoutCard({
                 {skipped ? "Restore" : "Skip"}
               </button>
             )}
-            {confirmRemove ? (
-              <span className="flex items-center gap-2 text-sm">
-                <span className="text-ink-soft">{logged ? "Remove? Logged sets stay in your history." : "Remove this workout?"}</span>
-                <button type="button" onClick={() => change(() => actions.removeWorkout(w.id), `${w.name} removed`)} disabled={pending} className="press h-9 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text">
-                  Remove
+            {!locked &&
+              (confirmRemove ? (
+                <span className="flex items-center gap-2 text-sm">
+                  <span className="text-ink-soft">{logged ? "Remove? Logged sets stay in your history." : "Remove this workout?"}</span>
+                  <button type="button" onClick={() => change(() => actions.removeWorkout(w.id), `${w.name} removed`)} disabled={pending} className="press h-9 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text">
+                    Remove
+                  </button>
+                  <button type="button" onClick={() => setConfirmRemove(false)} className="press h-9 rounded-lg px-2 font-medium text-ink-soft">
+                    Keep
+                  </button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setConfirmRemove(true)} aria-label={`Remove ${w.name} from the plan`} className="press flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-[15px] font-medium text-ink-mute hover:bg-ink/5 hover:text-ink">
+                  <Trash2 className="h-4 w-4" /> Remove
                 </button>
-                <button type="button" onClick={() => setConfirmRemove(false)} className="press h-9 rounded-lg px-2 font-medium text-ink-soft">
-                  Keep
-                </button>
-              </span>
-            ) : (
-              <button type="button" onClick={() => setConfirmRemove(true)} aria-label={`Remove ${w.name} from the plan`} className="press flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-[15px] font-medium text-ink-mute hover:bg-ink/5 hover:text-ink">
-                <Trash2 className="h-4 w-4" /> Remove
-              </button>
-            )}
+              ))}
           </div>
         </div>
       )}
@@ -448,9 +467,12 @@ export function PlanView({
   workoutBase,
   startLabel = "Start this workout",
   noteLabel = "Coaching notes",
+  locked = false,
 }: {
   plan: PlanOverview;
   actions: PlanActions;
+  /** The coach's plan: shown, not edited (no adding, removing or retargeting, no lighter-weeks switch, notes read-only). */
+  locked?: boolean;
   /**
    * Where "Start this workout" goes: a path the workout id is appended to
    * ("/workouts"), or one with a query parameter it fills ("/clients/x/log?workoutId=").
@@ -545,15 +567,19 @@ export function PlanView({
 
       <div key={week} className="fade-in mt-3 space-y-3">
         {shown.map((w) => (
-          <WorkoutCard key={w.id} w={w} isNext={w.id === plan.nextUp?.id} open={openId === w.id} onToggle={() => setOpenId(openId === w.id ? null : w.id)} actions={actions} startLabel={startLabel} workoutHref={workoutBase ? (id) => (workoutBase.endsWith("=") ? `${workoutBase}${id}` : `${workoutBase}/${id}`) : undefined} />
+          <WorkoutCard key={w.id} w={w} isNext={w.id === plan.nextUp?.id} open={openId === w.id} onToggle={() => setOpenId(openId === w.id ? null : w.id)} actions={actions} startLabel={startLabel} locked={locked} workoutHref={workoutBase ? (id) => (workoutBase.endsWith("=") ? `${workoutBase}${id}` : `${workoutBase}/${id}`) : undefined} />
         ))}
         {shown.length === 0 && <p className="py-4 text-center text-[15px] text-ink-mute">Nothing scheduled this week yet.</p>}
-        <AddWorkout week={week} workouts={shown} actions={actions} />
+        {!locked && <AddWorkout week={week} workouts={shown} actions={actions} />}
       </div>
 
       <div className="rule mt-8 pt-6">
-        <NoteField key={plan.id} label={noteLabel} value={plan.note} placeholder="Anything about the plan as a whole: what it's for, what to watch, when to revisit it." onSave={actions.setPlanNote} />
-        {actions.setLighterWeeks && (
+        {locked ? (
+          plan.note && <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink-soft">{plan.note}</p>
+        ) : (
+          <NoteField key={plan.id} label={noteLabel} value={plan.note} placeholder="Anything about the plan as a whole: what it's for, what to watch, when to revisit it." onSave={actions.setPlanNote} />
+        )}
+        {!locked && actions.setLighterWeeks && (
           <div className="mt-6">
             <LighterWeeksSwitch on={plan.lighterWeeks} onChange={actions.setLighterWeeks} />
           </div>

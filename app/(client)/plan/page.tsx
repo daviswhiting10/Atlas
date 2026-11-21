@@ -20,6 +20,7 @@ import {
   planSwapExercise,
   setWorkoutSkipped,
 } from "@/lib/actions/athlete";
+import { isCoached } from "@/lib/athlete/coached";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
 
 export const metadata: Metadata = { title: "Plan" };
@@ -110,7 +111,7 @@ export default async function PlanPage() {
       </div>
 
       <div className="max-w-3xl">
-        <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" />
+        <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" locked={isCoached(athlete)} />
       </div>
       {reportRows}
     </div>

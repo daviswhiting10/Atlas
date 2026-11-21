@@ -276,7 +276,7 @@ export async function planSetTargets(raw: { aweId: string; workoutId: string } &
 
 export async function planSetWorkoutNote(raw: { workoutId: string; text: string }) {
   const input = z.object({ workoutId: Ref, text: z.string().max(LIMITS.note * 2) }).parse(raw);
-  return edit((scope) => setWorkoutNote(scope, input.workoutId, input.text), input.workoutId);
+  return edit((scope) => setWorkoutNote(scope, input.workoutId, input.text), input.workoutId, true);
 }
 
 export async function planSetLighterWeeks(on: boolean) {
@@ -284,7 +284,7 @@ export async function planSetLighterWeeks(on: boolean) {
 }
 
 export async function planSetNote(text: string) {
-  return edit((scope) => setPlanNote(scope, z.string().max(LIMITS.note * 2).parse(text)));
+  return edit((scope) => setPlanNote(scope, z.string().max(LIMITS.note * 2).parse(text)), undefined, true);
 }
 
 /**
