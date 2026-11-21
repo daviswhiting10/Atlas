@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 import { safeTimeZone } from "@/lib/athlete/sessions";
 import { TZ_COOKIE } from "@/lib/athlete/data";
 import { loadCalendar } from "@/lib/history/load";
-import { hasProgressToShow } from "@/lib/progress/overall";
+import { hasProgressToShow, newestIsLighter } from "@/lib/progress/overall";
 import { listReports } from "@/lib/report/load";
 import { ReportLink } from "@/components/report/ReportLink";
 import { prisma } from "@/lib/db/client";
@@ -45,7 +45,15 @@ export default async function ClientPage({ params }: { params: { id: string } })
       // The same JSON /api/clients/[id] sends (dates as strings).
       initial={JSON.parse(JSON.stringify(details))}
       // Nothing to chart yet (a thin history): no Progress tab; the page opens on Sessions.
-      progress={hasProgressToShow(data) ? <ProgressView data={data} goalMetric={metric} /> : null}
+      progress={
+        hasProgressToShow(data) ? (
+          <>
+            {/* The line leaves lighter weeks out, so it can end before her latest session: say so. */}
+            {newestIsLighter(data.exercises) && <p className="mb-4 text-[13px] text-ink-mute">Lighter week: its sessions aren&apos;t in the line.</p>}
+            <ProgressView data={data} goalMetric={metric} />
+          </>
+        ) : null
+      }
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
       history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : null}
       access={access}

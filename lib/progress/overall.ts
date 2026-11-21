@@ -73,3 +73,21 @@ export function hasProgressToShow(data: { exercises: Lift[]; recentPRs: unknown[
   const o = overallProgress(data.exercises);
   return (o.change != null && o.since != null) || data.recentPRs.length > 0;
 }
+
+/**
+ * The newest session of any lift was in a lighter week. Those are left out of the line above, so the line can end
+ * earlier than the last session: the coach is told why.
+ */
+export function newestIsLighter(lifts: Lift[]): boolean {
+  let newest = "";
+  let lighter = false;
+  for (const l of lifts) {
+    for (const p of l.series) {
+      if (p.date > newest) {
+        newest = p.date;
+        lighter = p.deload;
+      } else if (p.date === newest && p.deload) lighter = true;
+    }
+  }
+  return newest !== "" && lighter;
+}
