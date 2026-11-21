@@ -6,7 +6,7 @@ import { LogOut, MoreHorizontal, Settings } from "lucide-react";
 import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { headerActions, type HeaderAction, type Side } from "@/lib/header-actions";
+import { headerSlots, type HeaderAction, type Side } from "@/lib/header-actions";
 import { signOutToLogin } from "@/lib/sign-out";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,6 @@ const ICON = "press flex h-11 w-11 items-center justify-center rounded-full text
 export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boolean; isCoach: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { desktop, phone } = headerActions({ side, demo, isCoach });
 
   const render = (a: HeaderAction) => {
     switch (a) {
@@ -59,10 +58,15 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
     }
   };
 
+  /** Each action once, shown where the list says: every size, desktop only, or phone only. */
+  const where = { both: "", desktop: "hidden md:flex", phone: "md:hidden" } as const;
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <div className="hidden items-center gap-1 md:flex">{desktop.map(render)}</div>
-      <div className="flex items-center gap-1 md:hidden">{phone.map(render)}</div>
+      {headerSlots({ side, demo, isCoach }).map(({ action, where: w }) => (
+        <div key={action} className={cn("flex items-center", where[w])}>
+          {render(action)}
+        </div>
+      ))}
     </div>
   );
 }

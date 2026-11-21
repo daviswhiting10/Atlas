@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { headerActions } from "./header-actions";
+import { headerActions, headerSlots } from "./header-actions";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
@@ -29,6 +29,25 @@ describe("headerActions: the same on both sides", () => {
   });
 });
 
+describe("headerSlots: every action once, shown where it belongs", () => {
+  const where = (side: "coach" | "me", demo = false) => Object.fromEntries(headerSlots({ side, demo, isCoach: true }).map((s) => [s.action, s.where]));
+  it("the Me side: Settings and Sign out on desktop, the Account menu on a phone, the toggle everywhere", () => {
+    expect(where("me")).toEqual({ settings: "desktop", signout: "desktop", account: "phone", mode: "both" });
+  });
+  it("the Coach side: the same on desktop; nothing extra on a phone (More has them)", () => {
+    expect(where("coach")).toEqual({ settings: "desktop", signout: "desktop", mode: "both" });
+  });
+  it("the chip shows everywhere when it shows at all", () => expect(where("me", true).demo).toBe("both"));
+  it("desktop order is the same on both sides", () => {
+    const order = (side: "coach" | "me") => headerSlots({ side, demo: true, isCoach: true }).filter((s) => s.where !== "phone").map((s) => s.action);
+    expect(order("me")).toEqual(order("coach"));
+  });
+  it("no action appears twice", () => {
+    const a = headerSlots({ side: "me", demo: true, isCoach: true }).map((s) => s.action);
+    expect(new Set(a).size).toBe(a.length);
+  });
+});
+
 describe("both headers use the one component", () => {
   const app = read("components/athlete/AppNav.tsx");
   const coach = read("components/coach/CoachNav.tsx");
@@ -47,7 +66,7 @@ describe("both headers use the one component", () => {
   });
   it("the shared actions are 44 px targets, and follow the pure list", () => {
     expect(shared).toContain("h-11 w-11");
-    expect(shared).toContain("headerActions(");
+    expect(shared).toContain("headerSlots(");
     expect(shared).toContain('aria-label="Settings"');
     expect(shared).toContain('aria-label="Sign out"');
     expect(shared).toContain('aria-label="Account"');

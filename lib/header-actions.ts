@@ -26,3 +26,15 @@ export function headerActions({ side, demo, isCoach }: { side: Side; demo: boole
     phone: [...chip, ...(side === "me" ? (["account"] as HeaderAction[]) : []), "mode"],
   };
 }
+
+export type Slot = { action: HeaderAction; /** Where it shows: on every screen size, or only desktop (md and up), or only a phone. */ where: "both" | "desktop" | "phone" };
+
+/** The actions once each, in order, with where each shows (so the page holds one copy of every action). */
+export function headerSlots(args: { side: Side; demo: boolean; isCoach: boolean }): Slot[] {
+  const { desktop, phone } = headerActions(args);
+  const order: HeaderAction[] = ["demo", "settings", "signout", "account", "mode"];
+  return order.flatMap((action) => {
+    const d = desktop.includes(action), f = phone.includes(action);
+    return d || f ? [{ action, where: d && f ? ("both" as const) : d ? ("desktop" as const) : ("phone" as const) }] : [];
+  });
+}
