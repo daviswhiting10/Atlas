@@ -13,17 +13,17 @@ describe("passwordBlock: the only things that are refused", () => {
     expect(passwordBlock("kq7xm2vp9z".repeat(20))).toBeNull();
     expect(PASSWORD_MAX).toBe(200);
   });
-  it("refuses the very most common passwords, whatever the case or spacing", () => {
-    for (const p of ["1234567890", "qwertyuiop", "password123", "1q2w3e4r5t", "0987654321", "1111111111", "QwertyUiop", "1234 5678 90"]) expect(passwordBlock(p)).toMatch(/most common/);
-  });
-  it("refuses nothing else: weak-looking, common-ish and email-like passwords are all allowed through the block", () => {
-    for (const p of ["aaaaaaaaaaaa", "abcdefghijk", "lkjhgfdsa1x", "football123", "jordan-lifts-heavy", "9876543210123"]) expect(passwordBlock(p)).toBeNull();
+  it("refuses nothing but the length: even the most common passwords get through the block", () => {
+    for (const p of ["1234567890", "qwertyuiop", "password123", "1q2w3e4r5t", "aaaaaaaaaaaa", "football123", "jordan-lifts-heavy"]) expect(passwordBlock(p)).toBeNull();
   });
 });
 
 describe("passwordWarning: a gentle note, never a refusal", () => {
   it("is quiet for an ordinary passphrase or a mixed password", () => {
     for (const p of ["blue kettle on the stove", "Tr41n!ng-at-dawn", "kq7xm2vp9z", "correct horse battery staple", "lkjhgfdsa1"]) expect(passwordWarning(p)).toBeNull();
+  });
+  it("warns (only) about the very most common passwords, whatever the case or spacing", () => {
+    for (const p of ["1234567890", "qwertyuiop", "password123", "1q2w3e4r5t", "0987654321", "1111111111", "QwertyUiop", "1234 5678 90"]) expect(passwordWarning(p)).toBe("This looks easy to guess.");
   });
   it("warns about common words, whatever the case or spacing", () => {
     for (const p of ["football123", "FootBall123", "foot ball 123", "atlas12345", "workout123"]) expect(passwordWarning(p)).toBe("This looks easy to guess.");

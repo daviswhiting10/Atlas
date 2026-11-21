@@ -1,10 +1,10 @@
 /**
  * Password rules shared by the server and the forms (no Node imports here).
  *
- * Three tiers:
- *   refused:  under 10 characters, over 200, or one of the very most common passwords (WORST);
- *   warned:   looks easy to guess (a common word, a simple pattern, all one kind of character): the person
- *             sees "This looks easy to guess" and can press "Use it anyway";
+ * Two tiers:
+ *   refused:  under 10 characters (or over 200, the hashing limit). Nothing else is ever refused.
+ *   warned:   looks easy to guess (one of the most common passwords, a common word, a simple pattern, all one kind
+ *             of character): the person sees "This looks easy to guess" and can press "Use it anyway";
  *   anything else is fine. No "must contain a symbol", and nothing about the email.
  */
 
@@ -12,7 +12,8 @@ export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 200;
 
 /**
- * The most common passwords of all, from the public top-100 lists (lowercase, spaces removed). Refused outright.
+ * The most common passwords of all, from the public top-100 lists (lowercase, spaces removed). Warned about, like
+ * the other easy-to-guess ones (the person's account, the person's call).
  * Those under 10 characters are already refused by the length rule; the ones that matter here are the 10+ ones
  * ("1234567890", "qwertyuiop", "password123", ...).
  */
@@ -55,13 +56,12 @@ function isPattern(p: string): boolean {
 const squash = (p: string) => p.toLowerCase().replace(/\s+/g, "");
 
 /**
- * The only reasons a password is refused: under the minimum, over the hashing limit, or one of the very most
- * common passwords. Nothing else stops a person choosing their own password.
+ * The only reason a password is refused: its length (under the minimum, or over the hashing limit). Nothing else
+ * stops a person choosing their own password.
  */
 export function passwordBlock(password: string): string | null {
   if (password.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`;
   if (password.length > PASSWORD_MAX) return "That password is too long.";
-  if (WORST.has(squash(password))) return "That's one of the most common passwords. Choose another.";
   return null;
 }
 
@@ -76,6 +76,6 @@ function oneKindOfCharacter(p: string): boolean {
  */
 export function passwordWarning(password: string): string | null {
   const squashed = squash(password);
-  if (COMMON.has(squashed) || isPattern(squashed) || oneKindOfCharacter(password)) return "This looks easy to guess.";
+  if (WORST.has(squashed) || COMMON.has(squashed) || isPattern(squashed) || oneKindOfCharacter(password)) return "This looks easy to guess.";
   return null;
 }

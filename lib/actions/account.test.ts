@@ -118,8 +118,7 @@ describe("resetPassword", () => {
     addUser({ id: "u1", email: "sam@example.com", passwordHash: oldHash });
     const token = await linkFor("sam@example.com");
     expect(await resetPassword({ token, password: "football123" })).toEqual({ ok: false, weak: true, error: "This looks easy to guess." });
-    expect(await resetPassword({ token, password: "1234567890" })).toMatchObject({ ok: false, error: expect.stringMatching(/most common/) });
-    expect(await resetPassword({ token, password: "1234567890", allowWeak: true })).toMatchObject({ ok: false, error: expect.stringMatching(/most common/) }); // no override for the worst
+    expect(await resetPassword({ token, password: "1234567890" })).toEqual({ ok: false, weak: true, error: "This looks easy to guess." }); // even the most common: a warning
     expect(await resetPassword({ token, password: "short" })).toMatchObject({ ok: false, error: expect.stringMatching(/at least 10/) });
     expect(db.users.get("u1")!.passwordHash).toBe(oldHash);
     // "Use it anyway": the very same weak-looking password is accepted, and the link is used up only now.
@@ -194,12 +193,14 @@ describe("setAccountPassword", () => {
     expect(await setAccountPassword({ password: "football123", allowWeak: true })).toEqual({ ok: true });
     expect(db.users.get("u1")!.passwordHash).not.toBeNull();
   }, 10_000);
-  it("keeps the 10-character minimum, refuses the very worst even with 'use it anyway', and ignores the email", async () => {
+  it("only the 10-character minimum blocks, even with 'use it anyway'; the most common passwords are a warning; the email is ignored", async () => {
     addUser({ id: "u1", email: "jordanlee@example.com" });
     env.session = { user: { id: "u1", role: "TRAINER" } };
     expect(await setAccountPassword({ password: "abc", allowWeak: true })).toMatchObject({ ok: false, error: expect.stringMatching(/at least 10/) });
-    expect(await setAccountPassword({ password: "qwertyuiop", allowWeak: true })).toMatchObject({ ok: false, error: expect.stringMatching(/most common/) });
+    expect(await setAccountPassword({ password: "qwertyuiop" })).toEqual({ ok: false, weak: true, error: "This looks easy to guess." });
     expect(db.users.get("u1")!.passwordHash).toBeNull();
+    expect(await setAccountPassword({ password: "qwertyuiop", allowWeak: true })).toEqual({ ok: true });
+    db.users.get("u1")!.passwordHash = null;
     // Containing the email's name is no longer a rule at all: no warning, no refusal.
     expect(await setAccountPassword({ password: "jordanlee-squats-2026" })).toEqual({ ok: true });
   }, 10_000);
