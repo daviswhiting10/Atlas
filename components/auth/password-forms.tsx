@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { requestPasswordReset, resetPassword, setAccountPassword, snoozePasswordStep } from "@/lib/actions/account";
 import { inputClass, signInWithPassword } from "@/components/athlete/account";
 import { Problem } from "@/components/auth/problem";
+import { PASSWORD_MIN } from "@/lib/password-rules";
 
 const primary =
   "press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60";
@@ -19,8 +20,9 @@ function NewPasswordInput({ value, onChange, autoFocus }: { value: string; onCha
         type="password"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="New password"
+        placeholder={`New password (${PASSWORD_MIN}+ characters)`}
         required
+        minLength={PASSWORD_MIN}
         maxLength={200}
         autoComplete="new-password"
         autoFocus={autoFocus}

@@ -110,7 +110,7 @@ async function main() {
     const password = await ask(tty, "New password (hidden): ", true);
     const problem = passwordBlock(password);
     if (problem) fail(`${problem} Nothing changed.`);
-    const warning = passwordWarning(password, email); // a warning only: it is their account
+    const warning = passwordWarning(password); // a warning only: it is their account
     if (warning) tty.output.write(`${warning} Setting it anyway.\n`);
     if ((await ask(tty, "Again (hidden): ", true)) !== password) fail("The two didn't match. Nothing changed.");
 
