@@ -98,4 +98,14 @@ describe("both loggers", () => {
   it("the coach logger shows a carried-down weight muted too", () => {
     expect(coach).toContain("muted={!entry.completed && filled.has(entry.uid)}");
   });
+  it("the athlete header keeps 12 px between back, switcher, Finish and ⋯ (a thumb can't hit the wrong one)", () => {
+    expect(athlete).toMatch(/<div className="flex items-center gap-3">\s*<button[\s\S]{0,120}aria-label="Back to Today"/);
+    expect(athlete).toContain('className="press h-11 shrink-0 rounded-full px-3 text-[15px] font-semibold text-signal');
+  });
+  it("the coach row keeps its labels on one line at 360 px: nowrap, no icon on Check all, small icons dropped when narrow", () => {
+    expect(ui).toContain("whitespace-nowrap");
+    expect(ui).not.toContain("lucide-react");
+    expect(coach).toContain("max-[400px]:hidden");
+    expect(coach).toContain("max-[380px]:hidden");
+  });
 });

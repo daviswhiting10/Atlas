@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import { Check } from "lucide-react";
 import type { BulkMode } from "@/lib/sessions/check-all";
 import { bulkConfirmText } from "@/lib/sessions/check-all";
 
@@ -15,9 +14,8 @@ export function CheckAllButton({ mode, onClick, name }: { mode: BulkMode; onClic
       type="button"
       onClick={onClick}
       aria-label={`${mode === "check" ? "Check all sets" : "Uncheck all sets"} of ${name}`}
-      className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-ink-soft transition-none active:bg-ink/15 active:text-ink"
+      className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-2 text-[13px] font-medium text-ink-soft transition-none active:bg-ink/15 active:text-ink"
     >
-      <Check className="h-3.5 w-3.5" strokeWidth={3} />
       {mode === "check" ? "Check all" : "Uncheck all"}
     </button>
   );

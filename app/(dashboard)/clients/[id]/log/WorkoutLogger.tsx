@@ -1596,9 +1596,9 @@ export default function WorkoutLogger({
                       <button
                         type="button"
                         onClick={() => addSet(ex.aweId)}
-                        className="logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
+                        className="logger-quiet inline-flex whitespace-nowrap items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
                       >
-                        <Plus className="h-3.5 w-3.5" /> Add set
+                        <Plus className="h-3.5 w-3.5 max-[400px]:hidden" /> Add set
                       </button>
                       {exerciseBulk(state.sets.map((x) => x.completed)) && (
                         <CheckAllButton mode={exerciseBulk(state.sets.map((x) => x.completed))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(state.sets.map((x) => x.completed))!)} />
@@ -1611,9 +1611,9 @@ export default function WorkoutLogger({
                           type="button"
                           aria-expanded={state.noteOpen}
                           onClick={() => setExState((prev) => ({ ...prev, [ex.aweId]: { ...prev[ex.aweId], noteOpen: !prev[ex.aweId].noteOpen } }))}
-                          className="logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
+                          className="logger-quiet inline-flex whitespace-nowrap items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
                         >
-                          <PencilLine className="h-3.5 w-3.5" /> Note
+                          <PencilLine className="h-3.5 w-3.5 max-[380px]:hidden" /> Note
                         </button>
                       )}
                       <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
@@ -2368,11 +2368,11 @@ function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; o
       disabled={busy}
       aria-expanded={open}
       className={cn(
-        "logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium disabled:opacity-50",
+        "logger-quiet inline-flex whitespace-nowrap items-center gap-1 px-1 py-1 text-[13px] font-medium disabled:opacity-50",
         open ? "text-ink" : "text-ink-soft hover:text-ink"
       )}
     >
-      {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
+      {open ? <X className="h-3.5 w-3.5 max-[380px]:hidden" /> : <SlidersHorizontal className="h-3.5 w-3.5 max-[380px]:hidden" />}
       {open ? "Close" : "Change"}
     </button>
   );

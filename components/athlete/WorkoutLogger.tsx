@@ -814,7 +814,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     <div className="-mt-5 md:mt-0">
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 -mx-4 border-b border-line bg-bone/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-8 sm:px-8 md:top-16">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button type="button" onClick={() => router.push("/today")} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -830,7 +830,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           </button>
           {finishing && <Loader2 className="h-5 w-5 shrink-0 animate-spin text-ink-mute" aria-label="Finishing" />}
           {data.status !== "LOGGED" && !finishQueued && (
-            <button type="button" onClick={tapFinish} disabled={finishing || doneCount === 0} className="press h-11 shrink-0 rounded-full px-4 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
+            <button type="button" onClick={tapFinish} disabled={finishing || doneCount === 0} className="press h-11 shrink-0 rounded-full px-3 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
               Finish
             </button>
           )}
