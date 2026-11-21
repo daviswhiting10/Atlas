@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
 import { useRouter } from "next/navigation";
-import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { describeDay, type ImportSummary } from "@/lib/programs/sheet-summary";
@@ -303,34 +303,41 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
         </div>
       )}
 
-      <label className="block text-xs font-medium text-ink-soft">
-        Context <span className="font-normal text-ink-mute">(optional)</span>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          disabled={busy}
-          rows={2}
-          maxLength={1000}
-          placeholder="e.g. 4-week block, start fresh at week 1"
-          className="mt-1 w-full resize-none rounded-lg border border-line-strong bg-dusk-raised px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60"
-        />
-      </label>
+      {/* Optional, so folded away: the importer works the same with or without them. */}
+      <details className="group rounded-xl border border-line">
+        <summary className="press flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3.5 text-[15px] font-medium text-ink-soft [&::-webkit-details-marker]:hidden">
+          Details <span className="text-[13px] font-normal text-ink-mute">(optional)</span>
+          <ChevronDown className="ml-auto h-4 w-4 text-ink-mute transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="space-y-3 border-t border-line px-3.5 pb-3.5 pt-3">
+          <label className="block text-xs font-medium text-ink-soft">
+            Context <span className="font-normal text-ink-mute">(optional)</span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={busy}
+              rows={2}
+              maxLength={1000}
+              placeholder="e.g. 4-week block, start fresh at week 1"
+              className="mt-1 w-full resize-none rounded-lg border border-line-strong bg-dusk-raised px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40 disabled:opacity-60"
+            />
+          </label>
+          <label className="block text-xs font-medium text-ink-soft">
+            Week 1 started <span className="font-normal text-ink-mute">(optional)</span>
+            <DayInput ref={dateRef} value={date} onDay={setDate} disabled={busy} className={cn(field, "mt-1 sm:w-44")} />
+          </label>
+        </div>
+      </details>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="text-xs font-medium text-ink-soft">
-          Week 1 started <span className="font-normal text-ink-mute">(optional)</span>
-          <DayInput ref={dateRef} value={date} onDay={setDate} disabled={busy} className={cn(field, "mt-1 sm:w-44")} />
-        </label>
-        <button type="button" onClick={read} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70">
-          {busy ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Reading the plan…
-            </>
-          ) : (
-            `Read ${firstName}'s plan`
-          )}
-        </button>
-      </div>
+      <button type="button" onClick={read} disabled={busy} className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70">
+        {busy ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" /> Reading the plan…
+          </>
+        ) : (
+          `Read ${firstName}'s plan`
+        )}
+      </button>
       {busy && <p className="text-[12px] text-ink-mute">About half a minute.</p>}
       {error && (
         <p role="alert" className="text-sm leading-relaxed text-destructive">
