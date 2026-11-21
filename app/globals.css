@@ -69,6 +69,7 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -191,15 +192,22 @@
 .press { transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1), background-color 160ms, border-color 160ms, box-shadow 160ms, color 160ms, opacity 160ms; }
 .press:active { transform: scale(0.97); }
 
-/* Staggered entrance */
-.rise { animation: rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.rise-1 { animation-delay: 60ms; }
-.rise-2 { animation-delay: 120ms; }
-.rise-3 { animation-delay: 180ms; }
-.rise-4 { animation-delay: 240ms; }
-.rise-5 { animation-delay: 300ms; }
+/* Entrance on a screen or tab change: 240 ms, stagger 0 to 60 ms, so everything is in by about 300 ms. */
+.rise { animation: rise 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rise-1 { animation-delay: 0ms; }
+.rise-2 { animation-delay: 15ms; }
+.rise-3 { animation-delay: 30ms; }
+.rise-4 { animation-delay: 45ms; }
+.rise-5 { animation-delay: 60ms; }
+/* The slow, staggered one is for the landing page and the Finish screen only. */
+.rise-intro { animation: rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rise-intro-1 { animation-delay: 60ms; }
+.rise-intro-2 { animation-delay: 120ms; }
+.rise-intro-3 { animation-delay: 180ms; }
+.rise-intro-4 { animation-delay: 240ms; }
+.rise-intro-5 { animation-delay: 300ms; }
 @keyframes rise {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 

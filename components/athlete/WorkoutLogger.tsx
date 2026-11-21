@@ -662,7 +662,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       [String(summary.minutes), "min"],
     ];
     return (
-      <div className="rise mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
+      <div className="rise-intro mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
         <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
