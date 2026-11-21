@@ -13,6 +13,9 @@ import { hasProgressToShow, newestIsLighter } from "@/lib/progress/overall";
 import { listReports } from "@/lib/report/load";
 import { ReportLink } from "@/components/report/ReportLink";
 import { prisma } from "@/lib/db/client";
+import { LatestSession } from "@/components/coach/LatestSession";
+import { loadLatestSession } from "@/lib/coach/latest-session";
+import { sessionPrs } from "@/lib/coach/review";
 import { loginStatus } from "@/lib/coach/login-status";
 import { ClientDetail } from "./ClientDetail";
 
@@ -27,12 +30,14 @@ export default async function ClientPage({ params }: { params: { id: string } })
   // The client's details load with the charts, on the server: the page no longer waits for a second fetch from the browser.
   // The calendar's read is scoped to this workspace too, and isn't shown unless the client is found.
   const timeZone = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
-  const [progress, details, calendar, reports] = await Promise.all([
+  const [progress, details, calendar, reports, latest] = await Promise.all([
     loadClientProgress(params.id, workspaceId),
     getClient(params.id, workspaceId),
     loadCalendar({ clientId: params.id, workspaceId, timeZone, viewer: { kind: "coach", clientId: params.id } }),
     // The latest finished block with a report, as one row under "Log session".
     listReports(params.id, workspaceId, timeZone),
+    // The latest finished plan session, judged against what was prescribed, one tap from the roster.
+    loadLatestSession({ clientId: params.id, workspaceId, timeZone }),
   ]);
   if (!progress || !details) notFound();
   // Where the client is with the app: invited, opened, password set (worked out from their login; nothing stored).
@@ -57,6 +62,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
       history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : null}
       access={access}
+      latest={latest ? <LatestSession clientId={params.id} session={latest} prs={sessionPrs(data.exercises, latest.day)} /> : null}
       report={reports[0] ? <ReportLink entry={reports[0]} className="sm:max-w-sm" /> : null}
     />
   );
