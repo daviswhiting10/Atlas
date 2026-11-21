@@ -22,6 +22,8 @@ import { useDragOrder } from "@/app/(dashboard)/clients/[id]/log/useDragOrder";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
+import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
+import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish, unloggedText } from "@/lib/sessions/finish";
@@ -67,6 +69,7 @@ function Stepper({
   label,
   onChange,
   dim,
+  muted = false,
   settled,
 }: {
   value: number | null;
@@ -75,6 +78,8 @@ function Stepper({
   label: string;
   onChange: (v: number | null) => void;
   dim: boolean;
+  /** A weight carried down from set 1 into a set that had none: shown muted until it's ticked or edited. */
+  muted?: boolean;
   /** False just after cards fold, open or move: a +/− tapped now was meant for what was there (it would change a logged set). */
   settled: () => boolean;
 }) {
@@ -100,7 +105,7 @@ function Stepper({
           aria-label={label}
           onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
           onFocus={(e) => e.target.select()}
-          className="tnum w-full bg-transparent text-center text-[17px] font-semibold leading-none text-ink outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className={cn("tnum w-full bg-transparent text-center text-[17px] leading-none outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
       </label>
@@ -377,9 +382,19 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
   const deloadWeek = data.deloadWeek;
 
+  // Weights carried down from set 1 into sets that had none (muted until ticked or edited). Still editable; logged only when ticked.
+  const [filled, setFilled] = useState<Set<string>>(() => new Set());
   function edit(ex: LoggerExercise, i: number, patch: Partial<Pick<LoggerSet, "weight" | "reps">>) {
     const list = setsRef.current[ex.aweId] ?? ex.sets;
     const before = list[i];
+    if (patch.weight !== undefined) {
+      const mark = new Set(filled);
+      mark.delete(`${ex.aweId}:${before.setNumber}`);
+      list.forEach((x, j) => {
+        if (j > i && !x.done && x.weight === before.weight && before.weight == null && patch.weight != null) mark.add(`${ex.aweId}:${x.setNumber}`);
+      });
+      setFilled(mark);
+    }
     const next = list.map((s, j) => {
       if (j === i) return { ...s, ...patch };
       // Carry a weight change forward to the sets you haven't done yet.
@@ -394,11 +409,92 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     }
   }
 
+  /**
+   * Personal record? Same rule as the charts (isRecord): the heaviest weight yet on a loaded lift, or the
+   * next 5-rep step on bodyweight work, judged against all history and anything else already done today.
+   * Returns the label to show, or null.
+   */
+  function recordFor(ex: LoggerExercise, list: LoggerSet[], i: number): string | null {
+    const s = list[i];
+    const earlier = list.filter((x, j) => j !== i && x.done);
+    const best = {
+      weight: Math.max(0, ...ex.history.map((p) => p.weight ?? 0), ...earlier.map((x) => x.weight ?? 0)),
+      reps: Math.max(0, ...ex.history.map((p) => p.reps), ...earlier.map((x) => x.reps ?? 0)),
+    };
+    const mine = { weight: ex.loaded ? s.weight : null, reps: s.reps ?? 0 };
+    if (ex.history.length === 0 || deloadWeek || !isRecord(mine, best)) return null;
+    return mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${ex.unit === "secs" ? "sec" : "reps"}`;
+  }
+
+  /**
+   * Check all / Uncheck all, for one exercise or the whole workout: each set goes through what a single tick does
+   * (on screen at once, kept on the phone until saved, saved in set order, a record judged per set), then the rest
+   * timer starts once (or the workout finishes, if that was the last set). Nothing flashes and no toast.
+   */
+  function applyBulk(groups: Array<{ ex: LoggerExercise; idx: number[] }>, mode: BulkMode) {
+    const done = mode === "check";
+    const nextSets = { ...setsRef.current };
+    const recs: Record<string, string> = {};
+    const gone: string[] = [];
+    const order: Array<{ aweId: string; setNumber: number; weight: number | null; reps: number | null }> = [];
+    for (const { ex, idx } of groups) {
+      const running = (setsRef.current[ex.aweId] ?? ex.sets).map((x) => ({ ...x }));
+      for (const i of idx) {
+        const s = running[i];
+        const key = `${ex.aweId}:${s.setNumber}`;
+        clearStuck(key);
+        if (!serverDone.current.has(key)) serverDone.current.set(key, s.setLogId ? s.done : false);
+        if (done) {
+          const label = recordFor(ex, running, i);
+          if (label) recs[key] = label;
+        } else gone.push(key);
+        running[i] = { ...s, done };
+        order.push({ aweId: ex.aweId, setNumber: s.setNumber, weight: s.weight, reps: s.reps });
+      }
+      nextSets[ex.aweId] = running;
+    }
+    if (order.length === 0) return;
+    apply(nextSets);
+    queueBulk(store(), data.id, order.map((o) => ({ ...o, done })));
+    for (const o of order) persist(o.aweId, o.setNumber);
+    if (!done) {
+      cancelFinish();
+      setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !gone.includes(k))));
+      return;
+    }
+    if (Object.keys(recs).length) setRecords((r) => ({ ...r, ...recs }));
+    const last = groups[groups.length - 1];
+    const lastSet = (nextSets[last.ex.aweId] ?? [])[last.idx[last.idx.length - 1]];
+    afterChange(last.ex, lastSet?.plan?.rest ?? undefined);
+  }
+
+  function bulkOne(ex: LoggerExercise, mode: BulkMode) {
+    if (!settled()) return;
+    const list = setsRef.current[ex.aweId] ?? ex.sets;
+    const idx = bulkIndices(list.map((x) => x.done), mode, list.map((x) => (x.reps ?? 0) > 0));
+    if (idx.length === 0) return void (mode === "check" && toast(`Enter your ${ex.unit === "secs" ? "time" : "reps"} first`));
+    applyBulk([{ ex, idx }], mode);
+  }
+
+  /** The whole workout, in the order on screen. */
+  function bulkAll(mode: BulkMode) {
+    if (!settled()) return;
+    const groups = exercises
+      .map((ex) => {
+        const list = setsRef.current[ex.aweId] ?? ex.sets;
+        return { ex, idx: bulkIndices(list.map((x) => x.done), mode, list.map((x) => (x.reps ?? 0) > 0)) };
+      })
+      .filter((g) => g.idx.length > 0);
+    if (groups.length) applyBulk(groups, mode);
+  }
+  const [confirmAll, setConfirmAll] = useState<number | null>(null);
+
   function toggle(ex: LoggerExercise, i: number) {
     if (!settled()) return;
     const list = setsRef.current[ex.aweId] ?? ex.sets;
     const s = list[i];
     const done = !s.done;
+    if (filled.has(`${ex.aweId}:${s.setNumber}`)) setFilled((f) => new Set(Array.from(f).filter((k) => k !== `${ex.aweId}:${s.setNumber}`)));
     if (done && (s.reps == null || s.reps <= 0)) {
       toast(`Enter your ${ex.unit === "secs" ? "time" : "reps"} first`);
       return;
@@ -422,20 +518,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       return;
     }
 
-    // Personal record? Same rule as the charts (isRecord): the heaviest weight
-    // yet on a loaded lift, or the next 5-rep step on bodyweight work — judged
-    // against all history and anything already done today.
-    const earlier = list.filter((x, j) => j !== i && x.done);
-    const best = {
-      weight: Math.max(0, ...ex.history.map((p) => p.weight ?? 0), ...earlier.map((x) => x.weight ?? 0)),
-      reps: Math.max(0, ...ex.history.map((p) => p.reps), ...earlier.map((x) => x.reps ?? 0)),
-    };
-    const mine = { weight: ex.loaded ? s.weight : null, reps: s.reps ?? 0 };
-    if (ex.history.length > 0 && !deloadWeek && isRecord(mine, best)) {
-      const timed = ex.unit === "secs";
-      const label = mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${timed ? "sec" : "reps"}`;
-      setRecords((r) => ({ ...r, [key]: label }));
-    }
+    const label = recordFor(ex, list, i);
+    if (label) setRecords((r) => ({ ...r, [key]: label }));
 
     afterChange(ex, s.plan?.rest ?? undefined);
   }
@@ -451,6 +535,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       scheduleFinish();
       return;
     }
+    restFor.current = ex.aweId;
     setRest({ endsAt: Date.now() + restSeconds * 1000, total: restSeconds });
     // An exercise's last set folds it and opens the next one with sets left (in the order on screen).
     const shown = exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).length > 0 && (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));
@@ -649,6 +734,27 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   );
   const swapping = picker?.mode === "swap" ? data.exercises.find((e) => e.aweId === picker.aweId) ?? null : null;
 
+  const wb = workoutBulk(data.exercises.map((e) => listOf(e).map((x) => x.done)));
+  // The rest pill floats at the bottom. When a rest starts, the next set to log is moved above it if it would sit under it.
+  const pillRef = useRef<HTMLDivElement>(null);
+  const restFor = useRef<string | null>(null);
+  const restStartedAt = rest ? rest.endsAt - rest.total * 1000 : 0;
+  useEffect(() => {
+    if (!restStartedAt) return;
+    const id = requestAnimationFrame(() => {
+      const pill = pillRef.current;
+      // The next set to log in the exercise being logged (else the first one still to log).
+      const tick =
+        document.querySelector<HTMLElement>(`section[data-exercise="${restFor.current}"] button[aria-label^="Mark set"]`) ?? document.querySelector<HTMLElement>('button[aria-label^="Mark set"]');
+      if (!pill || !tick) return;
+      const row = tick.closest("li") ?? tick;
+      // The pill's box is its full-width wrapper; its own rise animation only moves it down, so this is the final top.
+      const top = window.innerHeight - pill.offsetHeight;
+      const over = row.getBoundingClientRect().bottom - (top - 12);
+      if (over > 0) window.scrollBy({ top: over, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [restStartedAt]);
   const restLeft = rest ? (rest.endsAt - now) / 1000 : 0;
   const elapsed = (now - startedAt.current) / 1000;
 
@@ -724,9 +830,21 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           </button>
           {finishing && <Loader2 className="h-5 w-5 shrink-0 animate-spin text-ink-mute" aria-label="Finishing" />}
           {data.status !== "LOGGED" && !finishQueued && (
-            <button type="button" onClick={tapFinish} disabled={finishing || doneCount === 0} className="press -mr-2 h-11 shrink-0 rounded-full px-4 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
+            <button type="button" onClick={tapFinish} disabled={finishing || doneCount === 0} className="press h-11 shrink-0 rounded-full px-4 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
               Finish
             </button>
+          )}
+          {data.status !== "LOGGED" && wb && (
+            <DropdownMenu>
+              <DropdownMenuTrigger aria-label="More" className="press -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+                <MoreHorizontal className="h-5 w-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuItem className="min-h-11" onClick={() => (wb.mode === "check" ? setConfirmAll(wb.count) : bulkAll("uncheck"))}>
+                  {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
@@ -851,7 +969,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                             <li key={s.setNumber}>
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
                                 <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
                                 <Stepper
                                   value={s.reps}
                                   step={timed ? 5 : 1}
@@ -892,9 +1010,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                           );
                         })}
                       </ul>
-                      <button type="button" onClick={() => addSet(ex)} className="press logger-quiet mt-2 inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-medium text-ink-soft hover:text-ink">
-                        <Plus className="h-3.5 w-3.5" /> Add set
-                      </button>
+                      <div className="mt-2 flex items-center gap-1">
+                        <button type="button" onClick={() => addSet(ex)} className="press logger-quiet inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-medium text-ink-soft hover:text-ink">
+                          <Plus className="h-3.5 w-3.5" /> Add set
+                        </button>
+                        {data.status !== "LOGGED" && exerciseBulk(list.map((x) => x.done)) && (
+                          <CheckAllButton mode={exerciseBulk(list.map((x) => x.done))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(list.map((x) => x.done))!)} />
+                        )}
+                      </div>
                     </section>
                   );
                 })}
@@ -904,6 +1027,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         </div>
 
         <PendingExercises pending={offline.pending} />
+        {/* Room under the last card, so the floating rest pill never has to sit on a set. */}
+        <div aria-hidden className="h-20" />
 
         <button
           type="button"
@@ -930,7 +1055,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
       {/* ── Rest timer ───────────────────────────────────────────────── */}
       {rest && (
-        <div className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
+        <div ref={pillRef} className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
           <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full border border-line-strong bg-dusk-raised py-2 pl-5 pr-2 text-ink shadow-[0_20px_40px_-16px_rgba(0,0,0,0.7)]">
             <div className="absolute inset-y-0 left-0 bg-signal/35 transition-[width] duration-500 ease-linear" style={{ width: `${Math.max(0, Math.min(100, (restLeft / rest.total) * 100))}%` }} />
             <Timer className="relative h-4 w-4 text-ink-soft" />
@@ -994,6 +1119,17 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmAll != null && (
+        <CheckAllSheet
+          count={confirmAll}
+          onCancel={() => setConfirmAll(null)}
+          onConfirm={() => {
+            setConfirmAll(null);
+            bulkAll("check");
+          }}
+        />
       )}
 
       {/* ── Workout switcher ─────────────────────────────────────────── */}

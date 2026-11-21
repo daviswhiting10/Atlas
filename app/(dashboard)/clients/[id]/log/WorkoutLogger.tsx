@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  MoreHorizontal,
   Mic,
   MicOff,
   PencilLine,
@@ -42,6 +43,9 @@ import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExerci
 import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
+import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
+import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
@@ -675,6 +679,7 @@ export default function WorkoutLogger({
     addPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1), { done: nowDone });
     saveSet(aweId, exerciseId, entry.uid, { ...entry, completed: nowDone }, idx);
     if (!nowDone) return;
+    lastAwe.current = aweId;
     setLastSetAt(Date.now());
     setRestSecs(0);
     const lists = doneLists();
@@ -760,6 +765,82 @@ export default function WorkoutLogger({
       }
     });
   }
+
+  // ── Check all / Uncheck all (one exercise, or the whole workout) ──────────────
+  // Each set goes through what a single tick does: on screen at once, kept on the phone until the server
+  // confirms it, saved in set order. The rest timer restarts once. No toast, no flash.
+  const [confirmAll, setConfirmAll] = useState<number | null>(null);
+  function applyBulk(groups: Array<{ ex: LoggerExercise; idx: number[] }>, mode: BulkMode) {
+    const done = mode === "check";
+    const calls: Array<{ aweId: string; exerciseId: string; entry: SetEntry; idx: number }> = [];
+    const uids = new Set<string>();
+    for (const { ex, idx } of groups) {
+      const sets = exStateRef.current[ex.aweId]?.sets ?? [];
+      for (const i of idx) {
+        const entry = sets[i];
+        if (!entry) continue;
+        noteServer(entry);
+        clearStuck(entry.uid);
+        uids.add(entry.uid);
+        calls.push({ aweId: ex.aweId, exerciseId: ex.exerciseId, entry, idx: i });
+      }
+    }
+    if (calls.length === 0) return;
+    const mark = (m: Record<string, ExerciseState>) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.sets.some((x) => uids.has(x.uid)) ? { ...v, sets: v.sets.map((x) => (uids.has(x.uid) ? { ...x, completed: done } : x)) } : v]));
+    exStateRef.current = mark(exStateRef.current);
+    setExState((prev) => mark(prev));
+    queueBulk(store(), assignedWorkoutId, calls.map((c) => ({ aweId: c.aweId, setNumber: c.idx + 1, done })));
+    for (const c of calls) saveSet(c.aweId, c.exerciseId, c.entry.uid, { ...c.entry, completed: done }, c.idx);
+    if (!done) return void cancelFinish();
+    lastAwe.current = calls[calls.length - 1].aweId;
+    setLastSetAt(Date.now());
+    setRestSecs(0);
+    const lists = doneLists();
+    if (allDone(lists)) return void scheduleFinish();
+    afterExerciseChange(calls[calls.length - 1].aweId, lists);
+  }
+  function bulkOne(ex: LoggerExercise, mode: BulkMode) {
+    if (!settled()) return;
+    const sets = exStateRef.current[ex.aweId]?.sets ?? [];
+    applyBulk([{ ex, idx: bulkIndices(sets.map((x) => x.completed), mode) }], mode);
+  }
+  function bulkAll(mode: BulkMode) {
+    if (!settled()) return;
+    const groups = exercises
+      .map((ex) => ({ ex, idx: bulkIndices((exStateRef.current[ex.aweId]?.sets ?? []).map((x) => x.completed), mode) }))
+      .filter((g) => g.idx.length > 0);
+    if (groups.length) applyBulk(groups, mode);
+  }
+  const wb = workoutBulk(exercises.map((e) => (exState[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
+  const workoutMenu = wb ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label="More" className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+        <MoreHorizontal className="h-5 w-5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[180px]">
+        <DropdownMenuItem className="min-h-11" onClick={() => (wb.mode === "check" ? setConfirmAll(wb.count) : bulkAll("uncheck"))}>
+          {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
+  // The rest pill floats at the bottom: when it starts, the next set to log is moved above it if it would sit under it.
+  const pillRef = useRef<HTMLDivElement>(null);
+  const lastAwe = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastSetAt) return;
+    const id = requestAnimationFrame(() => {
+      const pill = pillRef.current;
+      const tick =
+        document.querySelector<HTMLElement>(`section[data-exercise="${lastAwe.current}"] button[aria-label^="Log set"]`) ?? document.querySelector<HTMLElement>('button[aria-label^="Log set"]');
+      if (!pill || !tick) return;
+      const row = (tick.closest('[role="group"]') as HTMLElement | null) ?? tick;
+      const over = row.getBoundingClientRect().bottom - (pill.getBoundingClientRect().top - 12);
+      if (over > 0) window.scrollBy({ top: over, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [lastSetAt]);
 
   /** Every exercise's sets as done flags, from the latest state, with one set (or one change) applied. */
   function doneLists(change?: { aweId: string; idx: number; removed?: boolean }): boolean[][] {
@@ -1418,6 +1499,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {workoutMenu}
         </div>
         </div>
       </div>
@@ -1498,6 +1580,9 @@ export default function WorkoutLogger({
                       >
                         <Plus className="h-3.5 w-3.5" /> Add set
                       </button>
+                      {exerciseBulk(state.sets.map((x) => x.completed)) && (
+                        <CheckAllButton mode={exerciseBulk(state.sets.map((x) => x.completed))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(state.sets.map((x) => x.completed))!)} />
+                      )}
                       <span className="flex-1" />
                       {state.noteAdded ? (
                         <span className="px-1 text-[13px] text-[var(--success)]">Note saved ✓</span>
@@ -1602,7 +1687,7 @@ export default function WorkoutLogger({
 
       {/* ── Floating rest timer ──────────────────────────────────── */}
       {lastSetAt && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
+        <div ref={pillRef} className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
           <Timer className="w-4 h-4 text-muted-foreground" />
           <span className="font-mono text-lg tabular-nums">{formatRest(restSecs)}</span>
           <button
@@ -1667,6 +1752,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {workoutMenu}
         </div>
       </div>
 
@@ -1740,6 +1826,9 @@ export default function WorkoutLogger({
                     <Plus className="w-3 h-3" />
                     Add set
                   </button>
+                  {exerciseBulk(state.sets.map((x) => x.completed)) && (
+                    <CheckAllButton mode={exerciseBulk(state.sets.map((x) => x.completed))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(state.sets.map((x) => x.completed))!)} />
+                  )}
                   <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                 </div>
                 {editingAweId === ex.aweId && (
@@ -1804,6 +1893,16 @@ export default function WorkoutLogger({
     <>
       {mobileView}
       {desktopView}
+      {confirmAll != null && (
+        <CheckAllSheet
+          count={confirmAll}
+          onCancel={() => setConfirmAll(null)}
+          onConfirm={() => {
+            setConfirmAll(null);
+            bulkAll("check");
+          }}
+        />
+      )}
       {pickerSheet}
     </>
   );
