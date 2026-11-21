@@ -12,6 +12,7 @@ import { saveSheetPlan } from "@/lib/programs/save-sheet-plan";
 import { SheetError, fetchSheetCsv, parseSheetLink, tidyCsv } from "@/lib/programs/sheet";
 import { CATEGORIES } from "@/lib/programs/categories";
 import { rateLimiter } from "@/lib/password";
+import { CHOOSE_A_FILE, PlanFileError, planFileFromForm, readPlanFile } from "@/lib/programs/read-plan-file";
 
 export const maxDuration = 120;
 
@@ -52,6 +53,8 @@ const perWorkspace = rateLimiter(20, 60 * 60_000);
  */
 export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, userId }, { params }) => {
   const { id } = await params;
+  // A PDF or screenshots (multipart): the shared reader, into the same grid as a sheet, so each week is read as written.
+  if ((req.headers.get("content-type") ?? "").includes("multipart/form-data")) return readFiles(req, id, { workspaceId, userId });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Drop an .xlsx or .csv file, or paste a Google Sheets link." }, { status: 400 });
 
@@ -140,5 +143,27 @@ async function save(
   } catch (err) {
     console.error("[plan-from-sheet] save failed:", err);
     return NextResponse.json({ error: "Read the sheet, but couldn't save the plan. Please try again." }, { status: 500 });
+  }
+}
+
+/** The read step for files (a PDF, screenshots, or a spreadsheet the browser turned into CSV): the shared reader. */
+async function readFiles(req: Request, id: string, who: { workspaceId: string; userId: string }) {
+  const client = await prisma.clientProfile.findFirst({ where: { id, workspaceId: who.workspaceId, deletedAt: null, ...ROSTER }, select: { id: true } });
+  if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  const form = await req.formData().catch(() => null);
+  if (!form) return NextResponse.json({ error: CHOOSE_A_FILE }, { status: 400 });
+  const weekOne = String(form.get("weekOneStart") ?? "");
+  const weekOneStart = /^\d{4}-\d{2}-\d{2}$/.test(weekOne) ? new Date(`${weekOne}T00:00:00`) : null;
+  const notes = String(form.get("notes") ?? "").trim().slice(0, 1000) || undefined;
+  try {
+    const file = planFileFromForm(form);
+    if (!perWorkspace(who.workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
+    const { grid, warnings } = await readPlanFile(file, { ...who, feature: file.csv ? "program-sheet-import" : "program-import", notes });
+    const context = notes ? contextFromText(notes) : NO_CONTEXT;
+    const summary = summarizeSheetImport({ grid, context, weekOneStart, today: new Date() });
+    return NextResponse.json({ grid, context, summary, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
+  } catch (err) {
+    if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
+    throw err;
   }
 }

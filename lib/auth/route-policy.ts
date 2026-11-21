@@ -23,7 +23,7 @@ export const GUEST_EMAIL_DOMAIN = "guest.atlas.app";
  * reaches a real person (an invite email) or costs money per call (AI, uploads, outreach).
  * Everything inside their own workspace still works.
  */
-const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|erase|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/, /^\/api\/athlete\/plan-import$/];
+const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|erase|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/, /^\/api\/athlete\/plan-import$/, /^\/api\/programs\/import$/];
 
 export type RouteUser = { role: string; needsPassword: boolean; guest?: boolean } | null;
 

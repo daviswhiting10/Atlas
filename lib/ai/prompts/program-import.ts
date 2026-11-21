@@ -1,73 +1,5 @@
 import { contextPromptSection } from "@/lib/programs/plan-context";
 
-export function buildProgramImportPrompt(imageCount: number, notes?: string) {
-  const multiDay = imageCount > 1;
-
-  return {
-    system: `You are Atlas, a workout-programming assistant. Your job is to parse ${multiDay ? `${imageCount} screenshots of a workout plan` : "a screenshot of a workout plan"} and return a JSON representation of the program.
-
-## Output format
-Respond ONLY with valid JSON — no markdown fences, no explanation text, just the raw JSON object.
-
-The JSON must follow this exact structure:
-{
-  "programName": string,
-  "description": string,
-  "durationWeeks": number,
-  "days": [
-    {
-      "name": string,
-      "dayOfWeek": number,
-      "sections": [
-        {
-          "name": string,
-          "exercises": [
-            {
-              "name": string,
-              "sets": number,
-              "repMin": number,
-              "repMax": number,
-              "unit": "reps" | "secs",
-              "loadNote": string,
-              "tempo": string,
-              "restSeconds": number | null,
-              "notes": string
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-
-## Field rules
-- **programName**: infer a short name from the day labels and goals (e.g. "Lower Body Power Block").
-- **durationWeeks**: 1 unless the screenshots indicate a multi-week programme.
-- **durationWeeks**: if the screenshot shows several week columns (Week 1, Week 2, …), the number of weeks.
-- **days**: one entry per training day shown. ${multiDay ? "Usually each image is one day, but an image can show several days: split them by their day labels." : "One image can show several days: split them by their day labels."}
-- **sets/reps when there are week columns**: use the week the client starts at (week 1 unless the coach's note says otherwise).
-- **name**: use the day label exactly as written in the screenshot (e.g. "Monday", "Thursday", "Day A"). If no label, use "Day 1", "Day 2", etc.
-- **dayOfWeek**: derive from the day label. Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6 Sun=7. If ambiguous, space days evenly starting at 1.
-- **sections**: labeled groups within a day (e.g. "Block A", "Block B", "Warmup"). If no labeled sections, use one section named "Main".
-- **sets**: number of working sets for the exercise.
-- **repMin / repMax**: if a single number (e.g. "15"), set both to 15. If a range (e.g. "8–12"), split them. Time-based (e.g. "30 sec"): unit="secs", repMin=repMax=30.
-- **loadNote**: any load/intensity guidance (e.g. "Light band", "BW", "Moderate cable"). Empty string if none.
-- **tempo**: tempo prescription if stated, else "".
-- **restSeconds**: rest in seconds if stated, else null.
-- **notes**: coaching notes or purpose notes from the plan.
-
-## Hard rules
-- Capture EVERY exercise shown, in the order they appear.
-- Preserve section groupings exactly as shown.
-- Do NOT invent exercises not visible in the images.${contextPromptSection(notes)}`,
-    user:
-      (notes?.trim() ? `The coach's note (follow it): ${notes.trim()}\n\n` : "") +
-      (multiDay
-        ? `${imageCount} screenshots of the plan follow, in order. Use the day labels visible in them to set each day's name and dayOfWeek.`
-        : `Parse the workout plan in this image.`),
-  };
-}
-
 /**
  * A coach's plan spreadsheet, transcribed cell for cell. The model doesn't
  * interpret anything (sets, weights, which weeks are done): it copies each
@@ -85,7 +17,7 @@ export function buildProgramSheetPrompt(csv: string, notes?: string) {
  * The same transcription, from images: the pages of a PDF or screenshots of a plan. Into the same grid as a spreadsheet,
  * so each week keeps its own sets, reps and loads (lib/programs/sheet-plan reads them the same way).
  */
-export function buildProgramPagesPrompt(imageCount: number) {
+export function buildProgramPagesPrompt(imageCount: number, notes?: string) {
   return {
     system: sheetSystem(
       `You transcribe a workout plan from ${imageCount === 1 ? "an image" : `${imageCount} images`} (the pages of a PDF, or screenshots) into JSON. Copy what is written exactly; do not interpret, convert, correct or invent anything.
@@ -94,9 +26,9 @@ export function buildProgramPagesPrompt(imageCount: number) {
 - A plan often gives each week its own page or section ("Week 1", "Week 2", …) with the same days and exercises. Merge them: one entry per training day, and for each exercise one "weeks" entry per week, taken from that week's page or section.
 - Match an exercise across weeks by its day and name. An exercise that appears only in some weeks still gets an entry; its other weeks have "" cells.
 - A table column for sets and one for reps go together in "setsReps" as written ("3" and "8-10" is "3x8-10"). A weight or load column goes in "load" ("135", "60 kg", "BW").`,
-      undefined
+      notes
     ).replace("## Typical layout (yours may differ)", "## Typical spreadsheet layout (a page may look like this, or not)"),
-    user: `The plan is in the ${imageCount === 1 ? "image" : `${imageCount} images`} above, in order.`,
+    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The plan is in the ${imageCount === 1 ? "image" : `${imageCount} images`} above, in order.`,
   };
 }
 

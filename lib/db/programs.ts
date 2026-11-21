@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "./client";
 import { planSessionSource, withDerivedStatus } from "@/lib/sessions/status";
 import type { ProgramBody, UpdateAssignedWorkoutInput } from "@/lib/validations/program";
@@ -37,6 +38,9 @@ export async function getProgram(id: string, workspaceId: string) {
   });
 }
 
+/** An id made here, so rows can be written in one batch and still point at each other (same form as lib/plan/persist). */
+const newId = () => randomUUID().replace(/-/g, "");
+
 export async function upsertProgram(
   workspaceId: string,
   data: ProgramBody,
@@ -67,6 +71,30 @@ export async function upsertProgram(
             isTemplate: true,
           },
         });
+
+    // A new program (an import, a copy): nothing to reconcile, so every row goes in one batch per table. Row by row,
+    // a 4-week plan is ~85 round trips and can run past the transaction's time limit.
+    const fresh = !existingId && data.blocks.every((b) => !b.id && b.workouts.every((w) => !w.id && w.exercises.every((e) => !e.id)));
+    if (fresh) {
+      const blocks: Array<{ id: string; workspaceId: string; programId: string; name: string; order: number; weeks: number }> = [];
+      const workouts: Array<{ id: string; workspaceId: string; blockId: string; name: string; dayOfWeek: number; order: number; isTemplate: boolean }> = [];
+      const exercises: Array<{ workspaceId: string; workoutId: string; exerciseId: string; order: number; prescribedSets: never; notes: string | null; section: string | null }> = [];
+      for (const block of data.blocks) {
+        const blockId = newId();
+        blocks.push({ id: blockId, workspaceId, programId: program.id, name: block.name, order: block.order, weeks: block.weeks });
+        for (const workout of block.workouts) {
+          const workoutId = newId();
+          workouts.push({ id: workoutId, workspaceId, blockId, name: workout.name, dayOfWeek: workout.dayOfWeek, order: workout.order, isTemplate: true });
+          for (const ex of workout.exercises) {
+            exercises.push({ workspaceId, workoutId, exerciseId: ex.exerciseId, order: ex.order, prescribedSets: ex.prescribedSets as never, notes: ex.notes ?? null, section: ex.section ?? null });
+          }
+        }
+      }
+      if (blocks.length) await tx.block.createMany({ data: blocks });
+      if (workouts.length) await tx.workout.createMany({ data: workouts });
+      if (exercises.length) await tx.workoutExercise.createMany({ data: exercises });
+      return program;
+    }
 
     // 2. Reconcile blocks: delete blocks not in incoming data
     const incomingBlockIds = data.blocks.filter((b) => b.id).map((b) => b.id!);
@@ -281,6 +309,9 @@ export async function assignProgram(
       },
     });
 
+    // Every scheduled workout and its exercises, written in two batches (row by row was ~80 round trips for 4 weeks).
+    const workouts: Array<{ id: string; workspaceId: string; programAssignmentId: string; sourceWorkoutId: string; name: string; scheduledDate: Date; loggedBy: "TRAINER"; status: "PLANNED"; order: number }> = [];
+    const exercises: Array<{ workspaceId: string; assignedWorkoutId: string; exerciseId: string; order: number; prescribedSets: never; notes: string | null; section: string | null }> = [];
     let blockStartOffset = 0;
     for (const block of program.blocks) {
       for (let week = 0; week < block.weeks; week++) {
@@ -288,37 +319,17 @@ export async function assignProgram(
           const dayOffset = blockStartOffset + week * 7 + ((workout.dayOfWeek ?? 1) - 1);
           const scheduledDate = new Date(startDate);
           scheduledDate.setDate(scheduledDate.getDate() + dayOffset);
-
-          const assigned = await tx.assignedWorkout.create({
-            data: {
-              workspaceId,
-              programAssignmentId: assignment.id,
-              sourceWorkoutId: workout.id,
-              name: workout.name,
-              scheduledDate,
-              loggedBy: "TRAINER",
-              status: "PLANNED",
-              order: workout.order ?? 1,
-            },
-          });
-
+          const id = newId();
+          workouts.push({ id, workspaceId, programAssignmentId: assignment.id, sourceWorkoutId: workout.id, name: workout.name, scheduledDate, loggedBy: "TRAINER", status: "PLANNED", order: workout.order ?? 1 });
           for (const ex of workout.exercises) {
-            await tx.assignedWorkoutExercise.create({
-              data: {
-                workspaceId,
-                assignedWorkoutId: assigned.id,
-                exerciseId: ex.exerciseId,
-                order: ex.order,
-                prescribedSets: ex.prescribedSets as never,
-                notes: ex.notes ?? null,
-                section: ex.section ?? null,
-              },
-            });
+            exercises.push({ workspaceId, assignedWorkoutId: id, exerciseId: ex.exerciseId, order: ex.order, prescribedSets: ex.prescribedSets as never, notes: ex.notes ?? null, section: ex.section ?? null });
           }
         }
       }
       blockStartOffset += block.weeks * 7;
     }
+    if (workouts.length) await tx.assignedWorkout.createMany({ data: workouts });
+    if (exercises.length) await tx.assignedWorkoutExercise.createMany({ data: exercises });
 
     return assignment;
   });

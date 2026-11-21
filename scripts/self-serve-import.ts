@@ -231,6 +231,9 @@ async function main() {
       // The Plan tab: no explainer text up top, no open note box, history under the workout.
       await ph.nav("/plan", 3000);
       const plan = await ph.text(4000);
+      // How busy the Plan tab is, as it opens (the next workout open): everything tappable, on the first screen and in all.
+      const count = await ph.ev<{ screen: number; page: number }>(`(()=>{const els=[...document.querySelectorAll('a,button,input,textarea,select,[role=button],[role=tab],[role=switch]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.closest('nav')});return {screen:els.filter(e=>{const r=e.getBoundingClientRect();return r.top<innerHeight&&r.bottom>0}).length,page:els.length}})()`);
+      await ph.shot("plan-tab-390x844");
       if (/every 4th week|Groove the lifts|Lighter week — recover|never count as a record/.test(plan)) throw new Error("an explainer line is still there");
       await ph.tap("button", upper.name);
       await sleep(500);
@@ -246,7 +249,7 @@ async function main() {
       const saved = await prisma.assignedWorkout.findUniqueOrThrow({ where: { id: upper.id }, select: { notes: true } });
       if (saved.notes !== "Swap rows for chest-supported rows") throw new Error(`saved note: ${saved.notes}`);
       await ph.shot("plan-note-saved");
-      return `on /today with Start; Plan tab: no explainer, note box closed, history shown; Add note ${add.w}x${add.h} -> saved and shown`;
+      return `on /today with Start; Plan tab interactive (not counting the tab bar): ${count.screen} on the first screen, ${count.page} on the page; no explainer, note box closed, history shown; Add note ${add.w}x${add.h} -> saved and shown`;
     });
 
     await step("too big: a 6 MB PDF gets a clear message, in the browser and from the server", async () => {

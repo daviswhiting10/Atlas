@@ -10,36 +10,45 @@
 
 import { prisma } from "@/lib/db/client";
 import { assignProgram, upsertProgram } from "@/lib/db/programs";
-import { resolveExercise } from "./resolve-exercise";
-import { type SheetGrid } from "./sheet-plan";
+import { expandShorthand, resolveExercise } from "./resolve-exercise";
+import { type PlanWeek, type SheetGrid } from "./sheet-plan";
 import { dayDate, planStart, shapeSheet } from "./sheet-summary";
 import { NO_CONTEXT, type PlanContext } from "./plan-context";
 
 export type SavedSheetPlan = { assignmentId: string; programId: string; weeks: number; days: number; weeksDone: number; sessionsLogged: number; exercises: number };
 
-export async function saveSheetPlan(input: {
+/**
+ * The program alone, one block per week (blocks are scheduled one after another, so week N lands in week N): what the
+ * Programs library saves from an import, and the first half of saving a client's plan.
+ */
+export async function saveProgramFromGrid(input: {
   workspaceId: string;
-  clientId: string;
   grid: SheetGrid;
   name: string;
   goals: string[];
-  /** When week 1 began. Left out: worked out from the weeks already done. */
-  weekOneStart?: Date | null;
-  /** The coach's note ("4 week block, start fresh"), already read. */
   context?: PlanContext;
-  /** Import the weeks the sheet shows as done as finished sessions. */
-  history: boolean;
-  /** A load in a week's cell is that week's target weight (an athlete's own plan), not a session done. */
+  /** A load in a week's cell is that week's target weight, not a session done. */
   loadsAsTargets?: boolean;
-  today?: Date;
-}): Promise<SavedSheetPlan> {
+}): Promise<{ programId: string; weeks: PlanWeek[]; lastLoggedWeek: number; exercises: number }> {
   const { weeks, lastLoggedWeek } = shapeSheet(input.grid, input.context ?? NO_CONTEXT);
 
   const names = Array.from(new Set(weeks.flatMap((w) => w.days.flatMap((d) => d.entries.map((e) => e.exercise)))));
+  // Each name looked up at once (a few at a time), not one after another: they don't depend on each other.
+  // Names that read the same once spelled out ("DB Curl", "Dumbbell Curl") are looked up once, so two lookups running
+  // side by side never both create the same new exercise.
   const ids = new Map<string, string>();
-  for (const name of names) ids.set(name, (await resolveExercise(name, input.workspaceId)).id);
+  const byKey = new Map<string, string[]>();
+  for (const name of names) {
+    const key = expandShorthand(name).toLowerCase();
+    byKey.set(key, [...(byKey.get(key) ?? []), name]);
+  }
+  const groups = Array.from(byKey.values());
+  for (let i = 0; i < groups.length; i += 6) {
+    const batch = groups.slice(i, i + 6);
+    const found = await Promise.all(batch.map((g) => resolveExercise(g[0], input.workspaceId)));
+    batch.forEach((g, j) => g.forEach((name) => ids.set(name, found[j].id)));
+  }
 
-  // One block per week: blocks are scheduled one after another, so week N lands in week N.
   const program = await upsertProgram(input.workspaceId, {
     name: input.name.slice(0, 120),
     description: null,
@@ -71,12 +80,43 @@ export async function saveSheetPlan(input: {
       })),
     })),
   });
+  return { programId: program.id, weeks, lastLoggedWeek, exercises: names.length };
+}
+
+export async function saveSheetPlan(input: {
+  workspaceId: string;
+  clientId: string;
+  grid: SheetGrid;
+  name: string;
+  goals: string[];
+  /** When week 1 began. Left out: worked out from the weeks already done. */
+  weekOneStart?: Date | null;
+  /** The coach's note ("4 week block, start fresh"), already read. */
+  context?: PlanContext;
+  /** Import the weeks the sheet shows as done as finished sessions. */
+  history: boolean;
+  /** A load in a week's cell is that week's target weight (an athlete's own plan), not a session done. */
+  loadsAsTargets?: boolean;
+  /** "PAUSED" (the default): a coach's draft to check. "ACTIVE": the live plan now; an earlier live plan is finished. */
+  status?: "PAUSED" | "ACTIVE";
+  today?: Date;
+}): Promise<SavedSheetPlan> {
+  const { programId, weeks, lastLoggedWeek, exercises } = await saveProgramFromGrid(input);
+  const program = { id: programId };
 
   const today = input.today ?? new Date();
   const start = planStart(lastLoggedWeek, input.weekOneStart, today);
   const assignment = await assignProgram(input.workspaceId, program.id, input.clientId, start);
-  // A draft until the coach has checked it and assigns it.
-  await prisma.programAssignment.update({ where: { id: assignment.id }, data: { status: "PAUSED" } });
+  if (input.status === "ACTIVE") {
+    // It is the plan now (assignProgram makes it ACTIVE); an earlier one is finished, its history stays.
+    await prisma.programAssignment.updateMany({ where: { clientId: input.clientId, workspaceId: input.workspaceId, status: "ACTIVE", NOT: { id: assignment.id } }, data: { status: "COMPLETED" } });
+  } else {
+    // A draft until the coach has checked it and assigns it.
+    await prisma.programAssignment.update({ where: { id: assignment.id }, data: { status: "PAUSED" } });
+  }
+  const done = { assignmentId: assignment.id, programId: program.id, weeks: weeks.length, days: Math.max(0, ...weeks.map((w) => w.days.length)), weeksDone: lastLoggedWeek, exercises };
+  // Nothing to bring in as history: no need to look the scheduled workouts up again.
+  if (!input.history) return { ...done, sessionsLogged: 0 };
 
   // Which week and day each scheduled workout came from.
   const source = await prisma.program.findUnique({
@@ -120,5 +160,5 @@ export async function saveSheetPlan(input: {
     sessionsLogged += 1;
   }
 
-  return { assignmentId: assignment.id, programId: program.id, weeks: weeks.length, days: Math.max(0, ...weeks.map((w) => w.days.length)), weeksDone: lastLoggedWeek, sessionsLogged, exercises: names.length };
+  return { assignmentId: assignment.id, programId: program.id, weeks: weeks.length, days: Math.max(0, ...weeks.map((w) => w.days.length)), weeksDone: lastLoggedWeek, sessionsLogged, exercises };
 }

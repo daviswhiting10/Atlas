@@ -25,7 +25,7 @@ Four rules shape everything below:
 
 ### Not plan import
 
-Plan import (`app/api/ai/program-import`) reads a coach's *plan*: what someone
+Plan import (`lib/programs/read-plan-file.ts`, shared by every importer) reads a coach's *plan*: what someone
 should do. It is coach-only, and its `resolveExercise` links names by "contains"
 and **creates new exercises while parsing**. That is acceptable for a coach
 building a library and wrong here. A screenshot is a record of what was done, it
