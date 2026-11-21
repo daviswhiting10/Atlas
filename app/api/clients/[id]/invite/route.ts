@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
-import { createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
+import { appBase, hashToken, inviteLink } from "@/lib/auth/invite-link";
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
 
 /** How long an invite link stays valid. It works once. */
 const INVITE_DAYS = 7;
-
-// Matches Auth.js v5 internal hashToken: SHA256(token + AUTH_SECRET)
-function hashToken(rawToken: string): string {
-  return createHash("sha256")
-    .update(`${rawToken}${process.env.AUTH_SECRET ?? ""}`)
-    .digest("hex");
-}
 
 export const POST = withWorkspace<{ id: string }>(
   async (_req, { workspaceId }, { params }) => {
@@ -69,9 +63,8 @@ export const POST = withWorkspace<{ id: string }>(
       data: { identifier: email, token: hashedToken, expires },
     });
 
-    const baseUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-    const callbackUrl = `${baseUrl}/today`;
-    const magicUrl = `${baseUrl}/api/auth/callback/email?token=${rawToken}&email=${encodeURIComponent(email)}&callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    // The link opens a page with one button; reading it signs nobody in, so a message preview can't use it up.
+    const magicUrl = inviteLink(appBase(), rawToken);
 
     // Email it when email is set up. Either way the coach gets the link to
     // share themselves, and is told whether the email actually went out.
