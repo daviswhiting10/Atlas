@@ -24,10 +24,15 @@ import { sendEmail } from "@/lib/email";
 /** `weak`: a warning, not a refusal. The form offers "Use it anyway", which sends the same request with `allowWeak`. */
 export type AccountResult = { ok: true } | { ok: false; error: string; weak?: true };
 
-/** A warning for a weak password unless the person already said to use it anyway. */
-const weakWarning = (password: string, email: string, allowWeak: unknown): { ok: false; error: string; weak: true } | null => {
+/**
+ * Refuse the very worst passwords; warn (once) about ones that look easy to guess, unless the person already said
+ * to use it anyway. Null means go on.
+ */
+const checkPassword = (password: string, allowWeak: unknown): { ok: false; error: string; weak?: true } | null => {
+  const block = passwordBlock(password);
+  if (block) return { ok: false, error: block };
   if (allowWeak === true) return null;
-  const w = passwordWarning(password, email);
+  const w = passwordWarning(password);
   return w ? { ok: false, error: w, weak: true } : null;
 };
 
@@ -57,8 +62,8 @@ export async function createAccount(raw: { name: string; email: string; password
   const parsed = NewAccount.safeParse(raw);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const { name, email, password, prefs } = parsed.data;
-  const weak = weakWarning(password, email, raw.allowWeak);
-  if (weak) return weak;
+  const refused = checkPassword(password, raw.allowWeak);
+  if (refused) return refused;
   if (!perIp(clientIp())) return { ok: false, error: "Too many sign-ups from this connection. Try again in a while." };
 
   if (isGuestEmail(email)) return { ok: false, error: "Use your own email address." };
@@ -88,8 +93,8 @@ export async function saveGuestAccount(raw: { email: string; password: string; a
   const parsed = SaveGuest.safeParse(raw);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const { email, password } = parsed.data;
-  const weak = weakWarning(password, email, raw.allowWeak);
-  if (weak) return weak;
+  const refused = checkPassword(password, raw.allowWeak);
+  if (refused) return refused;
   if (!perIp(clientIp())) return { ok: false, error: "Too many attempts from this connection. Try again in a while." };
 
   if (isGuestEmail(email)) return { ok: false, error: "Use your own email address." };
@@ -166,8 +171,8 @@ export async function setAccountPassword(raw: { password: string; current?: stri
     await clear(key);
   }
 
-  const weak = weakWarning(parsed.data.password, user.email, raw.allowWeak);
-  if (weak) return weak;
+  const refused = checkPassword(parsed.data.password, raw.allowWeak);
+  if (refused) return refused;
 
   const passwordHash = await hashPassword(parsed.data.password);
   if (user.passwordHash) {
@@ -274,10 +279,8 @@ export async function resetPassword(raw: { token: string; password: string; allo
   const user = await prisma.user.findUnique({ where: { id: reset.userId }, select: { id: true, email: true } });
   if (!user || isGuestEmail(user.email)) return { ok: false, error: LINK_GONE, expired: true };
 
-  const block = passwordBlock(password);
-  if (block) return { ok: false, error: block };
-  const weak = weakWarning(password, user.email, raw.allowWeak);
-  if (weak) return weak;
+  const refused = checkPassword(password, raw.allowWeak);
+  if (refused) return refused;
 
   const passwordHash = await hashPassword(password);
   const used = await prisma.$transaction(async (tx) => {

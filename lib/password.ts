@@ -65,10 +65,10 @@ export const Email = z
   .email("That doesn't look like an email address.")
   .transform(normalizeEmail);
 
-/** A new password: anything but empty or over-long. Weakness is only warned about (see passwordWarning). */
+/** A new password's length. Everything else (the worst-passwords list, the "looks easy to guess" warning) is passwordBlock / passwordWarning. */
 export const Password = z
   .string()
-  .min(1, "Choose a password.")
+  .min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters.`)
   .max(PASSWORD_MAX, "That password is too long.");
 
 /**

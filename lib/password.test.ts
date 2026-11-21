@@ -28,11 +28,10 @@ describe("passwords", () => {
     expect(await verifyPassword("anything", "bcrypt$x$y")).toBe(false);
   });
 
-  it("normalises emails, and accepts any non-empty password up to the limit", () => {
+  it("normalises emails and enforces the password length (10 to 200)", () => {
     expect(Email.parse("  Sam@Example.COM ")).toBe("sam@example.com");
     expect(Email.safeParse("not-an-email").success).toBe(false);
-    expect(Password.safeParse("").success).toBe(false);
-    expect(Password.safeParse("x").success).toBe(true);
+    expect(Password.safeParse("short").success).toBe(false);
     expect(Password.safeParse("long enough").success).toBe(true);
     expect(Password.safeParse("x".repeat(201)).success).toBe(false);
   });

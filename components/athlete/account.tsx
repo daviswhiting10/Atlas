@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { saveGuestAccount, setAccountPassword } from "@/lib/actions/account";
 import { Problem } from "@/components/auth/problem";
+import { PASSWORD_MIN } from "@/lib/password-rules";
 import { cn } from "@/lib/utils";
 
 /** Signs in with email and password. True on success. */
@@ -45,8 +46,9 @@ export function CredentialFields({
           type="password"
           value={password}
           onChange={(e) => onPassword(e.target.value)}
-          placeholder="Password"
+          placeholder={newPassword ? `Password (${PASSWORD_MIN}+ characters)` : "Password"}
           required
+          minLength={newPassword ? PASSWORD_MIN : undefined}
           maxLength={200}
           autoComplete={newPassword ? "new-password" : "current-password"}
           className={inputClass}
@@ -179,8 +181,9 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
               setPassword(e.target.value);
               setWeak(false);
             }}
-            placeholder="New password"
+            placeholder={`New password (${PASSWORD_MIN}+ characters)`}
             required
+            minLength={PASSWORD_MIN}
             maxLength={200}
             autoComplete="new-password"
             className={inputClass}
