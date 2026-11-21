@@ -16,6 +16,9 @@ export function SwipeRow({ open, onOpenChange, onDelete, children }: { open: boo
 
   return (
     <div className="relative overflow-hidden">
+      {/* Drawn only while the row is moving or open: left behind a closed row, its red edge bled through at the
+          row's sub-pixel edges as a thin red line. */}
+      {offset < 0 && (
       <button
         type="button"
         onClick={onDelete}
@@ -26,6 +29,7 @@ export function SwipeRow({ open, onOpenChange, onDelete, children }: { open: boo
       >
         Delete
       </button>
+      )}
       <div
         className="relative bg-paper"
         style={{ transform: `translateX(${offset}px)`, transition: dx == null ? "transform 180ms ease-out" : "none", touchAction: "pan-y" }}
