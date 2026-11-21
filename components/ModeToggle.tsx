@@ -11,10 +11,10 @@ export function ModeToggle({ mode }: { mode: "coach" | "me" }) {
     cn("press flex h-11 items-center rounded-full px-4 text-[14px] font-semibold", on ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft hover:text-ink");
   return (
     <nav aria-label="Coach or my training" className="flex shrink-0 rounded-full border border-line-strong p-0.5">
-      <Link href="/log" aria-current={mode === "coach" ? "page" : undefined} className={item(mode === "coach")}>
+      <Link href="/log" prefetch aria-current={mode === "coach" ? "page" : undefined} className={item(mode === "coach")}>
         Coach
       </Link>
-      <Link href="/today" aria-current={mode === "me" ? "page" : undefined} className={item(mode === "me")}>
+      <Link href="/today" prefetch aria-current={mode === "me" ? "page" : undefined} className={item(mode === "me")}>
         Me
       </Link>
     </nav>
