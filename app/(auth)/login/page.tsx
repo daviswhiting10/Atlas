@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { emailTypo } from "@/lib/email-typos";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Logo } from "@/components/athlete/Logo";
 import { DemoButton } from "@/components/athlete/guest";
@@ -27,7 +28,7 @@ export default function LoginPage() {
       window.location.assign("/");
       return;
     }
-    setError("That email and password don't match an account. Check them and try again.");
+    setError("That email and password don't match an account. Check how your email is spelled. Forgot your password? Reset it below, or ask your coach for a new sign-in link.");
     setLoading(false);
   }
 
@@ -71,9 +72,15 @@ export default function LoginPage() {
             <form onSubmit={signInPassword} className="mt-3 space-y-3">
               <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} newPassword={false} />
               {error && (
-                <p role="alert" className="text-sm leading-relaxed text-destructive">
-                  {error}
-                </p>
+                <div role="alert" className="space-y-1">
+                  <p className="text-sm leading-relaxed text-destructive">{error}</p>
+                  {/* The usual cause: a slip in the address (".con"). One tap fixes it; then Sign in again. */}
+                  {emailTypo(email) && (
+                    <button type="button" onClick={() => { setEmail(emailTypo(email)!); setError(null); }} className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline underline-offset-4">
+                      Did you mean {emailTypo(email)}?
+                    </button>
+                  )}
+                </div>
               )}
               <button type="submit" disabled={loading} className={primary}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}

@@ -1,5 +1,6 @@
 "use client";
 
+import { emailTypo } from "@/lib/email-typos";
 import { useEffect, useState } from "react";
 import { useContentFade } from "@/hooks/use-content-fade";
 import Link from "next/link";
@@ -139,6 +140,12 @@ export default function ClientsPage() {
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="jane@email.com"
                   />
+                  {/* A slip like ".con" locks her out later (she signs in with this address): one tap to fix it. */}
+                  {emailTypo(form.email) && (
+                    <button type="button" onClick={() => setForm({ ...form, email: emailTypo(form.email)! })} className="press inline-flex min-h-11 items-center text-sm font-medium text-ink-soft underline underline-offset-4 hover:text-ink">
+                      Did you mean {emailTypo(form.email)}?
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Phone</Label>

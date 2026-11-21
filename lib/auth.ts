@@ -7,11 +7,11 @@ import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
 import { GUEST_EMAIL_DOMAIN, createGuest, createOAuthAthlete } from "@/lib/guest"
 import { DemoBusyError } from "@/lib/guest-rules"
-import { Email as EmailAddress, hashPassword, needsRehash, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
-import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle"
+import { ipFrom } from "@/lib/auth/throttle"
 import { RECHECK_MS, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
 import { proofOk } from "@/lib/auth/proof"
 import { LINK_LIMIT_URL, allowLinkRequest } from "@/lib/auth/link-limit"
+import { passwordSignIn } from "@/lib/auth/password-signin"
 import { headers } from "next/headers"
 
 const baseAdapter = PrismaAdapter(prisma)
@@ -65,38 +65,8 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
       id: "password",
       name: "Email and password",
       credentials: { email: {}, password: {} },
-      async authorize(credentials, request) {
-        const parsed = EmailAddress.safeParse(credentials?.email)
-        const password = typeof credentials?.password === "string" ? credentials.password.slice(0, 200) : ""
-        if (!parsed.success || !password) return null
-        const email = parsed.data
-        const ip = ipFrom(request.headers)
-        // Limits are shared by every server instance (lib/auth/throttle.ts). A blocked attempt
-        // looks exactly like a wrong password: same answer, and the hash is still computed.
-        const keys = { emailIp: throttleKey("signinEmailIp", email, ip), email: throttleKey("signinEmail", email), ip: throttleKey("signinIp", ip) }
-        const waits = await Promise.all([waitFor(keys.emailIp), waitFor(keys.email), waitFor(keys.ip)])
-        await record(keys.ip, POLICIES.signinIp)
-        if (waits.some((w) => w > 0)) {
-          await verifyAgainstDecoy(password)
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true, name: true, email: true, role: true, workspaceId: true, passwordHash: true },
-        })
-        const ok = user?.passwordHash ? await verifyPassword(password, user.passwordHash) : (await verifyAgainstDecoy(password), false)
-        if (!user || !ok) {
-          await Promise.all([record(keys.emailIp, POLICIES.signinEmailIp), record(keys.email, POLICIES.signinEmail)])
-          return null
-        }
-        await clear(keys.emailIp)
-        // Hashes made with older, weaker settings are upgraded now that we have the password.
-        if (needsRehash(user.passwordHash)) {
-          await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } }).catch((err) => console.error("[rehash]", err))
-        }
-        return { id: user.id, name: user.name, email: user.email, role: user.role, workspaceId: user.workspaceId }
-      },
+      // The check itself (limits, decoy timing, rehash) is in lib/auth/password-signin.ts, so it can be tested end to end.
+      authorize: (credentials, request) => passwordSignIn(credentials, request.headers),
     }),
     Credentials({
       id: "guest",

@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
+import { InviteConfirm } from "@/components/coach/InviteConfirm";
 import { shareInvite } from "@/lib/coach/invite-share";
 import type { LoginStatus } from "@/lib/coach/login-status";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
@@ -110,6 +111,8 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
   const [loading, setLoading] = useState(initial == null);
   const [invite, setInvite] = useState<InviteResult | null>(null);
+  /** The "Sending to … — is that right?" step, before any link is made. */
+  const [confirmInvite, setConfirmInvite] = useState(false);
   // ?tab=plan opens the Plan view (the log page links there when there's no plan);
   // ?tab=sessions opens Sessions (after logging a workout); ?tab=import opens Plan with the importer open.
   const [view, setView] = useState<View>(() => {
@@ -141,6 +144,15 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
       .catch(() => setClient(null))
       .finally(() => setLoading(false));
   }, [id, initial]);
+
+  /** A corrected email: her record, and her login if she has one, change together (or it's refused). */
+  async function saveEmail(email: string): Promise<string | null> {
+    const res = await fetch(`/api/clients/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return typeof body?.error === "string" ? body.error : "Couldn't save that email.";
+    setClient((prev) => (prev ? { ...prev, email: body.email ?? email } : prev));
+    return null;
+  }
 
   async function inviteClient() {
     if (!client?.email) { toast.error("Add an email first"); return; }
@@ -244,7 +256,7 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
               <Plus className="mr-2 h-3.5 w-3.5" />
               Log a workout
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={inviteClient}>
+            <DropdownMenuItem onClick={() => setConfirmInvite(true)}>
               <UserCheck className="mr-2 h-3.5 w-3.5" />
               {client.userId ? "New sign-in link" : "Invite to the app"}
             </DropdownMenuItem>
@@ -261,7 +273,7 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
         <p className="-mt-3 mb-5 flex flex-wrap items-center gap-x-3 text-[13px] text-ink-soft">
           <span data-testid="login-status">{access.label}</span>
           {/* A fresh link at any time, even after a password is set: reset emails may not reach them */}
-          <button type="button" onClick={inviteClient} className="press inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2">
+          <button type="button" onClick={() => setConfirmInvite(true)} className="press inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2">
             {access.key === "not_invited" ? "Invite" : "New link"}
           </button>
         </p>
@@ -275,6 +287,7 @@ export function ClientDetail({ progress, history, report, access, initial }: { /
         </div>
       )}
 
+      {confirmInvite && <InviteConfirm email={client.email} onConfirm={inviteClient} onSaveEmail={saveEmail} onClose={() => setConfirmInvite(false)} />}
       {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
 
       {/* ── The one action: log ─────────────────────────────────────────── */}
