@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { HOME, initial, modeOf, sync, tap, type SwitchState } from "./mode";
 
@@ -86,7 +87,7 @@ describe("the toggle's state machine", () => {
 });
 
 describe("the toggle shell and the tab stack work together", () => {
-  const read = (p: string) => require("node:fs").readFileSync(new URL(`../${p}`, import.meta.url), "utf8") as string;
+  const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
   it("the toggle leaves the pressed look to PressFeedback (no second copy of it)", () => {
     expect(read("components/ModeToggle.tsx")).not.toContain("onPointerDown");
   });
