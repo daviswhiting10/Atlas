@@ -56,6 +56,7 @@ export async function getClient(id: string, workspaceId: string) {
           assignedWorkout: {
             select: {
               name: true,
+              loggedBy: true,
               scheduledDate: true,
               programAssignment: { select: { name: true } },
             },

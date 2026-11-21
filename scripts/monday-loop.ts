@@ -463,7 +463,14 @@ async function main() {
       await coach.nav(`/clients/${clientId}`, 4000);
       const card = await coach.ev<string>(`(()=>{const s=document.querySelector('section[aria-label="Latest session"]');return s?s.innerText.replace(/\\n+/g,' | '):''})()`);
       if (!card) throw new Error("no Latest session card");
-      return card.slice(0, 200);
+      // She finished it from her own Finish button, so the card says so (and says nothing more than that).
+      if (!/Finished by client/.test(card)) throw new Error(`no "Finished by client" on the card: ${card.slice(0, 120)}`);
+      await coach.ev(`(()=>{const t=[...document.querySelectorAll('[role=tab],[role=tablist] button')].find(e=>/^Sessions/.test((e.innerText||'').trim()));if(t)t.click()})()`);
+      await sleep(1500);
+      const listed = await coach.ev<number>(`(document.body.innerText.match(/Finished by client/g)||[]).length`);
+      if (listed < 3) throw new Error(`Sessions list shows the marker ${listed} times, expected 3`);
+      await coach.nav(`/clients/${clientId}`, 3000); // back to the first tab for the Week step
+      return `${card.slice(0, 120)} | list marks: ${listed}`;
     }, () => coach.shot("client-latest-session"));
 
     await must(STEPS[15], async () => {

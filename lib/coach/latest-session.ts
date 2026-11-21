@@ -6,6 +6,7 @@
 import { localDay } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
 import type { PrescribedSet } from "@/lib/plan/prescription";
+import { finishedByClient } from "./finished-by";
 import { reviewSession, type Review } from "./review";
 
 export type LatestSession = {
@@ -14,6 +15,8 @@ export type LatestSession = {
   date: string;
   minutes: number | null;
   note: string | null;
+  /** The client tapped Finish on this workout (AssignedWorkout.loggedBy); says nothing about who entered each set. */
+  finishedByClient: boolean;
   review: Review;
   /** The day it happened, in her time zone (the PR chips are matched on it). */
   day: string;
@@ -36,8 +39,9 @@ export async function loadLatestSession({
       date: true,
       durationMin: true,
       clientNotes: true,
+      completedAt: true,
       sets: { select: { assignedWorkoutExerciseId: true, setNumber: true, weight: true, reps: true, completed: true } },
-      assignedWorkout: { select: { name: true, exercises: { orderBy: { order: "asc" }, select: { id: true, prescribedSets: true, notes: true, exercise: { select: { name: true } } } } } },
+      assignedWorkout: { select: { name: true, loggedBy: true, exercises: { orderBy: { order: "asc" }, select: { id: true, prescribedSets: true, notes: true, exercise: { select: { name: true } } } } } },
     },
   });
   if (!log?.assignedWorkout) return null;
@@ -57,6 +61,7 @@ export async function loadLatestSession({
     date: log.date.toISOString(),
     minutes: log.durationMin,
     note: log.clientNotes,
+    finishedByClient: finishedByClient({ loggedBy: log.assignedWorkout.loggedBy, completedAt: log.completedAt }),
     review,
     day: localDay(log.date, timeZone),
   };

@@ -63,6 +63,15 @@ describe.skipIf(!RUN)("the latest session, judged against the plan", () => {
     expect(s!.review.exercises[1].sets.map((x) => x.outcome)).toEqual(["met", "short", "skipped"]);
   });
 
+  it("says finished by the client only when the workout's loggedBy is CLIENT", async () => {
+    const { loadLatestSession } = await import("./latest-session");
+    const log = await prisma.workoutLog.findUniqueOrThrow({ where: { id: logId }, select: { assignedWorkoutId: true } });
+    await prisma.assignedWorkout.update({ where: { id: log.assignedWorkoutId! }, data: { loggedBy: "CLIENT" } });
+    expect((await loadLatestSession({ clientId, workspaceId: ws, timeZone: "UTC" }))!.finishedByClient).toBe(true);
+    await prisma.assignedWorkout.update({ where: { id: log.assignedWorkoutId! }, data: { loggedBy: "TRAINER" } });
+    expect((await loadLatestSession({ clientId, workspaceId: ws, timeZone: "UTC" }))!.finishedByClient).toBe(false);
+  });
+
   it("is nothing for a client in another workspace", async () => {
     const { loadLatestSession } = await import("./latest-session");
     expect(await loadLatestSession({ clientId, workspaceId: "not-this-workspace", timeZone: "UTC" })).toBeNull();
