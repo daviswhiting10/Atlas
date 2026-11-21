@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
 import { Logo } from "./Logo";
-import { DemoChip } from "@/components/DemoChip";
-import { ModeToggle } from "@/components/ModeToggle";
+import { HeaderActions } from "@/components/nav/HeaderActions";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
 import { cn } from "@/lib/utils";
 
@@ -63,10 +62,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
-            {isDemo && <DemoChip />}
-            {isCoach && <ModeToggle mode="me" />}
-          </div>
+          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} />
         </div>
       </header>
 
