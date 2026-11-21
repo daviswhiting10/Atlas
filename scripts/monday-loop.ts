@@ -295,9 +295,19 @@ async function main() {
     return notes;
   }
 
+  /**
+   * Finish is a button in the logger header (ux-finish-early). With sets left unticked it asks "Finish now?" first.
+   * With every set ticked the logger finishes by itself; offline, that finish is queued and the header button is hidden
+   * ("Finishes when you're back"), so there is nothing to tap and the caller checks that it saves.
+   */
   async function finish(phone: Phone) {
-    await phone.tap('[aria-label="More"]', undefined, 600);
-    await phone.click("[role=menuitem]", "Finish");
+    const tapped = await phone.ev<boolean>(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Finish'&&!b.closest('[role=dialog]'));if(!b||b.disabled)return false;b.click();return true})()`);
+    if (!tapped) {
+      if (await phone.ev<boolean>(`/Finishes when you're back|All sets logged · finishing|, done\\./.test(document.body.innerText)`)) return;
+      throw new Error("no Finish button in the logger header");
+    }
+    await sleep(700);
+    await phone.ev(`(()=>{const b=[...document.querySelectorAll('[role=dialog][aria-label="Finish now?"] button')].find(b=>b.innerText.trim()==='Finish');if(b)b.click()})()`);
   }
 
   const dbDone = (cid: string) => prisma.workoutLog.count({ where: { clientId: cid, completedAt: { not: null } } });
