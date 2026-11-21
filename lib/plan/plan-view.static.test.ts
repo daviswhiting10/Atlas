@@ -24,4 +24,11 @@ describe("Plan tab (static)", () => {
     expect(src).toMatch(/function AtlasSuggestsFromNotes\([^)]*\) \{\s*return null;\s*\}/);
     expect(src).toContain("<AtlasSuggestsFromNotes");
   });
+
+  it("the athlete's Plan tab has no lighter-weeks switch and no goal-chip row (the default lighter weeks still apply)", () => {
+    const page = readFileSync(new URL("../../app/(client)/plan/page.tsx", import.meta.url), "utf8");
+    expect(page).not.toContain("setLighterWeeks");
+    expect(page).not.toMatch(/chips/);
+    expect(readFileSync(new URL("./lighter.ts", import.meta.url), "utf8")).toMatch(/plan\.lighterWeeks \?\? /);
+  });
 });

@@ -6,14 +6,11 @@ import { TZ_COOKIE, getAthlete, getPlanOverview } from "@/lib/athlete/data";
 import { safeTimeZone } from "@/lib/athlete/sessions";
 import { listReports } from "@/lib/report/load";
 import { ReportLink } from "@/components/report/ReportLink";
-import { EQUIPMENT, EXPERIENCE, GOALS, resolvePrefs } from "@/lib/plan/generator";
-import { CONDITIONS } from "@/lib/plan/goal";
 import {
   planAddExercise,
   planAddWorkout,
   planRemoveExercise,
   planRemoveWorkout,
-  planSetLighterWeeks,
   planSetNote,
   planSetTargets,
   planSetWorkoutNote,
@@ -36,7 +33,6 @@ const ACTIONS: PlanActions = {
   setTargets: planSetTargets,
   setWorkoutNote: planSetWorkoutNote,
   setPlanNote: planSetNote,
-  setLighterWeeks: planSetLighterWeeks,
   setSkipped: setWorkoutSkipped,
 };
 
@@ -76,18 +72,6 @@ export default async function PlanPage() {
     );
   }
 
-  const prefs = plan.prefs ? resolvePrefs(plan.prefs) : null;
-  const chips = prefs
-    ? [
-        GOALS[prefs.goal].label,
-        `${prefs.daysPerWeek} day${prefs.daysPerWeek === 1 ? "" : "s"} a week`,
-        `${prefs.minutes} min`,
-        EQUIPMENT[prefs.equipment].label,
-        EXPERIENCE[prefs.experience].label,
-        ...prefs.conditions.map((c) => CONDITIONS[c].label),
-      ]
-    : [];
-
   return (
     <div>
       <div className="rise mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -95,15 +79,6 @@ export default async function PlanPage() {
           <p className="eyebrow">Your plan · {plan.totalWeeks} weeks</p>
           <h1 className="mt-1.5 text-[34px] leading-[1.08] text-ink sm:text-[42px]">{plan.name}</h1>
           {plan.goalText && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-soft">“{plan.goalText}”</p>}
-          {chips.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {chips.map((c) => (
-                <span key={c} className="rounded-full border border-line bg-paper px-3 py-1 text-[13px] font-medium text-ink-soft">
-                  {c}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         {athlete.selfServe && (
           <Link href="/you?goals=1" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
