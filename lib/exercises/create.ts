@@ -37,8 +37,16 @@ export async function createCustomExercise(workspaceId: string, rawName: unknown
     instructions: [],
     workspaceId,
   };
-  // Upsert on the slug: two taps at once, or a retry after a lost answer, find the first one's row.
-  const row = await db.exercise.upsert({ where: { slug: data.slug }, create: data, update: {}, select: SELECT });
+  // Upsert on the slug: two taps at once, or a retry after a lost answer, find the first one's row. Postgres can still
+  // let two inserts race past the check; the loser gets a unique-slug error, and then the winner's row is the answer.
+  const row = await db.exercise
+    .upsert({ where: { slug: data.slug }, create: data, update: {}, select: SELECT })
+    .catch(async (err: unknown) => {
+      if ((err as { code?: string })?.code !== "P2002") throw err;
+      const winner = await db.exercise.findUnique({ where: { slug: data.slug }, select: SELECT });
+      if (!winner) throw err;
+      return winner;
+    });
   if (row.workspaceId === workspaceId && !row.mergedIntoId) return { ...row, created: true };
   // That slug belongs to something else (a one-in-a-trillion collision, or an exercise since merged away): take a fresh one.
   const fresh = await db.exercise.create({ data: { ...data, slug: `${data.slug}-${Date.now().toString(36)}` }, select: SELECT });
