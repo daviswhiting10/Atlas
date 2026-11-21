@@ -69,6 +69,10 @@ describe("both loggers", () => {
     expect(fn).not.toMatch(/toast/);
     expect((fn.match(/afterChange\(|setLastSetAt\(Date\.now\(\)\)/g) ?? []).length).toBe(1);
   });
+  it("the confirm sheet ignores a tap in its first 400 ms", () => {
+    expect(ui).toMatch(/performance\.now\(\) - openedAt\.current > 400/);
+    expect(ui).toContain("ready() && onConfirm()");
+  });
   it("the button is 44 px, has an instant pressed state and no animation", () => {
     expect(ui).toContain("min-h-11");
     expect(ui).toContain("transition-none");
