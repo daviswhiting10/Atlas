@@ -23,7 +23,8 @@ import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
-import { clearFinish, queueFinish, queuedFinish } from "@/lib/sessions/pending-finish";
+import { queuedFinish } from "@/lib/sessions/pending-finish";
+import { finishAction, sendFinish, unloggedText } from "@/lib/sessions/finish";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -597,25 +598,36 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         await queue.current;
         // Everything logged, or finished early with at least one set logged.
         if (!data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done))) return;
-        const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
-        // Offline, the finish is queued (with its length) and goes through when the connection is back.
-        const queued = queuedFinish(store(), data.id)?.minutes;
-        const length = queued ?? minutes;
-        await finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : length });
-        clearFinish(store(), data.id);
-        setFinishQueued(false);
-        setRest(null);
-        setSummary({ minutes: length });
-      } catch (e) {
-        if (isNetworkError(e)) {
-          if (!queuedFinish(store(), data.id)) queueFinish(store(), data.id, Math.max(1, Math.round((Date.now() - startedAt.current) / 60000)));
+        const res = await sendFinish({
+          send: (m) => finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : m }),
+          storage: store(),
+          workoutId: data.id,
+          minutes: Math.max(1, Math.round((Date.now() - startedAt.current) / 60000)),
+          isOffline: isNetworkError,
+        });
+        if (res.kind === "done") {
+          setFinishQueued(false);
+          setRest(null);
+          setSummary({ minutes: res.minutes });
+        } else if (res.kind === "queued") {
           setNoSignal(true);
           setFinishQueued(true);
-          return;
-        }
+        } else toast.error("Couldn't finish the workout. Please try again.");
+      } catch {
         toast.error("Couldn't finish the workout. Please try again.");
       }
     });
+  }
+
+  /** Finish tapped: nothing logged does nothing; all logged finishes now; some unlogged asks once. */
+  const [confirmFinish, setConfirmFinish] = useState<number | null>(null);
+  function tapFinish() {
+    const act = finishAction(data.exercises.map((e) => listOf(e).map((x) => x.done)));
+    if (act.kind === "none") return;
+    cancelFinish();
+    setRest(null);
+    if (act.kind === "confirm") return void setConfirmFinish(act.unlogged);
+    finish();
   }
 
   finishRef.current = finish;
@@ -650,7 +662,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       [String(summary.minutes), "min"],
     ];
     return (
-      <div className="rise mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
+      <div className="rise-intro mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
         <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
@@ -703,26 +715,18 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
             <span className="min-w-0">
               <span className="block truncate font-display text-2xl leading-tight text-ink">{data.name}</span>
-              <span className="tnum block text-xs text-ink-mute">
-                Week {data.week}
-                {data.deloadWeek ? " · Lighter week" : ""} · {doneCount}/{totalCount} sets{data.status === "LOGGED" ? " · logged" : ` · ${clock(elapsed)}`}
+              <span className="tnum block truncate text-xs text-ink-mute">
+                {doneCount}/{totalCount} sets{data.status === "LOGGED" ? " · logged" : ` · ${clock(elapsed)}`} · Week {data.week}
+                {data.deloadWeek ? " · Lighter week" : ""}
               </span>
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 text-ink-mute" />
           </button>
           {finishing && <Loader2 className="h-5 w-5 shrink-0 animate-spin text-ink-mute" aria-label="Finishing" />}
-          {data.status !== "LOGGED" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger aria-label="More" className="press -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
-                <MoreHorizontal className="h-5 w-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[180px]">
-                {/* Finishing early: whatever is logged is the workout. The countdown's Undo is the way back. */}
-                <DropdownMenuItem className="min-h-11" disabled={doneCount === 0} onClick={() => scheduleFinish("Finishing workout")}>
-                  Finish
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {data.status !== "LOGGED" && !finishQueued && (
+            <button type="button" onClick={tapFinish} disabled={finishing || doneCount === 0} className="press -mr-2 h-11 shrink-0 rounded-full px-4 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
+              Finish
+            </button>
           )}
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
@@ -965,6 +969,31 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             }
           }}
         />
+      )}
+
+      {/* ── Finish with sets still unlogged: asked once ── */}
+      {confirmFinish != null && (
+        <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 sm:items-center" onClick={() => setConfirmFinish(null)}>
+          <div className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }} role="dialog" aria-modal="true" aria-label="Finish now?" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-3xl text-ink">Finish now?</h2>
+            <p className="mt-1 text-[15px] text-ink-soft">{unloggedText(confirmFinish)}</p>
+            <div className="mt-5 flex gap-3">
+              <button type="button" onClick={() => setConfirmFinish(null)} className="press h-14 flex-1 rounded-2xl border border-line-strong text-[17px] font-semibold text-ink">
+                Keep logging
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmFinish(null);
+                  finish();
+                }}
+                className="press h-14 flex-[1.4] rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text"
+              >
+                Finish
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Workout switcher ─────────────────────────────────────────── */}
