@@ -31,6 +31,8 @@ type Client = {
   fullName: string;
   email: string | null;
   phone: string | null;
+  /** Set once she has a login of her own. */
+  userId?: string | null;
   status: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
   primaryGoal: string | null;
   retentionScore: number | null;
@@ -247,8 +249,9 @@ export default function ClientsPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{client.fullName}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {client.userId && <span className="shrink-0 rounded-full border border-line-strong px-1.5 py-px text-[10px] font-medium text-ink-soft">Logs own</span>}
+                            <span className="truncate">{[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}</span>
                           </p>
                         </div>
                       </div>
@@ -276,6 +279,14 @@ export default function ClientsPage() {
                           )}
                         </div>
                       </div>
+                    </Link>
+                    {/* The direct way to the logger; the row itself opens the profile. */}
+                    <Link
+                      href={`/clients/${client.id}/log`}
+                      aria-label={`Log a session for ${client.fullName}`}
+                      className="press flex min-h-[60px] min-w-[64px] shrink-0 items-center justify-center pr-5 text-sm font-semibold text-primary"
+                    >
+                      Log →
                     </Link>
                     </div>
                   ))}
