@@ -279,7 +279,9 @@ export async function assignProgram(
   programId: string,
   clientId: string,
   startDate: Date,
-  name?: string
+  name?: string,
+  /** "PAUSED": a coach's draft, never live even for a moment. */
+  status: "ACTIVE" | "PAUSED" = "ACTIVE"
 ) {
   const program = await prisma.program.findFirst({
     where: { id: programId, workspaceId, deletedAt: null },
@@ -305,7 +307,7 @@ export async function assignProgram(
         sourceProgramId: programId,
         name: name ?? program.name,
         startDate,
-        status: "ACTIVE",
+        status,
       },
     });
 

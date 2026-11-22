@@ -237,6 +237,11 @@ async function main() {
       const count = await ph.ev<{ screen: number; page: number }>(`(()=>{const els=[...document.querySelectorAll('a,button,input,textarea,select,[role=button],[role=tab],[role=switch]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.closest('nav')});return {screen:els.filter(e=>{const r=e.getBoundingClientRect();return r.top<innerHeight&&r.bottom>0}).length,page:els.length}})()`);
       await ph.shot("plan-tab-390x844");
       if (/every 4th week|Groove the lifts|Lighter week — recover|never count as a record/.test(plan)) throw new Error("an explainer line is still there");
+      // Option B: up next first with Start, then the week, "All N weeks" and "Edit plan"; the workout cards are under Edit plan.
+      if (!/Up next/i.test(plan) || !/All \d+ weeks/.test(plan) || !plan.includes("Edit plan")) throw new Error(`not the up-next layout: ${plan.slice(0, 300)}`);
+      await ph.tap("a", "Edit plan");
+      await ph.until(`location.search.includes('view=edit')`, 8000);
+      await sleep(800);
       await ph.tap("button", upper.name);
       await sleep(500);
       const boxes = await ph.ev<number>(`[...document.querySelectorAll('textarea')].filter(t=>t.getBoundingClientRect().height>0&&!t.placeholder.startsWith('Anything about the plan')).length`);
@@ -341,14 +346,21 @@ async function main() {
         if (alert) throw new Error(`read failed: ${alert}`);
         const tRead = Date.now();
         await coach.shot("coach-client-read");
+        const tSave = Date.now();
         await coach.tap("button", "Save plan");
-        await coach.until(`location.pathname.includes('/programs/')`, 30000, 100);
+        const progress = await coach.until(`(document.querySelector('[role=status]')||{}).innerText?.startsWith('Saving')`, 3000, 50).then(() => true, () => false);
+        if (!progress) throw new Error("no progress line while saving");
+        await coach.until(`(document.querySelector('[role=status]')||{}).innerText?.startsWith('Saved') || location.pathname.includes('/programs/')`, 30000, 50);
+        const tApi = Date.now();
+        await coach.until(`location.pathname.includes('/programs/') && !!document.querySelector('h1')`, 30000, 50);
+        const tPage = Date.now();
+        console.log(`    coach save: server ${((tApi - tSave) / 1000).toFixed(1)} s, then the draft page ${((tPage - tApi) / 1000).toFixed(1)} s`);
         const draft = await prisma.programAssignment.findFirstOrThrow({ where: { clientId: cl.id }, orderBy: { createdAt: "desc" }, select: { id: true, status: true } });
         const got = benchWeeks(await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkout: { programAssignmentId: draft.id }, ...benchWhere }, orderBy: { assignedWorkout: { scheduledDate: "asc" } }, select: { prescribedSets: true } }));
         if (JSON.stringify(got) !== JSON.stringify(BENCH_WEEKS)) throw new Error(`bench by week: ${got.join(", ")}`);
         const imported = await prisma.workoutLog.count({ where: { clientId: cl.id } });
         if (imported !== 0) throw new Error(`${imported} sessions imported as history from a plan PDF`);
-        return `read ${((tRead - t0) / 1000).toFixed(1)} s, save to draft ${((Date.now() - tRead) / 1000).toFixed(1)} s; draft ${draft.status}; no history; bench ${got.join(" · ")}`;
+        return `read ${((tRead - t0) / 1000).toFixed(1)} s, save ${((tApi - tSave) / 1000).toFixed(1)} s + draft page ${((tPage - tApi) / 1000).toFixed(1)} s (progress line shown); draft ${draft.status}; no history; bench ${got.join(" · ")}`;
       });
 
       await step("Programs library: the same drop zone reads a PDF, shows it, saves a 4-week program", async () => {

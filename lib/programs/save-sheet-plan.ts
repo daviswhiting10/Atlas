@@ -10,7 +10,7 @@
 
 import { prisma } from "@/lib/db/client";
 import { assignProgram, upsertProgram } from "@/lib/db/programs";
-import { expandShorthand, resolveExercise } from "./resolve-exercise";
+import { resolveExercises } from "./resolve-exercise";
 import { type PlanWeek, type SheetGrid } from "./sheet-plan";
 import { dayDate, planStart, shapeSheet } from "./sheet-summary";
 import { NO_CONTEXT, type PlanContext } from "./plan-context";
@@ -33,21 +33,9 @@ export async function saveProgramFromGrid(input: {
   const { weeks, lastLoggedWeek } = shapeSheet(input.grid, input.context ?? NO_CONTEXT);
 
   const names = Array.from(new Set(weeks.flatMap((w) => w.days.flatMap((d) => d.entries.map((e) => e.exercise)))));
-  // Each name looked up at once (a few at a time), not one after another: they don't depend on each other.
-  // Names that read the same once spelled out ("DB Curl", "Dumbbell Curl") are looked up once, so two lookups running
-  // side by side never both create the same new exercise.
-  const ids = new Map<string, string>();
-  const byKey = new Map<string, string[]>();
-  for (const name of names) {
-    const key = expandShorthand(name).toLowerCase();
-    byKey.set(key, [...(byKey.get(key) ?? []), name]);
-  }
-  const groups = Array.from(byKey.values());
-  for (let i = 0; i < groups.length; i += 6) {
-    const batch = groups.slice(i, i + 6);
-    const found = await Promise.all(batch.map((g) => resolveExercise(g[0], input.workspaceId)));
-    batch.forEach((g, j) => g.forEach((name) => ids.set(name, found[j].id)));
-  }
+  // Every name in a few queries (catalog and exact names together), the rest one by one: see resolveExercises.
+  const found = await resolveExercises(names, input.workspaceId);
+  const ids = new Map(Array.from(found, ([n, e]) => [n, e.id] as const));
 
   const program = await upsertProgram(input.workspaceId, {
     name: input.name.slice(0, 120),
@@ -106,13 +94,11 @@ export async function saveSheetPlan(input: {
 
   const today = input.today ?? new Date();
   const start = planStart(lastLoggedWeek, input.weekOneStart, today);
-  const assignment = await assignProgram(input.workspaceId, program.id, input.clientId, start);
+  // ACTIVE: the plan now. Otherwise a draft (PAUSED from the start) until the coach has checked it and assigns it.
+  const assignment = await assignProgram(input.workspaceId, program.id, input.clientId, start, undefined, input.status === "ACTIVE" ? "ACTIVE" : "PAUSED");
   if (input.status === "ACTIVE") {
-    // It is the plan now (assignProgram makes it ACTIVE); an earlier one is finished, its history stays.
+    // An earlier live plan is finished; its history stays.
     await prisma.programAssignment.updateMany({ where: { clientId: input.clientId, workspaceId: input.workspaceId, status: "ACTIVE", NOT: { id: assignment.id } }, data: { status: "COMPLETED" } });
-  } else {
-    // A draft until the coach has checked it and assigns it.
-    await prisma.programAssignment.update({ where: { id: assignment.id }, data: { status: "PAUSED" } });
   }
   const done = { assignmentId: assignment.id, programId: program.id, weeks: weeks.length, days: Math.max(0, ...weeks.map((w) => w.days.length)), weeksDone: lastLoggedWeek, exercises };
   // Nothing to bring in as history: no need to look the scheduled workouts up again.
