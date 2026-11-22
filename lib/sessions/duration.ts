@@ -7,6 +7,10 @@
 export const MAX_SECONDS = 4 * 3600;
 
 /** Where the stepper's step grows from 30 s to 1 min. */
+/** The time limit as a person reads it (stored in seconds): "240 min". */
+export const TIME_LIMIT_TEXT = `${MAX_SECONDS / 60} min`;
+export const TARGET_LIMIT_MESSAGE = `Too high: a timed set can be up to ${TIME_LIMIT_TEXT}, other sets up to 100 reps.`;
+
 export const STEP_BREAK = 600;
 
 /** 0 → "0:00", 45 → "0:45", 900 → "15:00", 3725 → "1:02:05". */

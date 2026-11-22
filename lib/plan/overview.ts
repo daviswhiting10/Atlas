@@ -10,6 +10,7 @@ import { prescriptionLabels, type PrescribedSet } from "./prescription";
 import { prisma } from "@/lib/db/client";
 import { planWorkoutStatus } from "@/lib/sessions/status";
 import { displayName } from "./catalog";
+import { durationRange } from "@/lib/sessions/duration";
 import { generatePlan, normalizePrefs, type Prefs } from "./generator";
 import { isLighterWeek, lighterWeeksOn } from "./lighter";
 import { weekOf } from "@/lib/athlete/sessions";
@@ -89,11 +90,9 @@ export function repLabel(sets: RawSet[]): string {
   if (!s) return "";
   const range = s.repMin === s.repMax ? `${s.repMax}` : `${s.repMin}–${s.repMax}`;
   if (s.unit !== "secs") return range;
-  // Whole minutes read as minutes: "5 min", not "300s".
+  // A time reads as minutes and seconds: "15 min", "45 sec", "1:30 min".
   const lo = s.repMin ?? 0;
-  const hi = s.repMax ?? lo;
-  if (lo >= 60 && lo % 60 === 0 && hi % 60 === 0) return lo === hi ? `${lo / 60} min` : `${lo / 60}–${hi / 60} min`;
-  return `${range}s`;
+  return durationRange(lo, s.repMax ?? lo);
 }
 
 function estimate(exercises: Array<{ prescribedSets: unknown }>): number {

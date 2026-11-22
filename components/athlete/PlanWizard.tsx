@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, Clock, Dumbbell, Flame, HeartPulse, Home, Loader2, PersonStanding, Sparkles, Trophy, Warehouse } from "lucide-react";
 import { DAYS_PER_WEEK, EQUIPMENT, EXPERIENCE, GOALS, GOAL_TEXT_MAX, generatePlan, type Experience, type Goal, type Prefs } from "@/lib/plan/generator";
 import { interpretGoal } from "@/lib/plan/goal";
+import { durationRange } from "@/lib/sessions/duration";
 import type { Equipment } from "@/lib/plan/catalog";
 import { rebuildPlan } from "@/lib/actions/athlete";
 import { createAccount } from "@/lib/actions/account";
@@ -114,8 +115,7 @@ export function PlanPreview({ prefs, className }: { prefs: Prefs; className?: st
                 <li key={e.slug} className="flex items-baseline justify-between gap-2 text-[13px]">
                   <ExerciseName name={e.name} className="text-ink-soft" />
                   <span className="tnum shrink-0 text-ink-mute">
-                    {e.sets} × {e.repMin}–{e.repMax}
-                    {e.unit === "secs" ? "s" : ""}
+                    {e.sets} × {e.unit === "secs" ? durationRange(e.repMin, e.repMax) : `${e.repMin}–${e.repMax}`}
                   </span>
                 </li>
               ))}

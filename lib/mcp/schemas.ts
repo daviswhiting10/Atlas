@@ -49,6 +49,6 @@ export const LoggedSetInput = z.object({
   exerciseId: Id,
   setNumber: z.number().int().min(1).max(20),
   weight: z.number().min(0).max(2000).nullable().optional().catch(null).describe("Pounds. null or omitted for bodyweight."),
-  reps: z.number().int().min(0).max(1000).nullable().catch(null).describe("Reps, or seconds for a timed hold."),
+  reps: z.number().int().min(0).max(14400).nullable().catch(null).describe("Reps, or seconds for a timed set (900 = 15 min; up to 14400 s = 240 min)."),
   rpe: z.number().min(1).max(10).nullable().optional().catch(null),
 });

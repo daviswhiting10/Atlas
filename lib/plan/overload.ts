@@ -8,6 +8,7 @@
 
 import type { FocusMetric } from "./generator";
 import { timedFirstReason, type TimedKind } from "@/lib/plan/timed";
+import { durationLabel } from "@/lib/sessions/duration";
 
 export type LoggedSet = { weight: number | null; reps: number | null; completed: boolean };
 
@@ -46,7 +47,8 @@ export function nextTarget({
   /** True when today falls in a lighter (deload) week. */
   deload?: boolean;
 }): Target {
-  const u = unit === "secs" ? "sec" : "reps";
+  // A time reads as minutes and seconds ("15 min"); reps as "10 reps".
+  const amt = (n: number) => (unit === "secs" ? durationLabel(n) : `${n} reps`);
   const done = last.filter((s) => s.completed && s.reps != null && s.reps > 0);
 
   if (done.length === 0) {
@@ -80,8 +82,8 @@ export function nextTarget({
       weight: topWeight,
       reps,
       kind: "deload",
-      headline: topWeight == null ? `Easy ${reps} ${u}` : `${topWeight} lb × ${reps}, easy`,
-      reason: `Lighter week. ${topWeight == null ? "Stop" : "Keep the weight and stop"} ${back} ${u} short of last time (${bestReps}) so you recover for the next block.`,
+      headline: topWeight == null ? `Easy ${amt(reps)}` : `${topWeight} lb × ${reps}, easy`,
+      reason: `Lighter week. ${topWeight == null ? "Stop" : "Keep the weight and stop"} ${amt(back)} short of last time (${amt(bestReps)}) so you recover for the next block.`,
     };
   }
 
@@ -93,8 +95,8 @@ export function nextTarget({
       weight: topWeight,
       reps: goal,
       kind: "add_reps",
-      headline: `Beat ${bestReps} ${u}`,
-      reason: `Last time your best set was ${bestReps} ${u}. Aim for ${goal}.`,
+      headline: `Beat ${amt(bestReps)}`,
+      reason: `Last time your best set was ${amt(bestReps)}. Aim for ${amt(goal)}.`,
     };
   }
 
