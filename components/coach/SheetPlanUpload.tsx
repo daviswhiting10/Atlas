@@ -35,6 +35,8 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   // Optional: "4 week block, start fresh". Beats what the sheet suggests.
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  // While saving: what is happening now, said under the button (saving takes a few seconds, then the draft opens).
+  const [phase, setPhase] = useState<"saving" | "opening" | null>(null);
   const [error, setError] = useState<string | null>(null);
   // After reading: the summary to confirm, and whether to bring in the completed weeks as history.
   const [read_, setRead] = useState<Read | null>(null);
@@ -91,6 +93,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
     setError(null);
     setBusy(true);
     const withHistory = history && read_.summary.history.sessions > 0;
+    setPhase("saving");
     try {
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
@@ -101,6 +104,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       if (!res.ok) {
         setError(data?.error ?? "Couldn't save the plan.");
         setBusy(false);
+        setPhase(null);
         return;
       }
       toast.success(
@@ -108,10 +112,12 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           (data.sessionsLogged > 0 ? ` ${data.sessionsLogged} past session${data.sessionsLogged === 1 ? "" : "s"} imported.` : "") +
           " Check it, then assign."
       );
+      setPhase("opening");
       router.push(`/clients/${clientId}/programs/${data.assignmentId}`);
     } catch {
       setError("Couldn't reach the server. Please try again.");
       setBusy(false);
+      setPhase(null);
     }
   }
 
@@ -157,7 +163,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           <button type="button" onClick={save} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70">
             {busy ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                <Loader2 className="h-4 w-4 animate-spin" /> {phase === "opening" ? "Opening the draft…" : "Saving…"}
               </>
             ) : history && h.sessions > 0 ? (
               `Save plan and ${h.sessions} past session${h.sessions === 1 ? "" : "s"}`
@@ -166,6 +172,13 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
             )}
           </button>
         </div>
+        {phase && (
+          <p role="status" aria-live="polite" className="text-[13px] text-ink-mute">
+            {phase === "saving"
+              ? `Saving ${summary.weeks} week${summary.weeks === 1 ? "" : "s"}, ${summary.exercises} exercises and ${firstName}\u2019s schedule. A few seconds.`
+              : "Saved. Opening the draft to check before you assign it."}
+          </p>
+        )}
         {error && (
           <p role="alert" className="text-sm leading-relaxed text-destructive">
             {error}
