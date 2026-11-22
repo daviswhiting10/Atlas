@@ -4,7 +4,6 @@ import { TARGET_LIMIT_MESSAGE, TIME_LIMIT_TEXT, durationRange } from "@/lib/sess
 import { describeLast } from "@/lib/sessions/quick-log";
 import { nextTarget } from "@/lib/plan/overload";
 
-const t = (repMin: number, repMax = repMin) => [{ setNumber: 1, weight: null, unit: "secs" as const, repMin, repMax, rpe: null, restSeconds: 60 }];
 const src = (p: string) => readFileSync(p, "utf8");
 
 describe("a time reads as minutes and seconds everywhere", () => {
