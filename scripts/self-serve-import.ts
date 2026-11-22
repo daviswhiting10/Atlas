@@ -239,6 +239,12 @@ async function main() {
       if (/every 4th week|Groove the lifts|Lighter week — recover|never count as a record/.test(plan)) throw new Error("an explainer line is still there");
       // Option B: up next first with Start, then the week, "All N weeks" and "Edit plan"; the workout cards are under Edit plan.
       if (!/Up next/i.test(plan) || !/All \d+ weeks/.test(plan) || !plan.includes("Edit plan")) throw new Error(`not the up-next layout: ${plan.slice(0, 300)}`);
+      await ph.tap("button", "Plan options");
+      await ph.until(`[...document.querySelectorAll('[role=menuitem]')].some(m=>m.innerText.trim()==='Change goals')`, 5000);
+      if (await ph.ev<boolean>(`[...document.querySelectorAll('[role=menuitem]')].some(m=>/Delete plan/.test(m.innerText))`)) throw new Error("Delete plan shows before deleteMyPlan exists");
+      await ph.shot("plan-menu");
+      await ph.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+      await sleep(300);
       await ph.tap("a", "Edit plan");
       await ph.until(`location.search.includes('view=edit')`, 8000);
       await sleep(800);
