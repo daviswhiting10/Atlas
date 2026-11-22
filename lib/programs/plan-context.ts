@@ -124,3 +124,12 @@ export function contextWarnings(ctx: PlanContext, found: { days: number }, what:
   }
   return out;
 }
+
+/**
+ * A coach's PDF or screenshots: week 1 with nothing marked done, unless the coach's note says "start at week N"
+ * (then week N, and the preview says so). Spreadsheets don't go through this: a filled-in weight is a week done.
+ */
+export function pagesContext(context: PlanContext): PlanContext {
+  return context.startAtWeek != null ? context : { ...context, startAtWeek: 1 };
+}
+

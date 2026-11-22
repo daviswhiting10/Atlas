@@ -7,7 +7,7 @@ import { callAI, MODELS } from "@/lib/ai/client";
 import { buildProgramSheetPrompt } from "@/lib/ai/prompts/program-import";
 import { readGrid } from "@/lib/programs/sheet-plan";
 import { summarizeSheetImport } from "@/lib/programs/sheet-summary";
-import { NO_CONTEXT, contextFromText, contextWarnings, describeReadAs, mergeContext, modelContextFromReply, type PlanContext } from "@/lib/programs/plan-context";
+import { NO_CONTEXT, pagesContext, contextFromText, contextWarnings, describeReadAs, mergeContext, modelContextFromReply, type PlanContext } from "@/lib/programs/plan-context";
 import { saveSheetPlan } from "@/lib/programs/save-sheet-plan";
 import { SheetError, fetchSheetCsv, parseSheetLink, tidyCsv } from "@/lib/programs/sheet";
 import { CATEGORIES } from "@/lib/programs/categories";
@@ -44,8 +44,8 @@ const Body = z.object({
 /** Reading a plan costs an AI call; this keeps one workspace from running up the bill. */
 const perWorkspace = rateLimiter(20, 60 * 60_000);
 
-/** A PDF or screenshots (targets): week 1, nothing done, whatever comes back from the browser. */
-const pagesRule = (context: PlanContext, targets: boolean): PlanContext => (targets ? { ...context, startAtWeek: 1 } : context);
+/** A PDF or screenshots (targets): week 1 with nothing done, or the week the coach's note names (see pagesContext). */
+const pagesRule = (context: PlanContext, targets: boolean): PlanContext => (targets ? pagesContext(context) : context);
 
 /**
  * A client's plan from the coach's own spreadsheet, in two steps:
@@ -166,10 +166,10 @@ async function readFiles(req: Request, id: string, who: { workspaceId: string; u
     if (!perWorkspace(who.workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
     const { grid, warnings } = await readPlanFile(file, { ...who, feature: file.csv ? "program-sheet-import" : "program-import", notes });
     // A spreadsheet keeps the sheet rule (a filled-in load is a week done). A PDF or screenshots show a plan: its loads
-    // are each week's targets and it always starts at week 1 with nothing marked done.
+    // are each week's targets; it starts at week 1 with nothing marked done, unless the coach's note names a week.
     const pages = !file.csv;
     const noted = notes ? contextFromText(notes) : NO_CONTEXT;
-    const context = pages ? { ...noted, startAtWeek: 1 } : noted;
+    const context = pages ? pagesContext(noted) : noted;
     const summary = summarizeSheetImport({ grid, context, weekOneStart, today: new Date() });
     return NextResponse.json({ grid, context, summary, targets: pages, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
   } catch (err) {

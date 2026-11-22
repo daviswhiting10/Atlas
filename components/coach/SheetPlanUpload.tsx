@@ -92,7 +92,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
     if (!read_) return;
     setError(null);
     setBusy(true);
-    const withHistory = history && read_.summary.history.sessions > 0;
+    const withHistory = history && !read_.targets && read_.summary.history.sessions > 0;
     setPhase("saving");
     try {
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
@@ -141,8 +141,13 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
             </li>
           ))}
         </ul>
+        {read_.targets && (
+          <p className="text-[13px] font-medium text-ink">
+            {summary.completedWeeks > 0 ? `Starts at week ${summary.completedWeeks + 1}, as your note says. Earlier weeks aren't imported as sessions.` : "Starts at week 1. Nothing is marked done."}
+          </p>
+        )}
         <TimesList times={summary.times ?? []} grid={read_.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
-        {h.sessions > 0 ? (
+        {read_.targets ? null : h.sessions > 0 ? (
           <label className="flex items-start gap-3 rounded-lg border border-line-strong bg-dusk-raised p-3">
             <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} disabled={busy} className="mt-1 h-4 w-4 shrink-0" />
             <span className="text-sm">
@@ -165,7 +170,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> {phase === "opening" ? "Opening the draft…" : "Saving…"}
               </>
-            ) : history && h.sessions > 0 ? (
+            ) : history && !read_.targets && h.sessions > 0 ? (
               `Save plan and ${h.sessions} past session${h.sessions === 1 ? "" : "s"}`
             ) : (
               "Save plan"
