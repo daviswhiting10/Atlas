@@ -21,6 +21,7 @@ import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/li
 import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
 export type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
+import { setPlan, type PrescribedSet } from "@/lib/plan/prescription";
 import { DAY_MS, iso, localDay, referenceSession, safeTimeZone, weekOf } from "./sessions";
 import { finishedTotals } from "./totals";
 import { loadCalendar } from "@/lib/history/load";
@@ -113,7 +114,7 @@ export const getAthlete = cache(async (): Promise<Athlete> => {
 
 // ── Plan overview ───────────────────────────────────────────────────────────
 
-type RawSet = { weight?: number | null; repMin?: number; repMax?: number; unit?: "reps" | "secs"; restSeconds?: number | null };
+type RawSet = PrescribedSet;
 
 /** The signed-in athlete's active plan. The read model itself is shared with the coach side. */
 export const getPlanOverview = cache(async (): Promise<PlanOverview | null> => {
@@ -305,6 +306,8 @@ export type LoggerSet = {
   reps: number | null;
   done: boolean;
   setLogId: string | null;
+  /** What the coach wrote for this set beyond weight and reps: the target RPE, the rest after it, a note. */
+  plan?: { rpe: number | null; rest: number | null; note: string | null } | null;
 };
 
 export type LoggerExercise = {
@@ -321,6 +324,8 @@ export type LoggerExercise = {
   repMin: number;
   repMax: number;
   restSeconds: number;
+  /** The coach's note on the exercise. */
+  note?: string | null;
   target: Target;
   last: { date: string; sets: Array<{ weight: number | null; reps: number | null }> } | null;
   /** History before today, for the mini chart and live PR detection. */
@@ -366,6 +371,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
           id: true,
           exerciseId: true,
           prescribedSets: true,
+          notes: true,
           section: true,
           exercise: { select: { name: true, slug: true, equipment: true, primaryMuscles: true, gifUrl: true } },
         },
@@ -474,7 +480,11 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       if (saved) {
         return { setNumber: i + 1, weight: saved.weight, reps: saved.reps, done: saved.completed, setLogId: saved.id };
       }
-      return { setNumber: i + 1, weight: target.weight, reps: target.reps, done: false, setLogId: null };
+      // Each set starts at its own prescription: the weight the coach wrote for it, and its reps when they differ across the sets.
+      const ps = prescribed[i];
+      const own = ps && typeof ps.weight === "number" && ps.weight > 0 && !bodyweight ? ps.weight : target.weight;
+      const perSetReps = prescribed.some((p) => p.repMin !== first.repMin);
+      return { setNumber: i + 1, weight: own, reps: perSetReps && ps?.repMin ? ps.repMin : target.reps, done: false, setLogId: null, plan: setPlan(ps) };
     });
 
     return {
@@ -491,6 +501,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       repMin,
       repMax,
       restSeconds: first.restSeconds ?? 90,
+      note: e.notes?.trim() || null,
       target,
       last: lastSession
         ? {

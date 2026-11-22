@@ -4,6 +4,7 @@ import { Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import "./dusk.css";
 import { Toaster } from "@/components/ui/sonner";
+import { PressFeedback } from "@/components/nav/PressFeedback";
 
 const geist = localFont({
   src: "./fonts/GeistVF.woff",
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}>
       <body className="antialiased font-body">
         {children}
+        <PressFeedback />
         <Toaster position="top-center" />
       </body>
     </html>

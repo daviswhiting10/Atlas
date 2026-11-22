@@ -122,4 +122,42 @@ describe("stored limits", () => {
     expect(await waitFor(key, t0)).toBe(0);
     expect(db.throttle.size).toBe(0);
   });
+
+  /**
+   * Password sign-in, step for step as lib/auth.ts does it: all three keys are asked before the password is
+   * looked at, every attempt counts against the connection, and every wrong one against the address.
+   */
+  async function attempt(email: string, ip: string, right: boolean, now: Date): Promise<"signed in" | "wrong" | "blocked"> {
+    const keys = { emailIp: throttleKey("signinEmailIp", email, ip), email: throttleKey("signinEmail", email), ip: throttleKey("signinIp", ip) };
+    const waits = await Promise.all([waitFor(keys.emailIp, now), waitFor(keys.email, now), waitFor(keys.ip, now)]);
+    await record(keys.ip, POLICIES.signinIp, now);
+    if (waits.some((w) => w > 0)) return "blocked";
+    if (!right) {
+      await Promise.all([record(keys.emailIp, POLICIES.signinEmailIp, now), record(keys.email, POLICIES.signinEmail, now)]);
+      return "wrong";
+    }
+    await clear(keys.emailIp);
+    return "signed in";
+  }
+
+  it("password sign-in, per address and connection: 5 wrong are free, then even the RIGHT password waits", async () => {
+    for (let i = 0; i < 5; i++) expect(await attempt("sam@example.com", "1.2.3.4", false, t0)).toBe("wrong");
+    expect(await attempt("sam@example.com", "1.2.3.4", false, t0)).toBe("wrong"); // the 6th wrong one starts the wait
+    expect(await attempt("sam@example.com", "1.2.3.4", true, t0)).toBe("blocked");
+    expect(await attempt("sam@example.com", "1.2.3.4", true, at(31 * SEC))).toBe("signed in"); // never a permanent lock
+    expect(await attempt("sam@example.com", "9.9.9.9", true, t0)).toBe("signed in"); // someone else's connection is not held
+  });
+
+  it("password sign-in, per connection: 50 attempts in 15 minutes, then every address from it waits", async () => {
+    for (let i = 0; i < 50; i++) await attempt(`user${i}@example.com`, "5.6.7.8", true, t0);
+    expect(await attempt("fresh@example.com", "5.6.7.8", true, at(MIN))).toBe("blocked");
+    expect(await attempt("fresh@example.com", "5.6.7.9", true, at(MIN))).toBe("signed in");
+    expect(await attempt("fresh@example.com", "5.6.7.8", true, at(16 * MIN))).toBe("signed in");
+  });
+
+  it("password sign-in, per address from anywhere: 20 wrong an hour (from many connections), then one a minute", async () => {
+    for (let i = 0; i < 21; i++) await attempt("sam@example.com", `10.0.0.${i}`, false, t0);
+    expect(await attempt("sam@example.com", "10.0.1.1", true, at(SEC))).toBe("blocked");
+    expect(await attempt("sam@example.com", "10.0.1.1", true, at(MIN + SEC))).toBe("signed in");
+  });
 });

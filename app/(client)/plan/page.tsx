@@ -20,6 +20,8 @@ import {
   planSwapExercise,
   setWorkoutSkipped,
 } from "@/lib/actions/athlete";
+import { isCoached } from "@/lib/athlete/coached";
+import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
 
 export const metadata: Metadata = { title: "Plan" };
@@ -58,6 +60,7 @@ export default async function PlanPage() {
     return (
       <div className="surface rise p-8">
         <h1 className="text-3xl text-ink">No plan yet</h1>
+        {isCoached(athlete) && <RefreshWhileEmpty />}
         {athlete.selfServe ? (
           <>
             <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it lays out your next 12 weeks.</p>
@@ -110,7 +113,7 @@ export default async function PlanPage() {
       </div>
 
       <div className="max-w-3xl">
-        <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" />
+        <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" locked={isCoached(athlete)} />
       </div>
       {reportRows}
     </div>

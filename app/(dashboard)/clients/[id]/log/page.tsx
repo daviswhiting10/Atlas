@@ -312,6 +312,7 @@ export default async function LogPage({
 
   return (
     <WorkoutLogger
+      ownerId={session?.user?.id ?? ""}
       uploadsEnabled={blobConfigured()}
       workspaceId={workspaceId}
       key={assignedWorkout.id}

@@ -35,6 +35,7 @@
   --dusk-purple: #a39acb; /* today */
   --dusk-teal: #7cc7bd; /* the primary action; done */
   --dusk-peach: #d8b19d; /* needs you: still open, restarted */
+  --dusk-amber: #e0a43a; /* a save that hasn't landed: one small dot, never a toast */
 
   /* Colour: the primary action (one per screen) */
   --dusk-button: var(--dusk-teal);

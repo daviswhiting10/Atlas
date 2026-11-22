@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Copy, X } from "lucide-react";
 import { toast } from "sonner";
 import { useEscape } from "@/hooks/use-escape";
@@ -26,7 +27,9 @@ export function InviteSheet({ name, invite, onClose }: { name: string; invite: I
   }
 
   useEscape(true, onClose);
-  return (
+  // Drawn on <body>: inside the page's animated container it would sit under the live-session bar.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div
         role="dialog"
@@ -74,6 +77,7 @@ export function InviteSheet({ name, invite, onClose }: { name: string; invite: I
           It works once and expires in {invite.expiresInDays} days. Once {first} is in, they can set a password from their You tab and sign in any time. Inviting again makes a new link.
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

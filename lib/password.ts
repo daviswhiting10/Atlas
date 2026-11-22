@@ -8,9 +8,9 @@
 
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from "crypto";
 import { z } from "zod";
-import { PASSWORD_MAX, PASSWORD_MIN, passwordProblem } from "./password-rules";
+import { PASSWORD_MAX, PASSWORD_MIN, passwordBlock, passwordWarning } from "./password-rules";
 
-export { PASSWORD_MAX, PASSWORD_MIN, passwordProblem };
+export { PASSWORD_MAX, PASSWORD_MIN, passwordBlock, passwordWarning };
 
 const scrypt = (password: string, salt: Buffer, keylen: number, opts: ScryptOptions) =>
   new Promise<Buffer>((resolve, reject) => scryptCb(password, salt, keylen, opts, (err, key) => (err ? reject(err) : resolve(key))));
@@ -65,7 +65,7 @@ export const Email = z
   .email("That doesn't look like an email address.")
   .transform(normalizeEmail);
 
-/** A new password's length. The other rules (common, contains the email) need the email: see passwordProblem. */
+/** A new password's length. Everything else (the worst-passwords list, the "looks easy to guess" warning) is passwordBlock / passwordWarning. */
 export const Password = z
   .string()
   .min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters.`)

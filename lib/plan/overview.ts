@@ -6,6 +6,7 @@
  * Scope is passed in explicitly; this module knows nothing about sessions.
  */
 
+import { prescriptionLabels, type PrescribedSet } from "./prescription";
 import { prisma } from "@/lib/db/client";
 import { planWorkoutStatus } from "@/lib/sessions/status";
 import { displayName } from "./catalog";
@@ -17,7 +18,7 @@ import { mediaPictures } from "@/lib/exercises/media";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-type RawSet = { weight?: number | null; repMin?: number; repMax?: number; unit?: "reps" | "secs"; restSeconds?: number | null };
+type RawSet = PrescribedSet;
 
 export type WorkoutStatus = "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
 
@@ -45,6 +46,11 @@ export type WorkoutSummary = {
     unit: "reps" | "secs";
     /** A target weight written into the plan, if there is one. */
     weight: number | null;
+    /** The weight as written across the sets ("95–115 lb"), the RPE ("7–9"), the rest ("2:00") and the coach's note on the exercise. */
+    weightLabel?: string | null;
+    rpe?: string | null;
+    rest?: string | null;
+    note?: string | null;
     /** What the movement looks like, when the library has it. */
     picture: Picture | null;
     /** Warm-up, block or cool-down, as stored (read with lib/workouts/structure). */
@@ -140,7 +146,7 @@ export async function loadPlanOverview({
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
-            select: { id: true, exerciseId: true, prescribedSets: true, section: true, exercise: { select: { name: true, slug: true, gifUrl: true } } },
+            select: { id: true, exerciseId: true, prescribedSets: true, notes: true, section: true, exercise: { select: { name: true, slug: true, gifUrl: true } } },
           },
         },
       },
@@ -180,6 +186,11 @@ export async function loadPlanOverview({
         repMax: sets[0]?.repMax ?? 0,
         unit: sets[0]?.unit === "secs" ? ("secs" as const) : ("reps" as const),
         weight: sets[0]?.weight ?? null,
+        ...(() => {
+          // What the coach wrote per set: the weight across the sets, RPE, rest, and a note on the exercise.
+          const l = prescriptionLabels(sets);
+          return { weightLabel: l.weight, rpe: l.rpe, rest: l.rest, note: e.notes?.trim() || null };
+        })(),
         picture: pictureFor({ name: displayName(e.exercise.slug, e.exercise.name), gifUrl: e.exercise.gifUrl }),
         section: e.section,
       };

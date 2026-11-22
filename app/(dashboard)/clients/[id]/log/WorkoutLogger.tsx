@@ -4,7 +4,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
-import { LIVE_EVENT, clearLive, mergeDraft, readLive, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
+import { LIVE_EVENT, clearLive, mergeDraft, readLiveFor, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import { ExerciseMediaUpload } from "@/components/coach/ExerciseMediaUpload";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  MoreHorizontal,
   Mic,
   MicOff,
   PencilLine,
@@ -41,6 +42,10 @@ import {
 import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
 import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
+import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
+import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
+import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
@@ -290,6 +295,7 @@ function localToday(): string {
 }
 
 export default function WorkoutLogger({
+  ownerId,
   clientId,
   clientName,
   assignedWorkoutId,
@@ -318,6 +324,8 @@ export default function WorkoutLogger({
   completed: boolean;
   /** Blob storage is connected: coaches can upload their own exercise photos and clips. */
   uploadsEnabled: boolean;
+  /** The signed-in coach: the "currently logging" bar is theirs alone. */
+  ownerId: string;
   workspaceId: string;
   exercises: LoggerExercise[];
   existingWorkoutLogId: string | null;
@@ -393,6 +401,15 @@ export default function WorkoutLogger({
   const [adding, setAdding] = useState(false);
   /** The exercise whose swap sheet is open. */
   const [swapFor, setSwapFor] = useState<string | null>(null);
+  /** Sets (by uid) whose save failed, or has waited offline a while: one small amber dot on that row. Never shown for a save that worked. */
+  const [unsaved, setUnsaved] = useState<Record<string, true>>({});
+  const stuckTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const markUnsaved = (uid: string, on: boolean) => setUnsaved((u) => (on === (uid in u) ? u : on ? { ...u, [uid]: true } : Object.fromEntries(Object.entries(u).filter(([k]) => k !== uid))));
+  const clearStuck = (uid: string) => {
+    clearTimeout(stuckTimers.current.get(uid));
+    stuckTimers.current.delete(uid);
+    markUnsaved(uid, false);
+  };
   const [busy, setBusy] = useState(false);
 
   // ── Live session: the "currently logging" bar on other screens, and coming back to this exact place ──
@@ -408,15 +425,16 @@ export default function WorkoutLogger({
     } catch {
       return;
     }
-    const prev = readLive(store);
-    const live = startLive(prev, {
+    // Only this coach's own earlier session counts (another account's on this browser is ignored).
+    const prev = readLiveFor(store, ownerId);
+    const live: LiveSession = { ...startLive(prev, {
       assignedWorkoutId,
       clientId,
       clientName,
       workoutName,
       href: `/clients/${clientId}/log?workoutId=${assignedWorkoutId}`,
       workoutLogId: existingWorkoutLogId,
-    });
+    }), owner: ownerId };
     liveRef.current = live;
     writeLive(store, live);
     window.dispatchEvent(new Event(LIVE_EVENT));
@@ -590,7 +608,22 @@ export default function WorkoutLogger({
   // Load-related keys that auto-carry forward to uncompleted subsequent sets
   const CARRY_KEYS: (keyof SetEntry)[] = ["weight", "isBodyweight", "isBand", "bandColor", "reps", "isSeconds"];
 
+  // Weights carried down into sets that had none (muted until ticked or edited). Still editable; logged only when ticked.
+  const [filled, setFilled] = useState<Set<string>>(() => new Set());
   function updateSet(aweId: string, idx: number, patch: Partial<SetEntry>) {
+    if (patch.weight !== undefined) {
+      const cur = exStateRef.current[aweId]?.sets;
+      const before = cur?.[idx];
+      if (cur && before) {
+        const mark = new Set(filled);
+        mark.delete(before.uid);
+        cur.forEach((x, j) => {
+          if (j > idx && !x.completed && x.weight === before.weight && before.weight === "" && patch.weight !== "") mark.add(x.uid);
+          else if (j > idx && !x.completed && x.weight === before.weight) mark.delete(x.uid);
+        });
+        setFilled(mark);
+      }
+    }
     setExState((prev) => {
       const sets = [...prev[aweId].sets];
       sets[idx] = { ...sets[idx], ...patch };
@@ -653,6 +686,7 @@ export default function WorkoutLogger({
     // A set un-ticked: the session isn't over after all.
     if (!nowDone) cancelFinish();
     noteServer(entry);
+    clearStuck(entry.uid);
     // Only this set's tick changes (nothing carried forward), and the ref changes with it, so a
     // second tap before React re-renders sees it.
     setSet(aweId, entry.uid, { completed: nowDone });
@@ -660,6 +694,7 @@ export default function WorkoutLogger({
     addPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1), { done: nowDone });
     saveSet(aweId, exerciseId, entry.uid, { ...entry, completed: nowDone }, idx);
     if (!nowDone) return;
+    lastAwe.current = aweId;
     setLastSetAt(Date.now());
     setRestSecs(0);
     const lists = doneLists();
@@ -667,18 +702,7 @@ export default function WorkoutLogger({
       scheduleFinish();
       return;
     }
-    // Undo un-logs it (the same toggle, the other way), on the server too.
-    toast.success(`Set ${idx + 1} logged`, {
-      id: `logged-${entry.uid}`,
-      action: { label: "Undo", onClick: () => toggleByUid(aweId, exerciseId, entry.uid) },
-    });
     afterExerciseChange(aweId, lists);
-  }
-
-  /** Toggle a set found by its id (a toast's Undo: the set may have moved since). */
-  function toggleByUid(aweId: string, exerciseId: string, uid: string) {
-    const i = exStateRef.current[aweId]?.sets.findIndex((x) => x.uid === uid) ?? -1;
-    if (i !== -1) handleComplete(aweId, exerciseId, i);
   }
 
   /** Change one set by its id, in state and in the ref at once. */
@@ -732,6 +756,7 @@ export default function WorkoutLogger({
         if (!result?.setLogId || !result.workoutLogId) throw new Error("The set wasn't saved");
         logIdRef.current = result.workoutLogId;
         serverSets.current.set(uid, { setLogId: result.setLogId, completed: want.completed });
+        clearStuck(uid);
         // Confirmed while the page is closing: the next page may have read the server before this
         // landed, so it stays pending there (that page clears it, or resends it harmlessly).
         if (!leaving) clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1), want.completed);
@@ -743,19 +768,98 @@ export default function WorkoutLogger({
         // No connection: the tick stays (it's the truth on this phone) and is sent when the
         // connection is back. Only a refusal from the server puts the set back.
         if (isNetworkError(e)) {
-          toast("You're offline. Sets save when you're back.", { id: "offline" });
+          if (!stuckTimers.current.has(uid)) stuckTimers.current.set(uid, setTimeout(() => markUnsaved(uid, true), STUCK_MS));
           return;
         }
         // Refused: put the set back the way the server has it, unless a newer tap for it is still on its way.
         if (left > 0) return;
         clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
         setSet(aweId, uid, { completed: server.completed });
-        toast.dismiss(`logged-${uid}`);
         if (!server.completed) cancelFinish();
-        toast.error(`Set ${idx + 1} didn't save. Check your connection and tap it again.`, { id: `save-${uid}` });
+        markUnsaved(uid, true);
       }
     });
   }
+
+  // ── Check all / Uncheck all (one exercise, or the whole workout) ──────────────
+  // Each set goes through what a single tick does: on screen at once, kept on the phone until the server
+  // confirms it, saved in set order. The rest timer restarts once. No toast, no flash.
+  const [confirmAll, setConfirmAll] = useState<{ mode: BulkMode; count: number } | null>(null);
+  function applyBulk(groups: Array<{ ex: LoggerExercise; idx: number[] }>, mode: BulkMode) {
+    const done = mode === "check";
+    const calls: Array<{ aweId: string; exerciseId: string; entry: SetEntry; idx: number }> = [];
+    const uids = new Set<string>();
+    for (const { ex, idx } of groups) {
+      const sets = exStateRef.current[ex.aweId]?.sets ?? [];
+      for (const i of idx) {
+        const entry = sets[i];
+        if (!entry) continue;
+        noteServer(entry);
+        clearStuck(entry.uid);
+        uids.add(entry.uid);
+        calls.push({ aweId: ex.aweId, exerciseId: ex.exerciseId, entry, idx: i });
+      }
+    }
+    if (calls.length === 0) return;
+    const mark = (m: Record<string, ExerciseState>) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.sets.some((x) => uids.has(x.uid)) ? { ...v, sets: v.sets.map((x) => (uids.has(x.uid) ? { ...x, completed: done } : x)) } : v]));
+    exStateRef.current = mark(exStateRef.current);
+    setExState((prev) => mark(prev));
+    queueBulk(store(), assignedWorkoutId, calls.map((c) => ({ aweId: c.aweId, setNumber: c.idx + 1, done })));
+    for (const c of calls) saveSet(c.aweId, c.exerciseId, c.entry.uid, { ...c.entry, completed: done }, c.idx);
+    if (!done) return void cancelFinish();
+    lastAwe.current = calls[calls.length - 1].aweId;
+    setLastSetAt(Date.now());
+    setRestSecs(0);
+    const lists = doneLists();
+    if (allDone(lists)) return void scheduleFinish();
+    afterExerciseChange(calls[calls.length - 1].aweId, lists);
+  }
+  function bulkOne(ex: LoggerExercise, mode: BulkMode) {
+    if (!settled()) return;
+    const sets = exStateRef.current[ex.aweId]?.sets ?? [];
+    applyBulk([{ ex, idx: bulkIndices(sets.map((x) => x.completed), mode) }], mode);
+  }
+  function bulkAll(mode: BulkMode) {
+    if (!settled()) return;
+    const groups = exercises
+      .map((ex) => ({ ex, idx: bulkIndices((exStateRef.current[ex.aweId]?.sets ?? []).map((x) => x.completed), mode) }))
+      .filter((g) => g.idx.length > 0);
+    if (groups.length) applyBulk(groups, mode);
+  }
+  const wb = workoutBulk(exercises.map((e) => (exState[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
+  const workoutMenu = wb ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label="More" className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+        <MoreHorizontal className="h-5 w-5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[180px]">
+        <DropdownMenuItem className="min-h-11" onClick={() => {
+                    // Asking to uncheck during the finishing countdown stops it: the sheet must not race the auto-finish.
+                    cancelFinish();
+                    setConfirmAll({ mode: wb.mode, count: wb.count });
+                  }}>
+          {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
+  // The rest pill floats at the bottom: when it starts, the next set to log is moved above it if it would sit under it.
+  const pillRef = useRef<HTMLDivElement>(null);
+  const lastAwe = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastSetAt) return;
+    const id = requestAnimationFrame(() => {
+      const pill = pillRef.current;
+      const tick =
+        document.querySelector<HTMLElement>(`section[data-exercise="${lastAwe.current}"] button[aria-label^="Log set"]`) ?? document.querySelector<HTMLElement>('button[aria-label^="Log set"]');
+      if (!pill || !tick) return;
+      const row = (tick.closest('[role="group"]') as HTMLElement | null) ?? tick;
+      const over = row.getBoundingClientRect().bottom - (pill.getBoundingClientRect().top - 12);
+      if (over > 0) window.scrollBy({ top: over, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [lastSetAt]);
 
   /** Every exercise's sets as done flags, from the latest state, with one set (or one change) applied. */
   function doneLists(change?: { aweId: string; idx: number; removed?: boolean }): boolean[][] {
@@ -766,18 +870,24 @@ export default function WorkoutLogger({
     });
   }
 
-  /** An exercise just finished: fold it and go to the next one with sets left. */
+  /**
+   * An exercise just finished: its card stays open for a moment, so the check that finished it is seen (the
+   * athlete logger waits the same 450 ms), then it folds and the next one with sets left opens.
+   */
   function afterExerciseChange(aweId: string, lists: boolean[][]) {
     const i = exercises.findIndex((e) => e.aweId === aweId);
     const done = lists.map((l) => l.length > 0 && l.every(Boolean));
     if (i === -1 || !done[i]) return;
-    setFoldOverride((prev) => {
-      const next = { ...prev };
-      delete next[aweId];
-      return next;
-    });
+    setFoldOverride((prev) => ({ ...prev, [aweId]: false }));
     const n = nextOpen(done, i);
-    if (n != null) setTimeout(() => jumpTo(exercises[n]), 350);
+    setTimeout(() => {
+      setFoldOverride((prev) => {
+        const next = { ...prev };
+        delete next[aweId];
+        return next;
+      });
+      if (n != null) setTimeout(() => jumpTo(exercises[n]), 0);
+    }, FOLD_DELAY_MS);
   }
 
   /** Delete a set that isn't logged (a long-press on its row, or Delete in its details), with an Undo. */
@@ -863,7 +973,6 @@ export default function WorkoutLogger({
   finishedRef.current = finished;
   const onOnline = useRef(() => {});
   onOnline.current = () => {
-    toast.dismiss("offline");
     resendPending();
     // Everything logged while offline: finish now that it can.
     saveChain.current.then(() => {
@@ -1409,6 +1518,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {workoutMenu}
         </div>
         </div>
       </div>
@@ -1459,7 +1569,7 @@ export default function WorkoutLogger({
                 if (isFolded(ex)) {
                   return (
                     <section key={ex.aweId} data-exercise={ex.aweId} ref={(el) => void (cardRefs.current[ex.aweId] = el)} style={drag.styleFor(ex.aweId)} className="scroll-mt-28 rounded-2xl border border-line bg-paper">
-                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} hold={drag.bind(ex.aweId)} />
+                      <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} hold={drag.bind(ex.aweId)} />
                       {!completed && <MoveButtons name={ex.name} {...moves(ex.aweId)} />}
                     </section>
                   );
@@ -1475,6 +1585,8 @@ export default function WorkoutLogger({
                       last={ex.lastSets}
                       prescribed={ex.prescribedSets}
                       onChange={(idx, patch) => updateSet(ex.aweId, idx, patch)}
+                      unsaved={unsaved}
+                      filled={filled}
                       onComplete={(idx) => settled() && handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
                       onRemove={(idx) => deleteSet(ex.aweId, idx)}
@@ -1484,10 +1596,13 @@ export default function WorkoutLogger({
                       <button
                         type="button"
                         onClick={() => addSet(ex.aweId)}
-                        className="logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
+                        className="logger-quiet inline-flex whitespace-nowrap items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
                       >
-                        <Plus className="h-3.5 w-3.5" /> Add set
+                        <Plus className="h-3.5 w-3.5 max-[400px]:hidden" /> Add set
                       </button>
+                      {exerciseBulk(state.sets.map((x) => x.completed)) && (
+                        <CheckAllButton mode={exerciseBulk(state.sets.map((x) => x.completed))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(state.sets.map((x) => x.completed))!)} />
+                      )}
                       <span className="flex-1" />
                       {state.noteAdded ? (
                         <span className="px-1 text-[13px] text-[var(--success)]">Note saved ✓</span>
@@ -1496,9 +1611,9 @@ export default function WorkoutLogger({
                           type="button"
                           aria-expanded={state.noteOpen}
                           onClick={() => setExState((prev) => ({ ...prev, [ex.aweId]: { ...prev[ex.aweId], noteOpen: !prev[ex.aweId].noteOpen } }))}
-                          className="logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
+                          className="logger-quiet inline-flex whitespace-nowrap items-center gap-1 px-1 py-1 text-[13px] font-medium text-ink-soft hover:text-ink"
                         >
-                          <PencilLine className="h-3.5 w-3.5" /> Note
+                          <PencilLine className="h-3.5 w-3.5 max-[380px]:hidden" /> Note
                         </button>
                       )}
                       <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
@@ -1592,7 +1707,7 @@ export default function WorkoutLogger({
 
       {/* ── Floating rest timer ──────────────────────────────────── */}
       {lastSetAt && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
+        <div ref={pillRef} className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
           <Timer className="w-4 h-4 text-muted-foreground" />
           <span className="font-mono text-lg tabular-nums">{formatRest(restSecs)}</span>
           <button
@@ -1657,6 +1772,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {workoutMenu}
         </div>
       </div>
 
@@ -1686,7 +1802,7 @@ export default function WorkoutLogger({
               )}
             {isFolded(ex) ? (
               <div className="mt-2 rounded-xl border border-line bg-paper">
-                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} onOpen={() => setFolded(ex.aweId, false)} />
+                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} />
               </div>
             ) : (
             <Card>
@@ -1714,6 +1830,7 @@ export default function WorkoutLogger({
                       idx={idx}
                       entry={entry}
                       onChange={(patch) => updateSet(ex.aweId, idx, patch)}
+                      unsaved={entry.uid in unsaved}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
                     />
@@ -1729,6 +1846,9 @@ export default function WorkoutLogger({
                     <Plus className="w-3 h-3" />
                     Add set
                   </button>
+                  {exerciseBulk(state.sets.map((x) => x.completed)) && (
+                    <CheckAllButton mode={exerciseBulk(state.sets.map((x) => x.completed))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(state.sets.map((x) => x.completed))!)} />
+                  )}
                   <ChangeButton open={editingAweId === ex.aweId} busy={busy} onClick={() => setEditingAweId((cur) => (cur === ex.aweId ? null : ex.aweId))} />
                 </div>
                 {editingAweId === ex.aweId && (
@@ -1793,6 +1913,18 @@ export default function WorkoutLogger({
     <>
       {mobileView}
       {desktopView}
+      {confirmAll != null && (
+        <CheckAllSheet
+          mode={confirmAll.mode}
+          count={confirmAll.count}
+          onCancel={() => setConfirmAll(null)}
+          onConfirm={() => {
+            const mode = confirmAll.mode;
+            setConfirmAll(null);
+            bulkAll(mode);
+          }}
+        />
+      )}
       {pickerSheet}
     </>
   );
@@ -1899,7 +2031,7 @@ function CollapseButton({ name, onClick }: { name: string; onClick: () => void }
  * A folded exercise: one skinny row with its badge and name, then a tick when every set is
  * logged or "3/4" when some are. Tapping anywhere on it opens the card again.
  */
-function FoldedRow({ label, name, sets, onOpen, hold = {} }: { label: string; name: string; sets: SetEntry[]; onOpen: () => void; /** Holding the row picks the card up (useDragOrder). */ hold?: React.HTMLAttributes<HTMLElement> }) {
+function FoldedRow({ label, name, sets, unsaved, onOpen, hold = {} }: { label: string; name: string; sets: SetEntry[]; /** A set inside it hasn't saved. */ unsaved: boolean; onOpen: () => void; /** Holding the row picks the card up (useDragOrder). */ hold?: React.HTMLAttributes<HTMLElement> }) {
   const logged = sets.filter((x) => x.completed).length;
   const done = sets.length > 0 && logged === sets.length;
   return (
@@ -1923,8 +2055,9 @@ function FoldedRow({ label, name, sets, onOpen, hold = {} }: { label: string; na
           <span className="sr-only"> sets logged</span>
         </span>
       ) : null}
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center text-ink-mute">
         <ChevronDown className="h-4 w-4" />
+        <UnsavedDot show={unsaved} />
       </span>
     </button>
   );
@@ -1947,6 +2080,7 @@ function NumField({
   label,
   decimal,
   placeholder,
+  muted = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -1954,6 +2088,8 @@ function NumField({
   label: string;
   decimal: boolean;
   placeholder?: string;
+  /** A weight carried down from an earlier set: shown muted until it is ticked or edited. */
+  muted?: boolean;
 }) {
   return (
     <input
@@ -1967,7 +2103,7 @@ function NumField({
       onBlur={onBlur}
       aria-label={label}
       placeholder={placeholder}
-      className="logger-cell h-10 w-full min-w-0 rounded-lg border border-line-strong bg-dusk-raised px-1 text-center text-[16px] font-semibold tabular-nums text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/70"
+      className={cn("logger-cell h-10 w-full min-w-0 rounded-lg border border-line-strong bg-dusk-raised px-1 text-center text-[16px] tabular-nums outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/70", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
     />
   );
 }
@@ -1979,12 +2115,17 @@ function SetTable({
   sets,
   last,
   prescribed,
+  unsaved,
+  filled,
   onChange,
   onComplete,
   onBlurPersist,
   onRemove,
 }: {
   secs: boolean;
+  unsaved: Record<string, true>;
+  /** Sets whose weight was carried down from an earlier set (by uid). */
+  filled: Set<string>;
   sets: SetEntry[];
   last: LoggerExercise["lastSets"];
   prescribed: PrescribedSet[];
@@ -2064,6 +2205,7 @@ function SetTable({
                       onBlur={persist}
                       label={`Set ${idx + 1} weight in pounds`}
                       decimal
+                      muted={!entry.completed && filled.has(entry.uid)}
                       placeholder={prescribed[idx]?.weight != null ? String(prescribed[idx].weight) : "lb"}
                     />
                   )}
@@ -2085,11 +2227,12 @@ function SetTable({
                   aria-pressed={entry.completed}
                   aria-label={entry.completed ? `Set ${idx + 1} logged — tap to undo` : `Log set ${idx + 1}`}
                   className={cn(
-                    "logger-cell flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
+                    "logger-cell relative flex h-10 w-10 items-center justify-center rounded-lg border",
                     entry.completed ? "border-[var(--success)] bg-[var(--success)] text-dusk-button-text" : "border-line-strong text-ink-mute"
                   )}
                 >
                   <Check className="h-4 w-4" strokeWidth={2.5} />
+                  <UnsavedDot show={entry.uid in unsaved} />
                 </button>
               </HoldRow>
               {open && (
@@ -2225,11 +2368,11 @@ function ChangeButton({ open, busy, onClick }: { open: boolean; busy: boolean; o
       disabled={busy}
       aria-expanded={open}
       className={cn(
-        "logger-quiet inline-flex items-center gap-1 px-1 py-1 text-[13px] font-medium disabled:opacity-50",
+        "logger-quiet inline-flex whitespace-nowrap items-center gap-1 px-1 py-1 text-[13px] font-medium disabled:opacity-50",
         open ? "text-ink" : "text-ink-soft hover:text-ink"
       )}
     >
-      {open ? <X className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
+      {open ? <X className="h-3.5 w-3.5 max-[380px]:hidden" /> : <SlidersHorizontal className="h-3.5 w-3.5 max-[380px]:hidden" />}
       {open ? "Close" : "Change"}
     </button>
   );
@@ -2326,10 +2469,12 @@ function ChangePanel({
 function DesktopSetRow({
   idx,
   entry,
+  unsaved,
   onChange,
   onComplete,
   onRemove,
 }: {
+  unsaved: boolean;
   onRemove?: () => void;
   idx: number;
   entry: SetEntry;
@@ -2339,7 +2484,7 @@ function DesktopSetRow({
 
   return (
     <div className="space-y-0.5">
-      <div className={cn("flex items-center gap-1.5 transition-opacity", entry.completed && "opacity-60")}>
+      <div className={cn("flex items-center gap-1.5", entry.completed && "opacity-60")}>
         <span className="text-xs text-muted-foreground w-5 shrink-0 text-right">{idx + 1}</span>
 
         {/* Load type: weight / BW / band */}
@@ -2435,13 +2580,14 @@ function DesktopSetRow({
           type="button"
           onClick={onComplete}
           className={cn(
-            "ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors border",
+            "relative ml-1 w-7 h-7 rounded flex items-center justify-center shrink-0 border",
             entry.completed
               ? "bg-[var(--success)] border-[var(--success)] text-dusk-button-text"
               : "border-border text-muted-foreground hover:border-[color-mix(in_srgb,var(--dusk-teal)_30%,transparent)] hover:text-[var(--success)]"
           )}
         >
           <Check className="w-3 h-3" />
+          <UnsavedDot show={unsaved} />
         </button>
         {onRemove ? (
           <button type="button" onClick={onRemove} title="Remove set" aria-label={`Remove set ${idx + 1}`} className="w-6 h-7 flex items-center justify-center shrink-0 text-muted-foreground hover:text-[var(--destructive)]">

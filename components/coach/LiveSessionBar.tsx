@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, X } from "lucide-react";
-import { LIVE_EVENT, LIVE_KEY, clearLive, formatElapsed, liveIsFresh, readLive, type LiveSession } from "@/lib/sessions/live";
+import { LIVE_EVENT, LIVE_KEY, clearLive, formatElapsed, liveIsFresh, readLiveFor, type LiveSession } from "@/lib/sessions/live";
 
 function storage(): Storage | null {
   try {
@@ -21,14 +21,14 @@ function storage(): Storage | null {
  *
  * Minimal on purpose: the logger's redesign owns the look.
  */
-export function LiveSessionBar() {
+export function LiveSessionBar({ owner }: { /** The signed-in coach: only their own session shows. */ owner: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [live, setLive] = useState<LiveSession | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const load = () => setLive(readLive(storage()));
+    const load = () => setLive(readLiveFor(storage(), owner));
     load();
     const onStorage = (e: StorageEvent) => e.key === LIVE_KEY && load();
     window.addEventListener(LIVE_EVENT, load);
@@ -37,7 +37,7 @@ export function LiveSessionBar() {
       window.removeEventListener(LIVE_EVENT, load);
       window.removeEventListener("storage", onStorage);
     };
-  }, [pathname]);
+  }, [pathname, owner]);
 
   const onLogger = live != null && pathname === live.href.split("?")[0];
   // Gone once the session has sat untouched for 3 hours, even while this screen stays open.

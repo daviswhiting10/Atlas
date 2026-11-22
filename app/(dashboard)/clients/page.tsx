@@ -1,5 +1,6 @@
 "use client";
 
+import { emailTypo } from "@/lib/email-typos";
 import { useEffect, useState } from "react";
 import { useContentFade } from "@/hooks/use-content-fade";
 import Link from "next/link";
@@ -24,17 +25,26 @@ import {
 import { toast } from "sonner";
 import { Plus, Search, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { lastLogged } from "@/lib/coach/last-logged";
+import { SwipeRow } from "@/components/coach/SwipeRow";
+import { DeleteClientSheet, type DeletePreview } from "@/components/coach/DeleteClientSheet";
 
 type Client = {
   id: string;
   fullName: string;
   email: string | null;
   phone: string | null;
+  /** Set once she has a login of her own. */
+  userId?: string | null;
   status: "PROSPECT" | "ACTIVE" | "AT_RISK" | "CHURNED";
   primaryGoal: string | null;
   retentionScore: number | null;
   updatedAt: string;
   _count: { sessionNotes: number; programAssignments: number; workoutLogs?: number };
+  /** The latest finished session (at most one). */
+  workoutLogs?: Array<{ date: string }>;
+  /** Workouts done of those planned in her plan's current week. */
+  thisWeek?: { done: number; planned: number } | null;
 };
 
 const GOAL_LABELS: Record<string, string> = {
@@ -50,6 +60,9 @@ const sel = (setter: (v: string) => void) => (v: string | null) => { if (v) sett
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
+  // Swipe left on a row: Delete. One row open at a time; the sheet says exactly what goes.
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<(DeletePreview & { id: string }) | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const phase = useContentFade(loading);
@@ -74,6 +87,31 @@ export default function ClientsPage() {
   const filtered = clients.filter(
     (c) => c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
+
+  async function askDelete(id: string) {
+    const res = await fetch(`/api/clients/${id}/erase`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Can't delete this client");
+      setOpenRow(null);
+      return;
+    }
+    setToDelete({ id, ...(body as DeletePreview) });
+  }
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    const res = await fetch(`/api/clients/${toDelete.id}/erase`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Couldn't delete");
+      return;
+    }
+    setClients((prev) => prev.filter((c) => c.id !== toDelete.id));
+    toast.success(`${toDelete.name} deleted`);
+    setToDelete(null);
+    setOpenRow(null);
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -136,6 +174,12 @@ export default function ClientsPage() {
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="jane@email.com"
                   />
+                  {/* A slip like ".con" locks her out later (she signs in with this address): one tap to fix it. */}
+                  {emailTypo(form.email) && (
+                    <button type="button" onClick={() => setForm({ ...form, email: emailTypo(form.email)! })} className="press inline-flex min-h-11 items-center text-sm font-medium text-ink-soft underline underline-offset-4 hover:text-ink">
+                      Did you mean {emailTypo(form.email)}?
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Phone</Label>
@@ -231,27 +275,41 @@ export default function ClientsPage() {
               <Card>
                 <div className="divide-y divide-border">
                   {filtered.map((client) => (
-                    <div key={client.id} className="group flex items-center hover:bg-muted/40 transition-colors">
+                    <SwipeRow key={client.id} open={openRow === client.id} onOpenChange={(o) => setOpenRow(o ? client.id : null)} onDelete={() => void askDelete(client.id)}>
+                    <div className="group flex items-center hover:bg-muted/40 transition-colors">
                     <Link
                       href={`/clients/${client.id}`}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 px-5 min-h-[60px] active:bg-muted/60"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="w-9 h-9 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
                           {client.fullName.charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold">{client.fullName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{client.fullName}</p>
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {client.userId && <span className="shrink-0 rounded-full border border-line-strong px-1.5 py-px text-[10px] font-medium text-ink-soft">Logs own</span>}
+                            <span className="truncate">{[client.email, client.primaryGoal ? (GOAL_LABELS[client.primaryGoal] ?? client.primaryGoal) : null].filter(Boolean).join(" · ")}</span>
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
+                        {/* When she last logged ("Logged today" in teal) and the plan week so far (3/4), on a phone too. */}
+                        {(() => {
+                          const last = lastLogged(client.workoutLogs?.[0]?.date);
+                          if (!last && !client.thisWeek) return null;
+                          return (
+                            <div className="flex shrink-0 flex-col items-end gap-0.5 whitespace-nowrap">
+                              {last && <p className={cn("text-xs", last.today ? "font-semibold text-primary" : "text-muted-foreground")}>{last.label}</p>}
+                              {client.thisWeek && (
+                                <p className="text-sm font-semibold tabular-nums" title="Workouts done this week of those planned">
+                                  {client.thisWeek.done}/{client.thisWeek.planned}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="text-right hidden sm:block">
-                          <p className="text-xs text-muted-foreground">
-                            {client._count.workoutLogs ?? 0} workout{(client._count.workoutLogs ?? 0) === 1 ? "" : "s"} logged
-                          </p>
                           {client.retentionScore != null && (
                             <p className="text-xs font-mono text-muted-foreground">
                               Retention: {client.retentionScore}/100
@@ -260,7 +318,16 @@ export default function ClientsPage() {
                         </div>
                       </div>
                     </Link>
+                    {/* The direct way to the logger; the row itself opens the profile. */}
+                    <Link
+                      href={`/clients/${client.id}/log`}
+                      aria-label={`Log a session for ${client.fullName}`}
+                      className="press flex min-h-[60px] min-w-[64px] shrink-0 items-center justify-center pr-5 text-sm font-semibold text-primary"
+                    >
+                      Log →
+                    </Link>
                     </div>
+                    </SwipeRow>
                   ))}
                 </div>
               </Card>
@@ -268,6 +335,7 @@ export default function ClientsPage() {
           </div>
         )}
       </div>
+      {toDelete && <DeleteClientSheet preview={toDelete} onDelete={confirmDelete} onClose={() => { setToDelete(null); setOpenRow(null); }} />}
     </div>
   );
 }

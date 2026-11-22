@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <CoachNav demo={session.user.email?.endsWith(`@${GUEST_EMAIL_DOMAIN}`) === true} />
       <main className="coach-ui mx-auto max-w-5xl px-4 pb-28 pt-5 sm:px-8 md:pb-16 md:pt-9">
         {children}
-        <LiveSessionBar />
+        <LiveSessionBar owner={session.user.id ?? ""} />
       </main>
     </div>
   );

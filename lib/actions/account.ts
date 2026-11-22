@@ -14,14 +14,27 @@ import { z } from "zod";
 import { auth, unstable_update } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN, createAthlete } from "@/lib/guest";
-import { Email, Password, hashPassword, passwordProblem, rateLimiter, verifyPassword } from "@/lib/password";
+import { Email, Password, hashPassword, passwordBlock, passwordWarning, rateLimiter, verifyPassword } from "@/lib/password";
 import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle";
-import { SNOOZE_MS, passwordStep } from "@/lib/auth/session-policy";
+import { SNOOZE_MS, mayWait } from "@/lib/auth/session-policy";
 import { stampProof } from "@/lib/auth/proof";
 import { RESET_TTL_MS, consumeReset, createReset, peekReset, resetUrl } from "@/lib/auth/reset";
 import { sendEmail } from "@/lib/email";
 
-export type AccountResult = { ok: true } | { ok: false; error: string };
+/** `weak`: a warning, not a refusal. The form offers "Use it anyway", which sends the same request with `allowWeak`. */
+export type AccountResult = { ok: true } | { ok: false; error: string; weak?: true };
+
+/**
+ * Refuse the very worst passwords; warn (once) about ones that look easy to guess, unless the person already said
+ * to use it anyway. Null means go on.
+ */
+const checkPassword = (password: string, allowWeak: unknown): { ok: false; error: string; weak?: true } | null => {
+  const block = passwordBlock(password);
+  if (block) return { ok: false, error: block };
+  if (allowWeak === true) return null;
+  const w = passwordWarning(password);
+  return w ? { ok: false, error: w, weak: true } : null;
+};
 
 const TAKEN = "An account already uses that email. Sign in instead.";
 const perIp = rateLimiter(10, 60 * 60_000);
@@ -45,12 +58,12 @@ const NewAccount = z.object({
 });
 
 /** Sign up: a self-serve athlete with their own plan, reachable from any device. */
-export async function createAccount(raw: { name: string; email: string; password: string; prefs: unknown }): Promise<AccountResult> {
+export async function createAccount(raw: { name: string; email: string; password: string; prefs: unknown; allowWeak?: boolean }): Promise<AccountResult> {
   const parsed = NewAccount.safeParse(raw);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const { name, email, password, prefs } = parsed.data;
-  const problem = passwordProblem(password, email);
-  if (problem) return { ok: false, error: problem };
+  const refused = checkPassword(password, raw.allowWeak);
+  if (refused) return refused;
   if (!perIp(clientIp())) return { ok: false, error: "Too many sign-ups from this connection. Try again in a while." };
 
   if (isGuestEmail(email)) return { ok: false, error: "Use your own email address." };
@@ -72,7 +85,7 @@ const SaveGuest = z.object({ email: Email, password: Password });
  * Give a guest account an email and password. Everything already logged
  * stays: it's the same account, now one you can sign back into.
  */
-export async function saveGuestAccount(raw: { email: string; password: string }): Promise<AccountResult> {
+export async function saveGuestAccount(raw: { email: string; password: string; allowWeak?: boolean }): Promise<AccountResult> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId || session.user.role !== "CLIENT") return { ok: false, error: "Sign in first." };
@@ -80,8 +93,8 @@ export async function saveGuestAccount(raw: { email: string; password: string })
   const parsed = SaveGuest.safeParse(raw);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const { email, password } = parsed.data;
-  const problem = passwordProblem(password, email);
-  if (problem) return { ok: false, error: problem };
+  const refused = checkPassword(password, raw.allowWeak);
+  if (refused) return refused;
   if (!perIp(clientIp())) return { ok: false, error: "Too many attempts from this connection. Try again in a while." };
 
   if (isGuestEmail(email)) return { ok: false, error: "Use your own email address." };
@@ -134,7 +147,7 @@ async function keepThisSession(userId: string, changedAt: Date): Promise<void> {
  * Changing an existing one needs the current password, and signs out every
  * other device. A first password leaves them signed in.
  */
-export async function setAccountPassword(raw: { password: string; current?: string }): Promise<AccountResult> {
+export async function setAccountPassword(raw: { password: string; current?: string; allowWeak?: boolean }): Promise<AccountResult> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { ok: false, error: "Sign in first." };
@@ -158,8 +171,8 @@ export async function setAccountPassword(raw: { password: string; current?: stri
     await clear(key);
   }
 
-  const problem = passwordProblem(parsed.data.password, user.email);
-  if (problem) return { ok: false, error: problem };
+  const refused = checkPassword(parsed.data.password, raw.allowWeak);
+  if (refused) return refused;
 
   const passwordHash = await hashPassword(parsed.data.password);
   if (user.passwordHash) {
@@ -178,28 +191,18 @@ export async function setAccountPassword(raw: { password: string; current?: stri
 }
 
 /**
- * "Not now" on the set-password step: asks again in 7 days. Only accounts
- * from before the step shipped may wait; newer ones must set a password.
+ * "Not now" on the set-password step: asks again in 7 days. Accounts from before the step shipped
+ * may wait every time; newer ones (invited clients) once, then they must set a password.
  */
 export async function snoozePasswordStep(): Promise<AccountResult> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { ok: false, error: "Sign in first." };
 
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, passwordHash: true, createdAt: true, accounts: { where: { provider: "google" }, select: { id: true }, take: 1 } },
-  });
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true, passwordPromptAfter: true } });
   if (!u) return { ok: false, error: "Sign in first." };
+  if (!mayWait(u.createdAt, u.passwordPromptAfter)) return { ok: false, error: "Set a password to go on." };
   const now = new Date();
-  // Asked as if the step were on and no snooze were running: may this account wait at all?
-  const step = passwordStep(
-    { email: u.email, hasPassword: u.passwordHash != null, createdAt: u.createdAt, passwordPromptAfter: null, googleLinked: u.accounts.length > 0 },
-    now,
-    true,
-    GUEST_EMAIL_DOMAIN
-  );
-  if (step.needs && !step.canSnooze) return { ok: false, error: "Set a password to go on." };
 
   await prisma.user.update({ where: { id: userId }, data: { passwordPromptAfter: new Date(now.getTime() + SNOOZE_MS) } });
   try {
@@ -259,7 +262,7 @@ export async function requestPasswordReset(raw: { email: string }): Promise<Acco
 
 const LINK_GONE = "This link has expired or has already been used. Ask for a new one.";
 
-export type ResetResult = { ok: true; email: string } | { ok: false; error: string; expired?: boolean };
+export type ResetResult = { ok: true; email: string } | { ok: false; error: string; expired?: boolean; weak?: true };
 
 /**
  * Save a new password from a reset link. The rules are checked before the
@@ -267,7 +270,7 @@ export type ResetResult = { ok: true; email: string } | { ok: false; error: stri
  * signed-in device is signed out, and the address's sign-in limits are
  * cleared. Returns the email so the browser can sign straight in.
  */
-export async function resetPassword(raw: { token: string; password: string }): Promise<ResetResult> {
+export async function resetPassword(raw: { token: string; password: string; allowWeak?: boolean }): Promise<ResetResult> {
   const token = typeof raw?.token === "string" ? raw.token : "";
   const password = typeof raw?.password === "string" ? raw.password : "";
 
@@ -276,8 +279,8 @@ export async function resetPassword(raw: { token: string; password: string }): P
   const user = await prisma.user.findUnique({ where: { id: reset.userId }, select: { id: true, email: true } });
   if (!user || isGuestEmail(user.email)) return { ok: false, error: LINK_GONE, expired: true };
 
-  const problem = passwordProblem(password, user.email);
-  if (problem) return { ok: false, error: problem };
+  const refused = checkPassword(password, raw.allowWeak);
+  if (refused) return refused;
 
   const passwordHash = await hashPassword(password);
   const used = await prisma.$transaction(async (tx) => {

@@ -53,17 +53,17 @@ export default function LandingPage() {
         {/* ── Hero ─────────────────────────────────────────────────────── */}
         <section className="grid items-center gap-12 pb-16 pt-8 sm:pt-14 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-24">
           <div>
-            <p className="rise eyebrow inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5 backdrop-blur">
+            <p className="rise-intro eyebrow inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-signal" /> Strength training, made obvious
             </p>
-            <h1 className="rise rise-1 mt-5 font-display text-[46px] leading-[1.02] text-ink sm:text-[68px]">
+            <h1 className="rise-intro rise-intro-1 mt-5 font-display text-[46px] leading-[1.02] text-ink sm:text-[68px]">
               A plan built for your goal. Progress you can <em className="text-signal">see</em>.
             </h1>
-            <p className="rise rise-2 mt-5 max-w-xl text-[17px] leading-relaxed text-ink-soft">
+            <p className="rise-intro rise-intro-2 mt-5 max-w-xl text-[17px] leading-relaxed text-ink-soft">
               Atlas writes your 12-week program, tells you what to lift every session, and turns each set you log into a
               chart that keeps climbing.
             </p>
-            <div className="rise rise-3 mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="rise-intro rise-intro-3 mt-8 flex flex-col gap-3 sm:flex-row">
               <DemoButton className="press flex h-14 items-center justify-center gap-2 rounded-2xl bg-dusk-button px-7 text-base font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60" />
               <Link
                 href="/start"
@@ -72,19 +72,19 @@ export default function LandingPage() {
                 Build my plan <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <p className="rise rise-4 mt-4 text-sm text-ink-mute">
+            <p className="rise-intro rise-intro-4 mt-4 text-sm text-ink-mute">
               Your plan is ready in under a minute. The demo needs no account and opens with five months already logged.
             </p>
             <Link
               href="/agents#demo"
-              className="rise rise-4 press mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-paper/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:border-ink/25"
+              className="rise-intro rise-intro-4 press mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-paper/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:border-ink/25"
             >
               <Sparkles className="h-4 w-4 text-signal" /> Watch an AI assistant use Atlas <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
           {/* Hero visual */}
-          <div className="rise rise-2 relative mx-auto w-full max-w-md lg:max-w-none">
+          <div className="rise-intro rise-intro-2 relative mx-auto w-full max-w-md lg:max-w-none">
             <div className="surface-night p-6 sm:p-7">
               <div className="flex items-start justify-between">
                 <div>
@@ -113,7 +113,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="surface rise rise-4 -mt-6 ml-auto mr-3 w-[86%] p-4 sm:mr-6 sm:w-[78%]">
+            <div className="surface rise-intro rise-intro-4 -mt-6 ml-auto mr-3 w-[86%] p-4 sm:mr-6 sm:w-[78%]">
               <p className="eyebrow">Today&apos;s target</p>
               <div className="mt-1.5 flex items-center justify-between gap-3">
                 <p className="tnum text-lg font-semibold text-ink">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSeries, sessionPoint } from "@/lib/plan/overload";
-import { hasProgressToShow, overallProgress } from "./overall";
+import { hasProgressToShow, newestIsLighter, overallProgress } from "./overall";
 
 const set = (weight: number | null, reps: number) => ({ weight, reps, completed: true });
 const lift = (sessions: Array<[string, number | null, number, boolean?]>) => {
@@ -59,3 +59,17 @@ describe("hasProgressToShow", () => {
     expect(hasProgressToShow({ exercises: [], recentPRs: [{}], totals: { sessions: 1 } })).toBe(true);
   });
 });
+
+describe("newestIsLighter", () => {
+  it("is true when the latest session was in a lighter week (the line ends before it)", () => {
+    const bench = lift([["2026-10-05", 100, 5], ["2026-10-12", 105, 5], ["2026-10-19", 80, 5, true]]);
+    const row = lift([["2026-10-05", 90, 5], ["2026-10-20", 70, 5, true]]);
+    expect(newestIsLighter([bench, row])).toBe(true);
+    expect(overallProgress([bench]).points.map((p) => p.week)).toEqual(["2026-10-05", "2026-10-12"]);
+  });
+  it("is false when the latest session counts, or there are none", () => {
+    expect(newestIsLighter([lift([["2026-10-05", 100, 5, true], ["2026-10-12", 105, 5]])])).toBe(false);
+    expect(newestIsLighter([])).toBe(false);
+  });
+});
+

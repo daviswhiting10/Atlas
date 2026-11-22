@@ -58,7 +58,7 @@ npx tsx scripts/exercise-cleanup/undo.ts <batch-id> --only <exercise-id>
 
 ## Sign-in (see HANDOFF.md, "Auth")
 - The email link stays as a fallback. Never rotate `AUTH_SECRET`: it would sign everyone out.
-- The set-password step is switched by `STEP_DEFAULT` in `lib/auth/session-policy.ts`, and `AUTH_PASSWORD_STEP=on|off` overrides it (the kill switch).
+- The set-password step is switched by `STEP_DEFAULT` in `lib/auth/session-policy.ts`, and `AUTH_PASSWORD_STEP=on|off` overrides it (the kill switch; a Vercel value of `off` keeps it off). Accounts from before 2026-11-14 may say "Not now" every time; newer ones (invited clients) may skip once, then must set a password. State: ON by default since the second invite release (2026-11-21); release 1 shipped it OFF first, as the rollout above says.
 - Rollout: rehearse, then deploy 1 with the step off, verify the user can still sign in every way, then deploy 2 to turn it on.
 
 ## Running locally

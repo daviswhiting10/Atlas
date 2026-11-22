@@ -16,6 +16,10 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
+import { InviteConfirm } from "@/components/coach/InviteConfirm";
+import { DeleteClientSheet, type DeletePreview } from "@/components/coach/DeleteClientSheet";
+import { shareInvite } from "@/lib/coach/invite-share";
+import type { LoginStatus } from "@/lib/coach/login-status";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
 import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
@@ -68,6 +72,7 @@ type Client = {
     title: string | null;
     _count: { sets: number };
     assignedWorkout: {
+      name?: string;
       scheduledDate: string;
       programAssignment: { name: string };
     } | null;
@@ -101,18 +106,22 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ progress, history, report, initial }: { /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** null: nothing to chart yet, so no Progress tab. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ week, progress, history, report, latest, access, initial }: { /** Invited, opened, password set: where the client is with the app. */ access?: LoginStatus | null; /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** The latest finished session, judged against the plan (nothing until she has finished one). */ latest?: React.ReactNode; /** The week so far and the main lifts, shown above the progress charts on the first tab (null: nothing to show yet). */ week?: React.ReactNode; /** null: nothing to chart yet. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
   const [loading, setLoading] = useState(initial == null);
   const [invite, setInvite] = useState<InviteResult | null>(null);
+  /** The "Sending to … — is that right?" step, before any link is made. */
+  const [confirmInvite, setConfirmInvite] = useState(false);
+  /** ⋯ Delete client: what would go, shown before anything is deleted. */
+  const [toDelete, setToDelete] = useState<DeletePreview | null>(null);
   // ?tab=plan opens the Plan view (the log page links there when there's no plan);
   // ?tab=sessions opens Sessions (after logging a workout); ?tab=import opens Plan with the importer open.
   const [view, setView] = useState<View>(() => {
     const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
     if (tab === "import" || tab === "build") return "plan";
-    return tab === "plan" || tab === "sessions" ? tab : progress ? "progress" : "sessions";
+    return tab === "plan" || tab === "sessions" ? tab : progress || week ? "progress" : "sessions";
   });
   // "Build with Atlas" opens its form here on the Plan tab (it had a page of its own). ?tab=build opens it.
   const [buildOpen, setBuildOpen] = useState(
@@ -139,6 +148,15 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
       .finally(() => setLoading(false));
   }, [id, initial]);
 
+  /** A corrected email: her record, and her login if she has one, change together (or it's refused). */
+  async function saveEmail(email: string): Promise<string | null> {
+    const res = await fetch(`/api/clients/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return typeof body?.error === "string" ? body.error : "Couldn't save that email.";
+    setClient((prev) => (prev ? { ...prev, email: body.email ?? email } : prev));
+    return null;
+  }
+
   async function inviteClient() {
     if (!client?.email) { toast.error("Add an email first"); return; }
     const res = await fetch(`/api/clients/${id}/invite`, { method: "POST" });
@@ -147,13 +165,32 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
       toast.error(err?.error ?? "Invite failed");
       return;
     }
-    setInvite((await res.json()) as InviteResult);
+    // One tap: the link goes straight to the phone's share sheet. Without one (or if the browser
+    // won't open it), the sheet with the link and Copy opens instead.
+    const result = (await res.json()) as InviteResult;
+    const outcome = await shareInvite(result, client.fullName.split(" ")[0]);
+    if (outcome === "unavailable") setInvite(result);
   }
 
-  async function deleteClient() {
-    if (!confirm(`Delete ${client?.fullName}? This cannot be undone.`)) return;
-    await fetch(`/api/clients/${id}`, { method: "DELETE" });
-    toast.success("Client deleted");
+  /** ⋯ Delete client: the same sheet as the roster's swipe (exactly what goes, then a red Delete). */
+  async function askDelete() {
+    const res = await fetch(`/api/clients/${id}/erase`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Can't delete this client");
+      return;
+    }
+    setToDelete(body as DeletePreview);
+  }
+
+  async function confirmDelete() {
+    const res = await fetch(`/api/clients/${id}/erase`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body?.error ?? "Couldn't delete");
+      return;
+    }
+    toast.success(`${client?.fullName ?? "Client"} deleted`);
     router.push("/clients");
   }
 
@@ -214,9 +251,9 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
   const redFlags = intakes[0]?.redFlags ?? null;
   // Progress open but nothing to chart any more (sessions deleted): show Sessions, not a blank tab.
-  const shown: View = view === "progress" && !progress ? "sessions" : view;
+  const shown: View = view === "progress" && !progress && !week ? "sessions" : view;
   const views: Array<{ id: View; label: string }> = [
-    ...(progress ? [{ id: "progress" as const, label: "Progress" }] : []),
+    ...(progress || week ? [{ id: "progress" as const, label: "Week" }] : []),
     { id: "sessions", label: "Sessions" },
     { id: "plan", label: "Plan" },
     // Intake and imported details, only when there are some.
@@ -237,17 +274,28 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
               <Plus className="mr-2 h-3.5 w-3.5" />
               Log a workout
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={inviteClient}>
+            <DropdownMenuItem onClick={() => setConfirmInvite(true)}>
               <UserCheck className="mr-2 h-3.5 w-3.5" />
               {client.userId ? "New sign-in link" : "Invite to the app"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={deleteClient} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem onClick={() => void askDelete()} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-3.5 w-3.5" />
               Delete client
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Where they are with the app, and the way to a fresh link at any time (reset emails may not reach them) */}
+      {access && (
+        <p className="-mt-3 mb-5 flex flex-wrap items-center gap-x-3 text-[13px] text-ink-soft">
+          <span data-testid="login-status">{access.label}</span>
+          {/* A fresh link at any time, even after a password is set: reset emails may not reach them */}
+          <button type="button" onClick={() => setConfirmInvite(true)} className="press inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2">
+            {access.key === "not_invited" ? "Invite" : "New link"}
+          </button>
+        </p>
+      )}
 
       {/* Retention flag banner */}
       {client.retentionFlag && (
@@ -257,6 +305,8 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
         </div>
       )}
 
+      {confirmInvite && <InviteConfirm email={client.email} onConfirm={inviteClient} onSaveEmail={saveEmail} onClose={() => setConfirmInvite(false)} />}
+      {toDelete && <DeleteClientSheet preview={toDelete} onDelete={confirmDelete} onClose={() => setToDelete(null)} />}
       {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
 
       {/* ── The one action: log ─────────────────────────────────────────── */}
@@ -267,6 +317,7 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
         Log session
       </Link>
       {report && <div className="-mt-3 mb-8">{report}</div>}
+      {latest}
       <div className="mb-12">
         <div role="tablist" className="flex w-full max-w-md gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">
           {views.map((v) => (
@@ -288,7 +339,10 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
       </div>
 
       {shown === "progress" && (
-        <div className="fade-in">{progress}</div>
+        <div className="fade-in space-y-10">
+          {week}
+          {progress}
+        </div>
       )}
 
 
@@ -331,7 +385,7 @@ export function ClientDetail({ progress, history, report, initial }: { /** A row
                           <span className="mr-1.5 rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">Off-plan</span>
                         )}
                         {/* No "0 sets": a session with none shows its name (its minutes are on the right), or nothing. */}
-                        {[s.title, s._count.sets > 0 ? `${s._count.sets} set${s._count.sets === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
+                        {[s.title ?? s.assignedWorkout?.name, s._count.sets > 0 ? `${s._count.sets} set${s._count.sets === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
                       </p>
                       {s.clientNotes && (
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{s.clientNotes}</p>

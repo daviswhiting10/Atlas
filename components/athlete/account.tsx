@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { saveGuestAccount, setAccountPassword } from "@/lib/actions/account";
+import { Problem } from "@/components/auth/problem";
 import { PASSWORD_MIN } from "@/lib/password-rules";
 import { cn } from "@/lib/utils";
 
@@ -66,20 +67,27 @@ export function SaveAccountPanel({ className }: { className?: string }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [weak, setWeak] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function run(allowWeak: boolean) {
     setBusy(true);
     setError(null);
-    const res = await saveGuestAccount({ email, password });
+    setWeak(false);
+    const res = await saveGuestAccount({ email, password, allowWeak });
     if (!res.ok) {
       setError(res.error);
+      setWeak(res.weak === true);
       setBusy(false);
       return;
     }
     // A fresh session carries the new email, so the app stops treating this as a guest.
     if (await signInWithPassword(email, password)) window.location.assign("/you");
     else window.location.assign("/login");
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    void run(false);
   }
 
   return (
@@ -89,12 +97,8 @@ export function SaveAccountPanel({ className }: { className?: string }) {
         You&apos;re on a guest account, so this browser is the only way back in. Add an email and password to keep your plan and everything you&apos;ve logged, and sign in from any device.
       </p>
       <form onSubmit={submit} className="mt-4 space-y-3">
-        <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} newPassword />
-        {error && (
-          <p role="alert" className="text-sm leading-relaxed text-destructive">
-            {error}
-          </p>
-        )}
+        <CredentialFields email={email} password={password} onEmail={setEmail} onPassword={(v) => { setPassword(v); setWeak(false); }} newPassword />
+        <Problem text={error} weak={weak} onUseAnyway={() => void run(true)} busy={busy} />
         <button type="submit" disabled={busy} className="press flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save my account"}
         </button>
@@ -115,15 +119,17 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<"set" | "changed" | null>(null);
+  const [weak, setWeak] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function run(allowWeak: boolean) {
     setBusy(true);
     setError(null);
-    const res = await setAccountPassword({ password, current: has ? current : undefined });
+    setWeak(false);
+    const res = await setAccountPassword({ password, current: has ? current : undefined, allowWeak });
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
+      setWeak(res.weak === true);
       return;
     }
     setHas(true);
@@ -131,6 +137,11 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
     setCurrent("");
     setPassword("");
     setDone(has ? "changed" : "set");
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    void run(false);
   }
 
   return (
@@ -166,7 +177,10 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setWeak(false);
+            }}
             placeholder={`New password (${PASSWORD_MIN}+ characters)`}
             required
             minLength={PASSWORD_MIN}
@@ -174,11 +188,7 @@ export function PasswordPanel({ email, hasPassword, className }: { email: string
             autoComplete="new-password"
             className={inputClass}
           />
-          {error && (
-            <p role="alert" className="text-sm leading-relaxed text-destructive">
-              {error}
-            </p>
-          )}
+          <Problem text={error} weak={weak} onUseAnyway={() => void run(true)} busy={busy} />
           <div className="flex gap-2">
             {has && (
               <button type="button" onClick={() => setOpen(false)} className="press h-12 flex-1 rounded-2xl border border-line bg-paper text-[15px] font-semibold text-ink-soft hover:border-ink/20">

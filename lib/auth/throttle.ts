@@ -33,6 +33,9 @@ export const POLICIES = {
   resetIp: { kind: "requests", max: 10, windowMs: 60 * MIN },
   /** New demos from one connection: 6 an hour. The overall cap (10 an hour) is what protects the database; this only stops one connection hogging it, so an office sharing one address isn't locked out. */
   demoIp: { kind: "requests", max: 6, windowMs: 60 * MIN },
+  /** Sign-in link emails: 5 an hour per address, 20 per connection. */
+  linkEmail: { kind: "requests", max: 5, windowMs: 60 * MIN },
+  linkIp: { kind: "requests", max: 20, windowMs: 60 * MIN },
   /** Wrong "current password" when changing it: 5 free, then 1 min doubling to 15. */
   changeUser: { kind: "failures", free: 5, baseMs: MIN, maxMs: 15 * MIN, windowMs: 60 * MIN },
 } satisfies Record<string, Policy>;

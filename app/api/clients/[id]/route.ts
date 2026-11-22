@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
-import { getClient, updateClient, deleteClient } from "@/lib/db/clients";
+import { getClient, updateClient } from "@/lib/db/clients";
+import { changeClientEmail } from "@/lib/clients/change-email";
 
 const UpdateSchema = z.object({
   fullName: z.string().min(1).optional(),
@@ -29,7 +30,12 @@ export const PATCH = withWorkspace<{ id: string }>(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
-    const { reachOutDate, ...rest } = parsed.data;
+    const { reachOutDate, email, ...rest } = parsed.data;
+    // The email goes through its own path: if she has a login, it changes too (or the change is refused).
+    if (email !== undefined) {
+      const changed = await changeClientEmail(id, workspaceId, email);
+      if (!changed.ok) return NextResponse.json({ error: changed.error }, { status: changed.status });
+    }
     const updateData: Parameters<typeof updateClient>[2] = { ...rest };
     if (reachOutDate !== undefined) {
       updateData.reachOutDate = reachOutDate === null ? null : new Date(reachOutDate);
@@ -40,10 +46,5 @@ export const PATCH = withWorkspace<{ id: string }>(
   }
 );
 
-export const DELETE = withWorkspace<{ id: string }>(
-  async (_req, { workspaceId }, { params }) => {
-    const { id } = await params;
-    await deleteClient(id, workspaceId);
-    return NextResponse.json({ ok: true });
-  }
-);
+// Deleting a client: POST /api/clients/[id]/erase (deletes her for good, with a confirm sheet first). The old
+// hide-only DELETE here is gone.

@@ -6,9 +6,9 @@
 import { RECHECK_MS } from "./session-policy";
 
 /** Pages anyone can see without signing in. */
-export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password"];
+export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password", "/invite", "/api/invite"];
 /** Public pages a signed-in visitor may also read, whatever their role. */
-export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password"];
+export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password", "/invite", "/api/invite"];
 /** The athlete app. Coaches use it too, for their own training ("My training"). */
 export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals", "/report"];
 /** The set-password step: signed in, any role. */
@@ -21,7 +21,7 @@ export const GUEST_EMAIL_DOMAIN = "guest.atlas.app";
  * reaches a real person (an invite email) or costs money per call (AI, uploads, outreach).
  * Everything inside their own workspace still works.
  */
-const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/];
+const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|erase|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/];
 
 export type RouteUser = { role: string; needsPassword: boolean; guest?: boolean } | null;
 

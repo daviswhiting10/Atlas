@@ -7,10 +7,12 @@ import { prisma } from "@/lib/db/client"
 import authConfig from "./auth.config"
 import { GUEST_EMAIL_DOMAIN, createGuest, createOAuthAthlete } from "@/lib/guest"
 import { DemoBusyError } from "@/lib/guest-rules"
-import { Email as EmailAddress, hashPassword, needsRehash, verifyAgainstDecoy, verifyPassword } from "@/lib/password"
-import { POLICIES, clear, ipFrom, record, throttleKey, waitFor } from "@/lib/auth/throttle"
+import { ipFrom } from "@/lib/auth/throttle"
 import { RECHECK_MS, passwordStep, passwordStepEnabled, sessionCurrent } from "@/lib/auth/session-policy"
 import { proofOk } from "@/lib/auth/proof"
+import { LINK_LIMIT_URL, allowLinkRequest } from "@/lib/auth/link-limit"
+import { passwordSignIn } from "@/lib/auth/password-signin"
+import { headers } from "next/headers"
 
 const baseAdapter = PrismaAdapter(prisma)
 
@@ -63,38 +65,8 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
       id: "password",
       name: "Email and password",
       credentials: { email: {}, password: {} },
-      async authorize(credentials, request) {
-        const parsed = EmailAddress.safeParse(credentials?.email)
-        const password = typeof credentials?.password === "string" ? credentials.password.slice(0, 200) : ""
-        if (!parsed.success || !password) return null
-        const email = parsed.data
-        const ip = ipFrom(request.headers)
-        // Limits are shared by every server instance (lib/auth/throttle.ts). A blocked attempt
-        // looks exactly like a wrong password: same answer, and the hash is still computed.
-        const keys = { emailIp: throttleKey("signinEmailIp", email, ip), email: throttleKey("signinEmail", email), ip: throttleKey("signinIp", ip) }
-        const waits = await Promise.all([waitFor(keys.emailIp), waitFor(keys.email), waitFor(keys.ip)])
-        await record(keys.ip, POLICIES.signinIp)
-        if (waits.some((w) => w > 0)) {
-          await verifyAgainstDecoy(password)
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true, name: true, email: true, role: true, workspaceId: true, passwordHash: true },
-        })
-        const ok = user?.passwordHash ? await verifyPassword(password, user.passwordHash) : (await verifyAgainstDecoy(password), false)
-        if (!user || !ok) {
-          await Promise.all([record(keys.emailIp, POLICIES.signinEmailIp), record(keys.email, POLICIES.signinEmail)])
-          return null
-        }
-        await clear(keys.emailIp)
-        // Hashes made with older, weaker settings are upgraded now that we have the password.
-        if (needsRehash(user.passwordHash)) {
-          await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } }).catch((err) => console.error("[rehash]", err))
-        }
-        return { id: user.id, name: user.name, email: user.email, role: user.role, workspaceId: user.workspaceId }
-      },
+      // The check itself (limits, decoy timing, rehash) is in lib/auth/password-signin.ts, so it can be tested end to end.
+      authorize: (credentials, request) => passwordSignIn(credentials, request.headers),
     }),
     Credentials({
       id: "guest",
@@ -155,9 +127,12 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
     // Email sign-in is for people who already have an account: the coach, and
     // clients the coach has invited. Without this, any address that completed
     // a magic link would become a new user with the default (coach) role.
-    async signIn({ user, account }) {
+    async signIn({ user, account, email }) {
       if (account?.provider !== "email") return true
       if (!user.email) return false
+      // Asking for a link (not opening one): a few an hour per address and per connection.
+      // The login page shows a friendly message for LINK_LIMIT_URL.
+      if (email?.verificationRequest && !(await allowLinkRequest(user.email, ipFrom(headers())))) return LINK_LIMIT_URL
       const existing = await prisma.user.findUnique({ where: { email: user.email }, select: { id: true } })
       if (existing) return true
       // Brand-new database: let the first person in so they can bootstrap it.
