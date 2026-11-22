@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, getAthlete, getPlanOverview } from "@/lib/athlete/data";
 import { safeTimeZone } from "@/lib/athlete/sessions";
@@ -20,6 +20,9 @@ import {
 import { isCoached } from "@/lib/athlete/coached";
 import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
+import { PlanUpNext } from "@/components/athlete/PlanUpNext";
+import { PlanMenu } from "@/components/athlete/PlanMenu";
+import { upNextView } from "@/lib/plan/up-next";
 
 export const metadata: Metadata = { title: "Plan" };
 
@@ -36,7 +39,12 @@ const ACTIONS: PlanActions = {
   setSkipped: setWorkoutSkipped,
 };
 
-export default async function PlanPage() {
+/**
+ * The Plan tab (option B): up next first, with its exercises and Start, then the rest of the week,
+ * "All N weeks" and "Edit plan". Change goals (and Delete plan, once it exists) sit under ⋯.
+ * ?view=all shows every week; ?view=edit the same with editing (not for a coached athlete).
+ */
+export default async function PlanPage({ searchParams }: { searchParams?: { view?: string } }) {
   // Finished blocks with a report, newest first: a row each, under the plan. Loaded alongside the plan.
   const timeZone = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
   const [athlete, plan, reports] = await Promise.all([
@@ -72,24 +80,34 @@ export default async function PlanPage() {
     );
   }
 
+  const locked = isCoached(athlete);
+  const view = searchParams?.view === "all" ? "all" : searchParams?.view === "edit" && !locked ? "edit" : null;
+
+  if (view) {
+    return (
+      <div>
+        <Link href="/plan" className="press -ml-2 mb-3 inline-flex min-h-11 items-center gap-1.5 px-2 text-[15px] font-medium text-ink-soft">
+          <ArrowLeft className="h-4 w-4" /> Plan
+        </Link>
+        <h1 className="rise mb-6 text-[28px] leading-[1.1] text-ink">{view === "edit" ? "Edit plan" : `All ${plan.totalWeeks} weeks`}</h1>
+        <div className="max-w-3xl">
+          <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" locked={view === "all" || locked} />
+        </div>
+      </div>
+    );
+  }
+
+  const upNext = upNextView(plan);
   return (
     <div>
-      <div className="rise mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="rise mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="eyebrow">Your plan · {plan.totalWeeks} weeks</p>
-          <h1 className="mt-1.5 text-[34px] leading-[1.08] text-ink sm:text-[42px]">{plan.name}</h1>
-          {plan.goalText && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-soft">“{plan.goalText}”</p>}
+          <p className="eyebrow">{upNext.eyebrow}</p>
+          <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
         </div>
-        {athlete.selfServe && (
-          <Link href="/you?goals=1" className="press flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-paper px-4 text-sm font-semibold text-ink hover:border-ink/20 sm:self-auto">
-            <SlidersHorizontal className="h-4 w-4" /> Change goals
-          </Link>
-        )}
+        <PlanMenu changeGoals={athlete.selfServe} />
       </div>
-
-      <div className="max-w-3xl">
-        <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" locked={isCoached(athlete)} />
-      </div>
+      <PlanUpNext view={upNext} totalWeeks={plan.totalWeeks} canEdit={!locked} />
       {reportRows}
     </div>
   );
