@@ -8,6 +8,7 @@ import { ChevronDown, FileSpreadsheet, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { describeDay, type ImportSummary } from "@/lib/programs/sheet-summary";
+import { TimesList } from "@/components/plan/TimesList";
 import { PlanDropZone } from "@/components/plan/PlanDropZone";
 import { answer, planForm } from "@/components/plan/plan-file";
 
@@ -134,6 +135,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
             </li>
           ))}
         </ul>
+        <TimesList times={summary.times ?? []} grid={read_.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
         {h.sessions > 0 ? (
           <label className="flex items-start gap-3 rounded-lg border border-line-strong bg-dusk-raised p-3">
             <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} disabled={busy} className="mt-1 h-4 w-4 shrink-0" />

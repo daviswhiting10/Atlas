@@ -1,6 +1,6 @@
 /** The short "check it before saving" view of a plan read from a file (pure). */
 import type { PlanContext } from "@/lib/programs/plan-context";
-import type { SheetGrid } from "@/lib/programs/sheet-plan";
+import { formatTime, timedRows, type SheetGrid, type TimedRow } from "@/lib/programs/sheet-plan";
 import { shapeSheet } from "@/lib/programs/sheet-summary";
 
 export type ImportPreview = {
@@ -13,9 +13,12 @@ export type ImportPreview = {
   weekly: { exercise: string; weeks: string[] } | null;
   /** More than one week, every one the same: said plainly, so a flattened read can't pass for a real one. */
   sameEveryWeek: boolean;
+  /** Every exercise done for time, shown in minutes; `unclear` ones ask for the unit. */
+  times: TimedRow[];
 };
 
-const reps = (min: number, max: number, unit: string) => `${min === max ? min : `${min}–${max}`}${unit === "secs" ? " s" : ""}`;
+const reps = (min: number, max: number, unit: string) =>
+  unit === "secs" ? (min === max ? formatTime(min) : `${formatTime(min)}–${formatTime(max)}`) : min === max ? `${min}` : `${min}–${max}`;
 
 export function previewFromGrid(grid: SheetGrid, context: PlanContext): ImportPreview {
   const { weeks } = shapeSheet(grid, context);
@@ -41,5 +44,6 @@ export function previewFromGrid(grid: SheetGrid, context: PlanContext): ImportPr
           }
         : null,
     sameEveryWeek: weeks.length > 1 && new Set(weeks.map(rx)).size === 1,
+    times: timedRows(grid),
   };
 }

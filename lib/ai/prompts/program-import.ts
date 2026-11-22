@@ -65,7 +65,7 @@ Respond ONLY with JSON, no markdown fences, no commentary:
 - One entry per training day, in sheet order. "name" is the day label as written (e.g. "Day 1").
 - One entry per exercise row, in order. Copy the exercise name and its notes exactly.
 - "label": the row's group label as written ("A", "1A", "2B", "Block 2", "Warm-up"). A label written once applies to the rows under it until a blank row, a new label or a new day: copy it onto each of those rows. A section heading row ("Warm-up", "Cool-down") is the label of the rows under it. Use "" when the row has no group.
-- "weeks": one entry for every week column the sheet has, numbered 1, 2, 3… in order. "setsReps" and "load" are the cell text exactly as written ("2x12-15", "5 min", "4x20 yd", "12.5", "BW", "blue", "2nd to hardest. 3x"). Use "" for an empty cell. Never fill a cell in from another week.
+- "weeks": one entry for every week column the sheet has, numbered 1, 2, 3… in order. "setsReps" and "load" are the cell text exactly as written ("2x12-15", "5 min", "4x20 yd", "12.5", "BW", "blue", "2nd to hardest. 3x"). Use "" for an empty cell. Never fill a cell in from another week. A time keeps its unit as written ("15 min", "15'", "90 s"); never drop or convert it. A row like "Bike, Zone 2, 15 min" is name "Bike", notes "Zone 2", setsReps "15 min".
 - If the sheet has no week columns, treat the single set of columns as week 1.
 - Skip rows that aren't exercises: titles, headers, totals, blank rows, the client's name, dates.
 - "programName": a short name from the sheet's title if it has one, otherwise "".

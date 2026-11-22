@@ -72,7 +72,7 @@ export default function ProgramImportPage() {
 
       {read ? (
         <div className="space-y-4 rounded-2xl border border-line bg-paper p-4">
-          <ImportPreview preview={read.preview} warnings={read.warnings} />
+          <ImportPreview preview={read.preview} warnings={read.warnings} grid={read.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
           <div className="flex gap-2">
             <button type="button" onClick={() => setRead(null)} disabled={saving} className="press h-12 rounded-xl border border-line-strong px-5 text-[15px] font-semibold text-ink">
               Back

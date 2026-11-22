@@ -24,7 +24,7 @@ export type GridExercise = { name: string; notes?: string; /** The sheet's group
 export type GridDay = { name: string; exercises: GridExercise[] };
 export type SheetGrid = { programName?: string; days: GridDay[] };
 
-export type Rx = { sets: number; repMin: number; repMax: number; unit: "reps" | "secs"; note: string | null };
+export type Rx = { sets: number; repMin: number; repMax: number; unit: "reps" | "secs"; note: string | null; /** The time unit was guessed (minutes); the preview asks. */ unclear?: boolean };
 export type Load = { weight: number | null; band: string | null; note: string | null };
 
 /** The model's JSON, without fences, kept only if it has exercises in it. */
@@ -60,11 +60,30 @@ export function readGrid(raw: string): SheetGrid | null {
 
 const n = (s: string | undefined) => (s == null ? NaN : Number(s));
 
-/** "2x12-15" / "1 x 10" / "5 min" / "3x20 seconds" / "4x20 yd" / "12 each" → a prescription. */
-export function parseSetsReps(raw: string | undefined): Rx | null {
-  const s = (raw ?? "").trim().toLowerCase().replace(/[×*]/g, "x").replace(/\s+/g, " ");
+/** Exercises done for time, where a bare "15" means minutes, not 15 reps. */
+const TIMED = /\b(bike|cycl\w*|run|jog|walk\w*|row(?:er|ing)?|erg|treadmill|elliptical|stair\w*|swim\w*|zone ?[1-5]|z[1-5]|cardio|conditioning|ski ?erg|assault|airdyne|echo bike|hike|sled push|incline walk)\b/i;
+/** "min", "mins", "minute(s)", "m", or a foot mark (15' / 15’) after the number. */
+const MINUTES = /^(?:min|mins|minute|minutes|m|'|’)(?![a-z])/;
+const SECONDS = /^(?:s|sec|secs|second|seconds|"|”|″)(?![a-z])/;
+
+/**
+ * "2x12-15" / "1 x 10" / "5 min" / "15'" / "3x20 seconds" / "4x20 yd" / "12 each" → a prescription.
+ * Time is always stored in seconds ("15 min" → 900, never 15). `name` lets a bare number on a
+ * timed exercise ("Bike", "Zone 2") read as minutes; that guess, and "15m" (minutes or metres?),
+ * come back with `unclear` so the preview can ask.
+ */
+export function parseSetsReps(raw: string | undefined, name = ""): Rx | null {
+  let s = (raw ?? "").trim().toLowerCase().replace(/[×*]/g, "x").replace(/\s+/g, " ");
   if (!s) return null;
-  const m = s.match(/^(?:(\d{1,2})\s*x\s*)?(\d{1,4})(?:\s*(?:-|–|to)\s*(\d{1,4}))?\s*([a-z]+(?:\s+[a-z]+)?)?/);
+  // "Zone 2, 15 min": the duration is later in the cell. Take it, keep the rest as a note.
+  let lead: string | null = null;
+  if (!/^\d/.test(s)) {
+    const t = s.match(/(\d{1,3}(?:\s*(?:-|–|to)\s*\d{1,3})?)\s*(min|mins|minutes?|'|’)(?![a-z])/);
+    if (!t) return null;
+    lead = s.slice(0, t.index).replace(/[,;:·\s-]+$/, "").trim() || null;
+    s = s.slice(t.index);
+  }
+  const m = s.match(/^(?:(\d{1,2})\s*x\s*)?(\d{1,4})(?:\s*(?:-|–|to)\s*(\d{1,4}))?\s*((?:[a-z]+|['’"”″])(?:\s+[a-z]+)?)?/);
   if (!m) return null;
   const sets = m[1] ? n(m[1]) : 1;
   let lo = n(m[2]);
@@ -72,18 +91,67 @@ export function parseSetsReps(raw: string | undefined): Rx | null {
   const word = (m[4] ?? "").trim();
   let unit: Rx["unit"] = "reps";
   let note: string | null = null;
-  if (/^(min|mins|minute|minutes)\b/.test(word)) {
+  let unclear = false;
+  const minutes = () => {
     unit = "secs";
     lo *= 60;
     hi *= 60;
-  } else if (/^(s|sec|secs|second|seconds)\b/.test(word)) {
+  };
+  if (MINUTES.test(word)) {
+    minutes();
+    unclear = word === "m"; // minutes, or metres
+  } else if (SECONDS.test(word)) {
     unit = "secs";
+  } else if (!word && !m[1] && TIMED.test(name)) {
+    minutes();
+    unclear = true; // no unit written
   } else if (word) {
     // yards, meters, "each", "per side"…: kept as written, counted as reps.
     note = word;
   }
+  if (lead) note = [lead, note].filter(Boolean).join(" · ");
   if (!(sets >= 1 && lo >= 1)) return null;
-  return { sets: Math.min(sets, 12), repMin: Math.min(lo, 3600), repMax: Math.min(Math.max(hi, lo), 3600), unit, note };
+  const rx: Rx = { sets: Math.min(sets, 12), repMin: Math.min(lo, 3600), repMax: Math.min(Math.max(hi, lo), 3600), unit, note };
+  return unclear ? { ...rx, unclear } : rx;
+}
+
+/** "900" seconds → "15 min"; "45" → "45 s". */
+export function formatTime(secs: number): string {
+  return secs >= 60 && secs % 60 === 0 ? `${secs / 60} min` : secs > 60 ? `${Math.floor(secs / 60)} min ${secs % 60} s` : `${secs} s`;
+}
+
+/** Every timed exercise in the grid, once each, with its time as first written (for the preview). */
+export type TimedRow = { day: number; exercise: number; name: string; time: string; unclear: boolean };
+export function timedRows(grid: SheetGrid): TimedRow[] {
+  const out: TimedRow[] = [];
+  grid.days.forEach((d, di) =>
+    d.exercises.forEach((e, ei) => {
+      const rx = e.weeks.map((w) => parseSetsReps(w.setsReps, `${e.name} ${e.notes ?? ""}`)).find((r) => r?.unit === "secs");
+      if (!rx) return;
+      const t = rx.repMin === rx.repMax ? formatTime(rx.repMin) : `${formatTime(rx.repMin).replace(/ (min|s)$/, "")}–${formatTime(rx.repMax)}`;
+      out.push({ day: di, exercise: ei, name: e.name, time: rx.sets > 1 ? `${rx.sets} × ${t}` : t, unclear: !!rx.unclear });
+    }),
+  );
+  return out.slice(0, 20);
+}
+
+/** The preview's fix for an unclear time: rewrite that exercise's cells with the unit spelled out. */
+export function setTimeUnit(grid: SheetGrid, day: number, exercise: number, unit: "min" | "s"): SheetGrid {
+  return {
+    ...grid,
+    days: grid.days.map((d, di) =>
+      di !== day
+        ? d
+        : {
+            ...d,
+            exercises: d.exercises.map((e, ei) =>
+              ei !== exercise
+                ? e
+                : { ...e, weeks: e.weeks.map((w) => ({ ...w, setsReps: (w.setsReps ?? "").replace(/^((?:\d{1,2}\s*[x×*]\s*)?\d{1,4}(?:\s*(?:-|–|to)\s*\d{1,4})?)\s*(?:m|min|mins|minutes?|s|sec|secs|seconds?)?\b\s*$/i, `$1 ${unit}`) })) },
+            ),
+          },
+    ),
+  };
 }
 
 const BAND = /\b(yellow|red|green|blue|black|purple|orange|gr[ae]y|silver|gold|pink|light band|medium band|heavy band)\b/i;
@@ -118,7 +186,7 @@ export const recordsSession = (l: Load | null) => l != null && (l.weight != null
  * didn't need a load for them).
  */
 export function planFromGrid(grid: SheetGrid): { weeks: PlanWeek[]; lastLoggedWeek: number } {
-  const totalWeeks = Math.max(1, ...grid.days.flatMap((d) => d.exercises.flatMap((e) => e.weeks.filter((w) => parseSetsReps(w.setsReps) || w.load).map((w) => w.week))));
+  const totalWeeks = Math.max(1, ...grid.days.flatMap((d) => d.exercises.flatMap((e) => e.weeks.filter((w) => parseSetsReps(w.setsReps, `${e.name} ${e.notes ?? ""}`) || w.load).map((w) => w.week))));
   const days = spreadDays(grid.days.length);
   const weeks: PlanWeek[] = [];
   let lastLoggedWeek = 0;
@@ -132,7 +200,7 @@ export function planFromGrid(grid: SheetGrid): { weeks: PlanWeek[]; lastLoggedWe
         const cell = e.weeks.find((w) => w.week === week);
         const key = `${i}:${j}`;
         // A load recorded with no sets/reps: done at the previous week's prescription.
-        const rx = parseSetsReps(cell?.setsReps) ?? (recordsSession(parseLoad(cell?.load)) ? lastRx.get(key) ?? null : null);
+        const rx = parseSetsReps(cell?.setsReps, `${e.name} ${e.notes ?? ""}`) ?? (recordsSession(parseLoad(cell?.load)) ? lastRx.get(key) ?? null : null);
         if (!rx) return [];
         lastRx.set(key, rx);
         return [{ exercise: e.name, notes: [e.notes, rx.note].filter(Boolean).join(" · ") || null, section: sections[j], rx, load: parseLoad(cell?.load) }];
