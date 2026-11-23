@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { FINISHED_BY_CLIENT } from "@/lib/coach/finished-by";
 import { lastLogged } from "@/lib/coach/last-logged";
 import type { LatestSession as Latest } from "@/lib/coach/latest-session";
 import { exceptionGroups, setRange, type ExceptionGroup } from "@/lib/coach/review";
@@ -46,6 +47,7 @@ export function LatestSession({ clientId, session: s, prs }: { clientId: string;
           {[when?.today ? "Today" : when?.label, s.minutes ? `${s.minutes} min` : null].filter(Boolean).join(" · ")}
         </span>
       </Link>
+      {s.finishedByClient && <p className="text-[13px] text-ink-mute">{FINISHED_BY_CLIENT}</p>}
 
       <div className="mt-3 grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-2">
         {[

@@ -424,6 +424,8 @@ export async function updateAssignedWorkout(
       if (existing.workoutLog) {
         if (!existing.workoutLog.completedAt) {
           await tx.workoutLog.update({ where: { id: existing.workoutLog.id }, data: { completedAt: new Date() } });
+          // Marked done by the coach: the coach finished it (unless the caller said who).
+          if (data.loggedBy == null) await tx.assignedWorkout.update({ where: { id }, data: { loggedBy: "TRAINER" } });
         }
       } else {
         const plan = await tx.programAssignment.findUniqueOrThrow({
@@ -434,6 +436,7 @@ export async function updateAssignedWorkout(
         await tx.workoutLog.create({
           data: { clientId: plan.clientId, assignedWorkoutId: id, source: planSessionSource(plan.sourceProgram), date: now, completedAt: now },
         });
+        if (data.loggedBy == null) await tx.assignedWorkout.update({ where: { id }, data: { loggedBy: "TRAINER" } });
       }
     }
 

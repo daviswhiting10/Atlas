@@ -473,7 +473,17 @@ async function main() {
       await coach.nav(`/clients/${clientId}`, 4000);
       const card = await coach.ev<string>(`(()=>{const s=document.querySelector('section[aria-label="Latest session"]');return s?s.innerText.replace(/\\n+/g,' | '):''})()`);
       if (!card) throw new Error("no Latest session card");
-      return card.slice(0, 200);
+      // She finished it from her own Finish button. The marker shows only for sessions finished on or after the day the
+      // loggedBy fix ships (lib/coach/finished-by.ts); before that day it must not show at all.
+      const { FINISHED_BY_RELIABLE_FROM } = await import("@/lib/coach/finished-by");
+      const expectMarks = Date.now() >= FINISHED_BY_RELIABLE_FROM.getTime();
+      if (expectMarks !== /Finished by client/.test(card)) throw new Error(`"Finished by client" ${expectMarks ? "missing" : "shown before the cut-off"}: ${card.slice(0, 120)}`);
+      await coach.ev(`(()=>{const t=[...document.querySelectorAll('[role=tab],[role=tablist] button')].find(e=>/^Sessions/.test((e.innerText||'').trim()));if(t)t.click()})()`);
+      await sleep(1500);
+      const listed = await coach.ev<number>(`(document.body.innerText.match(/Finished by client/g)||[]).length`);
+      if (expectMarks ? listed < 3 : listed !== 0) throw new Error(`Sessions list shows the marker ${listed} times, expected ${expectMarks ? 3 : 0}`);
+      await coach.nav(`/clients/${clientId}`, 3000); // back to the first tab for the Week step
+      return `${card.slice(0, 120)} | list marks: ${listed} (cut-off ${FINISHED_BY_RELIABLE_FROM.toISOString().slice(0, 10)}, ${expectMarks ? "after" : "before"})`;
     }, () => coach.shot("client-latest-session"));
 
     await must(STEPS[15], async () => {

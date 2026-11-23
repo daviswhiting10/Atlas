@@ -141,7 +141,8 @@ export async function finishWorkout(raw: { assignedWorkoutId: string; durationMi
 
   const duration = clean(input.durationMin ?? null, 600);
   await prisma.$transaction([
-    prisma.assignedWorkout.update({ where: { id: workout.id }, data: { loggedBy: "CLIENT" } }),
+    // She finished it (first finish only: saving it again later doesn't change who finished it).
+    ...(workout.workoutLog.completedAt == null ? [prisma.assignedWorkout.update({ where: { id: workout.id }, data: { loggedBy: "CLIENT" as const } })] : []),
     prisma.workoutLog.update({
       where: { id: workout.workoutLog.id },
       // Done is the session's to say. Saving changes later keeps when it was first finished.

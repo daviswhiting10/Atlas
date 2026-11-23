@@ -240,6 +240,12 @@ export async function completeSession(input: {
       },
     }),
 
+    // The coach finished it: say so, so the client's "Finished by client" marker never shows on it. Only on the first
+    // finish: saving notes on a session the client already finished keeps it hers.
+    ...(workoutLog.completedAt == null && workoutLog.assignedWorkoutId
+      ? [prisma.assignedWorkout.updateMany({ where: { id: workoutLog.assignedWorkoutId, workspaceId }, data: { loggedBy: "TRAINER" as const } })]
+      : []),
+
     // Update client's last contact timestamp
     prisma.clientProfile.updateMany({
       where: { id: input.clientId, workspaceId },
