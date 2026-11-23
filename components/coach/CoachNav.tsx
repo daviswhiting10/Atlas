@@ -54,6 +54,8 @@ export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn 
               <Link
                 key={href}
                 href={href}
+                // The whole screen is fetched ahead (a plain link only gets its layout): the tab is then there when tapped.
+                prefetch
                 onClick={(e) => onClick(e, href)}
                 aria-current={chosen(href) ? "page" : undefined}
                 className={cn(

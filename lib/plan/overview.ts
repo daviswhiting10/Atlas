@@ -123,6 +123,9 @@ export async function loadPlanOverview({
   fallbackPrefs?: Prefs | null;
 }): Promise<PlanOverview | null> {
   const assignment = await prisma.programAssignment.findFirst({
+    // One joined query instead of a chain of them (assignment, workouts, logs, exercises, one after another): Today, Plan
+    // and Progress all wait on this read.
+    relationLoadStrategy: "join",
     where: assignmentId ? { id: assignmentId, clientId, workspaceId } : { clientId, workspaceId, status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
     select: {
