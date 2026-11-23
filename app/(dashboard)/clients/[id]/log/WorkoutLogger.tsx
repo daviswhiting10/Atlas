@@ -46,6 +46,8 @@ import { ExercisePicker, type PickerExercise } from "@/components/exercises/Exer
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
 import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
+import { FinishSheet } from "@/components/logger/FinishSheet";
+import { finishAction } from "@/lib/sessions/finish";
 import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
@@ -826,6 +828,30 @@ export default function WorkoutLogger({
       .filter((g) => g.idx.length > 0);
     if (groups.length) applyBulk(groups, mode);
   }
+  // ── Finish button: nothing logged does nothing; all logged finishes now; some unlogged asks once ──
+  const [confirmFinish, setConfirmFinish] = useState<number | null>(null);
+  function tapFinish() {
+    const act = finishAction(exercises.map((e) => (exStateRef.current[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
+    if (act.kind === "none") return;
+    cancelFinish();
+    if (act.kind === "confirm") return void setConfirmFinish(act.unlogged);
+    void handleCompleteSession(true);
+  }
+  /** Every unlogged set is logged as it stands (its prescribed weight and reps; blank if it has none), then the session finishes. */
+  function markRemainingAndFinish() {
+    const groups = exercises
+      .map((ex) => ({ ex, idx: bulkIndices((exStateRef.current[ex.aweId]?.sets ?? []).map((x) => x.completed), "check") }))
+      .filter((g) => g.idx.length > 0);
+    if (groups.length) applyBulk(groups, "check");
+    cancelFinish(); // the bulk check starts the automatic finish; this one is already on its way
+    void handleCompleteSession(true);
+  }
+  const anyLogged = exercises.some((e) => (exState[e.aweId] ?? freshState(e)).sets.some((x) => x.completed));
+  const finishButton = (
+    <button type="button" onClick={tapFinish} disabled={!anyLogged} className="press h-11 shrink-0 rounded-full px-3 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
+      Finish
+    </button>
+  );
   const wb = workoutBulk(exercises.map((e) => (exState[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
   const workoutMenu = wb ? (
     <DropdownMenu>
@@ -1169,12 +1195,13 @@ export default function WorkoutLogger({
   }
 
   // ── Complete session ──────────────────────────────────────────────────────
-  async function handleCompleteSession() {
+  /** `partial`: the Finish button's "only what I logged". The automatic finish still needs every set. */
+  async function handleCompleteSession(partial = false) {
     startComplete(async () => {
       // The last ticks may still be saving: wait for them, and finish only if they all stuck.
       await saveChain.current;
       const workoutLogId = logIdRef.current;
-      if (!workoutLogId || !allDone(doneLists())) return;
+      if (!workoutLogId || (!partial && !allDone(doneLists()))) return;
       try {
         await completeSession({
           workoutLogId,
@@ -1196,7 +1223,7 @@ export default function WorkoutLogger({
     });
   }
 
-  completeRef.current = handleCompleteSession;
+  completeRef.current = () => void handleCompleteSession();
 
   // ── Phone: folding and jumping ───────────────────────────────────────────
   const isDone = (ex: LoggerExercise) => {
@@ -1517,6 +1544,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {finishButton}
           {workoutMenu}
         </div>
         </div>
@@ -1772,6 +1800,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {finishButton}
           {workoutMenu}
         </div>
       </div>
@@ -1914,6 +1943,21 @@ export default function WorkoutLogger({
     <>
       {mobileView}
       {desktopView}
+      {confirmFinish != null && (
+        <FinishSheet
+          unlogged={confirmFinish}
+          onCancel={() => setConfirmFinish(null)}
+          onPartial={() => {
+            setConfirmFinish(null);
+            void handleCompleteSession(true);
+          }}
+          onMark={() => {
+            setConfirmFinish(null);
+            markRemainingAndFinish();
+          }}
+        />
+      )}
+
       {confirmAll != null && (
         <CheckAllSheet
           mode={confirmAll.mode}
