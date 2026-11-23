@@ -3,7 +3,7 @@
  *
  *   coach creates a client with a plan (one exercise has no weight) -> invites her -> she sets a password (a simple one,
  *   through "Use it anyway") -> signs out -> signs in with email and password -> the plan is there -> she logs sets against
- *   per-set targets, reorders, finishes online, and again offline -> the coach's roster, Log session tab, client page,
+ *   per-set targets, reorders, finishes online, and again offline -> the coach's roster, Log session tab (the row opens the logger), client page,
  *   latest-session card and Week tab show it. A second client signs in with no plan and the coach assigns one afterwards.
  *
  * Dry run by default: it checks the setup (database is not production, the server answers) and lists the steps. Nothing is created.
@@ -53,7 +53,7 @@ const STEPS = [
   "client logs session 2: offline, finishes offline, reconnects, it saves",
   "client logs session 3: online, short",
   "coach roster row: Logged today, 3/4, Logs own",
-  "coach Log session tab: the row opens the profile, Log -> opens the logger",
+  "coach Log session tab: the row is one target and opens the logger",
   "coach client page: the latest-session card",
   "coach client page: the Week tab",
   "late plan: a second client signs in with no plan, the coach assigns one, it appears",
@@ -458,18 +458,16 @@ async function main() {
     }, () => coach.shot("roster-row"));
 
     await must(STEPS[13], async () => {
+      // roster-dedupe: one target per row. This tab is for logging, so the row opens the logger; the profile is on the Roster.
       await coach.nav("/log", 3500);
       coach.resetTaps();
-      await coach.tap(`a[href="/clients/${clientId}"]`, undefined, 2500);
-      const u1 = await coach.url();
-      if (u1 !== `/clients/${clientId}`) throw new Error(`the row went to ${u1}, not the profile`);
-      await coach.nav("/log", 3500);
+      if (await coach.rect(`a[href="/clients/${clientId}"]`)) throw new Error("the Log tab still has a separate profile link on the row");
       const r = await coach.rect(`a[href="/clients/${clientId}/log"]`);
-      if (!r || r.h < 44) throw new Error(`Log -> button missing or under 44 px (${r?.h ?? "none"})`);
+      if (!r || r.h < 44) throw new Error(`the row is missing or under 44 px (${r?.h ?? "none"})`);
       await coach.tap(`a[href="/clients/${clientId}/log"]`, undefined, 2500);
-      const u2 = await coach.url();
-      if (u2 !== `/clients/${clientId}/log`) throw new Error(`Log -> went to ${u2}`);
-      return `row -> profile; Log -> logger (${r.w}x${r.h})`;
+      const u = await coach.url();
+      if (u !== `/clients/${clientId}/log`) throw new Error(`the row went to ${u}, not the logger`);
+      return `row -> logger (${r.w}x${r.h})`;
     }, () => coach.shot("log-tab-then-logger"));
 
     await must(STEPS[14], async () => {
