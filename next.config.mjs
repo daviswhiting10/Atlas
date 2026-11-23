@@ -3,7 +3,17 @@ import withPWA from "@ducanh2912/next-pwa";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ["@auth/core", "jose", "pdf-parse", "pdfjs-dist"],
+    serverComponentsExternalPackages: ["@auth/core", "jose", "pdf-parse", "pdfjs-dist", "@napi-rs/canvas"],
+    // pdf.js loads @napi-rs/canvas and its own worker by name at run time, so the server bundle's file tracing never
+    // sees them: ship them (and canvas's native build for Vercel's Linux) with the routes that read PDFs.
+    outputFileTracingIncludes: {
+      "/api/**/*": [
+        "./node_modules/@napi-rs/canvas/**/*",
+        "./node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
+        // pdf.js starts its worker by file name too.
+        "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      ],
+    },
   },
 };
 
