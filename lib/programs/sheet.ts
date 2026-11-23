@@ -54,17 +54,16 @@ export async function fetchSheetCsv(link: SheetLink, fetcher: typeof fetch = fet
 }
 
 /**
- * The plan from a shared sheet. A link to one tab (gid) reads that tab. A link to the whole sheet reads every tab
- * (the .xlsx export) and keeps the one that holds the plan (lib/programs/plan-sheet), with the sentences on the other
- * tabs as the plan's note: Google's CSV export of a whole sheet is only its first tab, often "How to use".
+ * A shared sheet as text for the plan reader. A link to one tab (gid) reads that tab. A link to the whole sheet reads
+ * every tab (the .xlsx export, each tab headed "Tab: <name>"): Google's CSV export of a whole sheet is only its first
+ * tab, often "How to use".
  */
-export async function fetchSheetPlan(link: SheetLink, fetcher: typeof fetch = fetch): Promise<{ csv: string; tab: string | null; note: string | null }> {
-  if (link.gid) return { csv: await fetchSheetCsv(link, fetcher), tab: null, note: null };
+export async function fetchSheetText(link: SheetLink, fetcher: typeof fetch = fetch): Promise<string> {
+  if (link.gid) return fetchSheetCsv(link, fetcher);
   const bytes = await fetchExport(`https://docs.google.com/spreadsheets/d/${link.id}/export?format=xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fetcher);
-  const { xlsxPlan, WorkbookError } = await import("./xlsx");
+  const { xlsxToCsv, WorkbookError } = await import("./xlsx");
   try {
-    const { csv, tab, note } = xlsxPlan(bytes);
-    return { csv, tab, note };
+    return xlsxToCsv(bytes);
   } catch (err) {
     if (err instanceof WorkbookError) throw new SheetError(err.message);
     throw err;

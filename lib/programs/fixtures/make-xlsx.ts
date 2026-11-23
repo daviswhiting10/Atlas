@@ -1,4 +1,4 @@
-/** Tests only: a minimal .xlsx (inline strings) with the given tabs, for the workbook reader and the plan-sheet picker. */
+/** Tests only: a minimal .xlsx (inline strings) with the given tabs, and two plan layouts besides Chloe's real file. */
 import { zipSync, strToU8 } from "fflate";
 
 export type TestTab = { name: string; rows: string[][]; hidden?: boolean };
@@ -30,37 +30,28 @@ export function makeXlsx(tabs: TestTab[]): Uint8Array {
   return zipSync(files);
 }
 
-/** Chloe's glute program pattern: "DAY N · NAME" headers, Block 3a/3b supersets, 10/side, mixed rest, "X (Wk 3-4: Y)" sets. */
-export const CHLOE_ROWS: string[][] = [
-  ["Glute Program: 4 weeks (4 workouts, repeat each week)"],
-  [],
-  ["DAY 1 · GLUTES & HAMSTRINGS"],
-  ["Block", "Exercise", "Sets", "Reps", "Rest", "Notes"],
-  ["1", "Barbell Hip Thrust", "3 (Wk 3-4: 4)", "8-10", "2 min", "Pause 1 s at the top"],
-  ["2", "Romanian Deadlift", "3", "10", "90 sec", ""],
-  ["Block 3a", "Bulgarian Split Squat", "3", "10/side", "60 sec", ""],
-  ["Block 3b", "Cable Kickback", "3", "12/side", "60 sec", ""],
-  [],
-  ["DAY 2 · UPPER & CORE"],
-  ["Block", "Exercise", "Sets", "Reps", "Rest", "Notes"],
-  ["1", "Lat Pulldown", "3 (Wk 3-4: 4)", "10-12", "90 sec", ""],
-  ["Block 2a", "Seated Cable Row", "3", "12", "1 min", ""],
-  ["Block 2b", "Push-Up", "3", "AMRAP", "1 min", ""],
-  [],
-  ["DAY 3 · GLUTES & QUADS"],
-  ["Block", "Exercise", "Sets", "Reps", "Rest", "Notes"],
-  ["1", "Goblet Squat", "4", "10", "2 min", ""],
-  ["2", "Reverse Lunge", "3", "8/side", "60 sec", ""],
-  [],
-  ["DAY 4 · FULL BODY"],
-  ["Block", "Exercise", "Sets", "Reps", "Rest", "Notes"],
-  ["1", "Trap Bar Deadlift", "3 (Wk 3-4: 4)", "6", "2.5 min", ""],
-  ["2", "Side Plank", "3", "30 sec/side", "45 sec", ""],
+/** One tab, one workout, no day marker, sets and reps in one column. */
+export const ONE_WORKOUT: TestTab[] = [
+  {
+    name: "Sheet1",
+    rows: [
+      ["Full body (do 3x a week)"],
+      ["Exercise", "Sets x Reps", "Rest", "Notes"],
+      ["Goblet squat", "3 x 10", "90 sec", ""],
+      ["Push-up", "3 x 8-12", "60 sec", "Knees OK"],
+      ["Dumbbell row", "3 x 10/side", "60 sec", ""],
+      ["Plank", "3 x 30 sec", "", ""],
+    ],
+  },
 ];
 
-export const HOW_TO_USE_ROWS: string[][] = [
-  ["How to use this program"],
-  ["Warm up for 5-10 minutes before every session: bike or brisk walk, then the first exercise with light weight."],
-  ["Train 4 days a week with a rest day after days 2 and 4. Leave 1-2 reps in the tank on every set."],
-  ["If a weight feels easy for every rep, go up 5 lb next session."],
-];
+/** Seven tabs, one workout each (Monday … Sunday), plus nothing else. */
+export const SEVEN_TABS: TestTab[] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, i) => ({
+  name: day,
+  rows: [
+    [`${day}: ${["Push", "Pull", "Legs", "Easy cardio", "Upper", "Lower", "Mobility"][i]}`],
+    ["Exercise", "Sets", "Reps", "Rest"],
+    [["Bench press", "Pull-up", "Back squat", "Bike", "Overhead press", "Deadlift", "Hip 90/90"][i], "3", i === 3 ? "30 min" : "8", i === 3 ? "" : "2 min"],
+    [["Incline DB press", "Barbell row", "Walking lunge", "Walk", "Lat pulldown", "Leg curl", "Cat-cow"][i], "3", i === 3 ? "20 min" : "10", i === 3 ? "" : "90 sec"],
+  ],
+}));

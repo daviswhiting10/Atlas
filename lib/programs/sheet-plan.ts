@@ -20,10 +20,21 @@
 import { sectionsFromSheet } from "@/lib/workouts/structure";
 
 export type GridWeek = { week: number; setsReps?: string; load?: string };
-export type GridExercise = { name: string; notes?: string; /** The sheet's group label ("A", "1A", "Warm-up"), carried down its group. */ label?: string; weeks: GridWeek[] };
+export type GridExercise = {
+  name: string;
+  notes?: string;
+  /** The sheet's group label ("A", "1A", "Warm-up"), carried down its group. */
+  label?: string;
+  /** Rest between sets, in seconds, when the file says. */
+  rest?: number | null;
+  weeks: GridWeek[];
+};
 export type GridDay = { name: string; exercises: GridExercise[] };
-/** `note`: the sentences on a workbook's other tabs or a PDF's other pages ("How to use"), kept on the plan. */
-export type SheetGrid = { programName?: string; note?: string; days: GridDay[] };
+/**
+ * `note`: the plan-level text in the file (an overview table, how-to notes), kept on the plan.
+ * `uncertain`: what the reader had to guess, shown to the coach before saving.
+ */
+export type SheetGrid = { programName?: string; note?: string; uncertain?: string[]; days: GridDay[] };
 
 export type Rx = { sets: number; repMin: number; repMax: number; unit: "reps" | "secs"; note: string | null; /** The time unit was guessed (minutes); the preview asks. */ unclear?: boolean };
 export type Load = { weight: number | null; band: string | null; note: string | null };
@@ -46,6 +57,7 @@ export function readGrid(raw: string): SheetGrid | null {
             name: e.name.trim().slice(0, 120),
             notes: typeof e.notes === "string" ? e.notes.trim().slice(0, 500) : undefined,
             label: typeof e.label === "string" && e.label.trim() ? e.label.trim().slice(0, 40) : undefined,
+            rest: Number.isInteger(e.rest) && (e.rest as number) >= 0 && (e.rest as number) <= 900 ? (e.rest as number) : null,
             weeks: e.weeks
               .slice(0, 52)
               .filter((w) => w && Number.isInteger(w.week) && w.week >= 1 && w.week <= 52)
@@ -54,7 +66,10 @@ export function readGrid(raw: string): SheetGrid | null {
       }))
       .filter((d) => d.exercises.length > 0);
     const note = typeof g.note === "string" && g.note.trim() ? g.note.trim().slice(0, 2000) : undefined;
-    return days.length > 0 ? { programName: typeof g.programName === "string" ? g.programName.slice(0, 120) : undefined, ...(note ? { note } : {}), days } : null;
+    const uncertain = Array.isArray(g.uncertain) ? g.uncertain.filter((u): u is string => typeof u === "string" && !!u.trim()).map((u) => u.trim().slice(0, 200)).slice(0, 30) : [];
+    return days.length > 0
+      ? { programName: typeof g.programName === "string" ? g.programName.slice(0, 120) : undefined, ...(note ? { note } : {}), ...(uncertain.length ? { uncertain } : {}), days }
+      : null;
   } catch {
     return null;
   }
@@ -176,7 +191,7 @@ export function spreadDays(count: number): number[] {
   return table[Math.min(Math.max(count, 1), 7)];
 }
 
-export type PlannedEntry = { exercise: string; notes: string | null; /** "warmup" | "block:<n>" | "cooldown" (lib/workouts/structure). */ section: string; rx: Rx; load: Load | null };
+export type PlannedEntry = { exercise: string; notes: string | null; /** "warmup" | "block:<n>" | "cooldown" (lib/workouts/structure). */ section: string; rx: Rx; load: Load | null; rest?: number | null };
 export type PlanWeek = { week: number; days: Array<{ name: string; dayOfWeek: number; entries: PlannedEntry[]; logged: boolean }> };
 
 /** A load that records a session, as opposed to "BW" written ahead of time. */
@@ -205,7 +220,7 @@ export function planFromGrid(grid: SheetGrid): { weeks: PlanWeek[]; lastLoggedWe
         const rx = parseSetsReps(cell?.setsReps, `${e.name} ${e.notes ?? ""}`) ?? (recordsSession(parseLoad(cell?.load)) ? lastRx.get(key) ?? null : null);
         if (!rx) return [];
         lastRx.set(key, rx);
-        return [{ exercise: e.name, notes: [e.notes, rx.note].filter(Boolean).join(" · ") || null, section: sections[j], rx, load: parseLoad(cell?.load) }];
+        return [{ exercise: e.name, notes: [e.notes, rx.note].filter(Boolean).join(" · ") || null, section: sections[j], rx, load: parseLoad(cell?.load), rest: e.rest ?? null }];
       });
       const logged = entries.some((x) => recordsSession(x.load));
       if (logged) lastLoggedWeek = Math.max(lastLoggedWeek, week);

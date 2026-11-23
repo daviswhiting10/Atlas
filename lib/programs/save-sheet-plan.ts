@@ -63,7 +63,7 @@ export async function saveProgramFromGrid(input: {
             repMin: e.rx.repMin,
             repMax: e.rx.repMax,
             rpe: null,
-            restSeconds: null,
+            restSeconds: e.rest ?? null,
             notes: "",
           })),
         })),

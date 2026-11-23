@@ -1,6 +1,5 @@
 import { unzipSync, strFromU8 } from "fflate";
 import Papa from "papaparse";
-import { noteFromTabs, pickPlanTab, type Tab } from "./plan-sheet";
 
 /**
  * An Excel workbook (.xlsx) as the CSV the plan import already reads.
@@ -23,7 +22,10 @@ const MAX_PART_BYTES = 30_000_000;
 /** Stop reading once there's far more than the model is ever sent. */
 const MAX_CSV_CHARS = 900_000;
 
-/** Every visible tab with anything in it, as rows of shown cell values, in workbook order. */
+/** A workbook tab: its name and rows of shown cell values. */
+export type Tab = { name: string; rows: string[][] };
+
+/** Every visible tab with anything in it, in workbook order. */
 export function readWorkbook(bytes: Uint8Array): Tab[] {
   if (bytes.byteLength > MAX_XLSX_BYTES) throw new WorkbookError("That file is too big for a plan. Save just the plan's tabs and try again.");
   // .xlsx files are zips ("PK"). An old .xls starts D0 CF.
@@ -79,19 +81,6 @@ export function xlsxToCsv(bytes: Uint8Array): string {
   const tabs = readWorkbook(bytes);
   if (tabs.length === 1) return toCsv(tabs[0].rows);
   return tabs.map((t) => `Tab: ${t.name}\n${toCsv(t.rows)}`).join("\n\n");
-}
-
-/**
- * The plan in a workbook: the tab that looks most like a workout table (lib/programs/plan-sheet), as CSV, and the
- * sentences on the other tabs as a note for the plan. With no tab that looks like a plan, every tab goes (as before),
- * and `tab` is null.
- */
-export function xlsxPlan(bytes: Uint8Array): { csv: string; tab: string | null; note: string | null; tabs: number } {
-  const tabs = readWorkbook(bytes);
-  if (tabs.length === 1) return { csv: toCsv(tabs[0].rows), tab: null, note: null, tabs: 1 };
-  const { plan, others } = pickPlanTab(tabs);
-  if (!plan) return { csv: tabs.map((t) => `Tab: ${t.name}\n${toCsv(t.rows)}`).join("\n\n"), tab: null, note: null, tabs: tabs.length };
-  return { csv: toCsv(plan.rows), tab: plan.name, note: noteFromTabs(others), tabs: tabs.length };
 }
 
 // ── Parts of the workbook ──────────────────────────────────────────────────
