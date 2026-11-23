@@ -1,0 +1,2667 @@
+{
+ "today": "2026-11-20",
+ "s1": {
+  "sessions": 1,
+  "thresholds": [
+   1.5,
+   1.5,
+   1.5
+  ],
+  "trainingDays": 1,
+  "weeksInRange": 1,
+  "activeWeeks": 1,
+  "from": "2026-11-19",
+  "to": "2026-11-20",
+  "days": [
+   {
+    "day": "2026-11-19",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-11-20",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   }
+  ],
+  "recordDays": [],
+  "chapters": [],
+  "planned": [
+   {
+    "name": "Upper A",
+    "day": "2026-11-20",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-21",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-23",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-11-24",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper A",
+    "day": "2026-11-27",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-28",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-30",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-12-01",
+    "status": "PLANNED"
+   }
+  ]
+ },
+ "s2": {
+  "sessions": 2,
+  "thresholds": [
+   1.5,
+   1.5,
+   1.5
+  ],
+  "trainingDays": 2,
+  "weeksInRange": 1,
+  "activeWeeks": 1,
+  "from": "2026-11-17",
+  "to": "2026-11-20",
+  "days": [
+   {
+    "day": "2026-11-17",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-11-18",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-19",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-11-20",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   }
+  ],
+  "recordDays": [],
+  "chapters": [],
+  "planned": [
+   {
+    "name": "Upper A",
+    "day": "2026-11-20",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-21",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-23",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-11-24",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper A",
+    "day": "2026-11-27",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-28",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-30",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-12-01",
+    "status": "PLANNED"
+   }
+  ]
+ },
+ "s3": {
+  "sessions": 3,
+  "thresholds": [
+   1.5,
+   1.5,
+   1.5
+  ],
+  "trainingDays": 3,
+  "weeksInRange": 2,
+  "activeWeeks": 2,
+  "from": "2026-11-15",
+  "to": "2026-11-20",
+  "days": [
+   {
+    "day": "2026-11-15",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-11-16",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-17",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-11-18",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-19",
+    "sessions": 1,
+    "minutes": 54,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-11-20",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   }
+  ],
+  "recordDays": [],
+  "chapters": [],
+  "planned": [
+   {
+    "name": "Upper A",
+    "day": "2026-11-20",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-21",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-23",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-11-24",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper A",
+    "day": "2026-11-27",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-28",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-30",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-12-01",
+    "status": "PLANNED"
+   }
+  ]
+ },
+ "s4": {
+  "sessions": 3,
+  "thresholds": [
+   1.5,
+   1.5,
+   1.5
+  ],
+  "trainingDays": 2,
+  "weeksInRange": 2,
+  "activeWeeks": 2,
+  "from": "2026-11-14",
+  "to": "2026-11-20",
+  "days": [
+   {
+    "day": "2026-11-14",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-11-15",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-16",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-17",
+    "sessions": 2,
+    "minutes": 104,
+    "hardSets": 36,
+    "sets": 36,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A",
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-11-18",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-19",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   },
+   {
+    "day": "2026-11-20",
+    "sessions": 0,
+    "minutes": 0,
+    "hardSets": 0,
+    "sets": 0,
+    "work": 0,
+    "level": 0,
+    "record": false,
+    "titles": []
+   }
+  ],
+  "recordDays": [],
+  "chapters": [],
+  "planned": [
+   {
+    "name": "Upper A",
+    "day": "2026-11-20",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-21",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-23",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-11-24",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper A",
+    "day": "2026-11-27",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-28",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-30",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-12-01",
+    "status": "PLANNED"
+   }
+  ]
+ },
+ "full": {
+  "sessions": 89,
+  "thresholds": [
+   1.6666666666666667,
+   1.6666666666666667,
+   1.8333333333333333
+  ],
+  "trainingDays": 87,
+  "weeksInRange": 24,
+  "activeWeeks": 24,
+  "from": "2026-06-12",
+  "to": "2026-11-20",
+  "days": [
+   {
+    "day": "2026-06-12",
+    "sessions": 1,
+    "minutes": 63,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-06-13",
+    "sessions": 1,
+    "minutes": 51,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-06-15",
+    "sessions": 1,
+    "minutes": 49,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-06-16",
+    "sessions": 1,
+    "minutes": 47,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-06-19",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-06-20",
+    "sessions": 1,
+    "minutes": 60,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-06-22",
+    "sessions": 1,
+    "minutes": 49,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-06-23",
+    "sessions": 1,
+    "minutes": 51,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-06-26",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-06-29",
+    "sessions": 1,
+    "minutes": 52,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-06-30",
+    "sessions": 1,
+    "minutes": 57,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-07-03",
+    "sessions": 1,
+    "minutes": 62,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-07-04",
+    "sessions": 1,
+    "minutes": 47,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-07-06",
+    "sessions": 1,
+    "minutes": 54,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-07-07",
+    "sessions": 1,
+    "minutes": 54,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-07-10",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-07-11",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-07-13",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-07-14",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-07-17",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-07-18",
+    "sessions": 1,
+    "minutes": 65,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-07-20",
+    "sessions": 1,
+    "minutes": 54,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-07-21",
+    "sessions": 1,
+    "minutes": 55,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-07-24",
+    "sessions": 1,
+    "minutes": 48,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-07-25",
+    "sessions": 1,
+    "minutes": 53,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-07-27",
+    "sessions": 1,
+    "minutes": 57,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-07-28",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-07-31",
+    "sessions": 1,
+    "minutes": 52,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-08-01",
+    "sessions": 1,
+    "minutes": 52,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-08-04",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-08-07",
+    "sessions": 1,
+    "minutes": 47,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-08-08",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-08-10",
+    "sessions": 1,
+    "minutes": 55,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-08-11",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-08-14",
+    "sessions": 1,
+    "minutes": 53,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-08-15",
+    "sessions": 1,
+    "minutes": 52,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-08-17",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-08-18",
+    "sessions": 1,
+    "minutes": 51,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-08-21",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-08-24",
+    "sessions": 1,
+    "minutes": 60,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-08-25",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-08-28",
+    "sessions": 1,
+    "minutes": 56,
+    "hardSets": 26,
+    "sets": 26,
+    "work": 2.167,
+    "level": 4,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-08-29",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-08-31",
+    "sessions": 1,
+    "minutes": 60,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-09-01",
+    "sessions": 1,
+    "minutes": 62,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-09-04",
+    "sessions": 1,
+    "minutes": 54,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-09-05",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-09-07",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-09-08",
+    "sessions": 1,
+    "minutes": 59,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-09-11",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-09-12",
+    "sessions": 1,
+    "minutes": 48,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-09-14",
+    "sessions": 1,
+    "minutes": 51,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-09-15",
+    "sessions": 1,
+    "minutes": 62,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-09-18",
+    "sessions": 1,
+    "minutes": 59,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-09-19",
+    "sessions": 1,
+    "minutes": 48,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-09-21",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-09-22",
+    "sessions": 1,
+    "minutes": 49,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-09-25",
+    "sessions": 1,
+    "minutes": 65,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-09-26",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-09-28",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-09-29",
+    "sessions": 1,
+    "minutes": 56,
+    "hardSets": 18,
+    "sets": 18,
+    "work": 1.5,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-10-02",
+    "sessions": 1,
+    "minutes": 53,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-10-03",
+    "sessions": 1,
+    "minutes": 62,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-10-05",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-10-06",
+    "sessions": 1,
+    "minutes": 53,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-10-09",
+    "sessions": 1,
+    "minutes": 55,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-10-10",
+    "sessions": 1,
+    "minutes": 47,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-10-12",
+    "sessions": 1,
+    "minutes": 64,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-10-13",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-10-16",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-10-17",
+    "sessions": 1,
+    "minutes": 52,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-10-19",
+    "sessions": 1,
+    "minutes": 61,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-10-20",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-10-23",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-10-24",
+    "sessions": 1,
+    "minutes": 52,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-10-26",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-10-27",
+    "sessions": 1,
+    "minutes": 63,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-10-30",
+    "sessions": 1,
+    "minutes": 48,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": false,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-10-31",
+    "sessions": 1,
+    "minutes": 58,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": false,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-11-03",
+    "sessions": 2,
+    "minutes": 98,
+    "hardSets": 40,
+    "sets": 40,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B",
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-11-06",
+    "sessions": 1,
+    "minutes": 55,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-11-08",
+    "sessions": 1,
+    "minutes": 59,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-11-10",
+    "sessions": 2,
+    "minutes": 114,
+    "hardSets": 40,
+    "sets": 40,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B",
+     "Lower B"
+    ]
+   },
+   {
+    "day": "2026-11-13",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 22,
+    "sets": 22,
+    "work": 1.833,
+    "level": 3,
+    "record": true,
+    "titles": [
+     "Upper A"
+    ]
+   },
+   {
+    "day": "2026-11-14",
+    "sessions": 1,
+    "minutes": 46,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower A"
+    ]
+   },
+   {
+    "day": "2026-11-16",
+    "sessions": 1,
+    "minutes": 49,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Upper B"
+    ]
+   },
+   {
+    "day": "2026-11-18",
+    "sessions": 1,
+    "minutes": 50,
+    "hardSets": 20,
+    "sets": 20,
+    "work": 1.667,
+    "level": 1,
+    "record": true,
+    "titles": [
+     "Lower B"
+    ]
+   }
+  ],
+  "allDays": [
+   [
+    "2026-06-12",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-06-13",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-06-14",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-15",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-06-16",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-06-17",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-18",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-19",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-06-20",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-06-21",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-22",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-06-23",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-06-24",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-25",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-26",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-06-27",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-28",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-06-29",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-06-30",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-07-01",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-02",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-03",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-07-04",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-07-05",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-06",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-07-07",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-07-08",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-09",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-10",
+    1,
+    4,
+    0
+   ],
+   [
+    "2026-07-11",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-07-12",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-13",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-07-14",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-07-15",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-16",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-17",
+    1,
+    4,
+    0
+   ],
+   [
+    "2026-07-18",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-07-19",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-20",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-07-21",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-07-22",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-23",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-24",
+    1,
+    4,
+    1
+   ],
+   [
+    "2026-07-25",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-07-26",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-27",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-07-28",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-07-29",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-30",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-07-31",
+    1,
+    4,
+    1
+   ],
+   [
+    "2026-08-01",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-02",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-03",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-04",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-05",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-06",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-07",
+    1,
+    4,
+    0
+   ],
+   [
+    "2026-08-08",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-08-09",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-10",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-11",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-08-12",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-13",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-14",
+    1,
+    4,
+    1
+   ],
+   [
+    "2026-08-15",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-16",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-17",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-08-18",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-19",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-20",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-21",
+    1,
+    4,
+    1
+   ],
+   [
+    "2026-08-22",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-23",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-24",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-25",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-26",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-27",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-28",
+    1,
+    4,
+    1
+   ],
+   [
+    "2026-08-29",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-08-30",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-08-31",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-09-01",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-09-02",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-03",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-04",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-05",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-06",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-07",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-08",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-09",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-10",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-11",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-12",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-13",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-14",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-15",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-16",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-17",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-18",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-19",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-20",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-21",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-09-22",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-09-23",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-24",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-25",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-26",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-27",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-09-28",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-29",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-09-30",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-01",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-02",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-10-03",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-04",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-05",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-06",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-07",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-08",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-09",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-10-10",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-11",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-12",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-10-13",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-14",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-15",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-16",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-10-17",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-10-18",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-19",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-20",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-10-21",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-22",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-23",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-10-24",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-10-25",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-26",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-10-27",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-10-28",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-29",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-10-30",
+    1,
+    3,
+    0
+   ],
+   [
+    "2026-10-31",
+    1,
+    1,
+    0
+   ],
+   [
+    "2026-11-01",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-02",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-03",
+    2,
+    1,
+    1
+   ],
+   [
+    "2026-11-04",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-05",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-06",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-11-07",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-08",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-11-09",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-10",
+    2,
+    1,
+    1
+   ],
+   [
+    "2026-11-11",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-12",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-13",
+    1,
+    3,
+    1
+   ],
+   [
+    "2026-11-14",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-11-15",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-16",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-11-17",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-18",
+    1,
+    1,
+    1
+   ],
+   [
+    "2026-11-19",
+    0,
+    0,
+    0
+   ],
+   [
+    "2026-11-20",
+    0,
+    0,
+    0
+   ]
+  ],
+  "recordDays": [
+   "2026-06-22",
+   "2026-06-26",
+   "2026-06-29",
+   "2026-06-30",
+   "2026-07-03",
+   "2026-07-04",
+   "2026-07-06",
+   "2026-07-07",
+   "2026-07-14",
+   "2026-07-18",
+   "2026-07-20",
+   "2026-07-24",
+   "2026-07-25",
+   "2026-07-28",
+   "2026-07-31",
+   "2026-08-01",
+   "2026-08-04",
+   "2026-08-10",
+   "2026-08-14",
+   "2026-08-15",
+   "2026-08-18",
+   "2026-08-21",
+   "2026-08-24",
+   "2026-08-25",
+   "2026-08-28",
+   "2026-08-29",
+   "2026-08-31",
+   "2026-09-21",
+   "2026-09-22",
+   "2026-10-09",
+   "2026-10-12",
+   "2026-10-16",
+   "2026-10-17",
+   "2026-10-20",
+   "2026-10-23",
+   "2026-10-24",
+   "2026-10-27",
+   "2026-11-03",
+   "2026-11-06",
+   "2026-11-08",
+   "2026-11-10",
+   "2026-11-13",
+   "2026-11-14",
+   "2026-11-16",
+   "2026-11-18"
+  ],
+  "chapters": [
+   {
+    "name": "30-day reset",
+    "from": "2026-08-17",
+    "to": "2026-09-16"
+   }
+  ],
+  "planned": [
+   {
+    "name": "Upper A",
+    "day": "2026-11-20",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower A",
+    "day": "2026-11-21",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Upper B",
+    "day": "2026-11-23",
+    "status": "PLANNED"
+   },
+   {
+    "name": "Lower B",
+    "day": "2026-11-24",
+    "status": "PLANNED"
+   }
+  ]
+ },
+ "plan": {
+  "total": 48,
+  "start": "2026-11-20"
+ }
+}
