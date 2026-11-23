@@ -19,7 +19,7 @@ export function ProgressScreen({ athlete, data, calendar, chapters }: { athlete:
   const lite = liteProgress(data);
   return (
     <div className="pt-4">
-      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} history={<HistoryCalendar calendar={historyView(calendar)} summary={sessionSummary} />} />
+      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} history={<HistoryCalendar calendar={historyView(calendar)} summary={sessionSummary} quickLog />} />
       {chapters.length > 0 && (
         <section className="mt-14">
           <h2 className="mb-3 flex min-h-11 items-center text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">Chapters</h2>

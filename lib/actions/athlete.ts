@@ -13,6 +13,7 @@ import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS, getProgress } from "@/lib/athlete/data";
 import type { SessionPoint } from "@/lib/plan/overload";
+import { toMetres } from "@/lib/cardio";
 import { displayName } from "@/lib/plan/catalog";
 import {
   LIMITS,
@@ -127,6 +128,39 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
       ).id;
 
   return { workoutLogId: log.id, setLogId };
+}
+
+const QuickCardioInput = z.object({
+  activity: z.enum(["RUN", "WALK", "OTHER"]),
+  minutes: z.number().int().min(1).max(600),
+  distance: z.number().finite().min(0).max(500).nullish(),
+  unit: z.enum(["mi", "km"]).default("mi"),
+});
+
+/**
+ * A quick log of cardio or a walk: a finished session with the type, the minutes and, if they said, how far. It counts
+ * today (the heatmap's colour is minutes, and its corner icon is the type). No plan exercise is behind it.
+ */
+export async function logCardio(raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = await requireAthlete();
+  const parsed = QuickCardioInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Minutes are a whole number from 1 to 600." };
+  const { activity, minutes, distance, unit } = parsed.data;
+  const now = new Date();
+  await prisma.workoutLog.create({
+    data: {
+      clientId,
+      source: "OFF_PLAN",
+      title: activity === "WALK" ? "Walk" : activity === "RUN" ? "Run" : "Cardio",
+      date: now,
+      completedAt: now,
+      durationMin: minutes,
+      activity,
+      distanceM: distance ? toMetres(distance, unit) : null,
+    },
+  });
+  refresh();
+  return { ok: true };
 }
 
 /**
