@@ -1200,11 +1200,22 @@ export default function WorkoutLogger({
   // ── Complete session ──────────────────────────────────────────────────────
   /** `partial`: the Finish button's "only what I logged". The automatic finish still needs every set. */
   async function handleCompleteSession(partial = false) {
+    if (!partial && !allDone(doneLists())) return;
+    // The finished screen shows at once, from what is on the phone; the saves and the finish go on behind it, and if
+    // they don't go through it goes back to the logger with a message. (Waiting for them first took up to 2.3 s.)
+    const before = { soap: soapOpen };
+    setSoapOpen(true);
+    setFinished(true);
+    const back = (message: string) => {
+      setFinished(false);
+      setSoapOpen(before.soap);
+      toast.error(message);
+    };
     startComplete(async () => {
       // The last ticks may still be saving: wait for them, and finish only if they all stuck.
       await saveChain.current;
       const workoutLogId = logIdRef.current;
-      if (!workoutLogId || (!partial && !allDone(doneLists()))) return;
+      if (!workoutLogId || (!partial && !allDone(doneLists()))) return void back("Couldn't finish the session. Please try again.");
       try {
         await completeSession({
           workoutLogId,
@@ -1217,11 +1228,8 @@ export default function WorkoutLogger({
         sentStructured.current = structuredNote;
         setSavedNotes(rawInput);
         toast.dismiss("finish");
-        // The notes stay open on the finished screen: they can be written now.
-        setSoapOpen(true);
-        setFinished(true);
       } catch {
-        toast.error("Failed to complete session");
+        back("Failed to complete session");
       }
     });
   }

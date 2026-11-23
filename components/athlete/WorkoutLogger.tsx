@@ -703,17 +703,25 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
 
   function finish() {
     setCountdown(null);
+    const loggedNow = () => data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done));
+    // The finished screen shows at once, from what is on the phone; the saves and the finish go on behind it. If the
+    // finish doesn't go through, it goes back to the logger with a message. (Waiting for them first took up to 2 s.)
+    const localMinutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
+    if (loggedNow()) {
+      setRest(null);
+      setSummary({ minutes: localMinutes });
+    }
     startFinish(async () => {
       try {
         // The last ticks may still be saving: wait for them, and finish only if they all stuck.
         await queue.current;
         // Everything logged, or finished early with at least one set logged.
-        if (!data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done))) return;
+        if (!loggedNow()) return void setSummary(null);
         const res = await sendFinish({
-          send: (m) => actions.finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : m }),
+          send: (m) => finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : m }),
           storage: store(),
           workoutId: data.id,
-          minutes: Math.max(1, Math.round((Date.now() - startedAt.current) / 60000)),
+          minutes: localMinutes,
           isOffline: isNetworkError,
         });
         if (res.kind === "done") {
@@ -721,10 +729,15 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           setRest(null);
           setSummary({ minutes: res.minutes });
         } else if (res.kind === "queued") {
+          setSummary(null);
           setNoSignal(true);
           setFinishQueued(true);
-        } else toast.error("Couldn't finish the workout. Please try again.");
+        } else {
+          setSummary(null);
+          toast.error("Couldn't finish the workout. Please try again.");
+        }
       } catch {
+        setSummary(null);
         toast.error("Couldn't finish the workout. Please try again.");
       }
     });
