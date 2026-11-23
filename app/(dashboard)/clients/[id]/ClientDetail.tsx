@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 import { InviteConfirm } from "@/components/coach/InviteConfirm";
 import { DeleteClientSheet, type DeletePreview } from "@/components/coach/DeleteClientSheet";
-import { shareInvite } from "@/lib/coach/invite-share";
 import type { LoginStatus } from "@/lib/coach/login-status";
 import { PlanStart } from "@/components/coach/PlanStart";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
@@ -157,11 +156,9 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
       toast.error(err?.error ?? "Invite failed");
       return;
     }
-    // One tap: the link goes straight to the phone's share sheet. Without one (or if the browser
-    // won't open it), the sheet with the link and Copy opens instead.
-    const result = (await res.json()) as InviteResult;
-    const outcome = await shareInvite(result, client.fullName.split(" ")[0]);
-    if (outcome === "unavailable") setInvite(result);
+    // The sheet with the link: a big Copy, and Share via… (the phone's share sheet, opened by its own tap so the
+    // browser allows it). It says "emailed" only when the email went out.
+    setInvite((await res.json()) as InviteResult);
   }
 
   /** ⋯ Delete client: the same sheet as the roster's swipe (exactly what goes, then a red Delete). */
