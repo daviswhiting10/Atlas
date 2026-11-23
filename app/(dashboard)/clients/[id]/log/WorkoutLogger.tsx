@@ -550,9 +550,17 @@ export default function WorkoutLogger({
   const stateFor = (ex: LoggerExercise): ExerciseState => exState[ex.aweId] ?? freshState(ex);
 
   // ── Mobile-specific state ────────────────────────────────────────────────────
-  // Folded cards. An exercise folds by itself once every set is logged; a tap on its chevron
-  // folds (true) or opens (false) it by hand. Kept on this screen only, never saved.
-  const [foldOverride, setFoldOverride] = useState<Record<string, boolean>>({});
+  // Folded cards. The screen opens with every card folded except the first one with sets left (a long
+  // workout is one short list, not 100+ targets); an exercise folds by itself once every set is logged, and
+  // a tap on its row or chevron opens (false) or folds (true) it by hand. Kept on this screen only, never saved.
+  const [foldOverride, setFoldOverride] = useState<Record<string, boolean>>(() => {
+    const left = (ex: LoggerExercise) => {
+      const sets = stateFor(ex).sets;
+      return sets.length === 0 || sets.some((x) => !x.completed);
+    };
+    const first = exercises.find(left);
+    return Object.fromEntries(exercises.filter((ex) => ex !== first).map((ex) => [ex.aweId, true]));
+  });
   // When a card folds, opens or moves, the cards under the finger change: a set's tick right after
   // is a second tap meant for what was there (a double tap on a header, a tap just after a drop),
   // not a set logged. It's ignored until the screen has settled.
