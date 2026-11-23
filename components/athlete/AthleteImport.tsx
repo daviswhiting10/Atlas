@@ -6,12 +6,13 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PlanDropZone } from "@/components/plan/PlanDropZone";
 import type { Found } from "@/components/plan/FoundInFile";
+import type { ExerciseMatch } from "@/lib/programs/dedupe";
 import { ImportPreview } from "@/components/plan/ImportPreview";
 import { answer, planForm } from "@/components/plan/plan-file";
 import type { ImportPreview as Preview } from "@/lib/athlete/plan-import";
 
 /** What the read step returned. The grid goes back, as read, to be saved. */
-type Read = { found?: Found; grid: unknown; preview: Preview; warnings: string[] };
+type Read = { found?: Found; matches?: ExerciseMatch[]; grid: unknown; preview: Preview; warnings: string[] };
 
 const today = () => {
   const d = new Date();
@@ -90,7 +91,7 @@ export function AthleteImport({
   if (read) {
     return (
       <div className="space-y-4">
-        <ImportPreview preview={read.preview} found={read.found} warnings={read.warnings} grid={read.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
+        <ImportPreview preview={read.preview} found={read.found} matches={read.matches} warnings={read.warnings} grid={read.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
         <div className="flex gap-2">
           <button type="button" onClick={() => { setRead(null); onRead?.(false); }} disabled={saving} className="press h-12 rounded-xl border border-line-strong px-5 text-[15px] font-semibold text-ink">
             Back

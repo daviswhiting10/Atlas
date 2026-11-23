@@ -71,11 +71,11 @@ async function read(req: Request, who: { userId: string; workspaceId: string; na
       return NextResponse.json({ error: `That's ${IMPORTS_PER_DAY} plans read today. Try again tomorrow, or build it with Atlas now.` }, { status: 429 });
     }
     // A spreadsheet or images (a PDF's pages, screenshots): the same grid, so each week keeps its own numbers.
-    const { grid, warnings } = await readPlanFile(file, { workspaceId: who.workspaceId, userId: who.userId, feature: file.csv ? "athlete-plan-import-sheet" : "athlete-plan-import" });
+    const { grid, warnings, matches } = await readPlanFile(file, { workspaceId: who.workspaceId, userId: who.userId, feature: file.csv ? "athlete-plan-import-sheet" : "athlete-plan-import" });
     const summary = summarizeSheetImport({ grid, context: START_FRESH, weekOneStart: null, today: new Date() });
     return NextResponse.json({
       grid,
-      found: foundInFile(grid),
+      found: foundInFile(grid), matches,
       readAs: summary.readAs,
       preview: previewFromGrid(grid, START_FRESH),
       warnings: [...warnings, ...contextWarnings(START_FRESH, { days: summary.daysPerWeek }, "sheet")],

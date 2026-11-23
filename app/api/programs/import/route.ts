@@ -44,11 +44,11 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
   try {
     const file = planFileFromForm(form);
     if (!perWorkspace(workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
-    const { grid, warnings } = await readPlanFile(file, { workspaceId, userId, feature: file.csv ? "program-sheet-import" : "program-import", notes });
+    const { grid, warnings, matches } = await readPlanFile(file, { workspaceId, userId, feature: file.csv ? "program-sheet-import" : "program-import", notes });
     // A library program starts at week 1: nothing in it is a session done.
     const context = { ...(notes ? contextFromText(notes) : NO_CONTEXT), startAtWeek: 1 };
     const summary = summarizeSheetImport({ grid, context, weekOneStart: null, today: new Date() });
-    return NextResponse.json({ grid, context, found: foundInFile(grid), readAs: summary.readAs, preview: previewFromGrid(grid, context), warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
+    return NextResponse.json({ grid, context, found: foundInFile(grid), matches, readAs: summary.readAs, preview: previewFromGrid(grid, context), warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
   } catch (err) {
     if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
