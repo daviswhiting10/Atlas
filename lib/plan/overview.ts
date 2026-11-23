@@ -145,7 +145,8 @@ export async function loadPlanOverview({
       weekNotes: true,
       sourceProgram: { select: { goalTags: true, isTemplate: true } },
       assignedWorkouts: {
-        orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
+        // By date: `order` is the day within its week (each week of an imported plan starts again at 1), so it only breaks ties.
+        orderBy: [{ scheduledDate: "asc" }, { order: "asc" }],
         select: {
           id: true,
           name: true,
