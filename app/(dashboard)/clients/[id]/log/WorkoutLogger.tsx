@@ -2,6 +2,7 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
+import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { LIVE_EVENT, clearLive, mergeDraft, readLiveFor, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
@@ -1591,6 +1592,7 @@ export default function WorkoutLogger({
 
       {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
       <div ref={drag.listRef} className="relative space-y-4">
+        <SupersetOutline box={drag.groupBox} />
         {drag.lineTop != null && (
           <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
             <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
@@ -1831,6 +1833,7 @@ export default function WorkoutLogger({
       {/* Exercise cards — grouped by block. Drag a card by its grip (or hold its header), or use the keyboard on the grip. */}
       <div ref={dragD.listRef} className="relative space-y-4">
         <DragStatus message={dragD.status} />
+        <SupersetOutline box={dragD.groupBox} />
         {dragD.lineTop != null && (
           <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: dragD.lineTop - 1.5 }}>
             <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />

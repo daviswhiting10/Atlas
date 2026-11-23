@@ -1,5 +1,6 @@
 "use client";
 
+import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ExerciseThumb } from "@/components/ExercisePicture";
@@ -904,6 +905,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
 
         <div ref={drag.listRef} className="relative space-y-4">
           <DragStatus message={drag.status} />
+          <SupersetOutline box={drag.groupBox} />
           {drag.lineTop != null && (
             <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
               <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />

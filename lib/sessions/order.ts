@@ -106,6 +106,50 @@ export function dropAt(order: OrderEntry[], aweId: string, gap: number): OrderEn
   return normalise([...others.slice(0, at), { aweId, section }, ...others.slice(at)]);
 }
 
+/** The exercises in `aweId`'s superset, itself included, in order. Empty when it isn't in one (or is a warm-up or cool-down). */
+export function groupOf(order: OrderEntry[], aweId: string): string[] {
+  const o = normalise(order);
+  const me = o.find((e) => e.aweId === aweId);
+  if (!me || partOf(me.section) !== "block") return [];
+  const members = o.filter((e) => e.section === me.section).map((e) => e.aweId);
+  return members.length > 1 ? members : [];
+}
+
+/**
+ * A member dropped inside its superset's outline stays in it: it moves among the members only (`gap` counts the others
+ * above it, as in dropAt, and is held to the group's own range).
+ */
+export function dropWithin(order: OrderEntry[], aweId: string, gap: number): OrderEntry[] {
+  const o = normalise(order);
+  const me = o.find((e) => e.aweId === aweId);
+  if (!me) return o;
+  const others = o.filter((e) => e.aweId !== aweId);
+  const first = others.findIndex((e) => e.section === me.section);
+  if (first === -1) return o;
+  const last = first + others.filter((e) => e.section === me.section).length;
+  const at = Math.max(first, Math.min(gap, last));
+  return normalise([...others.slice(0, at), me, ...others.slice(at)]);
+}
+
+/**
+ * A member dropped outside its superset's outline leaves it: on its own, at the gap it was dropped in (the same spot as
+ * before when that is where it was, so it simply comes out of the group).
+ */
+export function ungroupAt(order: OrderEntry[], aweId: string, gap: number): OrderEntry[] {
+  const o = normalise(order);
+  if (partOf(o.find((e) => e.aweId === aweId)?.section ?? "") !== "block") return dropAt(o, aweId, gap);
+  // Taken out at the end of its group first (a member from the middle would split the rest), then placed at the gap.
+  const me = o.find((e) => e.aweId === aweId)!;
+  const rest = o.filter((e) => e.aweId !== aweId);
+  const lastIn = rest.map((e) => e.section).lastIndexOf(me.section);
+  const edged = lastIn === -1 ? o : [...rest.slice(0, lastIn + 1), me, ...rest.slice(lastIn + 1)];
+  return dropAt(
+    normalise(edged.map((e) => (e.aweId === aweId ? { ...e, section: SINGLE } : e))),
+    aweId,
+    gap
+  );
+}
+
 /** Can `aweId` be held over `targetId` to superset them? Only onto a block's exercise. */
 export function canMerge(order: OrderEntry[], aweId: string, targetId: string): boolean {
   const target = order.find((e) => e.aweId === targetId);

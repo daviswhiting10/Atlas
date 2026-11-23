@@ -116,3 +116,45 @@ describe("Up and Down (screen readers)", () => {
     expect(stepOrder(o, "warm", -1)).toEqual(o);
   });
 });
+
+import { dropWithin, groupOf, ungroupAt } from "./order";
+describe("ungrouping a superset by dragging out of its outline", () => {
+  const two = [{ aweId: "a", section: "block:1" }, { aweId: "b", section: "block:2" }, { aweId: "c", section: "block:2" }, { aweId: "d", section: "block:3" }];
+  const three = [{ aweId: "a", section: "block:1" }, { aweId: "b", section: "block:2" }, { aweId: "c", section: "block:2" }, { aweId: "e", section: "block:2" }, { aweId: "d", section: "block:3" }];
+  it("groupOf lists the members of a superset, and nothing for a single", () => {
+    expect(groupOf(two, "b")).toEqual(["b", "c"]);
+    expect(groupOf(three, "e")).toEqual(["b", "c", "e"]);
+    expect(groupOf(two, "a")).toEqual([]);
+  });
+  it("2-member: dropped outside, below it, the member leaves and the other stays alone", () => {
+    const r = ungroupAt(two, "b", 3);
+    expect(r.map((e) => e.aweId)).toEqual(["a", "c", "d", "b"]);
+    expect(groupOf(r, "c")).toEqual([]);
+    expect(groupOf(r, "b")).toEqual([]);
+  });
+  it("2-member: dropped outside, above it", () => {
+    const r = ungroupAt(two, "c", 0);
+    expect(r.map((e) => e.aweId)).toEqual(["c", "a", "b", "d"]);
+    expect(groupOf(r, "b")).toEqual([]);
+  });
+  it("2-member: dropped outside at its own gap, it simply comes out in place", () => {
+    const r = ungroupAt(two, "c", 2);
+    expect(r.map((e) => e.aweId)).toEqual(["a", "b", "c", "d"]);
+    expect(groupOf(r, "c")).toEqual([]);
+  });
+  it("3-member: one leaves, the other two stay grouped", () => {
+    const r = ungroupAt(three, "c", 0);
+    expect(r.map((e) => e.aweId)).toEqual(["c", "a", "b", "e", "d"]);
+    expect(groupOf(r, "b")).toEqual(["b", "e"]);
+    expect(groupOf(r, "c")).toEqual([]);
+  });
+  it("inside the outline the member stays: it only moves among the members", () => {
+    const r = dropWithin(three, "e", 1);
+    expect(r.map((e) => e.aweId)).toEqual(["a", "e", "b", "c", "d"]);
+    expect(groupOf(r, "e")).toEqual(["e", "b", "c"]);
+  });
+  it("inside, the gap is held to the group (never carried out of it)", () => {
+    expect(dropWithin(two, "b", 0).map((e) => e.aweId)).toEqual(["a", "b", "c", "d"]);
+    expect(groupOf(dropWithin(two, "b", 3), "b")).toEqual(["c", "b"]);
+  });
+});
