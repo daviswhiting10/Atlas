@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
-import { HomeProgress } from "@/components/athlete/HomeProgress";
+import { HomeProgress } from "@/components/athlete/HomeProgressLoader";
 import { TodayScreen } from "@/components/athlete/TodayScreen";
 import { GoalToday } from "@/components/goals/GoalToday";
 import { TodayReport } from "@/components/report/TodayReport";

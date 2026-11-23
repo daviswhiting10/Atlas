@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { Athlete, ProgressData } from "@/lib/athlete/data";
-import { getHistory, getProgress } from "@/lib/athlete/data";
 import type { HistoryCalendar as Calendar } from "@/lib/history/calendar";
 import type { sessionSummary } from "@/lib/actions/athlete";
 import { ProgressView } from "@/components/athlete/ProgressView";
@@ -33,10 +32,4 @@ export function HomeProgressView({
       </Link>
     </div>
   );
-}
-
-/** For real athletes: loads what Progress loads, streamed in behind the greeting and the workout card. */
-export async function HomeProgress({ athlete }: { athlete: Pick<Athlete, "metric"> }) {
-  const [data, calendar] = await Promise.all([getProgress(), getHistory()]);
-  return <HomeProgressView athlete={athlete} data={data} calendar={calendar} />;
 }
