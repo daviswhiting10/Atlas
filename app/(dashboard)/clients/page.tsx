@@ -319,15 +319,7 @@ export default function ClientsPage() {
                         </div>
                       </div>
                     </Link>
-                    {/* The direct way to the logger; the row itself opens the profile. */}
-                    <Link
-                      href={`/clients/${client.id}/log`}
-                      aria-label={`Log a session for ${client.fullName}`}
-                      className="press flex min-h-[60px] min-w-[64px] shrink-0 items-center justify-center pr-5 text-sm font-semibold text-primary"
-                    >
-                      Log →
-                    </Link>
-                    {/* Desktop: the same Delete as the swipe (same sheet that says what goes). A phone keeps the swipe. */}
+{/* Desktop: the same Delete as the swipe (same sheet that says what goes). A phone keeps the swipe. */}
                     <DropdownMenu>
                       <DropdownMenuTrigger aria-label={`More for ${client.fullName}`} className="press mr-3 hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted md:flex">
                         <MoreHorizontal className="h-5 w-5" />

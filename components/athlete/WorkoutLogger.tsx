@@ -19,6 +19,7 @@ import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@
 // The coach logger's hold-and-drag (hold a card's header to lift it, drop between cards to reorder,
 // hold over a card to superset). Imported as it is; nothing in that folder is changed.
 import { useDragOrder } from "@/app/(dashboard)/clients/[id]/log/useDragOrder";
+import { DragHandle, DragStatus } from "@/components/logger/DragHandle";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
@@ -891,6 +892,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
         {data.note && <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink-soft">{data.note}</p>}
 
         <div ref={drag.listRef} className="relative space-y-4">
+          <DragStatus message={drag.status} />
           {drag.lineTop != null && (
             <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
               <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
@@ -913,7 +915,13 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                     const logged = list.filter((x) => x.done).length;
                     return (
                       <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={section}>
-                        <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} unsaved={list.some((s) => `${ex.aweId}:${s.setNumber}` in unsaved)} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                        {/* From a desktop width, a grip (mouse drag, or the keyboard); a phone holds the row, as before. */}
+                        <div className="flex items-center" data-drag-header="">
+                          <DragHandle props={drag.handle(ex.aweId, ex.name)} className="hidden md:flex" />
+                          <div className="min-w-0 flex-1">
+                            <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} unsaved={list.some((s) => `${ex.aweId}:${s.setNumber}` in unsaved)} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                          </div>
+                        </div>
                         <MoveButtons name={ex.name} {...moves(ex.aweId)} />
                       </section>
                     );
@@ -922,12 +930,14 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                     <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={cn(section, "px-3 pb-3 pt-2")}>
                       <div
                         {...drag.bind(ex.aweId)}
+                        data-drag-header=""
                         onClick={(e) => {
                           // A tap folds the card; its own buttons (the picture, the ⋯) do their own thing.
                           if (!(e.target as HTMLElement).closest("button, [role=menu], [role=menuitem]")) setOpenFor(ex.aweId, false);
                         }}
                         className="mb-1 flex cursor-pointer select-none items-center gap-2 [-webkit-touch-callout:none]"
                       >
+                        <DragHandle props={drag.handle(ex.aweId, ex.name)} className="-ml-1 hidden md:flex" />
                         <ExerciseThumb picture={ex.picture} name={ex.name} />
                         <div className="min-w-0 flex-1">
                           <ExerciseName as="h3" name={labelled(label, ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
