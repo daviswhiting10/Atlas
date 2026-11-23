@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MAX_PDF_PAGES, PDF_FAILED, PdfError, isPdf, pdfToImages } from "./pdf-pages";
+import { MAX_PDF_PAGES, PDF_FAILED, PDF_OFF, PdfError, isPdf, pdfImportOn, pdfToImages } from "./pdf-pages";
 
 // A real multi-week plan: one week to a page.
 // A fresh copy each time: pdf.js takes over (detaches) the buffer it is given.
@@ -34,5 +34,28 @@ describe("pdfToImages", () => {
     await expect(pdfToImages(plan(), missing)).rejects.toThrow(PDF_FAILED);
     const cantDraw = async () => ({ PDFParse: class { getScreenshot() { return Promise.reject(new Error("canvas.toBuffer is not a function")); } destroy() { return Promise.resolve(); } } as never });
     await expect(pdfToImages(plan(), cantDraw)).rejects.toThrow(PDF_FAILED);
+  });
+});
+
+describe("IMPORT_PDF switch", () => {
+  it("off on the production site unless IMPORT_PDF=on; on elsewhere unless IMPORT_PDF=off", () => {
+    expect(pdfImportOn({ VERCEL_ENV: "production" })).toBe(false);
+    expect(pdfImportOn({ VERCEL_ENV: "production", IMPORT_PDF: "on" })).toBe(true);
+    expect(pdfImportOn({ VERCEL_ENV: "preview" })).toBe(true);
+    expect(pdfImportOn({})).toBe(true);
+    expect(pdfImportOn({ IMPORT_PDF: "off" })).toBe(false);
+  });
+
+  it("switched off, a PDF gets the plain message and nothing is loaded", async () => {
+    const before = process.env.IMPORT_PDF;
+    process.env.IMPORT_PDF = "off";
+    let loaded = false;
+    try {
+      await expect(pdfToImages(plan(), async () => { loaded = true; return import("pdf-parse"); })).rejects.toThrow(PDF_OFF);
+      expect(loaded).toBe(false);
+    } finally {
+      if (before === undefined) delete process.env.IMPORT_PDF;
+      else process.env.IMPORT_PDF = before;
+    }
   });
 });
