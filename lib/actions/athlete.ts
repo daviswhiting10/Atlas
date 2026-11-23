@@ -11,7 +11,8 @@ import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
-import { MAX_SETS } from "@/lib/athlete/data";
+import { MAX_SETS, getProgress } from "@/lib/athlete/data";
+import type { SessionPoint } from "@/lib/plan/overload";
 import { displayName } from "@/lib/plan/catalog";
 import {
   LIMITS,
@@ -127,6 +128,20 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
       ).id;
 
   return { workoutLogId: log.id, setLogId };
+}
+
+/**
+ * Lifts' histories for Progress's charts, fetched when the lift chooser opens or a lift is picked (the page itself no
+ * longer carries every lift's). Only the signed-in athlete's own, by lift id.
+ */
+export async function exerciseSeries(raw: unknown): Promise<Record<string, SessionPoint[]>> {
+  await requireAthlete();
+  const { exerciseIds } = z.object({ exerciseIds: z.array(z.string().min(1).max(64)).min(1).max(60) }).parse(raw);
+  const wanted = new Set(exerciseIds);
+  const progress = await getProgress();
+  const out: Record<string, SessionPoint[]> = {};
+  for (const e of progress.exercises) if (wanted.has(e.exerciseId)) out[e.exerciseId] = e.series;
+  return out;
 }
 
 export async function finishWorkout(raw: { assignedWorkoutId: string; durationMin?: number }): Promise<void> {

@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CalendarSession } from "@/lib/history/calendar";
-import { latestTrained, PHONE_WEEKS, readout, YEAR_WEEKS, yearGrid, type GridCell } from "@/lib/history/year-grid";
+import { latestTrained, PHONE_WEEKS, readout, YEAR_WEEKS, yearGrid, type GridCell, type HeatDays } from "@/lib/history/year-grid";
 
 /** One accent, four steps. Empty days are a very light gray, future days fainter still. */
 const STEP = ["", "36%", "58%", "80%", "100%"].map((p) => (p ? `color-mix(in srgb, var(--dusk-teal) ${p}, transparent)` : undefined));
@@ -18,7 +17,7 @@ const FUTURE = "bg-ink/[0.035]";
  *
  * Cells are display-only: touching or hovering one writes a one-line readout under the grid, nothing floats.
  */
-export function YearHeatmap({ byDay, today, summary }: { byDay: Record<string, CalendarSession[]>; today: string; summary: string }) {
+export function YearHeatmap({ byDay, today, summary }: { byDay: HeatDays; today: string; summary: string }) {
   const grid = useMemo(() => yearGrid(byDay, { today, weeks: YEAR_WEEKS }), [byDay, today]);
   const cells = useMemo(() => new Map(grid.columns.flatMap((c) => c.cells).map((c) => [c.day, c] as const)), [grid]);
   const [picked, setPicked] = useState<string | null>(null);

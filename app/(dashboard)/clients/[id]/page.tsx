@@ -5,6 +5,7 @@ import { loadClientProgress } from "@/lib/coach/progress";
 import { getClient } from "@/lib/db/clients";
 import { ProgressView } from "@/components/athlete/ProgressView";
 import { HistoryCalendar } from "@/components/athlete/HistoryCalendar";
+import { historyView } from "@/lib/history/view";
 import { cookies } from "next/headers";
 import { safeTimeZone } from "@/lib/athlete/sessions";
 import { TZ_COOKIE } from "@/lib/athlete/data";
@@ -66,7 +67,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
         ) : null
       }
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
-      history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : null}
+      history={calendar.kind === "grid" ? <HistoryCalendar calendar={historyView(calendar)} /> : null}
       access={access}
       latest={latest ? <LatestSession clientId={params.id} session={latest} prs={sessionPrs(data.exercises, latest.day)} /> : null}
       report={reports[0] ? <ReportLink entry={reports[0]} className="sm:max-w-sm" /> : null}

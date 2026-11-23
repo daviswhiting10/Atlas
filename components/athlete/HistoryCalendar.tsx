@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { SessionSummary } from "@/lib/actions/athlete";
-import { shortDay, type CalendarSession, type HistoryCalendar as Calendar } from "@/lib/history/calendar";
+import { shortDay, type CalendarSession } from "@/lib/history/calendar";
+import type { HistoryView } from "@/lib/history/view";
 import { useEscape } from "@/hooks/use-escape";
 import { YearHeatmap } from "./YearHeatmap";
 
@@ -139,7 +140,7 @@ function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: 
  * History: the session count and the year of training as a heatmap (YearHeatmap, from lib/history/calendar).
  * Under three sessions: "Day one" and the first session.
  */
-export function HistoryCalendar({ calendar, summary }: { calendar: Calendar; summary?: (id: string) => Promise<SessionSummary | null> }) {
+export function HistoryCalendar({ calendar, summary }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null> }) {
   const [open, setOpen] = useState<string | null>(null);
   if (calendar.kind === "empty") return null;
 
@@ -162,7 +163,7 @@ export function HistoryCalendar({ calendar, summary }: { calendar: Calendar; sum
           </p>
           <p className="sr-only">{calendar.summary}</p>
           <div className="mt-6">
-            <YearHeatmap byDay={calendar.byDay} today={calendar.today} summary={calendar.summary} />
+            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} />
           </div>
         </>
       )}

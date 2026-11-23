@@ -15,6 +15,21 @@ import { mondayOf } from "@/lib/athlete/sessions";
 import { addDays } from "@/lib/goals/days";
 import type { CalendarSession } from "./calendar";
 
+/** What the grid needs to know about a training day: no ids, no links, no record flags. */
+export type DayInfo = { sets: number; minutes: number; titles: string[] };
+export type HeatDays = Record<string, DayInfo>;
+
+/** A calendar's days, cut down to DayInfo (days with no session are left out). This is what a browser is sent. */
+export function heatDays(byDay: Record<string, CalendarSession[]>): HeatDays {
+  const out: HeatDays = {};
+  for (const day of Object.keys(byDay)) {
+    const list = byDay[day];
+    if (list.length === 0) continue;
+    out[day] = { sets: list.reduce((n, s) => n + s.sets, 0), minutes: list.reduce((n, s) => n + (s.minutes ?? 0), 0), titles: list.map((s) => s.title) };
+  }
+  return out;
+}
+
 export type GridLevel = 0 | 1 | 2 | 3 | 4;
 
 export type GridCell = {
@@ -51,18 +66,14 @@ export function gridDay(day: string): string {
 
 /** Sets in a day, with a floor of "present" for a session that logged none. */
 const PRESENT = 0.5;
-const workOf = (sessions: CalendarSession[]) => {
-  const sets = sessions.reduce((n, s) => n + s.sets, 0);
-  return sets > 0 ? sets : PRESENT;
-};
+const workOf = (d: DayInfo) => (d.sets > 0 ? d.sets : PRESENT);
 
 /** Nearest-rank percentile of an ascending list. */
 const percentile = (sorted: number[], q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)];
 
 /** Steps 1 to 4 from the athlete's own quartiles over every training day they have. */
-export function quartileSteps(byDay: Record<string, CalendarSession[]>): [number, number, number] | null {
+export function quartileSteps(byDay: HeatDays): [number, number, number] | null {
   const work = Object.values(byDay)
-    .filter((s) => s.length > 0)
     .map(workOf)
     .sort((a, b) => a - b);
   return work.length === 0 ? null : [percentile(work, 0.25), percentile(work, 0.5), percentile(work, 0.75)];
@@ -73,7 +84,7 @@ export function levelOf(work: number, t: [number, number, number] | null): GridL
   return work <= t[0] ? 1 : work <= t[1] ? 2 : work <= t[2] ? 3 : 4;
 }
 
-export function yearGrid(byDay: Record<string, CalendarSession[]>, opts: { today: string; weeks?: number }): YearGrid {
+export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number }): YearGrid {
   const weeks = opts.weeks ?? YEAR_WEEKS;
   const thresholds = quartileSteps(byDay);
   const lastMonday = mondayOf(opts.today);
@@ -82,16 +93,16 @@ export function yearGrid(byDay: Record<string, CalendarSession[]>, opts: { today
     const monday = addDays(lastMonday, -7 * i);
     const cells: GridCell[] = Array.from({ length: 7 }, (_, k) => {
       const day = addDays(monday, k);
-      const sessions = byDay[day] ?? [];
+      const info = byDay[day];
       const future = day > opts.today;
-      const trained = !future && sessions.length > 0;
+      const trained = !future && info != null;
       return {
         day,
-        level: trained ? levelOf(workOf(sessions), thresholds) : 0,
+        level: trained ? levelOf(workOf(info), thresholds) : 0,
         future,
-        sets: sessions.reduce((n, s) => n + s.sets, 0),
-        titles: sessions.map((s) => s.title),
-        minutes: sessions.reduce((n, s) => n + (s.minutes ?? 0), 0),
+        sets: info?.sets ?? 0,
+        titles: info?.titles ?? [],
+        minutes: info?.minutes ?? 0,
       };
     });
     const first = cells.find((c) => parts(c.day).d === 1);

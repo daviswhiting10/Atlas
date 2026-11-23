@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CalendarSession } from "./calendar";
-import { gridDay, latestTrained, levelOf, PHONE_WEEKS, quartileSteps, readout, YEAR_WEEKS, yearGrid } from "./year-grid";
+import { gridDay, heatDays, latestTrained, levelOf, PHONE_WEEKS, quartileSteps, readout, YEAR_WEEKS, yearGrid } from "./year-grid";
 
 const s = (title: string, sets: number, minutes: number | null = null): CalendarSession => ({ id: title + sets, title, sets, minutes, record: false, href: null });
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
@@ -11,23 +11,23 @@ const TODAY = "2026-11-21";
 describe("quartileSteps: the athlete's own steps, from sets in a day", () => {
   it("is the 25th, 50th and 75th percentile (nearest rank) of every training day", () => {
     const byDay = Object.fromEntries([4, 8, 12, 16, 20, 24, 28, 32].map((n, i) => [`2026-10-0${i + 1}`, [s("A", n)]]));
-    expect(quartileSteps(byDay)).toEqual([8, 16, 24]);
+    expect(quartileSteps(heatDays(byDay))).toEqual([8, 16, 24]);
   });
   it("adds a day's sessions together", () => {
-    expect(quartileSteps({ "2026-10-01": [s("A", 10), s("B", 6)] })).toEqual([16, 16, 16]);
+    expect(quartileSteps(heatDays({ "2026-10-01": [s("A", 10), s("B", 6)] }))).toEqual([16, 16, 16]);
   });
-  it("has nothing without training days", () => expect(quartileSteps({})).toBeNull());
+  it("has nothing without training days", () => expect(quartileSteps(heatDays({}))).toBeNull());
   it("steps are 1 to 4, split at the quartiles", () => {
     const t: [number, number, number] = [8, 16, 24];
     expect([4, 8, 9, 16, 17, 24, 25].map((n) => levelOf(n, t))).toEqual([1, 1, 2, 2, 3, 3, 4]);
   });
   it("a light month still shows contrast: the steps come from the person's own spread, not a fixed number of sets", () => {
     const light = Object.fromEntries([3, 4, 5, 6].map((n, i) => [`2026-11-0${i + 1}`, [s("A", n)]]));
-    const levels = Object.values(light).map((d) => levelOf(d[0].sets, quartileSteps(light)));
+    const levels = Object.values(light).map((d) => levelOf(d[0].sets, quartileSteps(heatDays(light))));
     expect(new Set(levels).size).toBe(4);
   });
   it("a session with no sets logged is a training day at the lowest step", () => {
-    const g = yearGrid({ "2026-11-17": [s("Walk", 0, 30)], "2026-11-18": [s("Upper", 20)] }, { today: TODAY, weeks: 2 });
+    const g = yearGrid(heatDays({ "2026-11-17": [s("Walk", 0, 30)], "2026-11-18": [s("Upper", 20)] }), { today: TODAY, weeks: 2 });
     const cell = (d: string) => g.columns.flatMap((c) => c.cells).find((c) => c.day === d)!;
     expect(cell("2026-11-17").level).toBe(1);
     expect(cell("2026-11-18").level).toBeGreaterThan(1);
@@ -35,7 +35,7 @@ describe("quartileSteps: the athlete's own steps, from sets in a day", () => {
 });
 
 describe("yearGrid: weeks as columns, seven rows, Monday first", () => {
-  const g = yearGrid({}, { today: TODAY });
+  const g = yearGrid(heatDays({}), { today: TODAY });
   it("has a year of columns of seven days, oldest first, ending on the week of today", () => {
     expect(g.columns).toHaveLength(YEAR_WEEKS);
     expect(g.columns.every((c) => c.cells.length === 7)).toBe(true);
@@ -44,7 +44,7 @@ describe("yearGrid: weeks as columns, seven rows, Monday first", () => {
     expect(g.columns[0].monday < g.columns[1].monday).toBe(true);
   });
   it("marks the days after today as future, and never colours them", () => {
-    const withFuture = yearGrid({ "2026-11-22": [s("Oops", 9)] }, { today: TODAY });
+    const withFuture = yearGrid(heatDays({ "2026-11-22": [s("Oops", 9)] }), { today: TODAY });
     const sun = withFuture.columns.at(-1)!.cells[6];
     expect(sun).toMatchObject({ day: "2026-11-22", future: true, level: 0 });
     expect(withFuture.columns.at(-1)!.cells[5].future).toBe(false);
@@ -57,7 +57,7 @@ describe("yearGrid: weeks as columns, seven rows, Monday first", () => {
     expect(nov?.cells.map((x) => x.day)).toContain("2026-11-01");
   });
   it("a phone shows the last 26 of the columns, right-aligned to today", () => {
-    const phone = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS });
+    const phone = yearGrid(heatDays({}), { today: TODAY, weeks: PHONE_WEEKS });
     expect(phone.columns).toHaveLength(26);
     expect(phone.columns.at(-1)!.monday).toBe(g.columns.at(-1)!.monday);
     expect(phone.columns[0].monday).toBe(g.columns[YEAR_WEEKS - PHONE_WEEKS].monday);
@@ -66,7 +66,7 @@ describe("yearGrid: weeks as columns, seven rows, Monday first", () => {
 
 describe("the one-line readout", () => {
   const byDay = { "2026-11-11": [s("Lower A", 14, 50)], "2026-11-12": [s("Walk", 0, 30)], "2026-11-13": [s("Upper", 10), s("Core", 4)] };
-  const g = yearGrid(byDay, { today: TODAY });
+  const g = yearGrid(heatDays(byDay), { today: TODAY });
   const cell = (d: string) => g.columns.flatMap((c) => c.cells).find((c) => c.day === d)!;
   it("day, workout, sets", () => expect(readout(cell("2026-11-11"))).toBe("Wed Nov 11 · Lower A · 14 sets"));
   it("minutes when no sets were logged", () => expect(readout(cell("2026-11-12"))).toBe("Thu Nov 12 · Walk · 30 min"));
