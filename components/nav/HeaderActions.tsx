@@ -77,7 +77,7 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
   /** Each action once, shown where the list says: every size, desktop only, or phone only. */
   const where = { both: "", desktop: "hidden md:flex", phone: "md:hidden" } as const;
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <div className="ml-auto flex shrink-0 items-center gap-1">
       {headerSlots({ side, demo, isCoach }).map(({ action, where: w }) => (
         <div key={action} className={cn("flex items-center", where[w])}>
           {render(action)}
