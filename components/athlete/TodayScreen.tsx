@@ -25,6 +25,7 @@ export function TodayScreen({
   goal,
   report,
   nutrition,
+  progress,
   base = "",
 }: {
   athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe" | "prefs">;
@@ -35,6 +36,8 @@ export function TodayScreen({
   report?: ReactNode;
   /** The Nutrition row (only passed while the NUTRITION flag is on). */
   nutrition?: ReactNode;
+  /** Home's top section (strength curve and heatmap), under the greeting. */
+  progress?: ReactNode;
   /** Prefix for this screen's links ("/demo" keeps the demo inside /demo). */
   base?: string;
 }) {
@@ -49,6 +52,12 @@ export function TodayScreen({
 
   return (
     <div className="space-y-14 pt-4">
+      {/* Home: your progress first. The greeting is instant; the curve and heatmap stream in under it. */}
+      <header className="rise -mb-6">
+        <h1 className="text-[52px] font-semibold leading-none tracking-[-0.045em] text-ink [overflow-wrap:anywhere]">{athlete.firstName}</h1>
+      </header>
+      {progress}
+
       {!plan && athlete.selfServe && <PendingPlan />}
 
       {athlete.isGuest && !athlete.isDemo && (
@@ -63,7 +72,7 @@ export function TodayScreen({
             Week {next.week}
             {lighterWeek ? " · Lighter week" : ""}
           </p>
-          <h1 className="mt-3 text-[52px] font-semibold leading-none tracking-[-0.04em] text-ink [overflow-wrap:anywhere]">{next.name}</h1>
+          <h2 className="mt-3 text-[40px] font-semibold leading-none tracking-[-0.04em] text-ink [overflow-wrap:anywhere]">{next.name}</h2>
           <p className="mt-3 text-[15px] text-ink-mute">
             {next.exercises.length} exercises · {next.estMinutes} min
           </p>
@@ -80,7 +89,7 @@ export function TodayScreen({
       {plan && !next && (
         <section className="rise">
           <p className={label}>Plan</p>
-          <h1 className="mt-3 text-[44px] font-semibold leading-none tracking-[-0.04em] text-ink">Complete.</h1>
+          <h2 className="mt-3 text-[44px] font-semibold leading-none tracking-[-0.04em] text-ink">Complete.</h2>
           {athlete.selfServe && (
             <Link href={`${base}/you?goals=1`} className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text sm:max-w-sm">
               Build the next one
