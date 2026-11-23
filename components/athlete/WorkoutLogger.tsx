@@ -120,7 +120,18 @@ function Stepper({
 
 // ── Logger ──────────────────────────────────────────────────────────────────
 
-export function WorkoutLogger({ data }: { data: LoggerData }) {
+/** The saves the logger makes. Real ones by default; the demo (lib/demo/actions) passes stand-ins that keep everything in memory. */
+export type LoggerActions = {
+  saveSet: typeof saveSet;
+  finishWorkout: typeof finishWorkout;
+  planAddExercise: typeof planAddExercise;
+  planRemoveExercise: typeof planRemoveExercise;
+  planSetTargets: typeof planSetTargets;
+  planSwapExercise: typeof planSwapExercise;
+};
+const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise };
+
+export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { data: LoggerData; /** The saves; the demo passes in-memory stand-ins. */ actions?: LoggerActions; /** Prefix for links ("/demo"). */ base?: string }) {
   const router = useRouter();
   const [sets, setSetsState] = useState<SetMap>(() => Object.fromEntries(data.exercises.map((e) => [e.aweId, e.sets])));
   const setsRef = useRef(sets);
@@ -280,7 +291,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const offline = usePendingExercises(data.id, async (op, exercise) => {
     if (data.exercises.some((e) => e.exerciseId === exercise.id)) return true; // already in: an earlier send got through
     await queue.current;
-    const res = op.target.mode === "swap" ? await planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await planAddExercise({ workoutId: data.id, exerciseId: exercise.id });
+    const res = op.target.mode === "swap" ? await actions.planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await actions.planAddExercise({ workoutId: data.id, exerciseId: exercise.id });
     if (!res.ok) {
       toast.error(res.error);
       return false;
@@ -333,7 +344,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         const s = setsRef.current[aweId]?.find((x) => x.setNumber === setNumber);
         if (!s || (!s.done && !s.setLogId)) return;
         try {
-          const res = await saveSet({
+          const res = await actions.saveSet({
             assignedWorkoutId: data.id,
             aweId,
             setNumber,
@@ -379,7 +390,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         }
       });
     },
-    [apply, data.id, clearStuck, markUnsaved]
+    [apply, data.id, clearStuck, markUnsaved, actions]
   );
 
   const deloadWeek = data.deloadWeek;
@@ -686,7 +697,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         // Everything logged, or finished early with at least one set logged.
         if (!data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done))) return;
         const res = await sendFinish({
-          send: (m) => finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : m }),
+          send: (m) => actions.finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : m }),
           storage: store(),
           workoutId: data.id,
           minutes: Math.max(1, Math.round((Date.now() - startedAt.current) / 60000)),
@@ -803,7 +814,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         )}
 
         <div className="mt-auto pt-10">
-          <Link href="/today" className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
+          <Link href={`${base}/today`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
             Back to Today
           </Link>
         </div>
@@ -817,7 +828,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 -mx-4 border-b border-line bg-bone/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-8 sm:px-8 md:top-16">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => router.push("/today")} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+          <button type="button" onClick={() => router.push(`${base}/today`)} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
@@ -942,7 +953,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                             disabled={busy}
                             onClick={() => {
                               setConfirmRemove(null);
-                              change(() => planRemoveExercise({ aweId: ex.aweId, workoutId: data.id }), `${ex.name} removed`);
+                              change(() => actions.planRemoveExercise({ aweId: ex.aweId, workoutId: data.id }), `${ex.name} removed`);
                             }}
                             className="press min-h-11 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text"
                           >
@@ -963,7 +974,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                             onCancel={() => setEditingTarget(null)}
                             onSave={async (values) => {
                               setEditingTarget(null);
-                              change(() => planSetTargets({ aweId: ex.aweId, workoutId: data.id, ...values }), "Target updated for this session");
+                              change(() => actions.planSetTargets({ aweId: ex.aweId, workoutId: data.id, ...values }), "Target updated for this session");
                             }}
                           />
                         </div>
@@ -1087,13 +1098,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             setPicker(null);
             if (at.mode === "add") {
               change(async () => {
-                const res = await planAddExercise({ workoutId: data.id, exerciseId: chosen.id });
+                const res = await actions.planAddExercise({ workoutId: data.id, exerciseId: chosen.id });
                 if (res.ok) jumpTo.current = res.aweId;
                 return res;
               }, `${chosen.name} added`);
             } else {
               swapped.current.add(at.aweId);
-              change(() => planSwapExercise({ aweId: at.aweId, workoutId: data.id, exerciseId: chosen.id }), `Swapped for ${chosen.name}`);
+              change(() => actions.planSwapExercise({ aweId: at.aweId, workoutId: data.id, exerciseId: chosen.id }), `Swapped for ${chosen.name}`);
             }
           }}
         />
@@ -1156,7 +1167,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 return (
                   <li key={w.id}>
                     <Link
-                      href={`/workouts/${w.id}`}
+                      href={`${base}/workouts/${w.id}`}
                       onClick={() => setSwitching(false)}
                       aria-current={here ? "page" : undefined}
                       className={cn("press flex items-center gap-3 rounded-2xl border bg-paper p-3.5", here ? "border-ink" : "border-line hover:border-ink/20")}
@@ -1173,7 +1184,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 );
               })}
             </ul>
-            <Link href="/plan" className="press mt-3 flex h-12 items-center justify-center rounded-2xl text-sm font-semibold text-signal hover:bg-signal/5">
+            <Link href={`${base}/plan`} className="press mt-3 flex h-12 items-center justify-center rounded-2xl text-sm font-semibold text-signal hover:bg-signal/5">
               See the full plan
             </Link>
           </div>
