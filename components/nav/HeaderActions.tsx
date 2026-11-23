@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut, MoreHorizontal, PlayCircle, Scale, Settings } from "lucide-react";
+import { LogOut, MoreHorizontal, PlayCircle, Scale, Settings, Target } from "lucide-react";
 import { BodyWeightSheet } from "@/components/athlete/BodyWeightSheet";
 import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
@@ -19,7 +19,7 @@ const ICON = "press flex h-11 w-11 items-center justify-center rounded-full text
  * The header's right side, for both sides of the app (one component, not a copy in each header).
  * What shows where is decided by lib/header-actions.
  */
-export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boolean; isCoach: boolean }) {
+export function HeaderActions({ side, demo, isCoach, changeGoals = false }: { side: Side; demo: boolean; isCoach: boolean; /** A self-serve athlete on the Plan tab: the ⋯ also offers Change goals. */ changeGoals?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [weighIn, setWeighIn] = useState(false);
@@ -49,6 +49,11 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
               <MoreHorizontal className="h-5 w-5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[200px]">
+              {changeGoals && pathname.startsWith("/plan") && (
+                <DropdownMenuItem className="min-h-11" onClick={() => router.push("/you?goals=1")}>
+                  <Target className="mr-2 h-4 w-4" /> Change goals
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="min-h-11" onClick={() => setWeighIn(true)}>
                 <Scale className="mr-2 h-4 w-4" /> Add body weight
               </DropdownMenuItem>
