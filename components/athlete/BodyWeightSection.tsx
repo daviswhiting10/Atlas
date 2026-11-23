@@ -22,9 +22,17 @@ export function BodyWeightSection({ points }: { points: BodyWeightPoint[] }) {
         <span className="text-[15px] font-medium text-ink-mute">lb · {points.length > 1 ? change : format(parseISO(s.latest.day), "MMM d")}</span>
       </p>
       {points.length > 1 && (
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 h-[120px] w-full max-w-xl" role="img" aria-label={`Body weight from ${s.first.lb} to ${s.latest.lb} lb`}>
-          <polyline points={line} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" className="text-signal" />
-          {points.length <= 60 && points.map((p) => <circle key={p.day} cx={x(p)} cy={y(p.lb)} r={2.5} className="fill-signal" />)}
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 h-[120px] w-full max-w-xl overflow-visible text-signal" role="img" aria-label={`Body weight from ${s.first.lb} to ${s.latest.lb} lb`}>
+          <defs>
+            <linearGradient id="bodyweight-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="currentColor" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {/* The same treatment as the strength curve: a soft fill under the line, and a dot on the latest weigh-in only. */}
+          <polygon points={`${x(points[0]).toFixed(1)},${H} ${line} ${x(points[points.length - 1]).toFixed(1)},${H}`} fill="url(#bodyweight-fill)" />
+          <polyline points={line} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={x(points[points.length - 1])} cy={y(points[points.length - 1].lb)} r={4.5} fill="currentColor" />
         </svg>
       )}
       <p className="mt-2 text-[13px] text-ink-mute">Add a weigh-in from the ⋯ menu at the top.</p>
