@@ -6,6 +6,7 @@ import { isCoached } from "@/lib/athlete/coached";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
 import { PasswordPanel, SaveAccountPanel } from "@/components/athlete/account";
 import { OwnProgramPicker, type LibraryProgram } from "@/components/athlete/OwnProgramPicker";
+import { YouTabs } from "@/components/nutrition/YouTabs";
 
 /**
  * The You screen, from plain data. Just the person, their account, and the two things they
@@ -18,6 +19,7 @@ export function YouScreen({
   programs,
   goalsOpen,
   canStartGoal,
+  nutrition = false,
 }: {
   athlete: Pick<Athlete, "name" | "prefs" | "selfServe" | "isDemo" | "isGuest" | "isCoach">;
   account: { email: string | null; passwordHash: string | null } | null;
@@ -27,10 +29,17 @@ export function YouScreen({
   goalsOpen: boolean;
   /** No goal is running: starting one (75 Hard) is here, not on Today. */
   canStartGoal: boolean;
+  /** The NUTRITION flag is on: a Profile | Nutrition switch at the top. */
+  nutrition?: boolean;
 }) {
   return (
     <div className="rise">
       <h1 className="truncate text-3xl leading-none text-ink sm:text-4xl">{athlete.name}</h1>
+      {nutrition && (
+        <div className="mt-6">
+          <YouTabs active="profile" />
+        </div>
+      )}
 
       {/* How it works and Start a goal describe the self-serve flow: a coached client's plan comes from her coach. */}
       {!isCoached(athlete) && <HowItWorks className="mt-8" />}
