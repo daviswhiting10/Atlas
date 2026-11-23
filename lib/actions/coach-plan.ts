@@ -9,6 +9,7 @@
  * client's live plan until the coach assigns it.
  */
 
+import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { TARGET_LIMIT_MESSAGE } from "@/lib/sessions/duration";
@@ -85,7 +86,7 @@ const Targets = z.object({
   repMin: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   repMax: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
-});
+}).merge(CardioTarget);
 
 export async function coachAddWorkout(clientId: string, assignmentId: string, raw: { week: number; name: string; copyFromWorkoutId?: string }) {
   return run(async () => {

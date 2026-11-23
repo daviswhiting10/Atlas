@@ -45,7 +45,7 @@ const planWhere = (scope: PlanScope): Prisma.ProgramAssignmentWhereInput => ({
   ...(scope.assignmentId ? { id: scope.assignmentId, status: { in: ["ACTIVE", "PAUSED"] } } : { status: "ACTIVE" }),
 });
 
-type SetShape = { setNumber: number; weight: number | null; unit?: "reps" | "secs"; repMin: number; repMax: number; rpe: number | null; restSeconds: number | null };
+type SetShape = { setNumber: number; weight: number | null; unit?: "reps" | "secs"; repMin: number; repMax: number; rpe: number | null; restSeconds: number | null; /** A cardio exercise's target distance, in metres. */ distanceM?: number | null };
 
 const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
   const v = Math.round(Number(n));
@@ -94,7 +94,14 @@ async function resolveExercise(scope: PlanScope, ref: { slug?: string; exerciseI
   throw invalid("Say which exercise.");
 }
 
-export type TargetInput = { sets?: number; repMin?: number; repMax?: number; weight?: number | null; restSeconds?: number };
+export type TargetInput = { sets?: number; repMin?: number; repMax?: number; weight?: number | null; restSeconds?: number; mode?: "STRENGTH" | "CARDIO"; activity?: "RUN" | "WALK" | "OTHER"; distanceM?: number | null; minutes?: number };
+
+/** A cardio exercise is one entry: its target time in seconds (when the plan names one) and its target distance. No weight. */
+export function buildCardioSets(input: TargetInput): SetShape[] {
+  const seconds = input.minutes ? clampInt(input.minutes * 60, 60, LIMITS.seconds, 1800) : 1800;
+  const distanceM = input.distanceM != null && Number.isFinite(input.distanceM) && input.distanceM > 0 ? Math.round(input.distanceM) : null;
+  return [{ setNumber: 1, weight: null, unit: "secs", repMin: seconds, repMax: seconds, rpe: null, restSeconds: null, distanceM }];
+}
 
 function buildSets(input: TargetInput, unit: "reps" | "secs", previous?: SetShape[]): SetShape[] {
   const before = previous?.[0];
@@ -211,8 +218,10 @@ export async function addExercise(
       assignedWorkoutId: w.id,
       exerciseId: exercise.id,
       order: existing.reduce((m, e) => Math.max(m, e.order), 0) + 1,
-      prescribedSets: buildSets(input, exercise.unit),
+      prescribedSets: input.mode === "CARDIO" ? buildCardioSets(input) : buildSets(input, exercise.unit),
       section: "accessory",
+      mode: input.mode === "CARDIO" ? "CARDIO" : "STRENGTH",
+      activity: input.mode === "CARDIO" ? (input.activity ?? "OTHER") : null,
     },
     select: { id: true },
   });

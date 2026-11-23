@@ -1,5 +1,6 @@
 "use server";
 
+import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -309,7 +310,7 @@ const Targets = z.object({
   repMin: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   repMax: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
-});
+}).merge(CardioTarget);
 
 export async function planAddWorkout(raw: { week: number; name: string; copyFromWorkoutId?: string }) {
   const input = z.object({ week: z.number().int().min(1).max(52), name: z.string().max(200), copyFromWorkoutId: Ref.optional() }).parse(raw);
