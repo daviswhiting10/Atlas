@@ -3,8 +3,9 @@
  * headers can't drift apart: the same actions, in the same order, with the same targets.
  *
  * Desktop (md and up): the demo chip, Settings, Sign out, then the Coach | Me toggle, on both sides.
- * Phone: the bottom bar's More already holds Settings and Sign out on the coach side, so the coach side adds nothing;
- * the Me side has no More, so it gets one Account menu (Settings, Sign out): two taps from any Me screen.
+ * Phone: the bottom bar's More already holds Settings and Sign out on the coach side, so the coach side adds nothing.
+ * The Me side has one ⋯ menu for every athlete, on every size: Add body weight and Demo; on a coach's phone also
+ * Settings and Sign out (the Me side has no More).
  *
  * Pure: no I/O.
  */
@@ -20,10 +21,11 @@ export type HeaderActions = { desktop: HeaderAction[]; phone: HeaderAction[] };
  */
 export function headerActions({ side, demo, isCoach }: { side: Side; demo: boolean; isCoach: boolean }): HeaderActions {
   const chip: HeaderAction[] = demo ? ["demo"] : [];
-  if (!isCoach) return { desktop: chip, phone: chip };
+  const account: HeaderAction[] = side === "me" ? ["account"] : [];
+  if (!isCoach) return { desktop: [...chip, ...account], phone: [...chip, ...account] };
   return {
-    desktop: [...chip, "settings", "signout", "mode"],
-    phone: [...chip, ...(side === "me" ? (["account"] as HeaderAction[]) : []), "mode"],
+    desktop: [...chip, "settings", "signout", ...account, "mode"],
+    phone: [...chip, ...account, "mode"],
   };
 }
 

@@ -31,6 +31,7 @@ import {
   swapExercise,
   type PlanScope,
 } from "@/lib/plan/edit";
+import { MAX_WEEK_NOTE, readWeekNotes, setWeekNote } from "@/lib/plan/week-notes";
 import { inviteClient, notInvited } from "@/lib/clients/invite";
 
 export type CoachResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string };
@@ -153,6 +154,23 @@ export async function coachSetWorkoutNote(clientId: string, assignmentId: string
 export async function coachSetPlanNote(clientId: string, assignmentId: string, text: string) {
   return run(async () => {
     await setPlanNote(await scopeFor(clientId, assignmentId), z.string().max(LIMITS.note * 2).parse(text));
+    refresh(clientId, assignmentId);
+  });
+}
+
+/** Pin a note to one week of a client's plan, signed with the coach's name; empty text clears it. */
+export async function coachSetWeekNote(clientId: string, assignmentId: string, raw: { week: number; title?: string; text: string }) {
+  return run(async () => {
+    const input = z.object({ week: z.number().int().min(1).max(52), title: z.string().max(80).optional(), text: z.string().max(MAX_WEEK_NOTE) }).parse(raw);
+    const scope = await scopeFor(clientId, assignmentId);
+    const { userId } = await requireCoach();
+    const [plan, coach] = await Promise.all([
+      prisma.programAssignment.findFirstOrThrow({ where: { id: assignmentId, clientId: scope.clientId, workspaceId: scope.workspaceId }, select: { weekNotes: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    ]);
+    const by = coach?.name?.trim() ? `Coach ${coach.name.trim().split(" ")[0]}` : undefined;
+    const notes = setWeekNote(readWeekNotes(plan.weekNotes), input.week, input.text, { title: input.title?.trim() || undefined, by });
+    await prisma.programAssignment.update({ where: { id: assignmentId }, data: { weekNotes: notes } });
     refresh(clientId, assignmentId);
   });
 }

@@ -13,12 +13,14 @@ import {
   coachRemoveExercise,
   coachRemoveWorkout,
   coachSetLighterWeeks,
+  coachSetWeekNote,
   coachSetPlanNote,
   coachSetTargets,
   coachSetWorkoutNote,
   coachSwapExercise,
 } from "@/lib/actions/coach-plan";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
+import { WeekNotesEditor } from "@/components/coach/WeekNotesEditor";
 import { AssignPanel } from "@/components/coach/AssignPanel";
 
 export const metadata: Metadata = { title: "Plan" };
@@ -96,6 +98,14 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
       </div>
 
       <div className={draft ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10" : "max-w-3xl"}>
+        <div className="min-w-0 space-y-6">
+        <WeekNotesEditor
+          notes={plan.weekNotes}
+          totalWeeks={plan.totalWeeks}
+          currentWeek={plan.currentWeek}
+          firstName={firstName}
+          save={coachSetWeekNote.bind(null, client.id, plan.id)}
+        />
         <PlanView
           plan={plan}
           actions={actions}
@@ -103,6 +113,7 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
           startLabel="Log this workout"
           noteLabel={`Coaching notes · ${firstName} sees these`}
         />
+        </div>
 
         {draft && (
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">

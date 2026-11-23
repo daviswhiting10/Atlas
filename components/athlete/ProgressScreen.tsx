@@ -6,16 +6,35 @@ import { sessionSummary } from "@/lib/actions/athlete";
 import { EmptyStart } from "@/components/athlete/EmptyStart";
 import { HistoryCalendar } from "@/components/athlete/HistoryCalendar";
 import type { HistoryCalendar as Calendar } from "@/lib/history/calendar";
+import { BodyWeightSection } from "@/components/athlete/BodyWeightSection";
+import type { BodyWeightPoint } from "@/lib/athlete/body-weight";
 
 export type ChapterRow = { id: string; name: string; startDay: string; endedAt: Date | null; chapter: unknown };
 
 /** The Progress screen, from plain data: the sections (Strength, History, Records), then finished goals (chapters). */
-export function ProgressScreen({ athlete, data, calendar, chapters }: { athlete: Pick<Athlete, "metric" | "hasHistory">; data: ProgressData; calendar: Calendar; chapters: ChapterRow[] }) {
+export function ProgressScreen({
+  athlete,
+  data,
+  calendar,
+  chapters,
+  bodyWeight = [],
+  summary = sessionSummary,
+}: {
+  athlete: Pick<Athlete, "metric" | "hasHistory">;
+  data: ProgressData;
+  calendar: Calendar;
+  chapters: ChapterRow[];
+  /** Body weight, one point a day (the Me ⋯ menu's "Add body weight"). */
+  bodyWeight?: BodyWeightPoint[];
+  /** What a tapped day in History shows (the demo passes its own: it never calls the server). */
+  summary?: typeof sessionSummary;
+}) {
   // Never blank: with nothing finished yet there is the one line and the one action.
-  if (!athlete.hasHistory && calendar.kind === "empty" && data.totals.sessions === 0 && chapters.length === 0) return <div className="pt-4"><EmptyStart /></div>;
+  if (!athlete.hasHistory && calendar.kind === "empty" && data.totals.sessions === 0 && chapters.length === 0 && bodyWeight.length === 0) return <div className="pt-4"><EmptyStart /></div>;
   return (
     <div className="pt-4">
-      <ProgressView data={data} goalMetric={athlete.metric} history={<HistoryCalendar calendar={calendar} summary={sessionSummary} />} />
+      <ProgressView data={data} goalMetric={athlete.metric} history={<HistoryCalendar calendar={calendar} summary={summary} />} />
+      <BodyWeightSection points={bodyWeight} />
       {chapters.length > 0 && (
         <section className="mt-14">
           <h2 className="mb-3 flex min-h-11 items-center text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">Chapters</h2>

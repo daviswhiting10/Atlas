@@ -13,7 +13,7 @@ const plan = (workouts: WorkoutSummary[]): PlanOverview => {
   const nextUp = workouts.find((w) => w.status === "PLANNED") ?? null;
   return {
     id: "p", name: "Build muscle", status: "ACTIVE", startDate: "2026-11-16", totalWeeks: 12, currentWeek: nextUp?.week ?? 12,
-    generated: true, lighterWeeks: true, prefs: null, goalText: null, note: null,
+    generated: true, lighterWeeks: true, prefs: null, goalText: null, note: null, weekNotes: [],
     blocks: [{ name: "Foundation", weeks: 4, focus: "" }, { name: "Build", weeks: 4, focus: "" }, { name: "Peak", weeks: 4, focus: "" }],
     rationale: [], workouts, nextUp, done: workouts.filter((w) => w.status === "LOGGED").length, rx: {},
   };

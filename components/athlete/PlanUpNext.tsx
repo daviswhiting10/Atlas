@@ -4,7 +4,7 @@ import type { UpNextView } from "@/lib/plan/up-next";
 import { cn } from "@/lib/utils";
 
 /** The Plan tab's first screen: up next with its exercises and Start, then the rest of this week as rows. */
-export function PlanUpNext({ view, totalWeeks, canEdit }: { view: UpNextView; totalWeeks: number; canEdit: boolean }) {
+export function PlanUpNext({ view, totalWeeks, canEdit, base = "" }: { view: UpNextView; totalWeeks: number; canEdit: boolean; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
   const { next } = view;
   return (
     <div className="max-w-xl">
@@ -25,7 +25,7 @@ export function PlanUpNext({ view, totalWeeks, canEdit }: { view: UpNextView; to
             ))}
             {next.more > 0 && <li className="border-t border-line py-2 text-[14px] text-ink-soft">+ {next.more} more</li>}
           </ul>
-          <Link href={`/workouts/${next.id}`} className="press flex h-[52px] w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
+          <Link href={`${base}/workouts/${next.id}`} className="press flex h-[52px] w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
             Start
           </Link>
         </section>
@@ -41,7 +41,7 @@ export function PlanUpNext({ view, totalWeeks, canEdit }: { view: UpNextView; to
           <ul className="overflow-hidden rounded-2xl border border-line bg-paper">
             {view.rows.map((r) => (
               <li key={r.id} className="border-t border-line first:border-t-0">
-                <Link href={`/workouts/${r.id}`} className="press flex min-h-16 items-center gap-3 px-4 py-3.5">
+                <Link href={`${base}/workouts/${r.id}`} className="press flex min-h-16 items-center gap-3 px-4 py-3.5">
                   <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px]", r.done ? "bg-signal text-dusk-button-text" : "bg-ink/10 text-ink")}>
                     {r.done ? <Check className="h-4 w-4" aria-label="Done" /> : r.dot}
                   </span>
@@ -57,11 +57,11 @@ export function PlanUpNext({ view, totalWeeks, canEdit }: { view: UpNextView; to
       )}
 
       <div className="mt-1.5 flex items-center justify-between">
-        <Link href="/plan?view=all" className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
+        <Link href={`${base}/plan?view=all`} className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
           All {totalWeeks} weeks
         </Link>
         {canEdit && (
-          <Link href="/plan?view=edit" className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
+          <Link href={`${base}/plan?view=edit`} className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
             Edit plan
           </Link>
         )}
