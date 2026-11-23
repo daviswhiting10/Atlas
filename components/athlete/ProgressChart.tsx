@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo } from "react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { format, parseISO } from "date-fns";
 import type { FocusMetric } from "@/lib/plan/generator";
+import { durationLabel } from "@/lib/sessions/duration";
 import { chartKind, formatValue, recordLabel, targetValue, unitFor, type SessionPoint, type Target } from "@/lib/plan/overload";
 
 type Row = {
@@ -43,7 +44,13 @@ function ChartTooltip({
     <div className="rounded-lg border border-line bg-paper px-3 py-2 shadow-md">
       <p className="text-[11px] text-ink-mute">{row.ghost ? "Next target" : row.date ? format(parseISO(row.date), "EEE, MMM d") : ""}</p>
       <p className="text-sm font-semibold text-ink">
-        {formatValue(v, metric)} <span className="font-normal text-ink-mute">{unit}</span>
+        {timed && metric === "reps" ? (
+          durationLabel(v)
+        ) : (
+          <>
+            {formatValue(v, metric)} <span className="font-normal text-ink-mute">{unit}</span>
+          </>
+        )}
       </p>
       {row.record && <p className="text-[11px] font-medium text-gold">{recordLabel(timed)}</p>}
       {row.best && <p className="text-[11px] font-medium text-signal">Best estimated 1RM yet</p>}

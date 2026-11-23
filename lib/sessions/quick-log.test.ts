@@ -68,7 +68,7 @@ describe("last time", () => {
   it("describes it the way a coach writes it", () => {
     expect(describeLast({ date: "2026-11-06", unit: "reps", sets: [s(10, 45), s(10, 45), s(10, 45)] })).toBe("3 × 10 @ 45 lb");
     expect(describeLast({ date: "2026-11-06", unit: "reps", sets: [s(10, 40), s(8, 45), s(6, 50)] })).toBe("10, 8, 6 @ 40–50 lb");
-    expect(describeLast({ date: "2026-11-06", unit: "secs", sets: [s(45), s(45), s(45)] })).toBe("3 × 45 s");
+    expect(describeLast({ date: "2026-11-06", unit: "secs", sets: [s(45), s(45), s(45)] })).toBe("3 × 45 sec");
     expect(describeLast({ date: "2026-11-06", unit: "reps", sets: [s(12, null, "blue"), s(12, null, "blue")] })).toBe("2 × 12 · blue band");
     expect(describeLast({ date: "2026-11-06", unit: "reps", sets: [s(15), s(12)] })).toBe("15, 12");
   });
@@ -82,7 +82,7 @@ describe("last time", () => {
   it("sums up an exercise being logged in the same words, counting only sets with reps", () => {
     expect(describeLogged([s(10, 135), s(10, 135), s(10, 135)], "reps")).toBe("3 × 10 @ 135 lb");
     expect(describeLogged([s(10, 135), s(null, 135), s(0, 135)], "reps")).toBe("1 × 10 @ 135 lb");
-    expect(describeLogged([s(30), s(30)], "secs")).toBe("2 × 30 s");
+    expect(describeLogged([s(30), s(30)], "secs")).toBe("2 × 30 sec");
     expect(describeLogged([s(null), s(null)], "reps")).toBe("");
   });
 });

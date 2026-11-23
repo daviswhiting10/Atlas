@@ -24,6 +24,8 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
 import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
+import { DurationStepper } from "@/components/athlete/DurationStepper";
+import { durationRange, formatClock } from "@/lib/sessions/duration";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish, unloggedText } from "@/lib/sessions/finish";
@@ -423,7 +425,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     };
     const mine = { weight: ex.loaded ? s.weight : null, reps: s.reps ?? 0 };
     if (ex.history.length === 0 || deloadWeek || !isRecord(mine, best)) return null;
-    return mine.weight != null ? `${mine.weight} lb` : `${mine.reps} ${ex.unit === "secs" ? "sec" : "reps"}`;
+    return mine.weight != null ? `${mine.weight} lb` : ex.unit === "secs" ? formatClock(mine.reps) : `${mine.reps} reps`;
   }
 
   /**
@@ -907,7 +909,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                         <div className="min-w-0 flex-1">
                           <ExerciseName as="h3" name={labelled(label, ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
                           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">
-                            {list.length} × {ex.repMin === ex.repMax ? ex.repMax : `${ex.repMin}–${ex.repMax}`} {unit}
+                            {list.length} × {timed ? durationRange(ex.repMin, ex.repMax) : `${ex.repMin === ex.repMax ? ex.repMax : `${ex.repMin}–${ex.repMax}`} ${unit}`}
                           </p>
                           {/* Only a first time (nothing to go on) gets a word of guidance; a hold is timed, so it never asks for "N reps". */}
                           {ex.target.kind === "first" && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
@@ -956,6 +958,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                           <TargetEditor
                             initial={{ sets: list.length, repMin: ex.repMin, repMax: ex.repMax, weight: ex.target.kind === "custom" ? ex.target.weight : null }}
                             unit={ex.unit}
+                            bare={ex.timedKind === "steady" ? "min" : "sec"}
                             loaded={ex.loaded}
                             onCancel={() => setEditingTarget(null)}
                             onSave={async (values) => {
@@ -974,15 +977,11 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
                                 <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
                                 {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
-                                <Stepper
-                                  value={s.reps}
-                                  step={timed ? 5 : 1}
-                                  unit={unit}
-                                  label={`Set ${s.setNumber} ${timed ? "seconds" : "reps"}`}
-                                  dim={s.done}
-                                  settled={settled}
-                                  onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })}
-                                />
+                                {timed ? (
+                                  <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
+                                ) : (
+                                  <Stepper value={s.reps} step={1} unit={unit} label={`Set ${s.setNumber} reps`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => toggle(ex, i)}
