@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, MoreHorizontal, Settings } from "lucide-react";
+import { useState } from "react";
+import { LogOut, MoreHorizontal, PlayCircle, Scale, Settings } from "lucide-react";
+import { BodyWeightSheet } from "@/components/athlete/BodyWeightSheet";
 import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -20,6 +22,7 @@ const ICON = "press flex h-11 w-11 items-center justify-center rounded-full text
 export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boolean; isCoach: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [weighIn, setWeighIn] = useState(false);
 
   const render = (a: HeaderAction) => {
     switch (a) {
@@ -45,13 +48,26 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
             <DropdownMenuTrigger aria-label="Account" className={ICON}>
               <MoreHorizontal className="h-5 w-5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[180px]">
-              <DropdownMenuItem className="min-h-11" onClick={() => router.push("/settings")}>
-                <Settings className="mr-2 h-4 w-4" /> Settings
+            <DropdownMenuContent align="end" className="min-w-[200px]">
+              <DropdownMenuItem className="min-h-11" onClick={() => setWeighIn(true)}>
+                <Scale className="mr-2 h-4 w-4" /> Add body weight
               </DropdownMenuItem>
-              <DropdownMenuItem className="min-h-11" onClick={() => void signOutToLogin()}>
-                <LogOut className="mr-2 h-4 w-4" /> Sign out
-              </DropdownMenuItem>
+              {!demo && (
+                <DropdownMenuItem className="min-h-11" onClick={() => router.push(`/demo?from=${encodeURIComponent(pathname)}`)}>
+                  <PlayCircle className="mr-2 h-4 w-4" /> Demo
+                </DropdownMenuItem>
+              )}
+              {/* A coach's phone has no More on the Me side: Settings and Sign out live here (desktop has the icons). */}
+              {isCoach && (
+                <>
+                  <DropdownMenuItem className="min-h-11 md:hidden" onClick={() => router.push("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" /> Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="min-h-11 md:hidden" onClick={() => void signOutToLogin()}>
+                    <LogOut className="mr-2 h-4 w-4" /> Sign out
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -67,6 +83,7 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
           {render(action)}
         </div>
       ))}
+      {weighIn && <BodyWeightSheet onClose={() => setWeighIn(false)} />}
     </div>
   );
 }

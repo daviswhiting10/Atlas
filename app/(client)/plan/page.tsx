@@ -22,6 +22,7 @@ import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
 import { PlanUpNext } from "@/components/athlete/PlanUpNext";
 import { PlanMenu } from "@/components/athlete/PlanMenu";
+import { WeekNotesList } from "@/components/plan/WeekNoteCard";
 import { upNextView } from "@/lib/plan/up-next";
 
 export const metadata: Metadata = { title: "Plan" };
@@ -107,6 +108,11 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         </div>
         <PlanMenu changeGoals={athlete.selfServe} />
       </div>
+      {plan.weekNotes.length > 0 && (
+        <div className="mb-6 max-w-3xl">
+          <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />
+        </div>
+      )}
       <PlanUpNext view={upNext} totalWeeks={plan.totalWeeks} canEdit={!locked} />
       {reportRows}
     </div>

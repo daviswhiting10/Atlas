@@ -7,6 +7,7 @@
  */
 
 import { prescriptionLabels, type PrescribedSet } from "./prescription";
+import { readWeekNotes, type WeekNote } from "./week-notes";
 import { prisma } from "@/lib/db/client";
 import { planWorkoutStatus } from "@/lib/sessions/status";
 import { displayName } from "./catalog";
@@ -79,6 +80,8 @@ export type PlanOverview = {
   goalText: string | null;
   /** Free notes on the plan as a whole. */
   note: string | null;
+  /** Notes pinned to single weeks (lib/plan/week-notes): Today shows the current week's, Plan shows the rest. */
+  weekNotes: WeekNote[];
   blocks: Array<{ name: string; weeks: number; focus: string }>;
   rationale: string[];
   workouts: WorkoutSummary[];
@@ -139,6 +142,7 @@ export async function loadPlanOverview({
       goalText: true,
       notes: true,
       lighterWeeks: true,
+      weekNotes: true,
       sourceProgram: { select: { goalTags: true, isTemplate: true } },
       assignedWorkouts: {
         orderBy: [{ order: "asc" }, { scheduledDate: "asc" }],
@@ -244,6 +248,7 @@ export async function loadPlanOverview({
     prefs,
     goalText: assignment.goalText ?? prefs?.goalText ?? null,
     note: assignment.notes,
+    weekNotes: readWeekNotes(assignment.weekNotes),
     blocks: plan?.blocks ?? [],
     rationale: plan?.rationale ?? [],
     workouts,
