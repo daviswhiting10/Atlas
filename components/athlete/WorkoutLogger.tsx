@@ -28,7 +28,8 @@ import { DurationStepper } from "@/components/athlete/DurationStepper";
 import { durationRange, formatClock } from "@/lib/sessions/duration";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 import { queuedFinish } from "@/lib/sessions/pending-finish";
-import { finishAction, sendFinish, unloggedText } from "@/lib/sessions/finish";
+import { finishAction, sendFinish } from "@/lib/sessions/finish";
+import { FinishSheet } from "@/components/logger/FinishSheet";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -717,6 +718,17 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
     finish();
   }
 
+  /** "Mark remaining and finish": every unlogged set is logged as it stands (its prescribed weight and reps; blank if it has none), then the workout finishes. */
+  function markRemainingAndFinish() {
+    const groups = exercises
+      .map((ex) => ({ ex, idx: bulkIndices((setsRef.current[ex.aweId] ?? ex.sets).map((x) => x.done), "check") }))
+      .filter((g) => g.idx.length > 0);
+    if (groups.length) applyBulk(groups, "check");
+    cancelFinish(); // the bulk check starts the automatic finish; this one is already on its way
+    setRest(null);
+    finish();
+  }
+
   finishRef.current = finish;
 
   // ── Derived numbers ───────────────────────────────────────────────────────
@@ -1099,29 +1111,20 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         />
       )}
 
-      {/* ── Finish with sets still unlogged: asked once ── */}
+      {/* ── Finish with sets still unlogged: asked once (the same sheet as the coach's) ── */}
       {confirmFinish != null && (
-        <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 sm:items-center" onClick={() => setConfirmFinish(null)}>
-          <div className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }} role="dialog" aria-modal="true" aria-label="Finish now?" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-display text-3xl text-ink">Finish now?</h2>
-            <p className="mt-1 text-[15px] text-ink-soft">{unloggedText(confirmFinish)}</p>
-            <div className="mt-5 flex gap-3">
-              <button type="button" onClick={() => setConfirmFinish(null)} className="press h-14 flex-1 rounded-2xl border border-line-strong text-[17px] font-semibold text-ink">
-                Keep logging
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmFinish(null);
-                  finish();
-                }}
-                className="press h-14 flex-[1.4] rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text"
-              >
-                Finish
-              </button>
-            </div>
-          </div>
-        </div>
+        <FinishSheet
+          unlogged={confirmFinish}
+          onCancel={() => setConfirmFinish(null)}
+          onPartial={() => {
+            setConfirmFinish(null);
+            finish();
+          }}
+          onMark={() => {
+            setConfirmFinish(null);
+            markRemainingAndFinish();
+          }}
+        />
       )}
 
       {confirmAll != null && (
