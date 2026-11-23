@@ -53,6 +53,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
+import { SetNote } from "@/components/logger/SetNote";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 
@@ -2418,21 +2419,21 @@ function SetDetails({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-1.5">
-        <label className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-ink-mute">
+      <div className="flex flex-wrap items-start gap-1.5">
+        <label className="flex h-10 shrink-0 items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-ink-mute">
           RPE
           <span className="w-14">
             <NumField value={entry.rpe} onChange={(v) => onChange({ rpe: v })} onBlur={onBlur} label={`Set ${idx + 1} RPE`} decimal placeholder="–" />
           </span>
         </label>
-        <Input
+        <SetNote
           value={entry.note}
-          onChange={(e) => onChange({ note: e.target.value })}
+          onChange={(note) => onChange({ note })}
           onBlur={onBlur}
-          placeholder="Set note…"
-          aria-label={`Set ${idx + 1} note`}
-          className="logger-cell h-10 px-2"
-          style={{ fontSize: "16px" }}
+          label={`Set ${idx + 1} note`}
+          // Beside RPE at rest; while it is being written it takes the whole row (a 190 px box wraps five short lines into eight).
+          className="logger-cell min-w-0 flex-1 basis-0 rounded-md border border-input bg-transparent px-2 py-[9px] text-ink outline-none placeholder:text-muted-foreground focus:basis-full focus:border-ring"
+          fontSize="16px"
         />
       </div>
       {!entry.completed && (
@@ -2733,11 +2734,11 @@ function DesktopSetRow({
 
       {/* Per-set note (desktop) */}
       <div className="pl-7">
-        <Input
+        <SetNote
           value={entry.note}
-          onChange={(e) => onChange({ note: e.target.value })}
-          placeholder="Set note…"
-          className="h-6 text-xs px-2 text-muted-foreground border-transparent hover:border-border focus:border-border bg-transparent"
+          onChange={(note) => onChange({ note })}
+          label="Set note"
+          className="rounded-md border border-transparent bg-transparent px-2 py-[3px] text-xs text-muted-foreground outline-none hover:border-border focus:border-border"
         />
       </div>
     </div>
