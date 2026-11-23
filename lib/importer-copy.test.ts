@@ -8,7 +8,8 @@ describe("importer copy cuts", () => {
   const plan = read("app/(dashboard)/clients/[id]/programs/[assignmentId]/page.tsx");
   it("'N exercises · week 1 started <date>' is gone from the Read-as panel; the Read-as line stays", () => {
     expect(upload).not.toMatch(/exercises · week 1 started/);
-    expect(upload).not.toContain("summary.exercises");
+    // (selfserve-empty's "Saving N weeks, N exercises…" progress line is a different line and stays.)
+    expect(upload).not.toMatch(/\{summary\.exercises\} exercises ·/);
     expect(upload).toContain("Read as {summary.readAs}");
   });
   it("the library-program sentence is gone", () => {
