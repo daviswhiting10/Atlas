@@ -1571,10 +1571,10 @@ export default function WorkoutLogger({
         type="button"
         onClick={() => setWhenOpen(true)}
         aria-haspopup="dialog"
-        className="mb-3 flex h-11 w-full items-center gap-2 rounded-xl border border-line-strong px-3 text-left text-[15px] font-medium text-ink touch-manipulation"
+        className="mb-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-line-strong px-3 py-2 text-left text-[15px] font-medium leading-snug text-ink touch-manipulation"
       >
         <Calendar className="h-4 w-4 shrink-0 text-ink-mute" />
-        <span className="min-w-0 flex-1 truncate">
+        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
           {dateLabel} · Week {currentWorkoutWeek} · {workoutName}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
