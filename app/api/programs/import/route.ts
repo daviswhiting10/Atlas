@@ -4,6 +4,7 @@ import { withWorkspace } from "@/lib/api/middleware";
 import { previewFromGrid } from "@/lib/athlete/plan-import";
 import { NO_CONTEXT, contextFromText, contextWarnings } from "@/lib/programs/plan-context";
 import { CHOOSE_A_FILE, PlanFileError, planFileFromForm, readPlanFile } from "@/lib/programs/read-plan-file";
+import { foundInFile } from "@/lib/programs/extract";
 import { saveProgramFromGrid } from "@/lib/programs/save-sheet-plan";
 import { readGrid } from "@/lib/programs/sheet-plan";
 import { summarizeSheetImport } from "@/lib/programs/sheet-summary";
@@ -47,7 +48,7 @@ export const POST = withWorkspace(async (req, { workspaceId, userId }) => {
     // A library program starts at week 1: nothing in it is a session done.
     const context = { ...(notes ? contextFromText(notes) : NO_CONTEXT), startAtWeek: 1 };
     const summary = summarizeSheetImport({ grid, context, weekOneStart: null, today: new Date() });
-    return NextResponse.json({ grid, context, readAs: summary.readAs, preview: previewFromGrid(grid, context), warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
+    return NextResponse.json({ grid, context, found: foundInFile(grid), readAs: summary.readAs, preview: previewFromGrid(grid, context), warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
   } catch (err) {
     if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;

@@ -7,6 +7,7 @@ import { athleteIdentity } from "@/lib/athlete/identity";
 import { IMPORTS_PER_DAY, canImportPlan } from "@/lib/athlete/empty-state";
 import { previewFromGrid } from "@/lib/athlete/plan-import";
 import { CHOOSE_A_FILE, PlanFileError, planFileFromForm, readPlanFile } from "@/lib/programs/read-plan-file";
+import { foundInFile } from "@/lib/programs/extract";
 import { readGrid } from "@/lib/programs/sheet-plan";
 import { contextWarnings, type PlanContext } from "@/lib/programs/plan-context";
 import { summarizeSheetImport } from "@/lib/programs/sheet-summary";
@@ -74,6 +75,7 @@ async function read(req: Request, who: { userId: string; workspaceId: string; na
     const summary = summarizeSheetImport({ grid, context: START_FRESH, weekOneStart: null, today: new Date() });
     return NextResponse.json({
       grid,
+      found: foundInFile(grid),
       readAs: summary.readAs,
       preview: previewFromGrid(grid, START_FRESH),
       warnings: [...warnings, ...contextWarnings(START_FRESH, { days: summary.daysPerWeek }, "sheet")],

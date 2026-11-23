@@ -33,6 +33,8 @@ export async function saveProgramFromGrid(input: {
   const { weeks, lastLoggedWeek } = shapeSheet(input.grid, input.context ?? NO_CONTEXT);
 
   const names = Array.from(new Set(weeks.flatMap((w) => w.days.flatMap((d) => d.entries.map((e) => e.exercise)))));
+  // Never a plan with nothing in it: the read step refuses this first, with a message for the coach.
+  if (names.length === 0) throw new Error("saveProgramFromGrid: no exercises read as sets and reps");
   // Every name in a few queries (catalog and exact names together), the rest one by one: see resolveExercises.
   const found = await resolveExercises(names, input.workspaceId);
   const ids = new Map(Array.from(found, ([n, e]) => [n, e.id] as const));
@@ -61,7 +63,7 @@ export async function saveProgramFromGrid(input: {
             repMin: e.rx.repMin,
             repMax: e.rx.repMax,
             rpe: null,
-            restSeconds: null,
+            restSeconds: e.rest ?? null,
             notes: "",
           })),
         })),
@@ -96,6 +98,8 @@ export async function saveSheetPlan(input: {
   const start = planStart(lastLoggedWeek, input.weekOneStart, today);
   // ACTIVE: the plan now. Otherwise a draft (PAUSED from the start) until the coach has checked it and assigns it.
   const assignment = await assignProgram(input.workspaceId, program.id, input.clientId, start, undefined, input.status === "ACTIVE" ? "ACTIVE" : "PAUSED");
+  // The file's other tabs or pages ("How to use"), as the plan's note.
+  if (input.grid.note) await prisma.programAssignment.update({ where: { id: assignment.id }, data: { notes: input.grid.note } });
   if (input.status === "ACTIVE") {
     // An earlier live plan is finished; its history stays.
     await prisma.programAssignment.updateMany({ where: { clientId: input.clientId, workspaceId: input.workspaceId, status: "ACTIVE", NOT: { id: assignment.id } }, data: { status: "COMPLETED" } });

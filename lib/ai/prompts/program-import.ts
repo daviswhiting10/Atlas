@@ -1,73 +1,85 @@
 import { contextPromptSection } from "@/lib/programs/plan-context";
 
 /**
- * A coach's plan spreadsheet, transcribed cell for cell. The model doesn't
- * interpret anything (sets, weights, which weeks are done): it copies each
- * exercise's name, notes, and every week's Sets/reps and Load cells exactly
- * as written. lib/programs/sheet-plan.ts reads them by rule.
+ * The plan reader for every importer. The model gets the whole file (every tab of a spreadsheet as CSV with row
+ * numbers; every page of a PDF as its text and its image; screenshots as images) and fills in one JSON shape
+ * (lib/programs/extract.ts checks it and turns it into the plan). Written for any coach's layout: the patterns below
+ * are examples, not the only layouts there are.
  */
-export function buildProgramSheetPrompt(csv: string, notes?: string) {
+
+export function buildProgramSheetPrompt(numberedSheet: string, notes?: string) {
   return {
-    system: sheetSystem("You transcribe a fitness coach's workout plan from a spreadsheet (given as CSV) into JSON. Copy cells exactly; do not interpret, convert, correct or invent anything.", notes),
-    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The spreadsheet, as CSV:\n\n${csv}`,
+    system: system("a spreadsheet, given as CSV. Every tab is included, each headed \"Tab: <name>\"; every row starts with its row number", notes),
+    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The spreadsheet:\n\n${numberedSheet}`,
   };
 }
 
-/**
- * The same transcription, from images: the pages of a PDF or screenshots of a plan. Into the same grid as a spreadsheet,
- * so each week keeps its own sets, reps and loads (lib/programs/sheet-plan reads them the same way).
- */
-export function buildProgramPagesPrompt(imageCount: number, notes?: string) {
+/** PDF pages (text and image for each) or screenshots (images only). */
+export function buildProgramPagesPrompt(imageCount: number, notes?: string, pageTexts: string[] = []) {
+  const withText = pageTexts.some((t) => t.trim());
+  const texts = withText ? pageTexts.map((t, i) => `--- Page ${i + 1} text ---\n${t.trim() || "(no text on this page: read the image)"}`).join("\n\n") : "";
   return {
-    system: sheetSystem(
-      `You transcribe a workout plan from ${imageCount === 1 ? "an image" : `${imageCount} images`} (the pages of a PDF, or screenshots) into JSON. Copy what is written exactly; do not interpret, convert, correct or invent anything.
-
-## Weeks on separate pages
-- A plan often gives each week its own page or section ("Week 1", "Week 2", …) with the same days and exercises. Merge them: one entry per training day, and for each exercise one "weeks" entry per week, taken from that week's page or section.
-- Match an exercise across weeks by its day and name. An exercise that appears only in some weeks still gets an entry; its other weeks have "" cells.
-- A table column for sets and one for reps go together in "setsReps" as written ("3" and "8-10" is "3x8-10"). A weight or load column goes in "load" ("135", "60 kg", "BW").`,
+    system: system(
+      withText
+        ? `a PDF of ${imageCount} page${imageCount === 1 ? "" : "s"}. For each page you get its image (for the layout) and its extracted text (for exact words and numbers; trust the text where they differ)`
+        : `${imageCount === 1 ? "an image" : `${imageCount} images`} (screenshots or photos of a plan), in order`,
       notes
-    ).replace("## Typical layout (yours may differ)", "## Typical spreadsheet layout (a page may look like this, or not)"),
-    user: (notes?.trim() ? `The coach's note: ${notes.trim()}\n\n` : "") + `The plan is in the ${imageCount === 1 ? "image" : `${imageCount} images`} above, in order.`,
+    ),
+    user: [notes?.trim() ? `The coach's note: ${notes.trim()}` : "", texts, `The plan is in the ${imageCount === 1 ? "image" : `${imageCount} images`} above, in order.`].filter(Boolean).join("\n\n"),
   };
 }
 
-function sheetSystem(intro: string, notes?: string) {
-  return `${intro}
+function system(what: string, notes?: string) {
+  return `You read a fitness coach's training plan from ${what}, and return it as JSON. Read the whole file: every tab, every page. Copy names and numbers as written; never invent an exercise, a number or a workout.
 
-## Typical layout (yours may differ)
-- A training day starts with a label like "Day 1" (often in the first column of a header row).
-- Each exercise is a row: its name, often a notes column, then for each week a "Sets/reps" cell and a "Load" cell.
-- Week headings ("Week 1", "Week 2", …) sit above their columns; in CSV a heading is often in one cell with the cells to its right blank.
-- Exercises are often grouped: a label cell left of the name ("A", "B", "1A", "1B", "2A", "Block 2", "Warm-up", "Cool-down"), usually written only on a group's first row, with blank rows between groups.
-- Blank rows separate groups. Don't output them.
+## Layouts coaches use (examples, not the only ones)
+- Workout markers: "DAY 1 · GLUTES A", "Day 1", "Monday", "Session 1", "Lower A", "Workout B", or one workout per tab.
+- A table per workout, with or without a Block column ("Warm-up", "Block 1", "A", "3a", "Finisher", "Cool-down").
+- Week columns going across: "Wk 1 | Wk 2 | Wk 3 | Wk 4", each with its own sets/reps or a load. Empty week columns are for the client to log in: they still say how many weeks the plan runs.
+- Weeks going down: a "Week 1" section, then "Week 2" with the same workouts. Merge them: one workout each, with week_overrides for what changes.
+- Set bumps written in a cell: "3 (Wk 3-4: 4)" → sets 3, and week_overrides [{ "weeks": [3, 4], "sets": 4 }].
+- One side at a time: "10/side", "8 each leg", "12 per arm" → reps "10", unilateral true.
+- Supersets: a letter after the block number ("3a", "3b", "Block 2a", "A1/A2") → the same superset_group ("3", "2", "A").
+- Sets and reps in separate columns, or together ("3x10", "3 x 8-12", "1 x 45 sec").
+- Tables that are not workouts: a week overview (Week | Sets | Effort | Goal), a key, an intake, a how-to. Don't make workouts or exercises from them; put what they say in plan_notes.
 
 ## Output
 Respond ONLY with JSON, no markdown fences, no commentary:
 {
-  "programName": string,
-  "days": [
+  "plan_title": string,
+  "plan_notes": string,
+  "weeks": number | null,
+  "workouts": [
     {
-      "name": string,
+      "day_label": string,
       "exercises": [
         {
-          "label": string,
           "name": string,
-          "notes": string,
-          "weeks": [ { "week": number, "setsReps": string, "load": string } ]
+          "block": string,
+          "sets": number | null,
+          "reps": string,
+          "rest_seconds": number | null,
+          "note": string,
+          "unilateral": boolean,
+          "superset_group": string | null,
+          "week_overrides": [ { "weeks": [number], "sets": number | null, "reps": string | null, "load": string | null } ],
+          "uncertain": [string]
         }
       ]
     }
-  ]
+  ],
+  "uncertain": [string]
 }
 
 ## Rules
-- One entry per training day, in sheet order. "name" is the day label as written (e.g. "Day 1").
-- One entry per exercise row, in order. Copy the exercise name and its notes exactly.
-- "label": the row's group label as written ("A", "1A", "2B", "Block 2", "Warm-up"). A label written once applies to the rows under it until a blank row, a new label or a new day: copy it onto each of those rows. A section heading row ("Warm-up", "Cool-down") is the label of the rows under it. Use "" when the row has no group.
-- "weeks": one entry for every week column the sheet has, numbered 1, 2, 3… in order. "setsReps" and "load" are the cell text exactly as written ("2x12-15", "5 min", "4x20 yd", "12.5", "BW", "blue", "2nd to hardest. 3x"). Use "" for an empty cell. Never fill a cell in from another week. A time keeps its unit as written ("15 min", "15'", "90 s"); never drop or convert it. A row like "Bike, Zone 2, 15 min" is name "Bike", notes "Zone 2", setsReps "15 min".
-- If the sheet has no week columns, treat the single set of columns as week 1.
-- Skip rows that aren't exercises: titles, headers, totals, blank rows, the client's name, dates.
-- "programName": a short name from the sheet's title if it has one, otherwise "".
-- Transcribe the grid exactly even when the coach's note says otherwise: the note is applied afterwards.${contextPromptSection(notes)}`;
+- Return as many workouts as the file has, in order: every DAY / session / tab that lists exercises. day_label is the marker as written ("DAY 1 · GLUTES A (hip thrust + hinge)").
+- One entry per exercise row, in order, warm-ups and cool-downs included. block is the row's block or section label as written ("Warm-up", "Block 3a", "Finisher"), "" if none.
+- sets: the number of sets as written for week 1 (null if not given). reps: reps or time as written without "/side" ("8-10", "15", "45 sec", "20-30 sec", "AMRAP").
+- rest_seconds: rest between sets in seconds ("2 min" → 120, "90 sec" → 90, "2.5 min" → 150). null when there is no rest, it says "—", or it isn't clear.
+- note: the row's coaching cue, swap or note, as written. Leave the week-log cells out of it.
+- week_overrides: only for weeks that differ from week 1, or that have a load written in them ("135", "BW", "60 kg"): copy the load as written.
+- weeks: how many weeks the plan runs, from week columns, week sections or the title ("4-Week Program"); null if the file doesn't say.
+- plan_title: the plan's title if it has one. plan_notes: the plan-level text: the title line's notes, a week overview table written out line by line ("Week 1: 3 sets, effort 7, learn the movements"), how-to notes. "" if none.
+- uncertain (per exercise): the fields you had to guess ("rest", "sets", "reps", "name"). The top-level uncertain: anything else you weren't sure of, in a few words each ("Day 3 might continue on page 4").
+- If the file has no workouts at all, return "workouts": [].${contextPromptSection(notes)}`;
 }

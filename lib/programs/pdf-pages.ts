@@ -32,7 +32,10 @@ export const isPdf = (bytes: Uint8Array): boolean => bytes.length > 4 && bytes[0
 
 type Loader = () => Promise<{ PDFParse: typeof import("pdf-parse").PDFParse }>;
 
-export async function pdfToImages(bytes: Uint8Array, load: Loader = () => import("pdf-parse")): Promise<{ images: ImageInput[]; pages: number; truncated: boolean }> {
+export async function pdfToImages(
+  bytes: Uint8Array,
+  load: Loader = () => import("pdf-parse")
+): Promise<{ images: ImageInput[]; texts: string[]; pages: number; truncated: boolean }> {
   if (!isPdf(bytes)) throw new PdfError("That doesn't look like a PDF.");
   // Switched off: nothing is drawn, and the native drawing module is never loaded.
   if (!pdfImportOn()) throw new PdfError(PDF_OFF);
@@ -40,10 +43,14 @@ export async function pdfToImages(bytes: Uint8Array, load: Loader = () => import
   try {
     const { PDFParse } = await load();
     parser = new PDFParse({ data: bytes });
+    // Each page twice: its image (for the layout) and its text (exact words and numbers). A scanned page has no text.
     const shots = await parser.getScreenshot({ first: MAX_PDF_PAGES, desiredWidth: PAGE_WIDTH, imageBuffer: true, imageDataUrl: false });
     if (shots.pages.length === 0) throw new PdfError("That PDF has no pages.");
+    const text = await parser.getText({ first: MAX_PDF_PAGES }).catch(() => null);
+    const byPage = new Map((text?.pages ?? []).map((p) => [p.num, (p.text ?? "").trim()]));
     return {
       images: shots.pages.map((p) => ({ base64: Buffer.from(p.data).toString("base64"), mediaType: "image/png" as const })),
+      texts: shots.pages.map((p) => byPage.get(p.pageNumber) ?? ""),
       pages: shots.total,
       truncated: shots.total > MAX_PDF_PAGES,
     };

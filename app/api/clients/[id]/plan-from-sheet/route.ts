@@ -3,16 +3,15 @@ import { z } from "zod";
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
 import { ROSTER } from "@/lib/db/roster";
-import { callAI, MODELS } from "@/lib/ai/client";
-import { buildProgramSheetPrompt } from "@/lib/ai/prompts/program-import";
 import { readGrid } from "@/lib/programs/sheet-plan";
 import { summarizeSheetImport } from "@/lib/programs/sheet-summary";
-import { NO_CONTEXT, pagesContext, contextFromText, contextWarnings, describeReadAs, mergeContext, modelContextFromReply, type PlanContext } from "@/lib/programs/plan-context";
+import { NO_CONTEXT, pagesContext, contextFromText, contextWarnings, describeReadAs, mergeContext, type PlanContext } from "@/lib/programs/plan-context";
 import { saveSheetPlan } from "@/lib/programs/save-sheet-plan";
-import { SheetError, fetchSheetCsv, parseSheetLink, tidyCsv } from "@/lib/programs/sheet";
+import { SheetError, fetchSheetText, parseSheetLink } from "@/lib/programs/sheet";
 import { CATEGORIES } from "@/lib/programs/categories";
 import { rateLimiter } from "@/lib/password";
-import { CHOOSE_A_FILE, PlanFileError, planFileFromForm, readPlanFile } from "@/lib/programs/read-plan-file";
+import { CHOOSE_A_FILE, PlanFileError, planFileFromForm, readPlanFile, readSheetText } from "@/lib/programs/read-plan-file";
+import { foundInFile } from "@/lib/programs/extract";
 
 export const maxDuration = 120;
 
@@ -80,36 +79,30 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
   }
   if (!perWorkspace(workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
 
-  // 1. The sheet's contents.
+  // 1. The sheet's contents: every tab of a whole-sheet link, or the one tab linked to.
   let csv: string;
   if (parsed.data.sheetUrl) {
     const link = parseSheetLink(parsed.data.sheetUrl);
     if (!link) return NextResponse.json({ error: "That isn't a Google Sheets link. Copy it from the sheet's address bar or its Share button." }, { status: 400 });
     try {
-      csv = await fetchSheetCsv(link);
+      csv = await fetchSheetText(link);
     } catch (err) {
       return NextResponse.json({ error: err instanceof SheetError ? err.message : "Couldn't read that sheet." }, { status: 400 });
     }
   } else {
     csv = parsed.data.csv!;
   }
-  const tidy = tidyCsv(csv);
-  if (tidy.length < 10) return NextResponse.json({ error: "That sheet looks empty." }, { status: 400 });
 
-  // 2. Transcribe the grid. Reading it (weeks, loads, what's done) happens by rule in lib/programs/sheet-plan.
+  // 2. The shared reader (every tab, the same JSON as files). Reading it (weeks, loads, what's done) happens by rule in lib/programs/sheet-plan.
   const notes = parsed.data.notes || undefined;
-  const { system, user } = buildProgramSheetPrompt(tidy, notes);
   let grid;
   let modelContext = NO_CONTEXT;
   try {
-    const result = await callAI({ system, user, model: MODELS.sonnet, maxTokens: 16000, feature: "program-sheet-import", workspaceId, userId });
-    grid = readGrid(result.content);
-    modelContext = modelContextFromReply(result.content);
+    ({ grid, modelContext } = await readSheetText(csv, { workspaceId, userId, feature: "program-sheet-import", notes }));
   } catch (err) {
-    console.error("[plan-from-sheet] AI call failed:", err);
-    return NextResponse.json({ error: "Couldn't read the plan right now. Please try again." }, { status: 502 });
+    if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
+    throw err;
   }
-  if (!grid) return NextResponse.json({ error: "Couldn't find workouts in that sheet. Check it lists exercises with sets and reps." }, { status: 422 });
 
   // The coach's note beats what the sheet suggests (e.g. "start fresh" ignores last block's loads).
   const context = notes ? mergeContext(contextFromText(notes), modelContext) : NO_CONTEXT;
@@ -119,6 +112,7 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
     context,
     summary,
     readAs: summary.readAs,
+    found: foundInFile(grid),
     warnings: contextWarnings(context, { days: summary.daysPerWeek }, "sheet"),
   });
 });
@@ -171,7 +165,7 @@ async function readFiles(req: Request, id: string, who: { workspaceId: string; u
     const noted = notes ? contextFromText(notes) : NO_CONTEXT;
     const context = pages ? pagesContext(noted) : noted;
     const summary = summarizeSheetImport({ grid, context, weekOneStart, today: new Date() });
-    return NextResponse.json({ grid, context, summary, targets: pages, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
+    return NextResponse.json({ grid, context, summary, found: foundInFile(grid), targets: pages, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
   } catch (err) {
     if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;

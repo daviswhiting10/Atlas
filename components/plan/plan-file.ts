@@ -12,7 +12,7 @@ const MAX_SHEET_BYTES = 5_000_000;
 const ext = (f: File) => f.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
 export const isPdfFile = (f: File) => f.type === "application/pdf" || ext(f) === "pdf";
 
-/** A spreadsheet as CSV text, or what to do instead. */
+/** A spreadsheet as CSV text (every tab of a workbook, each headed "Tab: <name>"), or what to do instead. */
 export async function sheetToCsv(f: File): Promise<string> {
   const e = ext(f);
   if (e === "numbers") throw new Error("That's a Numbers file. In Numbers, File → Export To → Excel, then drop the .xlsx here.");

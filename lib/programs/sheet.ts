@@ -47,11 +47,35 @@ const MAX_EXPORT_BYTES = 2_000_000;
  * A redirect anywhere else (a sign-in page included) means the sheet isn't shared by link.
  */
 export async function fetchSheetCsv(link: SheetLink, fetcher: typeof fetch = fetch): Promise<string> {
-  let url = link.exportUrl;
+  const bytes = await fetchExport(link.exportUrl, "text/csv", fetcher);
+  const text = Buffer.from(bytes).toString("utf8");
+  if (!text.trim()) throw new SheetError("That sheet is empty.");
+  return text;
+}
+
+/**
+ * A shared sheet as text for the plan reader. A link to one tab (gid) reads that tab. A link to the whole sheet reads
+ * every tab (the .xlsx export, each tab headed "Tab: <name>"): Google's CSV export of a whole sheet is only its first
+ * tab, often "How to use".
+ */
+export async function fetchSheetText(link: SheetLink, fetcher: typeof fetch = fetch): Promise<string> {
+  if (link.gid) return fetchSheetCsv(link, fetcher);
+  const bytes = await fetchExport(`https://docs.google.com/spreadsheets/d/${link.id}/export?format=xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fetcher);
+  const { xlsxToCsv, WorkbookError } = await import("./xlsx");
+  try {
+    return xlsxToCsv(bytes);
+  } catch (err) {
+    if (err instanceof WorkbookError) throw new SheetError(err.message);
+    throw err;
+  }
+}
+
+async function fetchExport(start: string, accept: string, fetcher: typeof fetch): Promise<Uint8Array> {
+  let url = start;
   let res: Response | null = null;
   for (let hop = 0; hop <= 3; hop++) {
     try {
-      res = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(15_000), headers: { Accept: "text/csv" } });
+      res = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(15_000), headers: { Accept: accept } });
     } catch {
       throw new SheetError("Couldn't reach Google Sheets. Try again, or download the sheet as .xlsx and drop the file here.");
     }
@@ -71,14 +95,13 @@ export async function fetchSheetCsv(link: SheetLink, fetcher: typeof fetch = fet
   const type = res.headers.get("content-type") ?? "";
   if (!res.ok || type.includes("text/html")) throw new SheetError(NOT_SHARED);
   if (Number(res.headers.get("content-length") ?? 0) > MAX_EXPORT_BYTES) throw new SheetError("That sheet is too big for a plan. Download just the plan's tab as .xlsx and drop it here.");
-  const text = await readCapped(res, MAX_EXPORT_BYTES);
-  if (text == null) throw new SheetError("That sheet is too big for a plan. Download just the plan's tab as .xlsx and drop it here.");
-  if (!text.trim()) throw new SheetError("That sheet is empty.");
-  return text;
+  const bytes = await readCapped(res, MAX_EXPORT_BYTES);
+  if (bytes == null) throw new SheetError("That sheet is too big for a plan. Download just the plan's tab as .xlsx and drop it here.");
+  return bytes;
 }
 
-async function readCapped(res: Response, max: number): Promise<string | null> {
-  if (!res.body) return "";
+async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
+  if (!res.body) return new Uint8Array();
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -92,7 +115,7 @@ async function readCapped(res: Response, max: number): Promise<string | null> {
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return new Uint8Array(Buffer.concat(chunks));
 }
 
 /** Drop empty rows and trailing empty cells, and cap the size sent to the model. */
