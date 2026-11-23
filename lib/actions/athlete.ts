@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
+import { TARGET_LIMIT_MESSAGE } from "@/lib/sessions/duration";
 import { auth } from "@/lib/auth";
 import { athleteIdentity } from "@/lib/athlete/identity";
 import { prisma } from "@/lib/db/client";
@@ -140,7 +141,8 @@ export async function finishWorkout(raw: { assignedWorkoutId: string; durationMi
 
   const duration = clean(input.durationMin ?? null, 600);
   await prisma.$transaction([
-    prisma.assignedWorkout.update({ where: { id: workout.id }, data: { loggedBy: "CLIENT" } }),
+    // She finished it (first finish only: saving it again later doesn't change who finished it).
+    ...(workout.workoutLog.completedAt == null ? [prisma.assignedWorkout.update({ where: { id: workout.id }, data: { loggedBy: "CLIENT" as const } })] : []),
     prisma.workoutLog.update({
       where: { id: workout.workoutLog.id },
       // Done is the session's to say. Saving changes later keeps when it was first finished.
@@ -240,8 +242,8 @@ async function edit<T extends object>(run: (scope: PlanScope) => Promise<T | voi
 const Ref = z.string().min(1).max(64);
 const Targets = z.object({
   sets: z.number().int().min(1).max(LIMITS.sets).optional(),
-  repMin: z.number().int().min(1).max(LIMITS.seconds).optional(),
-  repMax: z.number().int().min(1).max(LIMITS.seconds).optional(),
+  repMin: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
+  repMax: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
 });
 

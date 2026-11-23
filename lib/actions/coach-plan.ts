@@ -11,6 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { TARGET_LIMIT_MESSAGE } from "@/lib/sessions/duration";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { assignProgram } from "@/lib/db/programs";
@@ -80,8 +81,8 @@ async function run<T extends object>(fn: () => Promise<T | void>): Promise<Coach
 
 const Targets = z.object({
   sets: z.number().int().min(1).max(LIMITS.sets).optional(),
-  repMin: z.number().int().min(1).max(LIMITS.seconds).optional(),
-  repMax: z.number().int().min(1).max(LIMITS.seconds).optional(),
+  repMin: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
+  repMax: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
 });
 

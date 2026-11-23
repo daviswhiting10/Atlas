@@ -15,7 +15,6 @@ import {
   GOAL_TEXT_MAX,
   PHASES,
   PHASE_LABEL,
-  prefsFromCoachTags,
   resolvePrefs,
   type Experience,
   type Phase,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/plan/generator";
 import type { Equipment } from "@/lib/plan/catalog";
 import { generateDraftPlan } from "@/lib/actions/coach-plan";
+import { coachFormPrefs } from "@/lib/plan-start";
 import { PlanPreview } from "@/components/athlete/PlanWizard";
 import { interpretGoal } from "@/lib/plan/goal";
 import { cn } from "@/lib/utils";
@@ -85,12 +85,15 @@ export function CoachPlanForm({
   initialClientId,
   initialTags,
   fixedClientId,
+  door = false,
 }: {
   clients: Client[];
   initialClientId?: string;
   initialTags?: { goals: string[]; conditions: string[] };
   /** The client is chosen outside the form (the New plan page's own picker). */
   fixedClientId?: string;
+  /** The compact form inside the Plan tab's "Atlas builds it" row: the goal, the start day, Fine-tune, Generate. */
+  door?: boolean;
 }) {
   const router = useRouter();
   const [ownClientId, setClientId] = useState(initialClientId ?? "");
@@ -112,7 +115,7 @@ export function CoachPlanForm({
 
   // Every input lands in one set of generator preferences: the same generator the athlete uses.
   const prefs = useMemo(
-    () => prefsFromCoachTags({ goal: "muscle", experience, daysPerWeek, minutes, equipment, goalText, phases }, { goals, conditions: modifiers }),
+    () => coachFormPrefs({ goalText, goals, modifiers, experience, daysPerWeek, minutes, equipment, phases }),
     [experience, daysPerWeek, minutes, equipment, goalText, phases, goals, modifiers]
   );
   const resolved = useMemo(() => resolvePrefs(prefs), [prefs]);
@@ -128,6 +131,135 @@ export function CoachPlanForm({
   }
 
   const lockedByModifier = (key: "experience" | "equipment") => modifiers.some((m) => COACH_MODIFIERS[m]?.[key] != null);
+
+  const conditionsField = (
+        <Field label="Conditions and modifiers" hint="These change which exercises are chosen and how they're loaded.">
+          <div className="flex flex-wrap gap-1.5">
+            {Object.keys(COACH_MODIFIERS).map((c) => (
+              <Toggle key={c} on={modifiers.includes(c)} onClick={() => toggle(modifiers, setModifiers, c)}>
+                {c}
+              </Toggle>
+            ))}
+          </div>
+        </Field>
+  );
+
+  const experienceField = (
+        <Field label="Experience">
+          <div className={cn(lockedByModifier("experience") && "pointer-events-none opacity-40")}>
+            <Segment label="Experience" value={resolved.experience} onChange={setExperience} options={(Object.keys(EXPERIENCE) as Experience[]).map((x) => ({ value: x, label: EXPERIENCE[x].label }))} />
+          </div>
+        </Field>
+  );
+
+  const scheduleField = (
+        <Field label="Schedule">
+          <p className="mb-2 text-sm text-ink-mute">Days per week</p>
+          <Segment label="Days per week" value={daysPerWeek} onChange={setDays} options={DAYS_PER_WEEK.map((d) => ({ value: d, label: String(d) }))} />
+          <p className="mb-2 mt-4 text-sm text-ink-mute">Minutes per session</p>
+          <Segment label="Minutes per session" value={minutes} onChange={setMinutes} options={([30, 45, 60, 75] as const).map((m) => ({ value: m, label: `${m}` }))} />
+        </Field>
+  );
+
+  const equipmentField = (
+        <Field label="Equipment">
+          <div className={cn(lockedByModifier("equipment") && "pointer-events-none opacity-40")}>
+            <Segment label="Equipment" value={resolved.equipment} onChange={setEquipment} options={(Object.keys(EQUIPMENT) as Equipment[]).map((q) => ({ value: q, label: EQUIPMENT[q].label }))} />
+          </div>
+        </Field>
+  );
+
+  const phasesField = (
+        <Field label={`Phases · ${phases.length * 4} weeks`} hint="Each phase is four weeks and ends with a lighter week. The plan's length is set here.">
+          <div className="flex flex-wrap gap-1.5">
+            {PHASES.map((ph) => (
+              <Toggle key={ph} on={phases.includes(ph)} onClick={() => setPhases((cur) => (cur.includes(ph) ? (cur.length > 1 ? cur.filter((x) => x !== ph) : cur) : PHASES.filter((x) => x === ph || cur.includes(x))))}>
+                {PHASE_LABEL[ph]}
+              </Toggle>
+            ))}
+          </div>
+        </Field>
+  );
+
+  const chipsField = (
+        <Field label="Goals" hint={interpretGoal(goalText).goal ? "The goal written above takes priority; these still add conditioning or corrective work." : "The first one picked sets the rep ranges and rest."}>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.keys(COACH_GOALS).map((g) => (
+              <Toggle key={g} on={goals.includes(g)} onClick={() => toggle(goals, setGoals, g)}>
+                {g}
+              </Toggle>
+            ))}
+          </div>
+        </Field>
+  );
+
+  // The compact form inside the Plan tab's "Atlas builds it" row. Same inputs, same state, same action; everything that
+  // used to sit on the page beyond the goal and the start day is behind Fine-tune.
+  const [tune, setTune] = useState(false);
+  if (door) {
+    return (
+      <div>
+        <div className="relative">
+          <textarea
+            value={goalText}
+            onChange={(e) => setGoalText(e.target.value.slice(0, GOAL_TEXT_MAX))}
+            rows={3}
+            aria-label="Goal, in their words"
+            placeholder="Their goal, in their words. e.g. Lose 20 lb, bad left knee"
+            className="w-full resize-none rounded-lg border border-line-strong bg-dusk-raised p-3 pr-16 text-[16px] leading-relaxed text-ink outline-none placeholder:text-ink-mute focus:border-ink/40"
+          />
+          {/* Room for a mic button (not built yet): it will sit here, 44 px, at the field's right edge. */}
+          <div data-slot="mic" aria-hidden className="pointer-events-none absolute right-1.5 top-1.5 h-11 w-11" />
+        </div>
+        <p className="mt-1.5 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
+          {resolved.understood.length > 0 && (
+            <>
+              <span className="font-semibold text-signal">Atlas read:</span> {resolved.understood.join(", ")}.
+            </>
+          )}
+        </p>
+
+        <label className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong px-4 text-[14px] font-medium text-ink">
+          <span className="text-ink-mute">Starts</span>
+          <DayInput ref={startRef} value={startDate} onDay={setStartDate} className="h-9 bg-transparent text-[14px] text-ink outline-none" />
+        </label>
+
+        <div className="mt-3 rounded-xl border border-line">
+          <button type="button" onClick={() => setTune((t) => !t)} aria-expanded={tune} className="press flex min-h-14 w-full items-center justify-between gap-3 px-3.5 text-left">
+            <span className="min-w-0">
+              <span className="block text-[15px] font-semibold text-ink">Fine-tune</span>
+              <span className="block truncate text-xs text-ink-mute">
+                {EXPERIENCE[resolved.experience].label} · {daysPerWeek} day{daysPerWeek === 1 ? "" : "s"} a week · {minutes} min · {EQUIPMENT[resolved.equipment].label} · {phases.length * 4} weeks
+                {goals.length > 0 ? ` · ${goals.join(", ")}` : ""}
+                {modifiers.length > 0 ? ` · ${modifiers.join(", ")}` : ""}
+              </span>
+            </span>
+            <ChevronDown className={cn("h-5 w-5 shrink-0 text-ink-mute transition-transform", tune && "rotate-180")} />
+          </button>
+          {tune && (
+            <div className="fade-in border-t border-line px-3.5">
+              {chipsField}
+              {conditionsField}
+              {experienceField}
+              {scheduleField}
+              {equipmentField}
+              {phasesField}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={generate}
+          disabled={pending || !clientId}
+          className="press mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40"
+        >
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {client ? `Generate a draft for ${client.fullName.split(" ")[0]}` : "Generate a draft"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
@@ -173,15 +305,7 @@ export function CoachPlanForm({
           </p>
         </Field>
 
-        <Field label="Goals" hint={interpretGoal(goalText).goal ? "The goal written above takes priority; these still add conditioning or corrective work." : "The first one picked sets the rep ranges and rest."}>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.keys(COACH_GOALS).map((g) => (
-              <Toggle key={g} on={goals.includes(g)} onClick={() => toggle(goals, setGoals, g)}>
-                {g}
-              </Toggle>
-            ))}
-          </div>
-        </Field>
+        {chipsField}
 
         {/* Everything else has a sensible default: folded away until it's wanted. */}
         <div className="rule py-4">
@@ -198,44 +322,11 @@ export function CoachPlanForm({
         </div>
         {more && (
         <div className="fade-in">
-        <Field label="Conditions and modifiers" hint="These change which exercises are chosen and how they're loaded.">
-          <div className="flex flex-wrap gap-1.5">
-            {Object.keys(COACH_MODIFIERS).map((c) => (
-              <Toggle key={c} on={modifiers.includes(c)} onClick={() => toggle(modifiers, setModifiers, c)}>
-                {c}
-              </Toggle>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="Experience">
-          <div className={cn(lockedByModifier("experience") && "pointer-events-none opacity-40")}>
-            <Segment label="Experience" value={resolved.experience} onChange={setExperience} options={(Object.keys(EXPERIENCE) as Experience[]).map((x) => ({ value: x, label: EXPERIENCE[x].label }))} />
-          </div>
-        </Field>
-
-        <Field label="Schedule">
-          <p className="mb-2 text-sm text-ink-mute">Days per week</p>
-          <Segment label="Days per week" value={daysPerWeek} onChange={setDays} options={DAYS_PER_WEEK.map((d) => ({ value: d, label: String(d) }))} />
-          <p className="mb-2 mt-4 text-sm text-ink-mute">Minutes per session</p>
-          <Segment label="Minutes per session" value={minutes} onChange={setMinutes} options={([30, 45, 60, 75] as const).map((m) => ({ value: m, label: `${m}` }))} />
-        </Field>
-
-        <Field label="Equipment">
-          <div className={cn(lockedByModifier("equipment") && "pointer-events-none opacity-40")}>
-            <Segment label="Equipment" value={resolved.equipment} onChange={setEquipment} options={(Object.keys(EQUIPMENT) as Equipment[]).map((q) => ({ value: q, label: EQUIPMENT[q].label }))} />
-          </div>
-        </Field>
-
-        <Field label={`Phases · ${phases.length * 4} weeks`} hint="Each phase is four weeks and ends with a lighter week. The plan's length is set here.">
-          <div className="flex flex-wrap gap-1.5">
-            {PHASES.map((ph) => (
-              <Toggle key={ph} on={phases.includes(ph)} onClick={() => setPhases((cur) => (cur.includes(ph) ? (cur.length > 1 ? cur.filter((x) => x !== ph) : cur) : PHASES.filter((x) => x === ph || cur.includes(x))))}>
-                {PHASE_LABEL[ph]}
-              </Toggle>
-            ))}
-          </div>
-        </Field>
+        {conditionsField}
+        {experienceField}
+        {scheduleField}
+        {equipmentField}
+        {phasesField}
         </div>
         )}
 

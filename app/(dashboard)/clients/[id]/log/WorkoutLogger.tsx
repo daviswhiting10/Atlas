@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { bumpSeconds, durationLabel, durationRange, formatClock, parseClock, type BareUnit } from "@/lib/sessions/duration";
+import { timedKind } from "@/lib/plan/timed";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -193,16 +195,13 @@ function CompletedPill() {
   );
 }
 
-/** "3 × 8–12", "1 × 5 min", "3 × 30s". */
+/** "3 × 8–12", "1 × 15 min", "3 × 30 sec". */
 function rxLabel(ex: LoggerExercise): string {
   const p = ex.prescribedSets[0];
   if (!p) return "";
   const n = ex.prescribedSets.length;
   if (p.unit === "secs") {
-    if (p.repMax >= 60 && p.repMax % 60 === 0 && p.repMin % 60 === 0) {
-      return `${n} × ${p.repMin === p.repMax ? p.repMax / 60 : `${p.repMin / 60}–${p.repMax / 60}`} min`;
-    }
-    return `${n} × ${p.repMin === p.repMax ? p.repMax : `${p.repMin}–${p.repMax}`}s`;
+    return `${n} × ${durationRange(p.repMin, p.repMax)}`;
   }
   return `${n} × ${p.repMin === p.repMax ? p.repMax : `${p.repMin}–${p.repMax}`}`;
 }
@@ -210,7 +209,7 @@ function rxLabel(ex: LoggerExercise): string {
 /** "3 × 12 @ 15 lb", "5 min", "12, 10, 8 @ Blue band": identical sets collapse into one. */
 function describeSets(sets: Array<{ weight: number | null; bandColor?: string | null; reps: number | null }>, secs: boolean): string {
   if (sets.length === 0) return "";
-  const amount = (r: number | null) => (r == null ? "" : secs ? (r >= 60 && r % 60 === 0 ? `${r / 60} min` : `${r}s`) : `${r}`);
+  const amount = (r: number | null) => (r == null ? "" : secs ? durationLabel(r) : `${r}`);
   const load = (x: (typeof sets)[number]) =>
     x.bandColor ? `${x.bandColor.charAt(0).toUpperCase()}${x.bandColor.slice(1)} band` : x.weight != null ? `${x.weight} lb` : secs ? "" : "BW";
   const loads = Array.from(new Set(sets.map(load)));
@@ -1063,7 +1062,7 @@ export default function WorkoutLogger({
   function handleSetTargets(ex: LoggerExercise, t: { sets: number; repMin: number; repMax: number }) {
     return change(
       () => coachSetTargets(clientId, assignmentId, { aweId: ex.aweId, workoutId: assignedWorkoutId, ...t }),
-      `${ex.name}: ${t.sets} × ${t.repMin === t.repMax ? t.repMax : `${t.repMin}–${t.repMax}`}${ex.prescribedSets[0]?.unit === "secs" ? "s" : ""} today`,
+      `${ex.name}: ${t.sets} × ${ex.prescribedSets[0]?.unit === "secs" ? durationRange(t.repMin, t.repMax) : t.repMin === t.repMax ? t.repMax : `${t.repMin}–${t.repMax}`} today`,
       () =>
         setExState((prev) => {
           const cur = prev[ex.aweId] ?? freshState(ex);
@@ -1581,6 +1580,7 @@ export default function WorkoutLogger({
 
                     <SetTable
                       secs={secs}
+                      bare={timedKind(ex.name, ex.notes ?? "") === "steady" ? "min" : "sec"}
                       sets={state.sets}
                       last={ex.lastSets}
                       prescribed={ex.prescribedSets}
@@ -1831,6 +1831,7 @@ export default function WorkoutLogger({
                       entry={entry}
                       onChange={(patch) => updateSet(ex.aweId, idx, patch)}
                       unsaved={entry.uid in unsaved}
+                      bare={timedKind(ex.name, ex.notes ?? "") === "steady" ? "min" : "sec"}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
                     />
@@ -2108,10 +2109,51 @@ function NumField({
   );
 }
 
+/** A timed set's time as m:ss (the set keeps seconds): 15:00, 0:45. Typed entry reads as in the athlete logger; Up/Down step 30 s (1 min above 10:00). */
+function TimeField({ value, onChange, onBlur, label, bare }: { value: string; onChange: (v: string) => void; onBlur?: () => void; label: string; bare: BareUnit }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const n = value === "" ? null : Number(value);
+  const shown = draft ?? (n != null && Number.isFinite(n) && n > 0 ? formatClock(n) : "");
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      enterKeyHint="done"
+      autoComplete="off"
+      value={shown}
+      placeholder="0:00"
+      onFocus={(e) => {
+        setDraft(shown);
+        e.target.select();
+      }}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        if (e.target.value.trim() === "") return onChange("");
+        const secs = parseClock(e.target.value, bare);
+        if (secs != null) onChange(String(secs));
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        const next = bumpSeconds(n != null && Number.isFinite(n) ? n : null, e.key === "ArrowUp" ? 1 : -1);
+        setDraft(formatClock(next));
+        onChange(String(next));
+      }}
+      onBlur={() => {
+        setDraft(null);
+        onBlur?.();
+      }}
+      aria-label={label}
+      className="logger-cell h-10 w-full min-w-0 rounded-lg border border-line-strong bg-dusk-raised px-1 text-center text-[16px] font-semibold tabular-nums text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-ink/70"
+    />
+  );
+}
+
 const SET_GRID = "grid grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-1.5";
 
 function SetTable({
   secs,
+  bare,
   sets,
   last,
   prescribed,
@@ -2123,6 +2165,7 @@ function SetTable({
   onRemove,
 }: {
   secs: boolean;
+  bare: BareUnit;
   unsaved: Record<string, true>;
   /** Sets whose weight was carried down from an earlier set (by uid). */
   filled: Set<string>;
@@ -2141,7 +2184,7 @@ function SetTable({
         <span className="text-center">Set</span>
         <span>Last</span>
         <span className="text-center">lb</span>
-        <span className="text-center">{secs ? "Sec" : "Reps"}</span>
+        <span className="text-center">{secs ? "Time" : "Reps"}</span>
         <span />
       </div>
       <div className="space-y-1">
@@ -2152,7 +2195,7 @@ function SetTable({
             prev && (prev.weight != null || prev.reps != null) ? (
               <>
                 {prev.weight != null ? prev.weight : "BW"}
-                {prev.reps != null && <span className="whitespace-nowrap">×{prev.reps}</span>}
+                {prev.reps != null && <span className="whitespace-nowrap">×{secs ? formatClock(prev.reps) : prev.reps}</span>}
               </>
             ) : (
               "—"
@@ -2211,14 +2254,18 @@ function SetTable({
                   )}
                 </span>
                 <span className="min-w-0">
-                  <NumField
-                    value={entry.reps}
-                    onChange={(v) => onChange(idx, { reps: v })}
-                    onBlur={persist}
-                    label={`Set ${idx + 1} ${entry.isSeconds ? "seconds" : "reps"}`}
-                    decimal={false}
-                    placeholder={entry.isSeconds ? "sec" : "reps"}
-                  />
+                  {entry.isSeconds ? (
+                    <TimeField value={entry.reps} onChange={(v) => onChange(idx, { reps: v })} onBlur={persist} label={`Set ${idx + 1} time`} bare={bare} />
+                  ) : (
+                    <NumField
+                      value={entry.reps}
+                      onChange={(v) => onChange(idx, { reps: v })}
+                      onBlur={persist}
+                      label={`Set ${idx + 1} reps`}
+                      decimal={false}
+                      placeholder="reps"
+                    />
+                  )}
                 </span>
                 <button
                   type="button"
@@ -2255,7 +2302,7 @@ function SetTable({
   );
 }
 
-/** The rarer parts of a set, opened from its number: load type, seconds, RPE, a note. */
+/** The rarer parts of a set, opened from its number: load type, time, RPE, a note. */
 function SetDetails({
   idx,
   entry,
@@ -2283,7 +2330,7 @@ function SetDetails({
         </div>
         <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label={`Set ${idx + 1} counted in`}>
           <button type="button" className={seg(!entry.isSeconds)} aria-pressed={!entry.isSeconds} onClick={() => onChange({ isSeconds: false })}>Reps</button>
-          <button type="button" className={seg(entry.isSeconds)} aria-pressed={entry.isSeconds} onClick={() => onChange({ isSeconds: true })}>Sec</button>
+          <button type="button" className={seg(entry.isSeconds)} aria-pressed={entry.isSeconds} onClick={() => onChange({ isSeconds: true })}>Time</button>
         </div>
       </div>
       {entry.isBand && (
@@ -2403,13 +2450,14 @@ function ChangePanel({
   const ps0 = ex.prescribedSets[0];
   const secs = ps0?.unit === "secs";
   const [sets, setSets] = useState(String(setCount || ex.prescribedSets.length || 3));
-  const [lo, setLo] = useState(String(ps0?.repMin ?? 8));
-  const [hi, setHi] = useState(String(ps0?.repMax ?? ps0?.repMin ?? 10));
+  const bare: BareUnit = timedKind(ex.name, ex.notes ?? "") === "steady" ? "min" : "sec";
+  const [lo, setLo] = useState(secs ? formatClock(ps0?.repMin ?? 30) : String(ps0?.repMin ?? 8));
+  const [hi, setHi] = useState(secs ? formatClock(ps0?.repMax ?? ps0?.repMin ?? 60) : String(ps0?.repMax ?? ps0?.repMin ?? 10));
   const [confirmRemove, setConfirmRemove] = useState(false);
 
-  const n = (v: string) => parseInt(v, 10);
+  const n = (v: string) => (secs ? (parseClock(v, bare) ?? NaN) : parseInt(v, 10));
   const valid = n(sets) >= 1 && n(sets) <= 12 && n(lo) >= 1 && n(hi) >= 1;
-  const box = "h-10 w-14 rounded-lg border border-border bg-background text-center text-base tabular-nums focus:outline-none focus:border-primary";
+  const box = "h-10 w-16 rounded-lg border border-border bg-background text-center text-base tabular-nums focus:outline-none focus:border-primary";
 
   return (
     <div className="mt-2 space-y-4 rounded-xl bg-muted/40 p-3">
@@ -2420,14 +2468,13 @@ function ChangePanel({
       </div>
 
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Today&rsquo;s sets &amp; {secs ? "seconds" : "reps"}</p>
+        <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Today&rsquo;s sets &amp; {secs ? "time (min:sec)" : "reps"}</p>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <input aria-label="Sets" inputMode="numeric" value={sets} onChange={(e) => setSets(e.target.value.replace(/\D/g, ""))} className={box} />
           <span className="text-muted-foreground">×</span>
-          <input aria-label={secs ? "Seconds from" : "Reps from"} inputMode="numeric" value={lo} onChange={(e) => setLo(e.target.value.replace(/\D/g, ""))} className={box} />
+          <input aria-label={secs ? "Time from" : "Reps from"} inputMode={secs ? "decimal" : "numeric"} value={lo} onChange={(e) => setLo(secs ? e.target.value : e.target.value.replace(/\D/g, ""))} className={box} />
           <span className="text-muted-foreground">–</span>
-          <input aria-label={secs ? "Seconds to" : "Reps to"} inputMode="numeric" value={hi} onChange={(e) => setHi(e.target.value.replace(/\D/g, ""))} className={box} />
-          {secs && <span className="text-muted-foreground">sec</span>}
+          <input aria-label={secs ? "Time to" : "Reps to"} inputMode={secs ? "decimal" : "numeric"} value={hi} onChange={(e) => setHi(secs ? e.target.value : e.target.value.replace(/\D/g, ""))} className={box} />
           <Button
             size="sm"
             className="h-10"
@@ -2473,9 +2520,11 @@ function DesktopSetRow({
   onChange,
   onComplete,
   onRemove,
+  bare = "sec",
 }: {
   unsaved: boolean;
   onRemove?: () => void;
+  bare?: BareUnit;
   idx: number;
   entry: SetEntry;
   onChange: (patch: Partial<SetEntry>) => void;
@@ -2544,7 +2593,7 @@ function DesktopSetRow({
         {/* Reps/Secs toggle — click to switch unit */}
         <button
           type="button"
-          title={entry.isSeconds ? "Switch to reps" : "Switch to seconds"}
+          title={entry.isSeconds ? "Switch to reps" : "Switch to time"}
           onClick={() => onChange({ isSeconds: !entry.isSeconds })}
           className={cn(
             "text-xs px-1.5 h-7 rounded border shrink-0 transition-colors font-medium",
@@ -2555,14 +2604,31 @@ function DesktopSetRow({
         >
           {entry.isSeconds ? "s" : "×"}
         </button>
-        <Input
-          value={entry.reps}
-          onChange={(e) => onChange({ reps: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onComplete(); } }}
-          placeholder={entry.isSeconds ? "sec" : "reps"}
-          className="h-7 w-14 text-xs text-center px-1"
-          type="number"
-        />
+        {entry.isSeconds ? (
+          <input
+            type="text"
+            inputMode="decimal"
+            value={entry.reps === "" ? "" : formatClock(Number(entry.reps))}
+            onChange={(e) => {
+              const secs = parseClock(e.target.value, bare);
+              if (e.target.value.trim() === "") onChange({ reps: "" });
+              else if (secs != null) onChange({ reps: String(secs) });
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onComplete(); } }}
+            placeholder="0:00"
+            aria-label={`Set ${idx + 1} time`}
+            className="h-7 w-16 rounded-md border border-input bg-background text-xs text-center px-1"
+          />
+        ) : (
+          <Input
+            value={entry.reps}
+            onChange={(e) => onChange({ reps: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onComplete(); } }}
+            placeholder="reps"
+            className="h-7 w-14 text-xs text-center px-1"
+            type="number"
+          />
+        )}
 
         <span className="text-xs text-muted-foreground shrink-0">RPE</span>
         <Input

@@ -8,6 +8,7 @@ import { Logo } from "@/components/athlete/Logo";
 import { HeaderActions } from "@/components/nav/HeaderActions";
 import { signOutToLogin } from "@/lib/sign-out";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
+import { useRegisterChrome } from "@/components/mode/context";
 import { cn } from "@/lib/utils";
 import { useEscape } from "@/hooks/use-escape";
 
@@ -29,8 +30,10 @@ const ITEMS = [
 const TABS = ITEMS.filter((i) => "icon" in i) as unknown as Array<{ href: string; label: string; icon: typeof Users }>;
 const MORE: Array<{ href: string; label: string }> = [...ITEMS.filter((i) => !("icon" in i)), { href: "/settings", label: "Settings" }];
 
-export function CoachNav({ demo = false }: { demo?: boolean }) {
-  const pathname = usePathname();
+export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path. */ preview?: string }) {
+  const real = usePathname();
+  const pathname = preview ?? real;
+  useRegisterChrome(preview ? {} : { demo });
   const [more, setMore] = useState(false);
   useEscape(more, () => setMore(false));
   const isActive = useCallback((href: string) => pathname === href || pathname.startsWith(href + "/"), [pathname]);
