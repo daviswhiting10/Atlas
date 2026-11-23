@@ -73,6 +73,7 @@ const store = () => {
 };
 import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
 import { useDragOrder } from "./useDragOrder";
+import { DragHandle, DragStatus } from "@/components/logger/DragHandle";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useEscape } from "@/hooks/use-escape";
 
@@ -353,6 +354,8 @@ export default function WorkoutLogger({
   }, [planExercises, order]);
   // Hold a card's header to pick it up; drop between cards to reorder, hold over one to superset.
   const drag = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  // The same on a desktop: its own list, so its own lift (the phone's list is not on screen there).
+  const dragD = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
   /** Up, Down and "superset with the one above", for screen readers (useDragOrder's gestures, as buttons). */
   const moves = (aweId: string) => {
     const i = order.findIndex((o) => o.aweId === aweId);
@@ -1779,8 +1782,16 @@ export default function WorkoutLogger({
       {/* Day picker (desktop) */}
       {dayPicker}
 
-      {/* Exercise cards — grouped by block */}
-      <div className="space-y-4">
+      {/* Exercise cards — grouped by block. Drag a card by its grip (or hold its header), or use the keyboard on the grip. */}
+      <div ref={dragD.listRef} className="relative space-y-4">
+        <DragStatus message={dragD.status} />
+        {dragD.lineTop != null && (
+          <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: dragD.lineTop - 1.5 }}>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+            <span className="h-[3px] flex-1 rounded-full bg-dusk-teal" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+          </div>
+        )}
         {groupIntoBlocks(exercises).map((block) =>
           block.exIndices.length === 0 ? null : (
             block.exIndices.map((exI, k) => {
@@ -1791,7 +1802,7 @@ export default function WorkoutLogger({
           const blockHeaderLabel = block.title;
 
           return (
-            <div key={ex.aweId}>
+            <div key={ex.aweId} data-exercise={ex.aweId} style={dragD.styleFor(ex.aweId)}>
               {showBlockHeader && (
                 <div className="flex items-center gap-3 pt-1 pb-0">
                   <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -1801,15 +1812,19 @@ export default function WorkoutLogger({
                 </div>
               )}
             {isFolded(ex) ? (
-              <div className="mt-2 rounded-xl border border-line bg-paper">
-                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} />
+              <div className="mt-2 flex items-center rounded-xl border border-line bg-paper pl-1" data-drag-header="">
+                {!completed && <DragHandle props={dragD.handle(ex.aweId, ex.name)} />}
+                <div className="min-w-0 flex-1">
+                  <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} hold={dragD.bind(ex.aweId)} />
+                </div>
               </div>
             ) : (
             <Card>
-              <CardHeader className="pb-2 pt-4 px-4">
+              <CardHeader className="no-select pb-2 pt-4 px-4" data-drag-header="" {...dragD.bind(ex.aweId)}>
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
+                      {!completed && <DragHandle props={dragD.handle(ex.aweId, ex.name)} className="-ml-2" />}
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
                       <CardTitle className="text-base font-semibold leading-tight min-w-0"><ExerciseName name={labelled(block.labels[k], ex.name)} /></CardTitle>
                     </div>
