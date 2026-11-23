@@ -218,7 +218,7 @@ export async function draftFromTemplate(raw: { programId: string; clientId: stri
  * start; any plan that was live is completed (its logged history stays).
  */
 /** What "Assign and invite" did about the invite. The plan is assigned either way. */
-export type AssignInvite = { sent: true; emailed: boolean; link: string } | { sent: false; error: string };
+export type AssignInvite = { sent: true; emailed: boolean; link: string; email: string; expiresInDays: number } | { sent: false; error: string };
 
 export async function assignDraftPlan(raw: { clientId: string; assignmentId: string; startDate: string; invite?: boolean }): Promise<CoachResult<{ invite?: AssignInvite }>> {
   return run(async () => {
@@ -257,7 +257,7 @@ export async function assignDraftPlan(raw: { clientId: string; assignmentId: str
     if (input.invite && (await notInvited(scope.clientId, scope.workspaceId))) {
       try {
         const r = await inviteClient(scope.clientId, scope.workspaceId);
-        invite = r.ok ? { sent: true, emailed: r.emailed, link: r.link } : { sent: false, error: r.error };
+        invite = r.ok ? { sent: true, emailed: r.emailed, link: r.link, email: r.email, expiresInDays: r.expiresInDays } : { sent: false, error: r.error };
       } catch (err) {
         console.error("[assign and invite]", err);
         invite = { sent: false, error: "Couldn't send the invite. Try Invite on their profile." };

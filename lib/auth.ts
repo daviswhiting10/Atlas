@@ -13,6 +13,7 @@ import { proofOk } from "@/lib/auth/proof"
 import { LINK_LIMIT_URL, allowLinkRequest } from "@/lib/auth/link-limit"
 import { passwordSignIn } from "@/lib/auth/password-signin"
 import { headers } from "next/headers"
+import { emailFrom } from "@/lib/email-from";
 
 const baseAdapter = PrismaAdapter(prisma)
 
@@ -87,7 +88,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
     }),
     Email({
       server: process.env.EMAIL_SERVER ?? "smtp://localhost:25",
-      from: "Atlas <onboarding@resend.dev>",
+      from: emailFrom(),
       async sendVerificationRequest({ identifier, url }) {
         if (!process.env.RESEND_API_KEY) {
           console.log("\n" + "─".repeat(64))
@@ -104,7 +105,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Atlas <onboarding@resend.dev>",
+            from: emailFrom(),
             to: [identifier],
             subject: `Sign in to Atlas — ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
             html: `<p style="font-family:sans-serif;max-width:480px;margin:40px auto">

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Send, Trash2 } from "lucide-react";
 import { assignDraftPlan, discardDraftPlan } from "@/lib/actions/coach-plan";
+import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 
 /**
  * Assign a draft to the client, or throw it away. A client who isn't invited yet (an email, no login) is invited in the
@@ -32,6 +33,7 @@ export function AssignPanel({
   const dateRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [shareLink, setShareLink] = useState<InviteResult | null>(null);
 
   function assign() {
     start(async () => {
@@ -41,14 +43,8 @@ export function AssignPanel({
       if (!inv) toast.success(`Assigned to ${clientName}`);
       else if (!inv.sent) toast.warning(`Assigned to ${clientName}. The invite didn't go: ${inv.error}`);
       else if (inv.emailed) toast.success(`Assigned to ${clientName} and invite emailed`);
-      else {
-        // Email isn't set up: the coach shares the link, as with the Invite button.
-        const link = inv.link;
-        toast.success(`Assigned to ${clientName}. Invite link ready to share`, {
-          action: { label: "Copy link", onClick: () => void navigator.clipboard?.writeText(link).then(() => toast.success("Link copied")) },
-          duration: 15_000,
-        });
-      }
+      // The email couldn't go out: the coach gets the link to share (Copy, or Share via…). Never "sent".
+      else setShareLink({ email: inv.email, emailed: false, link: inv.link, expiresInDays: inv.expiresInDays });
       router.refresh();
     });
   }
@@ -104,6 +100,7 @@ export function AssignPanel({
           <Trash2 className="h-4 w-4" /> Discard draft
         </button>
       )}
+      {shareLink && <InviteSheet name={clientName} invite={shareLink} onClose={() => setShareLink(null)} />}
     </div>
   );
 }

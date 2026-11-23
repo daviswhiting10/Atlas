@@ -7,6 +7,7 @@
 import { randomBytes } from "crypto";
 import { appBase, hashToken, inviteLink } from "@/lib/auth/invite-link";
 import { prisma } from "@/lib/db/client";
+import { emailFrom } from "@/lib/email-from";
 
 /** How long an invite link stays valid. It works once. */
 export const INVITE_DAYS = 7;
@@ -73,7 +74,7 @@ export async function inviteClient(clientId: string, workspaceId: string): Promi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Atlas <onboarding@resend.dev>",
+        from: emailFrom(),
         to: [email],
         subject: "You've been invited to Atlas",
         html: `<p style="font-family:sans-serif;max-width:480px;margin:40px auto">
