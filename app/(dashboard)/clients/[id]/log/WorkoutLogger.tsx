@@ -1461,6 +1461,7 @@ export default function WorkoutLogger({
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (finished) {
+    const notesUnsaved = rawInput.trim() !== savedNotes.trim();
     let doneSetsAll = 0;
     let totalVolumeAll = 0;
     for (const ex of exercises) {
@@ -1513,22 +1514,29 @@ export default function WorkoutLogger({
           ))}
         </div>
 
-        {/* Notes can still be written: the session is finished, the notes aren't. */}
+        {/* Notes can still be written: the session is finished, the notes aren't. While there is typed text that isn't
+            saved, Save notes is the main button. With nothing unsaved (saved, or never written) the main button is Done. */}
         <div className="mb-6 w-full text-left">
           {soapPanel}
-          <Button
-            className="mt-3 w-full"
-            disabled={savingNotes || rawInput.trim() === savedNotes.trim()}
-            onClick={saveNotes}
-          >
-            {savingNotes ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-            {rawInput.trim() === savedNotes.trim() && savedNotes.trim() ? "Notes saved" : "Save notes"}
-          </Button>
+          {notesUnsaved ? (
+            <Button className="mt-3 w-full" disabled={savingNotes} onClick={saveNotes}>
+              {savingNotes ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Save notes
+            </Button>
+          ) : savedNotes.trim() ? (
+            <p className="mt-3 text-center text-sm text-muted-foreground" aria-live="polite">Notes saved</p>
+          ) : null}
         </div>
 
-        <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
-          Back to {clientName}
-        </Button>
+        {notesUnsaved ? (
+          <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
+            Back to {clientName}
+          </Button>
+        ) : (
+          <Button size="lg" className="h-12 w-full max-w-sm text-[16px] font-semibold" onClick={() => router.push(`/clients/${clientId}`)}>
+            Done — back to {clientName}
+          </Button>
+        )}
       </div>
     );
   }

@@ -839,7 +839,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
 
         <div className="mt-auto pt-10">
           <Link href={`${base}/today`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
-            Back to Today
+            Done — back to your plan
           </Link>
         </div>
       </div>
