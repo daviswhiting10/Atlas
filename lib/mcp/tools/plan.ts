@@ -59,8 +59,8 @@ function exerciseOf(args: { exerciseId?: string; slug?: string }) {
 // Training values proposed by an AI client are coerced into range, not rejected (as in SetSchema).
 const targets = {
   sets: z.number().int().min(1).max(LIMITS.sets).optional().catch(undefined),
-  repMin: z.number().int().min(1).max(LIMITS.seconds).optional().catch(undefined),
-  repMax: z.number().int().min(1).max(LIMITS.seconds).optional().catch(undefined),
+  repMin: z.number().int().min(1).max(LIMITS.seconds).optional().catch(undefined).describe("Reps, or for a timed exercise the time in SECONDS (900 = 15 min). A timed set can be up to 240 min (14400 s); other sets up to 100 reps."),
+  repMax: z.number().int().min(1).max(LIMITS.seconds).optional().catch(undefined).describe("Top of the range: reps, or seconds for a timed exercise (up to 14400 s = 240 min)."),
   weightLb: z.number().min(0).max(LIMITS.weight).nullable().optional().catch(undefined).describe("Target weight. null clears it so Atlas works it out from the last session."),
 };
 

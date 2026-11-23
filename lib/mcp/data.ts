@@ -9,6 +9,7 @@ import { liveExercise } from "@/lib/exercises/find";
 import { withDerivedStatus } from "@/lib/sessions/status";
 import { LIGHTER_SELECT, isLighterWeek } from "@/lib/plan/lighter";
 import { displayName } from "@/lib/plan/catalog";
+import { durationRange } from "@/lib/sessions/duration";
 import type { ClientLookup } from "./auth";
 import type { ScopedClient } from "./context";
 
@@ -160,5 +161,5 @@ export function describePrescription(prescribedSets: unknown): { sets: number; r
   const first = sets[0];
   if (!first) return { sets: 0, reps: "", repMin: null };
   const range = first.repMin === first.repMax ? `${first.repMax}` : `${first.repMin}–${first.repMax}`;
-  return { sets: sets.length, reps: first.unit === "secs" ? `${range}s` : range, repMin: first.repMin ?? null };
+  return { sets: sets.length, reps: first.unit === "secs" ? durationRange(first.repMin ?? 0, first.repMax ?? first.repMin ?? 0) : range, repMin: first.repMin ?? null };
 }

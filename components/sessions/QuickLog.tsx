@@ -13,6 +13,8 @@ import { nameKey } from "@/lib/exercises/names";
 import { lastTime, quickLogStart, saveQuickSession, searchQuickExercises, type QuickExercise } from "@/lib/actions/quick-log";
 import { describeLast, describeLogged, prefillSets, type LastTime, type QuickSet } from "@/lib/sessions/quick-log";
 import { ExerciseName } from "@/components/ExerciseName";
+import { formatClock, parseClock } from "@/lib/sessions/duration";
+import { timedKind } from "@/lib/plan/timed";
 
 type Row = { weight: string; reps: string; band: QuickSet["band"] };
 type Item = {
@@ -450,15 +452,31 @@ export function QuickLog({
                     </label>
                   )}
                   <label className="relative flex-1">
-                    <input
-                      inputMode="numeric"
-                      value={r.reps}
-                      onChange={(e) => setRow(i.key, k, { reps: e.target.value.replace(/[^\d]/g, "") })}
-                      placeholder="—"
-                      aria-label={`Set ${k + 1} ${i.unit === "secs" ? "seconds" : "reps"}`}
-                      className={cn(field, "pr-12 text-right font-semibold tabular-nums")}
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">{i.unit === "secs" ? "sec" : "reps"}</span>
+                    {i.unit === "secs" ? (
+                      <input
+                        inputMode="decimal"
+                        defaultValue={r.reps === "" ? "" : formatClock(Number(r.reps))}
+                        key={`${i.key}-${k}-${i.rows.length}-${i.last}`}
+                        onChange={(e) => {
+                          const secs = parseClock(e.target.value, timedKind(i.name, "") === "steady" ? "min" : "sec");
+                          if (e.target.value.trim() === "") setRow(i.key, k, { reps: "" });
+                          else if (secs != null) setRow(i.key, k, { reps: String(secs) });
+                        }}
+                        placeholder="0:00"
+                        aria-label={`Set ${k + 1} time`}
+                        className={cn(field, "pr-12 text-right font-semibold tabular-nums")}
+                      />
+                    ) : (
+                      <input
+                        inputMode="numeric"
+                        value={r.reps}
+                        onChange={(e) => setRow(i.key, k, { reps: e.target.value.replace(/[^\d]/g, "") })}
+                        placeholder="—"
+                        aria-label={`Set ${k + 1} reps`}
+                        className={cn(field, "pr-12 text-right font-semibold tabular-nums")}
+                      />
+                    )}
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">{i.unit === "secs" ? "min:sec" : "reps"}</span>
                   </label>
                   <button
                     type="button"

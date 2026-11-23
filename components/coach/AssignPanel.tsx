@@ -8,8 +8,25 @@ import { toast } from "sonner";
 import { Loader2, Send, Trash2 } from "lucide-react";
 import { assignDraftPlan, discardDraftPlan } from "@/lib/actions/coach-plan";
 
-/** Assign a draft to the client, or throw it away. */
-export function AssignPanel({ clientId, clientName, assignmentId, startDate, hasLivePlan }: { clientId: string; clientName: string; assignmentId: string; startDate: string; hasLivePlan: boolean }) {
+/**
+ * Assign a draft to the client, or throw it away. A client who isn't invited yet (an email, no login) is invited in the
+ * same tap: "Assign and invite", the same invite as the Invite button.
+ */
+export function AssignPanel({
+  clientId,
+  clientName,
+  assignmentId,
+  startDate,
+  hasLivePlan,
+  notInvited = false,
+}: {
+  clientId: string;
+  clientName: string;
+  assignmentId: string;
+  startDate: string;
+  hasLivePlan: boolean;
+  notInvited?: boolean;
+}) {
   const router = useRouter();
   const [date, setDate] = useState(startDate);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -18,9 +35,20 @@ export function AssignPanel({ clientId, clientName, assignmentId, startDate, has
 
   function assign() {
     start(async () => {
-      const res = await assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date) });
+      const res = await assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date), invite: notInvited });
       if (!res.ok) return void toast.error(res.error);
-      toast.success(`Assigned to ${clientName}`);
+      const inv = res.invite;
+      if (!inv) toast.success(`Assigned to ${clientName}`);
+      else if (!inv.sent) toast.warning(`Assigned to ${clientName}. The invite didn't go: ${inv.error}`);
+      else if (inv.emailed) toast.success(`Assigned to ${clientName} and invite emailed`);
+      else {
+        // Email isn't set up: the coach shares the link, as with the Invite button.
+        const link = inv.link;
+        toast.success(`Assigned to ${clientName}. Invite link ready to share`, {
+          action: { label: "Copy link", onClick: () => void navigator.clipboard?.writeText(link).then(() => toast.success("Link copied")) },
+          duration: 15_000,
+        });
+      }
       router.refresh();
     });
   }
@@ -40,6 +68,7 @@ export function AssignPanel({ clientId, clientName, assignmentId, startDate, has
       <p className="mt-1.5 text-[15px] leading-relaxed text-ink-soft">
         {clientName} can&apos;t see this yet. Edit anything, then assign it.
         {hasLivePlan ? " Assigning replaces their current plan; what they've logged stays." : ""}
+        {notInvited ? ` They aren't invited yet: this also sends their invite.` : ""}
       </p>
       <label className="mt-4 block">
         <span className="eyebrow">Starts</span>
@@ -56,7 +85,7 @@ export function AssignPanel({ clientId, clientName, assignmentId, startDate, has
         disabled={pending || !date}
         className="press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-50"
       >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Assign to {clientName.split(" ")[0]}
+        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {notInvited ? "Assign and invite" : `Assign to ${clientName.split(" ")[0]}`}
       </button>
       {confirmDiscard ? (
         <div className="mt-3 flex items-center justify-between gap-2 text-sm">

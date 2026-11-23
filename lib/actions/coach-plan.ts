@@ -11,6 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { TARGET_LIMIT_MESSAGE } from "@/lib/sessions/duration";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { assignProgram } from "@/lib/db/programs";
@@ -30,6 +31,7 @@ import {
   swapExercise,
   type PlanScope,
 } from "@/lib/plan/edit";
+import { inviteClient, notInvited } from "@/lib/clients/invite";
 
 export type CoachResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -80,8 +82,8 @@ async function run<T extends object>(fn: () => Promise<T | void>): Promise<Coach
 
 const Targets = z.object({
   sets: z.number().int().min(1).max(LIMITS.sets).optional(),
-  repMin: z.number().int().min(1).max(LIMITS.seconds).optional(),
-  repMax: z.number().int().min(1).max(LIMITS.seconds).optional(),
+  repMin: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
+  repMax: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
 });
 
@@ -197,9 +199,12 @@ export async function draftFromTemplate(raw: { programId: string; clientId: stri
  * Make a draft the client's live plan. The plan's dates move to the chosen
  * start; any plan that was live is completed (its logged history stays).
  */
-export async function assignDraftPlan(raw: { clientId: string; assignmentId: string; startDate: string }): Promise<CoachResult> {
+/** What "Assign and invite" did about the invite. The plan is assigned either way. */
+export type AssignInvite = { sent: true; emailed: boolean; link: string } | { sent: false; error: string };
+
+export async function assignDraftPlan(raw: { clientId: string; assignmentId: string; startDate: string; invite?: boolean }): Promise<CoachResult<{ invite?: AssignInvite }>> {
   return run(async () => {
-    const input = z.object({ clientId: Ref, assignmentId: Ref, startDate: IsoDay }).parse(raw);
+    const input = z.object({ clientId: Ref, assignmentId: Ref, startDate: IsoDay, invite: z.boolean().optional() }).parse(raw);
     const scope = await scopeFor(input.clientId, input.assignmentId);
     const draft = await prisma.programAssignment.findFirst({
       where: { id: input.assignmentId, clientId: scope.clientId, workspaceId: scope.workspaceId, status: "PAUSED" },
@@ -228,7 +233,20 @@ export async function assignDraftPlan(raw: { clientId: string; assignmentId: str
       await tx.programAssignment.update({ where: { id: draft.id }, data: { status: "ACTIVE", startDate: start } });
       await tx.program.updateMany({ where: { id: draft.sourceProgramId, workspaceId: scope.workspaceId, isDraft: true }, data: { isDraft: false } });
     });
+    // "Assign and invite": the same invite as the Invite button, only for a client who isn't invited yet (checked
+    // here, not taken from the button). The plan is assigned first, so a failed invite never undoes it.
+    let invite: AssignInvite | undefined;
+    if (input.invite && (await notInvited(scope.clientId, scope.workspaceId))) {
+      try {
+        const r = await inviteClient(scope.clientId, scope.workspaceId);
+        invite = r.ok ? { sent: true, emailed: r.emailed, link: r.link } : { sent: false, error: r.error };
+      } catch (err) {
+        console.error("[assign and invite]", err);
+        invite = { sent: false, error: "Couldn't send the invite. Try Invite on their profile." };
+      }
+    }
     refresh(scope.clientId, draft.id);
+    return invite ? { invite } : {};
   });
 }
 

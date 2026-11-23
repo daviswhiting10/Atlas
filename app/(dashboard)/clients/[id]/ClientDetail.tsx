@@ -24,6 +24,7 @@ import { PlanStart } from "@/components/coach/PlanStart";
 import { initialDoor } from "@/lib/plan-start";
 import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
+import { FINISHED_BY_CLIENT, finishedByClient } from "@/lib/coach/finished-by";
 import {
   ClipboardList,
   AlertTriangle,
@@ -67,8 +68,10 @@ type Client = {
     source: "PLAN" | "GENERATED" | "MANUAL" | "SCREENSHOT" | "OFF_PLAN";
     title: string | null;
     _count: { sets: number };
+    completedAt?: string | null;
     assignedWorkout: {
       name?: string;
+      loggedBy?: "TRAINER" | "CLIENT";
       scheduledDate: string;
       programAssignment: { name: string };
     } | null;
@@ -370,6 +373,9 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
                       <p className="text-xs text-muted-foreground">
                         {s.source === "OFF_PLAN" && (
                           <span className="mr-1.5 rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">Off-plan</span>
+                        )}
+                        {finishedByClient({ loggedBy: s.assignedWorkout?.loggedBy, completedAt: s.completedAt }) && (
+                          <span className="mr-1.5 rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">{FINISHED_BY_CLIENT}</span>
                         )}
                         {/* No "0 sets": a session with none shows its name (its minutes are on the right), or nothing. */}
                         {[s.title ?? s.assignedWorkout?.name, s._count.sets > 0 ? `${s._count.sets} set${s._count.sets === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
