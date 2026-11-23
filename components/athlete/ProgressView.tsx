@@ -7,6 +7,7 @@ import type { ExerciseProgress, ProgressData } from "@/lib/athlete/data";
 import type { FocusMetric } from "@/lib/plan/generator";
 import { formatValue, metricFor, shortFor, unitFor } from "@/lib/plan/overload";
 import { overallProgress } from "@/lib/progress/overall";
+import { defaultLift } from "@/lib/progress/default-lift";
 import { OverallChart } from "./OverallChart";
 import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
@@ -101,7 +102,8 @@ function Big({ value, label, accent = false }: { value: string; label?: string; 
  * overall line yet means no Strength section): never a chart of two points or a row of zeros.
  */
 export function ProgressView({ data, goalMetric, history }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode }) {
-  const [exerciseId, setExerciseId] = useState<string | null>(null);
+  // Opens on the lift done most (its curve and its lighter weeks); "All lifts" is in the chooser.
+  const [exerciseId, setExerciseId] = useState<string | null>(() => defaultLift(data.exercises, THIN));
   const [sheet, setSheet] = useState(false);
   const overall = useMemo(() => overallProgress(data.exercises), [data.exercises]);
   const exercise = data.exercises.find((e) => e.exerciseId === exerciseId) ?? null;
@@ -167,7 +169,7 @@ export function ProgressView({ data, goalMetric, history }: { data: ProgressData
           <div className="flex items-baseline justify-between gap-3 border-t border-line py-3.5">
             <ExerciseName name={record.exercise} className="text-[17px] font-semibold text-ink" />
             <span className="shrink-0 text-[17px] text-ink-soft">
-              {formatValue(record.value, "weight")} {record.unit}
+              {formatValue(record.value, "weight")} {record.unit} · {day(record.date)}
             </span>
           </div>
         </Section>
