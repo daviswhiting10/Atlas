@@ -75,6 +75,8 @@ function Stepper({
   dim,
   muted = false,
   settled,
+  showButtons,
+  onArm,
 }: {
   value: number | null;
   step: number;
@@ -86,6 +88,10 @@ function Stepper({
   muted?: boolean;
   /** False just after cards fold, open or move: a +/− tapped now was meant for what was there (it would change a logged set). */
   settled: () => boolean;
+  /** − and + show on the active set only (and on a set you tapped into); elsewhere they keep their room but can't be touched. */
+  showButtons: boolean;
+  /** The number was tapped: this set's − and + show from now on. */
+  onArm: () => void;
 }) {
   const bump = (dir: 1 | -1) => {
     if (!settled()) return;
@@ -94,7 +100,7 @@ function Stepper({
   };
   return (
     <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
-      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
+      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Minus className="h-4 w-4" />
       </button>
       <label className="flex min-w-0 flex-1 flex-col items-center justify-center self-stretch">
@@ -108,12 +114,15 @@ function Stepper({
           placeholder="–"
           aria-label={label}
           onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => {
+            onArm();
+            e.target.select();
+          }}
           className={cn("tnum w-full bg-transparent text-center text-[17px] leading-none outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
       </label>
-      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
+      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Plus className="h-4 w-4" />
       </button>
     </div>
@@ -161,6 +170,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const [records, setRecords] = useState<Record<string, string>>({});
   /** Sets whose save failed, or has waited offline a while: one small amber dot on that row. Never shown for a save that worked. */
   const [unsaved, setUnsaved] = useState<Record<string, true>>({});
+  // The set whose number was last tapped into: it gets − and + like the active set (the first one not done) does.
+  const [armed, setArmed] = useState<string | null>(null);
   const stuckTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const markUnsaved = useCallback((key: string, on: boolean) => setUnsaved((u) => (on === (key in u) ? u : on ? { ...u, [key]: true } : Object.fromEntries(Object.entries(u).filter(([k]) => k !== key)))), []);
   const clearStuck = useCallback(
@@ -1005,15 +1016,17 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                       <ul className="space-y-2">
                         {list.map((s, i) => {
                           const record = records[`${ex.aweId}:${s.setNumber}`];
+                          const key = `${ex.aweId}:${s.setNumber}`;
+                          const showButtons = i === list.findIndex((x) => !x.done) || armed === key;
                           return (
                             <li key={s.setNumber}>
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
                                 <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { weight: v })} />}
                                 {timed ? (
-                                  <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
+                                  <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
                                 ) : (
-                                  <Stepper value={s.reps} step={1} unit={unit} label={`Set ${s.setNumber} reps`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
+                                  <Stepper value={s.reps} step={1} unit={unit} label={`Set ${s.setNumber} reps`} dim={s.done} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
                                 )}
                                 <button
                                   type="button"
