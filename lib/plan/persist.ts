@@ -236,6 +236,22 @@ export async function createPlanForClient(
   return { assignmentId, workouts };
 }
 
+/**
+ * "Build it myself": an empty plan with one empty "Workout 1" for the plan editor to fill. Marked `handBuilt` in the
+ * program's goalTags so it is never read as generated. An earlier live plan is finished (its history stays).
+ */
+export async function createHandBuiltPlan({ workspaceId, clientId, startDate, name = "My plan" }: { workspaceId: string; clientId: string; startDate: Date; name?: string }): Promise<{ assignmentId: string; workoutId: string }> {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  return prisma.$transaction(async (db) => {
+    const program = await db.program.create({ data: { workspaceId, name, goalTags: { handBuilt: true }, durationWeeks: 4, isTemplate: false }, select: { id: true } });
+    await db.programAssignment.updateMany({ where: { clientId, status: "ACTIVE" }, data: { status: "COMPLETED" } });
+    const assignment = await db.programAssignment.create({ data: { workspaceId, clientId, sourceProgramId: program.id, name, startDate: start, status: "ACTIVE", lighterWeeks: false }, select: { id: true } });
+    const workout = await db.assignedWorkout.create({ data: { workspaceId, programAssignmentId: assignment.id, name: "Workout 1", scheduledDate: start, loggedBy: "CLIENT", status: "PLANNED", order: 1, notes: null }, select: { id: true } });
+    return { assignmentId: assignment.id, workoutId: workout.id };
+  });
+}
+
 // ── Demo history ────────────────────────────────────────────────────────────
 
 /**

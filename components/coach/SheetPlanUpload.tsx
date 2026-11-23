@@ -1,84 +1,53 @@
 "use client";
 
+import { FoundInFile, type Found } from "@/components/plan/FoundInFile";
 import { useRef, useState } from "react";
 import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
 import { useRouter } from "next/navigation";
-import { ChevronDown, FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { describeDay, type ImportSummary } from "@/lib/programs/sheet-summary";
-import { PHOTO_TYPES, toProgramBody, type ImportedProgram } from "@/lib/programs/screenshot-program";
-import { draftFromTemplate } from "@/lib/actions/coach-plan";
+import { TimesList } from "@/components/plan/TimesList";
+import { PlanDropZone } from "@/components/plan/PlanDropZone";
+import { answer, planForm } from "@/components/plan/plan-file";
 
-/** What the file picker offers. */
-const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv," + PHOTO_TYPES.join(",");
-/** Photos go up in one request: Vercel takes 4.5 MB. */
-const MAX_PHOTO_BYTES = 4_000_000;
-/** A plan is a few hundred KB at most. */
-const MAX_FILE_BYTES = 5_000_000;
-
-type Picked = { name: string; csv: string; photos?: File[] };
+/** A chosen file, made ready to send (lib: components/plan/plan-file). */
+type Picked = { name: string; form: FormData };
 
 /** What the read step returned: shown to the coach, then sent back to save. */
-type Read = { grid: unknown; context: unknown; summary: ImportSummary; weekOneStart: string | null };
+type Read = { grid: unknown; context: unknown; summary: ImportSummary; found?: Found; weekOneStart: string | null; targets: boolean };
 
 const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 /**
- * Turn a dropped or chosen file into CSV text, or say what to do instead.
- * .xlsx is read here in the browser (lib/programs/xlsx), so the server only sees CSV.
- */
-async function readFile(f: File): Promise<Picked> {
-  const ext = f.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
-  if (ext === "numbers") throw new Error("That's a Numbers file. In Numbers, File → Export To → Excel, then drop the .xlsx here.");
-  if (ext === "xls") throw new Error("That's an old .xls file. Open it in Excel and save it as .xlsx.");
-  if (ext !== "xlsx" && ext !== "csv") throw new Error("Choose an .xlsx or .csv file, or photos of the plan.");
-  if (f.size > MAX_FILE_BYTES) throw new Error("That file is too big for a plan. Save just the plan's tabs and try again.");
-  if (ext === "csv") return { name: f.name, csv: await f.text() };
-  const { xlsxToCsv } = await import("@/lib/programs/xlsx");
-  return { name: f.name, csv: xlsxToCsv(new Uint8Array(await f.arrayBuffer())) };
-}
-
-/**
- * Import a client's plan from the coach's own spreadsheet: an .xlsx or .csv
- * (dropped or chosen), or a Google Sheets link shared by link. Atlas reads it
- * into a plan and opens it as a draft to check before it's assigned.
+ * Import a client's plan: a PDF, screenshots or a spreadsheet (.xlsx or .csv) through the shared drop zone, or a
+ * Google Sheets link shared by link. Atlas reads it week by week into a plan and opens it as a draft to check before
+ * it's assigned.
  */
 export function SheetPlanUpload({ clientId, firstName }: { clientId: string; firstName: string }) {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [link, setLink] = useState("");
   const [file, setFile] = useState<Picked | null>(null);
-  const [dragging, setDragging] = useState(false);
   // Optional: left empty, week 1 is dated back from the weeks the sheet shows as done.
   const [date, setDate] = useState("");
   const dateRef = useRef<HTMLInputElement>(null);
   // Optional: "4 week block, start fresh". Beats what the sheet suggests.
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  // While saving: what is happening now, said under the button (saving takes a few seconds, then the draft opens).
+  const [phase, setPhase] = useState<"saving" | "opening" | null>(null);
   const [error, setError] = useState<string | null>(null);
   // After reading: the summary to confirm, and whether to bring in the completed weeks as history.
   const [read_, setRead] = useState<Read | null>(null);
   const [history, setHistory] = useState(true);
 
-  async function pick(list: FileList | File[] | null | undefined) {
-    const files = Array.from(list ?? []);
-    const f = files[0];
-    if (!f || busy) return;
+  async function pick(files: File[]) {
+    if (files.length === 0 || busy) return;
     setError(null);
     try {
-      // Photos (screenshots) of the plan: one or several, read by the photo reader.
-      const photos = files.filter((x) => PHOTO_TYPES.includes(x.type));
-      if (photos.length > 0) {
-        if (photos.length !== files.length) throw new Error("Choose a spreadsheet or photos, not both.");
-        if (photos.reduce((n, x) => n + x.size, 0) > MAX_PHOTO_BYTES) throw new Error("Those photos are too big together. Use fewer, or screenshots.");
-        setFile({ name: photos.length === 1 ? photos[0].name : `${photos.length} photos`, csv: "", photos });
-        setLink("");
-        return;
-      }
-      const picked = await readFile(f);
-      setFile(picked);
+      setFile(await planForm(files));
       setLink("");
     } catch (err) {
       setFile(null);
@@ -89,53 +58,33 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   async function read() {
     setError(null);
     if (!link.trim() && !file) {
-      setError("Drop an .xlsx or .csv file, or paste a Google Sheets link.");
+      setError("Drop a PDF, a spreadsheet or screenshots, or paste a Google Sheets link.");
       return;
     }
     setBusy(true);
     // Optional: an empty field means "not given".
     const weekOne = dayFrom(dateRef, date, { allowEmpty: true });
-    if (file?.photos) return void readPhotos(file.photos, weekOne);
     try {
-      const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "read", ...(file ? { csv: file.csv } : { sheetUrl: link.trim() }), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) }),
-      });
-      const data = await res.json().catch(() => ({}));
+      // A file (PDF, screenshots or a spreadsheet) goes through the shared reader, week by week; a Sheets link as before.
+      let body: BodyInit;
+      const headers: Record<string, string> = {};
+      if (file) {
+        body = file.form;
+        body.set("weekOneStart", weekOne || "");
+        body.set("notes", notes.trim());
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify({ step: "read", sheetUrl: link.trim(), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) });
+      }
+      const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, { method: "POST", headers, body });
+      const data = (await answer(res)) as { error?: string; warnings?: string[]; grid?: unknown; context?: unknown; summary?: ImportSummary; found?: Found; targets?: boolean };
       setBusy(false);
-      if (!res.ok) return void setError(data?.error ?? "Couldn't read that sheet.");
-      for (const w of (data.warnings ?? []) as string[]) toast.warning(w, { duration: 10_000 });
-      setRead({ grid: data.grid, context: data.context, summary: data.summary, weekOneStart: weekOne || null });
+      if (!res.ok) return void setError(data?.error ?? "Couldn't read that plan.");
+      for (const w of data.warnings ?? []) toast.warning(w, { duration: 10_000 });
+      setRead({ grid: data.grid, context: data.context, summary: data.summary!, found: data.found, weekOneStart: weekOne || null, targets: data.targets === true });
       setHistory(true);
     } catch {
       setError("Couldn't reach the server. Please try again.");
-      setBusy(false);
-    }
-  }
-
-  /** Photos: read into a program (saved to the library, as the photo import does), then a draft for this client. */
-  async function readPhotos(photos: File[], weekOne: string) {
-    try {
-      const form = new FormData();
-      photos.forEach((p, i) => form.append(`image${i}`, p));
-      if (notes.trim()) form.append("notes", notes.trim());
-      const res = await fetch("/api/ai/program-import", { method: "POST", body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't read those photos.");
-      const { program, readAs, warnings } = data as { program: ImportedProgram; readAs?: string; warnings?: string[] };
-      const saved = await fetch("/api/programs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(toProgramBody(program)) });
-      if (!saved.ok) throw new Error("Read the photos, but couldn't save the plan. Try again.");
-      const { id } = (await saved.json()) as { id: string };
-      const today = new Date();
-      const startDate = weekOne || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-      const draft = await draftFromTemplate({ programId: id, clientId, startDate });
-      if (!draft.ok) throw new Error(draft.error);
-      toast.success(`${readAs ? `Read as ${readAs}. ` : ""}Check it, then assign.`);
-      for (const w of warnings ?? []) toast.warning(w, { duration: 10_000 });
-      router.push(`/clients/${clientId}/programs/${draft.assignmentId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't read those photos.");
       setBusy(false);
     }
   }
@@ -144,17 +93,19 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
     if (!read_) return;
     setError(null);
     setBusy(true);
-    const withHistory = history && read_.summary.history.sessions > 0;
+    const withHistory = history && !read_.targets && read_.summary.history.sessions > 0;
+    setPhase("saving");
     try {
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "save", grid: read_.grid, context: read_.context, history: withHistory, ...(read_.weekOneStart ? { weekOneStart: read_.weekOneStart } : {}) }),
+        body: JSON.stringify({ step: "save", grid: read_.grid, context: read_.context, history: withHistory, targets: read_.targets, ...(read_.weekOneStart ? { weekOneStart: read_.weekOneStart } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error ?? "Couldn't save the plan.");
         setBusy(false);
+        setPhase(null);
         return;
       }
       toast.success(
@@ -162,10 +113,12 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           (data.sessionsLogged > 0 ? ` ${data.sessionsLogged} past session${data.sessionsLogged === 1 ? "" : "s"} imported.` : "") +
           " Check it, then assign."
       );
+      setPhase("opening");
       router.push(`/clients/${clientId}/programs/${data.assignmentId}`);
     } catch {
       setError("Couldn't reach the server. Please try again.");
       setBusy(false);
+      setPhase(null);
     }
   }
 
@@ -178,18 +131,25 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       <div className="space-y-4">
         <div>
           <p className="text-[15px] font-semibold text-ink">Read as {summary.readAs}</p>
-          <p className="mt-0.5 text-[13px] text-ink-mute">
-            {summary.exercises} exercises · week 1 started {shortDay(summary.weekOneStart)}
-          </p>
         </div>
-        <ul className="space-y-1.5 text-[13px] text-ink-soft">
-          {summary.days.map((d) => (
-            <li key={d.name}>
-              <span className="font-medium text-ink">{d.name}:</span> {describeDay(d)}
-            </li>
-          ))}
-        </ul>
-        {h.sessions > 0 ? (
+        {read_.found ? (
+          <FoundInFile found={read_.found} detail={(i) => (summary.days[i] ? describeDay(summary.days[i]) : null)} />
+        ) : (
+          <ul className="space-y-1.5 text-[13px] text-ink-soft">
+            {summary.days.map((d) => (
+              <li key={d.name}>
+                <span className="font-medium text-ink">{d.name}:</span> {describeDay(d)}
+              </li>
+            ))}
+          </ul>
+        )}
+        {read_.targets && (
+          <p className="text-[13px] font-medium text-ink">
+            {summary.completedWeeks > 0 ? `Starts at week ${summary.completedWeeks + 1}, as your note says. Earlier weeks aren't imported as sessions.` : "Starts at week 1. Nothing is marked done."}
+          </p>
+        )}
+        <TimesList times={summary.times ?? []} grid={read_.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
+        {read_.targets ? null : h.sessions > 0 ? (
           <label className="flex items-start gap-3 rounded-lg border border-line-strong bg-dusk-raised p-3">
             <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} disabled={busy} className="mt-1 h-4 w-4 shrink-0" />
             <span className="text-sm">
@@ -210,15 +170,22 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           <button type="button" onClick={save} disabled={busy} className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-dusk-button px-5 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-70">
             {busy ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                <Loader2 className="h-4 w-4 animate-spin" /> {phase === "opening" ? "Opening the draft…" : "Saving…"}
               </>
-            ) : history && h.sessions > 0 ? (
+            ) : history && !read_.targets && h.sessions > 0 ? (
               `Save plan and ${h.sessions} past session${h.sessions === 1 ? "" : "s"}`
             ) : (
               "Save plan"
             )}
           </button>
         </div>
+        {phase && (
+          <p role="status" aria-live="polite" className="text-[13px] text-ink-mute">
+            {phase === "saving"
+              ? `Saving ${summary.weeks} week${summary.weeks === 1 ? "" : "s"}, ${summary.exercises} exercises and ${firstName}\u2019s schedule. A few seconds.`
+              : "Saved. Opening the draft to check before you assign it."}
+          </p>
+        )}
         {error && (
           <p role="alert" className="text-sm leading-relaxed text-destructive">
             {error}
@@ -247,43 +214,8 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={busy}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
-            if (!dragging) setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            void pick(e.dataTransfer.files);
-          }}
-          className={cn(
-            "press flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 [&>*]:pointer-events-none border-dashed px-4 py-7 text-center transition-colors",
-            dragging ? "border-ink/50 bg-ink/5" : "border-line-strong hover:border-ink/40 hover:bg-ink/[0.03]"
-          )}
-        >
-          <Upload className="h-5 w-5 text-ink-soft" />
-          <span className="text-[15px] font-semibold text-ink">{dragging ? "Drop it here" : "Drop a spreadsheet or photos, or choose"}</span>
-          <span className="text-[13px] text-ink-mute">.xlsx, .csv or screenshots of the plan</span>
-        </button>
+        <PlanDropZone onFiles={(f) => void pick(f)} disabled={busy} />
       )}
-      <input
-        ref={fileRef}
-        type="file"
-        accept={ACCEPT}
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          e.target.value = "";
-          void pick(files);
-        }}
-      />
 
       {!file && (
         <div>

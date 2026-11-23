@@ -9,7 +9,7 @@
  * Pure: no I/O.
  */
 
-import { inferWeekOneStart, planFromGrid, shapePlan, type PlanWeek, type SheetGrid } from "./sheet-plan";
+import { inferWeekOneStart, planFromGrid, shapePlan, timedRows, type PlanWeek, type SheetGrid, type TimedRow } from "./sheet-plan";
 import { NO_CONTEXT, describeReadAs, type PlanContext } from "./plan-context";
 import { structure } from "@/lib/workouts/structure";
 
@@ -56,6 +56,8 @@ export type ImportSummary = {
     to: string | null;
     perWeek: Array<{ week: number; sessions: number; sets: number }>;
   };
+  /** Every exercise done for time, shown in minutes; `unclear` ones ask for the unit. */
+  times: TimedRow[];
 };
 
 export function summarizeSheetImport(input: { grid: SheetGrid; context?: PlanContext; weekOneStart?: Date | null; today: Date }): ImportSummary {
@@ -93,6 +95,7 @@ export function summarizeSheetImport(input: { grid: SheetGrid; context?: PlanCon
       to: dates.length ? iso(dates[dates.length - 1]) : null,
       perWeek,
     },
+    times: timedRows(input.grid),
   };
 }
 

@@ -39,4 +39,8 @@ describe("tab taps", () => {
     const toggle = read("components/ModeToggle.tsx");
     expect(toggle).toMatch(/href=\{HOME\[side\]\}\n\s+prefetch/);
   });
+  it("the coach's header tabs on a desktop are fetched ahead in full, like the bottom tabs", () => {
+    const src = read("components/coach/CoachNav.tsx");
+    expect(src).toMatch(/key=\{href\}\n\s+href=\{href\}\n(\s+\/\/[^\n]*\n)*\s+prefetch\n\s+onClick=\{\(e\) => onClick\(e, href\)\}/);
+  });
 });

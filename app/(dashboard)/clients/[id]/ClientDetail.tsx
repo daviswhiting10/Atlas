@@ -21,6 +21,7 @@ import { DeleteClientSheet, type DeletePreview } from "@/components/coach/Delete
 import { shareInvite } from "@/lib/coach/invite-share";
 import type { LoginStatus } from "@/lib/coach/login-status";
 import { PlanStart } from "@/components/coach/PlanStart";
+import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { initialDoor } from "@/lib/plan-start";
 import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
@@ -242,6 +243,8 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
   const redFlags = intakes[0]?.redFlags ?? null;
   // Progress open but nothing to chart any more (sessions deleted): show Sessions, not a blank tab.
   const shown: View = view === "progress" && !progress && !week ? "sessions" : view;
+  // No plan yet and nothing logged: the page leads with Create a plan.
+  const noPlanNoSessions = client.programAssignments.length === 0 && client.workoutLogs.length === 0;
   const views: Array<{ id: View; label: string }> = [
     ...(progress || week ? [{ id: "progress" as const, label: "Week" }] : []),
     { id: "sessions", label: "Sessions" },
@@ -299,13 +302,27 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
       {toDelete && <DeleteClientSheet preview={toDelete} onDelete={confirmDelete} onClose={() => setToDelete(null)} />}
       {invite && <InviteSheet name={client.fullName} invite={invite} onClose={() => setInvite(null)} />}
 
-      {/* ── The one action: log ─────────────────────────────────────────── */}
-      <Link
-        href={`/clients/${client.id}/log`}
-        className="press mb-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:max-w-sm"
-      >
-        Log session
-      </Link>
+      {/* ── The one action ──────────────────────────────────────────────── */}
+      {noPlanNoSessions ? (
+        // A client with no plan and no sessions: the page leads with making a plan (drop a file, or tap to choose one);
+        // logging is a quieter link under it. Once there is a plan or a session, the layout below is the usual one.
+        <section className="mb-8" aria-label="Create a plan">
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Create a plan</h2>
+          <div className="mt-3 max-w-xl">
+            <SheetPlanUpload clientId={client.id} firstName={client.fullName.split(" ")[0]} />
+          </div>
+          <Link href={`/clients/${client.id}/log`} className="press mt-3 inline-flex min-h-11 items-center text-[15px] font-medium text-ink-soft hover:text-ink">
+            Log session
+          </Link>
+        </section>
+      ) : (
+        <Link
+          href={`/clients/${client.id}/log`}
+          className="press mb-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:max-w-sm"
+        >
+          Log session
+        </Link>
+      )}
       {report && <div className="-mt-3 mb-8">{report}</div>}
       {latest}
       <div className="mb-12">

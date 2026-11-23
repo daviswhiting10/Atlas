@@ -14,6 +14,7 @@ import { durationRange } from "@/lib/sessions/duration";
 import { generatePlan, normalizePrefs, type Prefs } from "./generator";
 import { isLighterWeek, lighterWeeksOn } from "./lighter";
 import { weekOf } from "@/lib/athlete/sessions";
+import { noteHistory, type SessionNote } from "./note-history";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 import { mediaPictures } from "@/lib/exercises/media";
 
@@ -31,6 +32,8 @@ export type WorkoutSummary = {
   status: WorkoutStatus;
   /** A note written by the athlete or their coach. */
   note: string | null;
+  /** Notes from past sessions of this workout (same name, this week or earlier), newest first. */
+  history: SessionNote[];
   /** One of the plan's lighter weeks. */
   deload: boolean;
   estMinutes: number;
@@ -123,6 +126,9 @@ export async function loadPlanOverview({
   fallbackPrefs?: Prefs | null;
 }): Promise<PlanOverview | null> {
   const assignment = await prisma.programAssignment.findFirst({
+    // One joined query instead of a chain of them (assignment, workouts, logs, exercises, one after another): Today, Plan
+    // and Progress all wait on this read.
+    relationLoadStrategy: "join",
     where: assignmentId ? { id: assignmentId, clientId, workspaceId } : { clientId, workspaceId, status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
     select: {
@@ -141,7 +147,7 @@ export async function loadPlanOverview({
           name: true,
           scheduledDate: true,
           status: true,
-          workoutLog: { select: { completedAt: true } },
+          workoutLog: { select: { completedAt: true, date: true, clientNotes: true } },
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
@@ -170,6 +176,7 @@ export async function loadPlanOverview({
     date: iso(w.scheduledDate),
     status: planWorkoutStatus(w.status, w.workoutLog),
     note: w.notes,
+    history: [],
     deload: isDeload(w.scheduledDate),
     estMinutes: estimate(w.exercises),
     exercises: w.exercises.map((e) => {
@@ -195,6 +202,16 @@ export async function loadPlanOverview({
       };
     }),
   }));
+  // Under each workout: what was written after its past sessions (the logger's "how did it go" note).
+  const notesBefore = noteHistory(
+    assignment.assignedWorkouts.map((w, i) => ({
+      id: w.id,
+      name: w.name,
+      week: workouts[i].week,
+      sessionNote: w.workoutLog?.completedAt && w.workoutLog.clientNotes ? { date: iso(w.workoutLog.date), text: w.workoutLog.clientNotes } : null,
+    }))
+  );
+  for (const w of workouts) w.history = notesBefore.get(w.id) ?? [];
 
   // The coach's own photos and clips win over the library's.
   const own = await mediaPictures(workspaceId, workouts.flatMap((w) => w.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name }))));

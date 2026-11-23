@@ -71,11 +71,14 @@ describe("the Atlas form's wiring (static)", () => {
 });
 
 describe("the rows (static)", () => {
-  const start = read("components/coach/PlanStart.tsx");
+  // The rows live in one shared component, used by the coach's Plan tab and the athlete's empty Today.
+  const start = read("components/plan/DoorRows.tsx");
   const detail = read("app/(dashboard)/clients/[id]/ClientDetail.tsx");
   it("each row is at least 44 px tall and shows an instant pressed state", () => {
     expect(start).toMatch(/min-h-\[(6\d|7\d)px\]/);
     expect(start).toContain("onPointerDown");
+    expect(read("components/coach/PlanStart.tsx")).toContain("<DoorRows");
+    expect(read("components/athlete/NoPlanCard.tsx")).toContain("<DoorRows");
   });
   it("there is no mic button, only room for one", () => {
     expect(start + read("components/coach/CoachPlanForm.tsx")).not.toMatch(/<Mic\b/);

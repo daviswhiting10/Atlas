@@ -1,0 +1,555 @@
+{
+ "plan_title": "Chloe · 4-Week Glute Focus Program (Month 1)",
+ "plan_notes": "4 days per week. Same exercises all 4 weeks. Log weight x reps in the Wk columns after every set block. Week 1: 3 main lift sets, effort RPE 7, learn the movements, leave 3 reps in the tank. Week 2: 3 sets, effort RPE 8, add weight or 1-2 reps vs. Week 1. Week 3: 4 sets, effort RPE 8, add a set on the main lifts. Week 4: 4 sets, effort RPE 8-9, beat Week 1 numbers, check-in after this week.",
+ "weeks": 4,
+ "workouts": [
+  {
+   "day_label": "DAY 1 · GLUTES A (hip thrust + hinge)",
+   "exercises": [
+    {
+     "name": "Glute bridge",
+     "block": "Warm-up",
+     "sets": 2,
+     "reps": "15",
+     "rest_seconds": null,
+     "note": "Squeeze 2 sec at top; ribs down",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Banded lateral walk",
+     "block": "Warm-up",
+     "sets": 2,
+     "reps": "10",
+     "rest_seconds": null,
+     "note": "Band above knees, stay low, toes forward",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Hip hinge drill (dowel on back)",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "10",
+     "rest_seconds": null,
+     "note": "Push hips back, dowel touches head, upper back, tailbone",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Barbell hip thrust",
+     "block": "Block 1",
+     "sets": 3,
+     "reps": "8-10",
+     "rest_seconds": 120,
+     "note": "Chin tucked, shins vertical at top. Swap: hip thrust machine",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Dumbbell Romanian deadlift",
+     "block": "Block 2",
+     "sets": 3,
+     "reps": "10",
+     "rest_seconds": 90,
+     "note": "Soft knees, DBs slide down thighs, stop when hips stop moving back",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "45° back extension (glute bias)",
+     "block": "Block 3a",
+     "sets": 3,
+     "reps": "12-15",
+     "rest_seconds": null,
+     "note": "Round upper back, toes out, drive hips into pad",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Seated hip abduction machine",
+     "block": "Block 3b",
+     "sets": 3,
+     "reps": "15-20",
+     "rest_seconds": 60,
+     "note": "Lean forward slightly; 2 sec pause open",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Cable glute kickback",
+     "block": "Finisher",
+     "sets": 2,
+     "reps": "12",
+     "rest_seconds": 45,
+     "note": "Weaker side first; match reps on strong side",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Figure-4 stretch + half-kneeling hip flexor stretch",
+     "block": "Cool-down",
+     "sets": 1,
+     "reps": "45 sec",
+     "rest_seconds": null,
+     "note": "Easy breathing, no pain",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    }
+   ]
+  },
+  {
+   "day_label": "DAY 2 · UPPER A (push focus)",
+   "exercises": [
+    {
+     "name": "Band pull-apart",
+     "block": "Warm-up",
+     "sets": 2,
+     "reps": "15",
+     "rest_seconds": null,
+     "note": "Arms straight, squeeze shoulder blades",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Wall slides",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "10",
+     "rest_seconds": null,
+     "note": "Back and arms stay on wall",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Scap push-up (knees OK)",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "10",
+     "rest_seconds": null,
+     "note": "Only shoulder blades move",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Dumbbell bench press",
+     "block": "Block 1",
+     "sets": 3,
+     "reps": "8-10",
+     "rest_seconds": 90,
+     "note": "Shoulder blades pinned, elbows ~45°",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Lat pulldown",
+     "block": "Block 2",
+     "sets": 3,
+     "reps": "10-12",
+     "rest_seconds": 90,
+     "note": "Pull elbows to back pockets, no leaning back",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Seated cable row",
+     "block": "Block 3a",
+     "sets": 3,
+     "reps": "12",
+     "rest_seconds": null,
+     "note": "Chest tall, pause 1 sec at ribs",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Seated dumbbell shoulder press",
+     "block": "Block 3b",
+     "sets": 3,
+     "reps": "10",
+     "rest_seconds": 60,
+     "note": "Back against pad, ribs down",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Dead bug",
+     "block": "Finisher",
+     "sets": 2,
+     "reps": "8",
+     "rest_seconds": 45,
+     "note": "Low back stays flat on floor; slow",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Doorway pec stretch + child's pose lat stretch",
+     "block": "Cool-down",
+     "sets": 1,
+     "reps": "45 sec each",
+     "rest_seconds": null,
+     "note": "",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    }
+   ]
+  },
+  {
+   "day_label": "DAY 3 · GLUTES B (single-leg + squat pattern)",
+   "exercises": [
+    {
+     "name": "Side-lying clamshell",
+     "block": "Warm-up",
+     "sets": 2,
+     "reps": "12",
+     "rest_seconds": null,
+     "note": "Weaker side first",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Single-leg glute bridge",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "8",
+     "rest_seconds": null,
+     "note": "Hips stay level; note which side feels weaker",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Goblet squat to box",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "8",
+     "rest_seconds": null,
+     "note": "Sit back to the box, light weight",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Leg press (feet high and wide)",
+     "block": "Block 1",
+     "sets": 3,
+     "reps": "10-12",
+     "rest_seconds": 120,
+     "note": "Full depth without low back lifting off pad",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Dumbbell reverse lunge",
+     "block": "Block 2",
+     "sets": 3,
+     "reps": "8",
+     "rest_seconds": 90,
+     "note": "Weaker side first. Slight forward lean. Swap if hip hurts: step-up to low box",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Cable pull-through",
+     "block": "Block 3a",
+     "sets": 3,
+     "reps": "12-15",
+     "rest_seconds": null,
+     "note": "Hinge, not squat; snap hips through",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Single-leg hip thrust (bench)",
+     "block": "Block 3b",
+     "sets": 3,
+     "reps": "10",
+     "rest_seconds": 60,
+     "note": "Bodyweight first, add DB on hip when 10 is easy",
+     "unilateral": true,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Banded seated abduction",
+     "block": "Finisher",
+     "sets": 2,
+     "reps": "25",
+     "rest_seconds": 45,
+     "note": "Burnout; keep tension the whole set",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Figure-4 stretch + 90/90 hip switches",
+     "block": "Cool-down",
+     "sets": 1,
+     "reps": "45 sec / 8 switches",
+     "rest_seconds": null,
+     "note": "",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    }
+   ]
+  },
+  {
+   "day_label": "DAY 4 · UPPER B + GLUTE PUMP",
+   "exercises": [
+    {
+     "name": "Band pull-apart",
+     "block": "Warm-up",
+     "sets": 2,
+     "reps": "15",
+     "rest_seconds": null,
+     "note": "",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Cat-cow",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "8",
+     "rest_seconds": null,
+     "note": "Slow, move through whole spine",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Glute bridge",
+     "block": "Warm-up",
+     "sets": 1,
+     "reps": "15",
+     "rest_seconds": null,
+     "note": "",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Hip thrust (lighter, 2 sec pause at top)",
+     "block": "Block 1",
+     "sets": 3,
+     "reps": "12",
+     "rest_seconds": 90,
+     "note": "About 70% of Day 1 weight; quality over load",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Single-arm dumbbell row",
+     "block": "Block 2a",
+     "sets": 3,
+     "reps": "10",
+     "rest_seconds": null,
+     "note": "Weaker side first, hips square",
+     "unilateral": true,
+     "superset_group": "2",
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Machine chest press or incline push-up",
+     "block": "Block 2b",
+     "sets": 3,
+     "reps": "10-12",
+     "rest_seconds": 90,
+     "note": "",
+     "unilateral": false,
+     "superset_group": "2",
+     "week_overrides": [
+      {
+       "weeks": [
+        3,
+        4
+       ],
+       "sets": 4,
+       "reps": null,
+       "load": null
+      }
+     ],
+     "uncertain": []
+    },
+    {
+     "name": "Dumbbell lateral raise",
+     "block": "Block 3a",
+     "sets": 3,
+     "reps": "12-15",
+     "rest_seconds": null,
+     "note": "Lead with elbows, stop at shoulder height",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Cable face pull",
+     "block": "Block 3b",
+     "sets": 3,
+     "reps": "15",
+     "rest_seconds": 60,
+     "note": "Pull rope to forehead, thumbs back",
+     "unilateral": false,
+     "superset_group": "3",
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Side plank (knees OK)",
+     "block": "Finisher",
+     "sets": 2,
+     "reps": "20-30 sec",
+     "rest_seconds": 45,
+     "note": "Compare sides; weaker side first",
+     "unilateral": true,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    },
+    {
+     "name": "Doorway pec stretch + figure-4 stretch",
+     "block": "Cool-down",
+     "sets": 1,
+     "reps": "45 sec each",
+     "rest_seconds": null,
+     "note": "",
+     "unilateral": false,
+     "superset_group": null,
+     "week_overrides": [],
+     "uncertain": []
+    }
+   ]
+  }
+ ],
+ "uncertain": [
+  "Warm-up and cool-down rows have no rest given (treated as null)",
+  "Week 3-4 set bumps in Day 4 Block 2a/2b assumed to apply to each exercise individually"
+ ]
+}
