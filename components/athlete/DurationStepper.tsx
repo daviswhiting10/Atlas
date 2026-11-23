@@ -17,6 +17,8 @@ export function DurationStepper({
   onChange,
   dim,
   settled,
+  showButtons,
+  onArm,
 }: {
   value: number | null;
   bare: BareUnit;
@@ -25,6 +27,9 @@ export function DurationStepper({
   dim: boolean;
   /** False just after cards fold, open or move: a +/− tapped now was meant for what was there. */
   settled: () => boolean;
+  /** − and + show on the active set only (and on a set you tapped into). */
+  showButtons: boolean;
+  onArm: () => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null); // what is typed, while the field has focus
   const focused = useRef(false);
@@ -39,7 +44,7 @@ export function DurationStepper({
   };
   return (
     <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
-      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
+      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Minus className="h-4 w-4" />
       </button>
       <label className="flex min-w-0 flex-1 flex-col items-center justify-center self-stretch">
@@ -53,6 +58,7 @@ export function DurationStepper({
           aria-label={label}
           onFocus={(e) => {
             focused.current = true;
+            onArm();
             setDraft(formatClock(value));
             e.target.select();
           }}
@@ -73,7 +79,7 @@ export function DurationStepper({
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">min:sec</span>
       </label>
-      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
+      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Plus className="h-4 w-4" />
       </button>
     </div>
