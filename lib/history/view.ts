@@ -9,10 +9,10 @@ import { heatDays, type HeatDays } from "./year-grid";
 export type HistoryView =
   | { kind: "empty" }
   | { kind: "thin"; sessions: number; first: CalendarSession & { day: string } }
-  | { kind: "grid"; sessions: number; today: string; summary: string; days: HeatDays };
+  | { kind: "grid"; sessions: number; today: string; summary: string; days: HeatDays; /** The running challenge's name, for the legend and the readout. */ challenge: string | null };
 
 export function historyView(c: HistoryCalendar): HistoryView {
   if (c.kind === "empty") return c;
   if (c.kind === "thin") return { kind: "thin", sessions: c.sessions, first: c.first };
-  return { kind: "grid", sessions: c.sessions, today: c.today, summary: c.summary, days: heatDays(c.byDay) };
+  return { kind: "grid", sessions: c.sessions, today: c.today, summary: c.summary, days: heatDays(c.byDay, c.challenge), challenge: c.challenge?.name ?? null };
 }

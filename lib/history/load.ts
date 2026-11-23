@@ -9,7 +9,8 @@
 
 import { localDay } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
-import { chapterSpan, historyCalendar, type HistoryCalendar } from "./calendar";
+import { activeGoalId, loadGoal } from "@/lib/goals/data";
+import { chapterSpan, historyCalendar, type Challenge, type HistoryCalendar } from "./calendar";
 import type { HistorySession } from "./types";
 
 /** Where a session opens: the athlete's own pages, or the coach's session page. */
@@ -26,7 +27,7 @@ export function sessionHref(viewer: Viewer, s: Row): string | null {
 }
 
 export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: { clientId: string; workspaceId: string; timeZone: string; viewer: Viewer }): Promise<HistoryCalendar> {
-  const [rows, goals] = await Promise.all([
+  const [rows, goals, challenge] = await Promise.all([
     prisma.workoutLog.findMany({
       where: { clientId, client: { workspaceId }, completedAt: { not: null } },
       select: {
@@ -34,21 +35,39 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
         date: true,
         completedAt: true,
         durationMin: true,
+        activity: true,
         title: true,
         source: true,
         assignedWorkoutId: true,
         assignedWorkout: { select: { name: true } },
-        sets: { select: { exerciseId: true, weight: true, reps: true, rpe: true, bandColor: true, completed: true } },
+        sets: { select: { exerciseId: true, weight: true, reps: true, rpe: true, bandColor: true, completed: true, assignedWorkoutExercise: { select: { mode: true, activity: true } } } },
       },
     }),
     prisma.goal.findMany({
       where: { clientId, client: { workspaceId }, status: { in: ["COMPLETED", "ENDED"] } },
       select: { name: true, startDay: true, endedAt: true },
     }),
+    loadChallenge(clientId),
   ]);
 
-  const sessions: HistorySession[] = rows.map((r) => ({ id: r.id, date: r.date, completedAt: r.completedAt, durationMin: r.durationMin, sets: r.sets }));
+  const sessions: HistorySession[] = rows.map((r) => ({
+    id: r.id,
+    date: r.date,
+    completedAt: r.completedAt,
+    durationMin: r.durationMin,
+    activity: r.activity,
+    // A set of a plan exercise logged as cardio says what kind (and is not strength work).
+    sets: r.sets.map(({ assignedWorkoutExercise: awe, ...set }) => ({ ...set, cardio: awe?.mode === "CARDIO" ? (awe.activity ?? "OTHER") : null })),
+  }));
   const meta = Object.fromEntries(rows.map((r) => [r.id, { title: r.title ?? r.assignedWorkout?.name ?? "Workout", href: sessionHref(viewer, r) }]));
   const today = localDay(new Date(), timeZone);
-  return historyCalendar(sessions, { timeZone, today, meta, chapters: goals.map((g) => chapterSpan(g, timeZone, today)) });
+  return historyCalendar(sessions, { timeZone, today, meta, chapters: goals.map((g) => chapterSpan(g, timeZone, today)), challenge });
+}
+
+/** The running goal's days for the heatmap's ring: met, or open (a missed day, or one still going). */
+async function loadChallenge(clientId: string): Promise<Challenge | null> {
+  const id = await activeGoalId(clientId);
+  const loaded = id ? await loadGoal(id, clientId) : null;
+  if (!loaded || loaded.goal.status !== "ACTIVE") return null;
+  return { name: loaded.goal.name, days: Object.fromEntries(loaded.result.periods.map((p) => [p.day, p.state === "met" ? ("met" as const) : ("open" as const)])) };
 }

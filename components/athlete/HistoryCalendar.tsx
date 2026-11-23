@@ -163,7 +163,7 @@ export function HistoryCalendar({ calendar, summary }: { calendar: HistoryView; 
           </p>
           <p className="sr-only">{calendar.summary}</p>
           <div className="mt-6">
-            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} />
+            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} challenge={calendar.challenge} />
           </div>
         </>
       )}

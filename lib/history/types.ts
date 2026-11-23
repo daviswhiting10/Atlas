@@ -14,6 +14,8 @@ export type HistorySet = {
   reps: number | null;
   rpe?: number | null;
   bandColor?: string | null;
+  /** When the set was of a plan exercise logged as cardio: what kind. Such a set is not strength work. */
+  cardio?: "RUN" | "WALK" | "OTHER" | null;
   completed: boolean;
 };
 
@@ -22,5 +24,7 @@ export type HistorySession = {
   date: Date;
   completedAt: Date | null;
   durationMin: number | null;
+  /** A quick log of cardio or a walk (no plan exercise behind it): what it was. */
+  activity?: "RUN" | "WALK" | "OTHER" | null;
   sets: HistorySet[];
 };

@@ -1,54 +1,86 @@
 /**
- * The History heatmap as a year grid: weeks are columns, seven day rows, Monday first. Pure: no I/O.
+ * The History heatmap, v3: weeks as columns, seven day rows, Monday first. Pure: no I/O.
  *
- * - **Intensity is logged sets in a day** (all that day's sessions added), in four steps (1 to 4) from the athlete's own
- *   quartiles: the 25th, 50th and 75th percentile (nearest rank) of every training day in their whole history. So the
- *   steps belong to the person, not to a fixed number of sets, and a light month still shows contrast. A session with no
- *   sets logged still counts as a training day (step 1, "present").
- * - Level 0 is a day with no session; a **future** day (after today, in the last week) is its own state.
- * - The window ends on the week of today. `weeks` is how many columns: a year on a desktop, the last 26 on a phone
- *   (the component shows the older ones only from the md breakpoint up).
- * - A month is named above the column that holds its 1st.
+ * Three layers on every day:
+ * 1. **Colour: minutes logged that day** (all its sessions added), one hue in five fixed bands: 1-29, 30-59, 60-89, 90-119,
+ *    120 and over. A day with no session is unshaded. A session with no minutes recorded still makes it a training day,
+ *    at the lightest band.
+ * 2. **Corner icon: how you trained** (lib/history/mode): strength, run, walk, or a mix.
+ * 3. **Ring: the running challenge.** Closed when the day's rules were met, open (a gap) when not.
+ *
+ * The window ends on the week of today: 13 weeks on a phone, 26 on a desktop. A month is named above the column that
+ * holds its 1st.
  */
 
 import { mondayOf } from "@/lib/athlete/sessions";
 import { addDays } from "@/lib/goals/days";
-import type { CalendarSession } from "./calendar";
+import type { CalendarSession, Challenge } from "./calendar";
+import { dayMode, type DayMode } from "./mode";
 
-/** What the grid needs to know about a training day: no ids, no links, no record flags. */
-export type DayInfo = { sets: number; minutes: number; titles: string[] };
+/** 0 is an empty day; 1 to 5 are the minute bands. */
+export type GridLevel = 0 | 1 | 2 | 3 | 4 | 5;
+
+/** What the grid needs to know about a day: no ids, no links, no record flags. This is what a browser is sent. */
+export type DayInfo = { minutes: number; sets: number; titles: string[]; mode: DayMode | null; ring: "met" | "open" | null };
 export type HeatDays = Record<string, DayInfo>;
 
-/** A calendar's days, cut down to DayInfo (days with no session are left out). This is what a browser is sent. */
-export function heatDays(byDay: Record<string, CalendarSession[]>): HeatDays {
+/** The bands' lower edges in minutes, for levels 1 to 5. */
+export const BANDS = [1, 30, 60, 90, 120] as const;
+/** How the bands read in the legend. */
+export const BAND_LABELS = ["1-29", "30-59", "60-89", "90-119", "120+"] as const;
+
+/** A day's colour band from its minutes. `trained`: it had a session (even one with no minutes written down). */
+export function bandOf(minutes: number, trained: boolean): GridLevel {
+  if (!trained) return 0;
+  if (minutes >= BANDS[4]) return 5;
+  if (minutes >= BANDS[3]) return 4;
+  if (minutes >= BANDS[2]) return 3;
+  if (minutes >= BANDS[1]) return 2;
+  return 1;
+}
+
+/**
+ * A calendar's days, cut down to DayInfo. Days with sessions, plus every day of the running challenge (a challenge day with
+ * nothing logged still gets its open ring).
+ */
+export function heatDays(byDay: Record<string, CalendarSession[]>, challenge?: Challenge | null): HeatDays {
   const out: HeatDays = {};
   for (const day of Object.keys(byDay)) {
     const list = byDay[day];
     if (list.length === 0) continue;
-    out[day] = { sets: list.reduce((n, s) => n + s.sets, 0), minutes: list.reduce((n, s) => n + (s.minutes ?? 0), 0), titles: list.map((s) => s.title) };
+    out[day] = {
+      minutes: list.reduce((n, s) => n + (s.minutes ?? 0), 0),
+      sets: list.reduce((n, s) => n + s.sets, 0),
+      titles: list.map((s) => s.title),
+      mode: dayMode(list),
+      ring: null,
+    };
+  }
+  for (const [day, state] of Object.entries(challenge?.days ?? {})) {
+    out[day] = { ...(out[day] ?? { minutes: 0, sets: 0, titles: [], mode: null }), ring: state };
   }
   return out;
 }
-
-export type GridLevel = 0 | 1 | 2 | 3 | 4;
 
 export type GridCell = {
   day: string;
   level: GridLevel;
   future: boolean;
   sets: number;
-  titles: string[];
   minutes: number;
+  titles: string[];
+  mode: DayMode | null;
+  ring: "met" | "open" | null;
 };
 
 export type GridColumn = { monday: string; month: string | null; cells: GridCell[] };
 
-export type YearGrid = { columns: GridColumn[]; thresholds: [number, number, number] | null };
+export type YearGrid = { columns: GridColumn[] };
 
-/** Columns on a desktop (a year of weeks, plus the partial one). */
-export const YEAR_WEEKS = 53;
-/** Columns on a phone: the last 26 weeks, so cells stay around 12 px. */
-export const PHONE_WEEKS = 26;
+/** Columns on a desktop. */
+export const DESKTOP_WEEKS = 26;
+/** Columns on a phone: the last 13 weeks, so each cell is wide enough (about 24 px) for its icon and ring. */
+export const PHONE_WEEKS = 13;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -64,29 +96,8 @@ export function gridDay(day: string): string {
   return `${WEEKDAYS[p.wd]} ${MONTHS[p.m]} ${p.d}`;
 }
 
-/** Sets in a day, with a floor of "present" for a session that logged none. */
-const PRESENT = 0.5;
-const workOf = (d: DayInfo) => (d.sets > 0 ? d.sets : PRESENT);
-
-/** Nearest-rank percentile of an ascending list. */
-const percentile = (sorted: number[], q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)];
-
-/** Steps 1 to 4 from the athlete's own quartiles over every training day they have. */
-export function quartileSteps(byDay: HeatDays): [number, number, number] | null {
-  const work = Object.values(byDay)
-    .map(workOf)
-    .sort((a, b) => a - b);
-  return work.length === 0 ? null : [percentile(work, 0.25), percentile(work, 0.5), percentile(work, 0.75)];
-}
-
-export function levelOf(work: number, t: [number, number, number] | null): GridLevel {
-  if (t == null) return 1;
-  return work <= t[0] ? 1 : work <= t[1] ? 2 : work <= t[2] ? 3 : 4;
-}
-
 export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number }): YearGrid {
-  const weeks = opts.weeks ?? YEAR_WEEKS;
-  const thresholds = quartileSteps(byDay);
+  const weeks = opts.weeks ?? DESKTOP_WEEKS;
   const lastMonday = mondayOf(opts.today);
   const columns: GridColumn[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
@@ -95,29 +106,33 @@ export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number 
       const day = addDays(monday, k);
       const info = byDay[day];
       const future = day > opts.today;
-      const trained = !future && info != null;
+      const trained = !future && info != null && info.titles.length > 0;
       return {
         day,
-        level: trained ? levelOf(workOf(info), thresholds) : 0,
+        level: trained ? bandOf(info.minutes, true) : 0,
         future,
         sets: info?.sets ?? 0,
-        titles: info?.titles ?? [],
         minutes: info?.minutes ?? 0,
+        titles: info?.titles ?? [],
+        mode: future ? null : (info?.mode ?? null),
+        // No ring on a day that hasn't come: only the days the challenge has reached.
+        ring: future ? null : (info?.ring ?? null),
       };
     });
     const first = cells.find((c) => parts(c.day).d === 1);
     columns.push({ monday, month: first ? MONTHS[parts(first.day).m] : null, cells });
   }
-  return { columns, thresholds };
+  return { columns };
 }
 
-/** The one line under the grid: "Tue Nov 11 · Lower A · 14 sets". */
-export function readout(c: GridCell): string {
+/** The one line under the grid: "Sat Nov 14 · Long run · 52 min · 75 Hard: not met". */
+export function readout(c: GridCell, challenge?: { name: string; today: string } | null): string {
   const head = gridDay(c.day);
   if (c.future) return `${head} · not yet`;
-  if (c.titles.length === 0) return `${head} · no session`;
-  const size = c.sets > 0 ? `${c.sets} set${c.sets === 1 ? "" : "s"}` : c.minutes > 0 ? `${c.minutes} min` : null;
-  return [head, c.titles.join(", "), size].filter(Boolean).join(" · ");
+  const ring = c.ring && challenge ? `${challenge.name}: ${c.ring === "met" ? "met" : c.day === challenge.today ? "still open" : "not met"}` : null;
+  if (c.titles.length === 0) return [head, "no session", ring].filter(Boolean).join(" · ");
+  const size = c.minutes > 0 ? `${c.minutes} min` : c.sets > 0 ? `${c.sets} set${c.sets === 1 ? "" : "s"}` : null;
+  return [head, c.titles.join(", "), size, ring].filter(Boolean).join(" · ");
 }
 
 /** The most recent training day in the grid (what the readout shows before anything is touched), if any. */

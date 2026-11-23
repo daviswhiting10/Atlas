@@ -39,7 +39,7 @@ describe("liteProgress", () => {
 });
 
 describe("historyView: only what the heatmap draws is sent", () => {
-  const s = (id: string, sets: number): CalendarSession => ({ id, title: "Upper A", sets, minutes: 50, record: true, href: `/workouts/${id}` });
+  const s = (id: string, sets: number): CalendarSession => ({ id, title: "Upper A", sets, minutes: 50, mode: "S" as const, record: true, href: `/workouts/${id}` });
   const grid = {
     kind: "grid", sessions: 2, today: "2026-11-23", summary: "1 of the last 1 weeks active, 2 sessions",
     rows: [{ monday: "2026-11-23", month: "Nov", chapter: null, days: [] }],
@@ -47,7 +47,7 @@ describe("historyView: only what the heatmap draws is sent", () => {
   } as unknown as HistoryCalendar;
   const v = historyView(grid);
   it("a grid keeps the day totals and drops rows, ids, links and record flags", () => {
-    expect(v).toEqual({ kind: "grid", sessions: 2, today: "2026-11-23", summary: "1 of the last 1 weeks active, 2 sessions", days: { "2026-11-20": { sets: 16, minutes: 100, titles: ["Upper A", "Upper A"] } } });
+    expect(v).toEqual({ kind: "grid", sessions: 2, today: "2026-11-23", summary: "1 of the last 1 weeks active, 2 sessions", challenge: null, days: { "2026-11-20": { sets: 16, minutes: 100, titles: ["Upper A", "Upper A"], mode: "S", ring: null } } });
     expect(JSON.stringify(v)).not.toMatch(/rows|href|record|"id"/);
   });
   it("empty and thin pass through", () => {
