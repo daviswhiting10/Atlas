@@ -10,7 +10,7 @@ export const FINISHED_BY_CLIENT = "Finished by client";
  * older CLIENT can't be trusted. Only sessions finished from here on get the marker.
  * SET THIS TO THE DAY THE CHANGE SHIPS (the deploy of this commit). It is the first day the stored value means it.
  */
-export const FINISHED_BY_RELIABLE_FROM = new Date("2026-11-22T00:00:00Z");
+export const FINISHED_BY_RELIABLE_FROM = new Date("2026-11-23T00:00:00Z");
 
 export function finishedByClient(
   s: { loggedBy?: string | null; completedAt?: Date | string | null } | null | undefined,
