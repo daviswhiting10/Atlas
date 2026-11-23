@@ -46,6 +46,8 @@ import { ExercisePicker, type PickerExercise } from "@/components/exercises/Exer
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
 import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
+import { FinishSheet } from "@/components/logger/FinishSheet";
+import { finishAction } from "@/lib/sessions/finish";
 import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
@@ -73,6 +75,7 @@ const store = () => {
 };
 import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
 import { useDragOrder } from "./useDragOrder";
+import { DragHandle, DragStatus } from "@/components/logger/DragHandle";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useEscape } from "@/hooks/use-escape";
 
@@ -353,6 +356,8 @@ export default function WorkoutLogger({
   }, [planExercises, order]);
   // Hold a card's header to pick it up; drop between cards to reorder, hold over one to superset.
   const drag = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  // The same on a desktop: its own list, so its own lift (the phone's list is not on screen there).
+  const dragD = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
   /** Up, Down and "superset with the one above", for screen readers (useDragOrder's gestures, as buttons). */
   const moves = (aweId: string) => {
     const i = order.findIndex((o) => o.aweId === aweId);
@@ -826,6 +831,30 @@ export default function WorkoutLogger({
       .filter((g) => g.idx.length > 0);
     if (groups.length) applyBulk(groups, mode);
   }
+  // ── Finish button: nothing logged does nothing; all logged finishes now; some unlogged asks once ──
+  const [confirmFinish, setConfirmFinish] = useState<number | null>(null);
+  function tapFinish() {
+    const act = finishAction(exercises.map((e) => (exStateRef.current[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
+    if (act.kind === "none") return;
+    cancelFinish();
+    if (act.kind === "confirm") return void setConfirmFinish(act.unlogged);
+    void handleCompleteSession(true);
+  }
+  /** Every unlogged set is logged as it stands (its prescribed weight and reps; blank if it has none), then the session finishes. */
+  function markRemainingAndFinish() {
+    const groups = exercises
+      .map((ex) => ({ ex, idx: bulkIndices((exStateRef.current[ex.aweId]?.sets ?? []).map((x) => x.completed), "check") }))
+      .filter((g) => g.idx.length > 0);
+    if (groups.length) applyBulk(groups, "check");
+    cancelFinish(); // the bulk check starts the automatic finish; this one is already on its way
+    void handleCompleteSession(true);
+  }
+  const anyLogged = exercises.some((e) => (exState[e.aweId] ?? freshState(e)).sets.some((x) => x.completed));
+  const finishButton = (
+    <button type="button" onClick={tapFinish} disabled={!anyLogged} className="press h-11 shrink-0 rounded-full px-3 text-[15px] font-semibold text-signal disabled:text-ink-mute disabled:opacity-60">
+      Finish
+    </button>
+  );
   const wb = workoutBulk(exercises.map((e) => (exState[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
   const workoutMenu = wb ? (
     <DropdownMenu>
@@ -1169,12 +1198,13 @@ export default function WorkoutLogger({
   }
 
   // ── Complete session ──────────────────────────────────────────────────────
-  async function handleCompleteSession() {
+  /** `partial`: the Finish button's "only what I logged". The automatic finish still needs every set. */
+  async function handleCompleteSession(partial = false) {
     startComplete(async () => {
       // The last ticks may still be saving: wait for them, and finish only if they all stuck.
       await saveChain.current;
       const workoutLogId = logIdRef.current;
-      if (!workoutLogId || !allDone(doneLists())) return;
+      if (!workoutLogId || (!partial && !allDone(doneLists()))) return;
       try {
         await completeSession({
           workoutLogId,
@@ -1196,7 +1226,7 @@ export default function WorkoutLogger({
     });
   }
 
-  completeRef.current = handleCompleteSession;
+  completeRef.current = () => void handleCompleteSession();
 
   // ── Phone: folding and jumping ───────────────────────────────────────────
   const isDone = (ex: LoggerExercise) => {
@@ -1517,6 +1547,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {finishButton}
           {workoutMenu}
         </div>
         </div>
@@ -1772,6 +1803,7 @@ export default function WorkoutLogger({
           >
             {formatRest(sessionElapsedSec)}
           </div>
+          {finishButton}
           {workoutMenu}
         </div>
       </div>
@@ -1779,8 +1811,16 @@ export default function WorkoutLogger({
       {/* Day picker (desktop) */}
       {dayPicker}
 
-      {/* Exercise cards — grouped by block */}
-      <div className="space-y-4">
+      {/* Exercise cards — grouped by block. Drag a card by its grip (or hold its header), or use the keyboard on the grip. */}
+      <div ref={dragD.listRef} className="relative space-y-4">
+        <DragStatus message={dragD.status} />
+        {dragD.lineTop != null && (
+          <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: dragD.lineTop - 1.5 }}>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+            <span className="h-[3px] flex-1 rounded-full bg-dusk-teal" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+          </div>
+        )}
         {groupIntoBlocks(exercises).map((block) =>
           block.exIndices.length === 0 ? null : (
             block.exIndices.map((exI, k) => {
@@ -1791,7 +1831,7 @@ export default function WorkoutLogger({
           const blockHeaderLabel = block.title;
 
           return (
-            <div key={ex.aweId}>
+            <div key={ex.aweId} data-exercise={ex.aweId} style={dragD.styleFor(ex.aweId)}>
               {showBlockHeader && (
                 <div className="flex items-center gap-3 pt-1 pb-0">
                   <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -1801,15 +1841,19 @@ export default function WorkoutLogger({
                 </div>
               )}
             {isFolded(ex) ? (
-              <div className="mt-2 rounded-xl border border-line bg-paper">
-                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} />
+              <div className="mt-2 flex items-center rounded-xl border border-line bg-paper pl-1" data-drag-header="">
+                {!completed && <DragHandle props={dragD.handle(ex.aweId, ex.name)} />}
+                <div className="min-w-0 flex-1">
+                  <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} hold={dragD.bind(ex.aweId)} />
+                </div>
               </div>
             ) : (
             <Card>
-              <CardHeader className="pb-2 pt-4 px-4">
+              <CardHeader className="no-select pb-2 pt-4 px-4" data-drag-header="" {...dragD.bind(ex.aweId)}>
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
+                      {!completed && <DragHandle props={dragD.handle(ex.aweId, ex.name)} className="-ml-2" />}
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
                       <CardTitle className="text-base font-semibold leading-tight min-w-0"><ExerciseName name={labelled(block.labels[k], ex.name)} /></CardTitle>
                     </div>
@@ -1914,6 +1958,21 @@ export default function WorkoutLogger({
     <>
       {mobileView}
       {desktopView}
+      {confirmFinish != null && (
+        <FinishSheet
+          unlogged={confirmFinish}
+          onCancel={() => setConfirmFinish(null)}
+          onPartial={() => {
+            setConfirmFinish(null);
+            void handleCompleteSession(true);
+          }}
+          onMark={() => {
+            setConfirmFinish(null);
+            markRemainingAndFinish();
+          }}
+        />
+      )}
+
       {confirmAll != null && (
         <CheckAllSheet
           mode={confirmAll.mode}

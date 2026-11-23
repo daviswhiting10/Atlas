@@ -13,12 +13,14 @@ import {
   coachRemoveExercise,
   coachRemoveWorkout,
   coachSetLighterWeeks,
+  coachSetWeekNote,
   coachSetPlanNote,
   coachSetTargets,
   coachSetWorkoutNote,
   coachSwapExercise,
 } from "@/lib/actions/coach-plan";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
+import { WeekNotesEditor } from "@/components/coach/WeekNotesEditor";
 import { AssignPanel } from "@/components/coach/AssignPanel";
 
 export const metadata: Metadata = { title: "Plan" };
@@ -35,7 +37,7 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
 
   const client = await prisma.clientProfile.findFirst({
     where: { id: params.id, workspaceId, deletedAt: null },
-    select: { id: true, fullName: true, programAssignments: { where: { status: "ACTIVE" }, select: { id: true } } },
+    select: { id: true, fullName: true, email: true, userId: true, programAssignments: { where: { status: "ACTIVE" }, select: { id: true } } },
   });
   if (!client) notFound();
 
@@ -93,12 +95,17 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
             ))}
           </div>
         )}
-        {!plan.generated && (
-          <p className="mt-3 max-w-2xl text-[13px] text-ink-mute">Built from a library program, exactly as written. It edits the same way; lighter weeks are off unless you turn them on below.</p>
-        )}
       </div>
 
       <div className={draft ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10" : "max-w-3xl"}>
+        <div className="min-w-0 space-y-6">
+        <WeekNotesEditor
+          notes={plan.weekNotes}
+          totalWeeks={plan.totalWeeks}
+          currentWeek={plan.currentWeek}
+          firstName={firstName}
+          save={coachSetWeekNote.bind(null, client.id, plan.id)}
+        />
         <PlanView
           plan={plan}
           actions={actions}
@@ -106,10 +113,18 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
           startLabel="Log this workout"
           noteLabel={`Coaching notes · ${firstName} sees these`}
         />
+        </div>
 
         {draft && (
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-            <AssignPanel clientId={client.id} clientName={client.fullName} assignmentId={plan.id} startDate={plan.startDate} hasLivePlan={client.programAssignments.length > 0} />
+            <AssignPanel
+              clientId={client.id}
+              clientName={client.fullName}
+              assignmentId={plan.id}
+              startDate={plan.startDate}
+              hasLivePlan={client.programAssignments.length > 0}
+              notInvited={!client.userId && !!client.email?.trim()}
+            />
           </aside>
         )}
       </div>

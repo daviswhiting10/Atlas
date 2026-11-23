@@ -34,9 +34,19 @@ describe("tab taps", () => {
     expect(read("components/coach/CoachNav.tsx")).toMatch(/prefetch\n\s+onClick=\{\(e\) => onClick\(e, href\)\}/);
   });
   it("every link to a home page asks for the same full prefetch (the first, lighter ask would otherwise win)", () => {
-    expect(read("components/athlete/AppNav.tsx")).toContain('<Link href="/today" prefetch');
-    expect(read("components/coach/CoachNav.tsx")).toContain('<Link href="/log" prefetch');
     const toggle = read("components/ModeToggle.tsx");
-    expect(toggle).toMatch(/href=\{HOME\[side\]\}\n\s+prefetch/);
+    expect(toggle).toMatch(/href=\{HOME\[other\]\}\n\s+prefetch/);
+  });
+});
+
+describe("header chrome (chrome-cleanup)", () => {
+  it("no Atlas logo link in either app header, and Coach | Me is one link", () => {
+    for (const f of ["components/athlete/AppNav.tsx", "components/coach/CoachNav.tsx"]) expect(read(f)).not.toContain("Atlas home");
+    const toggle = read("components/ModeToggle.tsx");
+    expect((toggle.match(/<Link\b/g) ?? []).length).toBe(1);
+  });
+  it("the coach's header tabs on a desktop are fetched ahead in full, like the bottom tabs", () => {
+    const src = read("components/coach/CoachNav.tsx");
+    expect(src).toMatch(/key=\{href\}\n\s+href=\{href\}\n(\s+\/\/[^\n]*\n)*\s+prefetch\n\s+onClick=\{\(e\) => onClick\(e, href\)\}/);
   });
 });

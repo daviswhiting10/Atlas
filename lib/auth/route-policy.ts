@@ -6,12 +6,15 @@
 import { RECHECK_MS } from "./session-policy";
 
 /** Pages anyone can see without signing in. */
-export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password", "/invite", "/api/invite"];
+export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password", "/invite", "/api/invite", "/demo"];
 /** Public pages a signed-in visitor may also read, whatever their role. */
-export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password", "/invite", "/api/invite"];
+/** (/demo: fixed sample data, no account, nothing stored; open to anyone, and a signed-in session is left alone.) */
+export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password", "/invite", "/api/invite", "/demo"];
 /** The athlete app. Coaches use it too, for their own training ("My training"). */
 export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals", "/report"];
 /** The set-password step: signed in, any role. */
+/** The athlete's own plan import (reads a PDF, photos or a sheet). Its handler checks who may use it. */
+export const ATHLETE_IMPORT_PATH = "/api/athlete/plan-import";
 export const SET_PASSWORD_PATH = "/set-password";
 
 /** Guest and demo logins: a made-up address on this domain, no email, no password. */
@@ -21,7 +24,7 @@ export const GUEST_EMAIL_DOMAIN = "guest.atlas.app";
  * reaches a real person (an invite email) or costs money per call (AI, uploads, outreach).
  * Everything inside their own workspace still works.
  */
-const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|erase|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/];
+const GUEST_BLOCKED = [/^\/api\/ai(\/|$)/, /^\/api\/clients\/[^/]+\/(invite|erase|plan-from-sheet)(\/|$)/, /^\/api\/exercise-media(\/|$)/, /^\/api\/outreach(\/|$)/, /^\/api\/leads(\/|$)/, /^\/api\/mcp(\/|$)/, /^\/api\/athlete\/plan-import$/, /^\/api\/programs\/import$/];
 
 export type RouteUser = { role: string; needsPassword: boolean; guest?: boolean } | null;
 
@@ -58,9 +61,9 @@ export function decide(path: string, user: RouteUser): Decision {
   if (path === "/" || path === "/login" || path === "/start") return go(home);
 
   if (isAthlete) {
-    // The athlete app talks to the server through server actions and /api/mcp;
-    // every other API route belongs to the coach dashboard.
-    if (isApi) return path === "/api/mcp" ? next : { kind: "json", status: 403, error: "Forbidden" };
+    // The athlete app talks to the server through server actions, /api/mcp and one upload route (Import a plan,
+    // which takes a file a server action can't); every other API route belongs to the coach dashboard.
+    if (isApi) return path === "/api/mcp" || path === ATHLETE_IMPORT_PATH ? next : { kind: "json", status: 403, error: "Forbidden" };
     if (!matches(path, ATHLETE_PATHS)) return go(home);
   }
 

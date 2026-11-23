@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardPen, MoreHorizontal, Users, X } from "lucide-react";
-import { Logo } from "@/components/athlete/Logo";
 import { HeaderActions } from "@/components/nav/HeaderActions";
 import { signOutToLogin } from "@/lib/sign-out";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
@@ -45,15 +44,14 @@ export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn 
     <>
       <header className="sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 sm:px-8 md:h-16">
-          <Link href="/log" prefetch aria-label="Atlas home" className="flex min-h-11 shrink-0 items-center">
-            <Logo />
-          </Link>
 
           <nav className="no-scrollbar hidden min-w-0 items-center gap-1 overflow-x-auto rounded-full border border-line bg-paper/80 p-1 md:flex" aria-label="Main">
             {ITEMS.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
+                // The whole screen is fetched ahead (a plain link only gets its layout): the tab is then there when tapped.
+                prefetch
                 onClick={(e) => onClick(e, href)}
                 aria-current={chosen(href) ? "page" : undefined}
                 className={cn(

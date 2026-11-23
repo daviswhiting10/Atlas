@@ -34,6 +34,17 @@ describe("decide: signed in", () => {
     expect(decide("/api/mcp", athlete)).toEqual(next);
     expect(decide("/api/clients", athlete)).toEqual({ kind: "json", status: 403, error: "Forbidden" });
   });
+  it("opens exactly one API route to athletes: their own plan import (and not to guests)", () => {
+    expect(decide("/api/athlete/plan-import", athlete)).toEqual(next);
+    for (const p of ["/api/athlete", "/api/athlete/plan-import/x", "/api/athlete/other", "/api/programs", "/api/ai/program-import"]) {
+      expect(decide(p, athlete)).toEqual({ kind: "json", status: 403, error: "Forbidden" });
+    }
+    expect(decide("/api/athlete/plan-import", { ...athlete, guest: true })).toEqual({ kind: "json", status: 403, error: "Not available in the demo" });
+    expect(decide("/api/athlete/plan-import", null)).toEqual({ kind: "json", status: 401, error: "Unauthorized" });
+    // The library's import reads a file too (an AI call): not for the demo.
+    expect(decide("/api/programs/import", { ...coach, guest: true })).toEqual({ kind: "json", status: 403, error: "Not available in the demo" });
+    expect(decide("/api/programs/import", coach)).toEqual(next);
+  });
   it("lets both roles open goals: Start a goal and a goal's chapter", () => {
     for (const u of [coach, athlete]) for (const p of ["/goals/new", "/goals/clx9abc123", "/goals"]) expect(decide(p, u)).toEqual(next);
   });

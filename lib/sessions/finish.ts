@@ -18,6 +18,9 @@ export function finishAction(lists: boolean[][]): FinishAction {
 }
 
 export const unloggedText = (n: number) => `${n} ${n === 1 ? "set" : "sets"} not logged`;
+/** The question under it. The same words in the athlete's logger and the coach's. */
+export const markPrompt = (n: number) => `Mark ${n === 1 ? "it" : "them"} as done and finish?`;
+export const FINISH_LABELS = { mark: "Mark remaining and finish", partial: "Finish with only what I logged", cancel: "Cancel" } as const;
 
 type Store = Parameters<typeof queueFinish>[0];
 export type FinishResult = { kind: "done"; minutes: number } | { kind: "queued" } | { kind: "failed" };

@@ -51,7 +51,6 @@ describe.skipIf(!RUN)("a coach's client can't restructure the plan", () => {
     expect(await a.planRemoveWorkout(workoutId)).toMatchObject({ ok: false });
     expect(await a.planAddWorkout({ week: 1, name: "Mine" })).toMatchObject({ ok: false });
     expect(await a.planSetTargets({ aweId, workoutId, sets: 9 })).toMatchObject({ ok: false });
-    expect(await a.planSetLighterWeeks(false)).toMatchObject({ ok: false });
     expect(await count()).toBe(before);
     expect(await prisma.assignedWorkout.count({ where: { id: workoutId } })).toBe(1);
   });

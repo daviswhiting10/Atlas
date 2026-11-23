@@ -31,6 +31,8 @@ import {
   swapExercise,
   type PlanScope,
 } from "@/lib/plan/edit";
+import { MAX_WEEK_NOTE, readWeekNotes, setWeekNote } from "@/lib/plan/week-notes";
+import { inviteClient, notInvited } from "@/lib/clients/invite";
 
 export type CoachResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -156,6 +158,23 @@ export async function coachSetPlanNote(clientId: string, assignmentId: string, t
   });
 }
 
+/** Pin a note to one week of a client's plan, signed with the coach's name; empty text clears it. */
+export async function coachSetWeekNote(clientId: string, assignmentId: string, raw: { week: number; title?: string; text: string }) {
+  return run(async () => {
+    const input = z.object({ week: z.number().int().min(1).max(52), title: z.string().max(80).optional(), text: z.string().max(MAX_WEEK_NOTE) }).parse(raw);
+    const scope = await scopeFor(clientId, assignmentId);
+    const { userId } = await requireCoach();
+    const [plan, coach] = await Promise.all([
+      prisma.programAssignment.findFirstOrThrow({ where: { id: assignmentId, clientId: scope.clientId, workspaceId: scope.workspaceId }, select: { weekNotes: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    ]);
+    const by = coach?.name?.trim() ? `Coach ${coach.name.trim().split(" ")[0]}` : undefined;
+    const notes = setWeekNote(readWeekNotes(plan.weekNotes), input.week, input.text, { title: input.title?.trim() || undefined, by });
+    await prisma.programAssignment.update({ where: { id: assignmentId }, data: { weekNotes: notes } });
+    refresh(clientId, assignmentId);
+  });
+}
+
 export async function coachSetLighterWeeks(clientId: string, assignmentId: string, on: boolean) {
   return run(async () => {
     await setLighterWeeks(await scopeFor(clientId, assignmentId), z.boolean().parse(on));
@@ -198,9 +217,12 @@ export async function draftFromTemplate(raw: { programId: string; clientId: stri
  * Make a draft the client's live plan. The plan's dates move to the chosen
  * start; any plan that was live is completed (its logged history stays).
  */
-export async function assignDraftPlan(raw: { clientId: string; assignmentId: string; startDate: string }): Promise<CoachResult> {
+/** What "Assign and invite" did about the invite. The plan is assigned either way. */
+export type AssignInvite = { sent: true; emailed: boolean; link: string; email: string; expiresInDays: number } | { sent: false; error: string };
+
+export async function assignDraftPlan(raw: { clientId: string; assignmentId: string; startDate: string; invite?: boolean }): Promise<CoachResult<{ invite?: AssignInvite }>> {
   return run(async () => {
-    const input = z.object({ clientId: Ref, assignmentId: Ref, startDate: IsoDay }).parse(raw);
+    const input = z.object({ clientId: Ref, assignmentId: Ref, startDate: IsoDay, invite: z.boolean().optional() }).parse(raw);
     const scope = await scopeFor(input.clientId, input.assignmentId);
     const draft = await prisma.programAssignment.findFirst({
       where: { id: input.assignmentId, clientId: scope.clientId, workspaceId: scope.workspaceId, status: "PAUSED" },
@@ -229,7 +251,20 @@ export async function assignDraftPlan(raw: { clientId: string; assignmentId: str
       await tx.programAssignment.update({ where: { id: draft.id }, data: { status: "ACTIVE", startDate: start } });
       await tx.program.updateMany({ where: { id: draft.sourceProgramId, workspaceId: scope.workspaceId, isDraft: true }, data: { isDraft: false } });
     });
+    // "Assign and invite": the same invite as the Invite button, only for a client who isn't invited yet (checked
+    // here, not taken from the button). The plan is assigned first, so a failed invite never undoes it.
+    let invite: AssignInvite | undefined;
+    if (input.invite && (await notInvited(scope.clientId, scope.workspaceId))) {
+      try {
+        const r = await inviteClient(scope.clientId, scope.workspaceId);
+        invite = r.ok ? { sent: true, emailed: r.emailed, link: r.link, email: r.email, expiresInDays: r.expiresInDays } : { sent: false, error: r.error };
+      } catch (err) {
+        console.error("[assign and invite]", err);
+        invite = { sent: false, error: "Couldn't send the invite. Try Invite on their profile." };
+      }
+    }
     refresh(scope.clientId, draft.id);
+    return invite ? { invite } : {};
   });
 }
 

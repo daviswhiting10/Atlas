@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../app/generated/prisma"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -148,6 +149,7 @@ model ClientProfile {
   sessionNotes       SessionNote[]
   outreachLog        OutreachMessage[]
   workoutLogs        WorkoutLog[]
+  nutritionTarget    NutritionTarget?
   workouts           Workout[]
   nutritionEntries   NutritionEntry[]
   progressPhotos     ProgressPhoto[]
@@ -384,6 +386,7 @@ model ProgramAssignment {
   goalText        String?          @db.Text // the goal in the athlete's (or coach's) own words, as the plan was built from
   notes           String?          @db.Text // free notes on the plan as a whole
   lighterWeeks    Boolean? // every 4th week is lighter; null = the default (on for generated plans, off for hand-built ones)
+  weekNotes       Json? // a note for a week of the plan: [{ week, title?, text, by? }]; Today shows the current week's, Plan shows all
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -878,4 +881,17 @@ model AuthThrottle {
   updatedAt    DateTime  @updatedAt
 
   @@index([updatedAt])
+}
+
+/// Daily nutrition targets the athlete set themselves (spike, behind the NUTRITION flag). Null: no target for that number.
+/// Meals themselves live in NutritionEntry.
+model NutritionTarget {
+  id        String        @id @default(cuid())
+  clientId  String        @unique
+  client    ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  calories  Int?
+  proteinG  Int?
+  carbsG    Int?
+  fatG      Int?
+  updatedAt DateTime      @updatedAt
 }

@@ -72,6 +72,8 @@ export type HistoryCalendar =
       kind: "grid";
       /** Finished sessions, all time. */
       sessions: number;
+      /** The athlete's today (the grid's last day). */
+      today: string;
       rows: CalendarRow[];
       /** The grid as one sentence, for screen readers. */
       summary: string;
@@ -163,6 +165,7 @@ export function historyCalendar(
   return {
     kind: "grid",
     sessions: dated.length,
+    today: opts.today,
     rows,
     summary: `${heat.activeWeeks} of the last ${plural(heat.weeksInRange, "week", "weeks")} active, ${plural(dated.length, "session", "sessions")}`,
     byDay,

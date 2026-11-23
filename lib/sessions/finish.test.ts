@@ -60,7 +60,7 @@ describe("sendFinish", () => {
 describe("the athlete logger's Finish", () => {
   const src = readFileSync(new URL("../../components/athlete/WorkoutLogger.tsx", import.meta.url), "utf8");
   it("has a visible Finish button, not one inside the ⋯ menu", () => {
-    expect(src).toContain("Finish now?");
+    expect(src).toContain("<FinishSheet");
     expect(src).not.toMatch(/<DropdownMenuItem[^>]*>\s*Finish/);
     expect(src).not.toContain('scheduleFinish("Finishing workout")');
   });
