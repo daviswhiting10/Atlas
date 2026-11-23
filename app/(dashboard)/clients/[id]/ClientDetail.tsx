@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useContentFade } from "@/hooks/use-content-fade";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,21 +20,17 @@ import { InviteConfirm } from "@/components/coach/InviteConfirm";
 import { DeleteClientSheet, type DeletePreview } from "@/components/coach/DeleteClientSheet";
 import { shareInvite } from "@/lib/coach/invite-share";
 import type { LoginStatus } from "@/lib/coach/login-status";
-import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
-import { AssignFromLibrary } from "@/components/coach/AssignFromLibrary";
-import { CoachPlanForm } from "@/components/coach/CoachPlanForm";
+import { PlanStart } from "@/components/coach/PlanStart";
+import { initialDoor } from "@/lib/plan-start";
 import { deletePlan } from "@/lib/actions/coach-plan";
 import { categoryLabel } from "@/lib/programs/categories";
 import {
-  Dumbbell,
   ClipboardList,
   AlertTriangle,
   Trash2,
   UserCheck,
-  ChevronDown,
   MoreHorizontal,
   Plus,
-  FileSpreadsheet,
 } from "lucide-react";
 
 type ProgramAssignment = {
@@ -123,16 +119,8 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
     if (tab === "import" || tab === "build") return "plan";
     return tab === "plan" || tab === "sessions" ? tab : progress || week ? "progress" : "sessions";
   });
-  // "Build with Atlas" opens its form here on the Plan tab (it had a page of its own). ?tab=build opens it.
-  const [buildOpen, setBuildOpen] = useState(
-    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "build"
-  );
-  // The spreadsheet importer on the Plan tab: always open when there's no plan, otherwise on request.
-  // ?tab=import opens it.
-  const [importOpen, setImportOpen] = useState(
-    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "import"
-  );
-  const importRef = useRef<HTMLDivElement>(null);
+  // ?tab=import and ?tab=build open their row on the Plan tab (components/coach/PlanStart).
+  const startDoor = initialDoor(typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null);
   const phase = useContentFade(loading);
 
   useEffect(() => {
@@ -245,7 +233,6 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
   }
 
   // ── Computed values ──────────────────────────────────────────────────────
-  const firstName = client.fullName.split(" ")[0];
   // Spreadsheet details from an import are shown on their own, never as an intake.
   const intakes = client.intakeForms.filter((f) => f.sourceType !== "csv-import");
   const imported = client.intakeForms.filter((f) => f.sourceType === "csv-import");
@@ -401,51 +388,7 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
 
       {shown === "plan" && (
         <div className="fade-in">
-          <div ref={importRef} className="scroll-mt-4">
-            {client.programAssignments.length === 0 ? (
-              <Card className="mb-4">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold">Import plan</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <SheetPlanUpload clientId={client.id} firstName={firstName} />
-                </CardContent>
-              </Card>
-            ) : (
-              <details
-                open={importOpen}
-                onToggle={(e) => setImportOpen((e.currentTarget as HTMLDetailsElement).open)}
-                className="group mb-4 rounded-xl border bg-card"
-              >
-                <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold">
-                  <span className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    Import plan
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="border-t px-4 pb-4 pt-3">
-                  <SheetPlanUpload clientId={client.id} firstName={firstName} />
-                </div>
-              </details>
-            )}
-          </div>
-
-          {/* Assign a program: from the library (also reachable from More), or built by Atlas. */}
-          <div className="mb-4 rounded-xl border bg-card px-4 py-3">
-            <AssignFromLibrary clientId={client.id} firstName={firstName} />
-          </div>
-          <div className="mb-3 flex justify-end">
-            <button type="button" onClick={() => setBuildOpen((o) => !o)} aria-expanded={buildOpen} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>
-              <Dumbbell className="w-3 h-3 mr-1.5" />
-              Build with Atlas
-            </button>
-          </div>
-          {buildOpen && (
-            <div className="mb-4 rounded-xl border bg-card px-4 py-4">
-              <CoachPlanForm clients={[{ id: client.id, fullName: client.fullName, primaryGoal: client.primaryGoal }]} fixedClientId={client.id} />
-            </div>
-          )}
+          <PlanStart client={{ id: client.id, fullName: client.fullName, primaryGoal: client.primaryGoal }} initialDoor={startDoor} />
           {client.programAssignments.length > 0 && (
             <div className="space-y-2">
               {client.programAssignments.map((a) => (
