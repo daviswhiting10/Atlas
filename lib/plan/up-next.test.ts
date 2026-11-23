@@ -24,7 +24,7 @@ describe("Plan tab, up next first", () => {
     const v = upNextView(plan([wo("Upper A", 1, "LOGGED", 6, "2026-11-16"), wo("Lower A", 1, "PLANNED"), wo("Upper B", 1, "PLANNED"), wo("Lower B", 1, "PLANNED"), wo("Next wk", 2, "PLANNED")]));
     expect(v.eyebrow).toBe("Week 1 of 12 · Foundation");
     expect(v.next).toMatchObject({ id: "Lower A", meta: "6 exercises · ~50 min", more: 3 });
-    expect(v.next!.lines).toEqual([{ name: "Ex 1", rx: "3 × 6–10 at 135" }, { name: "Ex 2", rx: "3 × 6–10" }, { name: "Ex 3", rx: "3 × 6–10" }]);
+    expect(v.next!.lines).toEqual([{ name: "Ex 1", rx: "3 × 6–10 at 135", cue: null }, { name: "Ex 2", rx: "3 × 6–10", cue: null }, { name: "Ex 3", rx: "3 × 6–10", cue: null }]);
     expect(v.weekLabel).toBe("This week · 1 of 4 done");
     expect(v.rows.map((r) => [r.name, r.dot, r.meta])).toEqual([
       ["Upper A", "✓", "Done · Mon"],
@@ -52,4 +52,19 @@ describe("Plan tab, up next first", () => {
     expect(layout).toContain("changeGoals={athlete.selfServe}");
   });
 
+});
+
+import { cueOf } from "./up-next";
+describe("the coach's cue on the up-next card", () => {
+  it("is the first sentence of the exercise note", () => {
+    expect(cueOf("Pause a beat on the chest. Drive through the floor.")).toBe("Pause a beat on the chest.");
+  });
+  it("is nothing when there is no note", () => {
+    expect(cueOf(null)).toBeNull();
+    expect(cueOf("   ")).toBeNull();
+  });
+  it("keeps a single unpunctuated line, and shortens a long one", () => {
+    expect(cueOf("Slow on the way down")).toBe("Slow on the way down");
+    expect(cueOf("x".repeat(200))!.length).toBe(90);
+  });
 });
