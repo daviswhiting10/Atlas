@@ -20,6 +20,7 @@ export function TodayScreen({
   plan,
   goal,
   report,
+  nutrition,
 }: {
   athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe">;
   plan: PlanOverview | null;
@@ -27,6 +28,8 @@ export function TodayScreen({
   goal: ReactNode;
   /** The latest progress report, for a week after a block ends (nothing otherwise). */
   report?: ReactNode;
+  /** The Nutrition row (only passed while the NUTRITION flag is on). */
+  nutrition?: ReactNode;
 }) {
   const next = plan?.nextUp ?? null;
   const lighterWeek = plan != null && plan.lighterWeeks && next != null && next.week % BLOCK_WEEKS === 0;
@@ -115,6 +118,8 @@ export function TodayScreen({
           </div>
         </section>
       )}
+
+      {nutrition}
 
       {/* While a goal is running, its card sits under today's session: the session is the hero. */}
       {goal}

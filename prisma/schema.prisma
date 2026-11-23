@@ -148,6 +148,7 @@ model ClientProfile {
   sessionNotes       SessionNote[]
   outreachLog        OutreachMessage[]
   workoutLogs        WorkoutLog[]
+  nutritionTarget    NutritionTarget?
   workouts           Workout[]
   nutritionEntries   NutritionEntry[]
   progressPhotos     ProgressPhoto[]
@@ -878,4 +879,17 @@ model AuthThrottle {
   updatedAt    DateTime  @updatedAt
 
   @@index([updatedAt])
+}
+
+/// Daily nutrition targets the athlete set themselves (spike, behind the NUTRITION flag). Null: no target for that number.
+/// Meals themselves live in NutritionEntry.
+model NutritionTarget {
+  id        String        @id @default(cuid())
+  clientId  String        @unique
+  client    ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  calories  Int?
+  proteinG  Int?
+  carbsG    Int?
+  fatG      Int?
+  updatedAt DateTime      @updatedAt
 }

@@ -5,6 +5,7 @@ import { libraryForPicker } from "@/lib/programs/library";
 import { prisma } from "@/lib/db/client";
 import { activeGoalId } from "@/lib/goals/data";
 import { isCoached } from "@/lib/athlete/coached";
+import { nutritionEnabled } from "@/lib/nutrition/flag";
 
 export const metadata: Metadata = { title: "You" };
 
@@ -20,5 +21,5 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
     // Starting a goal lives here (Today shows the goal's card once one is running).
     athlete.isGuest || isCoached(athlete) ? null : activeGoalId(athlete.clientId),
   ]);
-  return <YouScreen athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} />;
+  return <YouScreen athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} nutrition={nutritionEnabled()} />;
 }
