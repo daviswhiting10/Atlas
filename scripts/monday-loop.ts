@@ -314,6 +314,16 @@ async function main() {
   }
 
   const dbDone = (cid: string) => prisma.workoutLog.count({ where: { clientId: cid, completedAt: { not: null } } });
+  /** finish-lag: the finished screen shows at once and the finish is saved behind it, so wait (up to 10 s) for it to land. */
+  const dbDoneReaches = async (cid: string, n: number) => {
+    const t0 = Date.now();
+    let done = await dbDone(cid);
+    while (done < n && Date.now() - t0 < 10000) {
+      await sleep(250);
+      done = await dbDone(cid);
+    }
+    return done;
+  };
 
   try {
     await must(STEPS[0], async () => {
@@ -399,7 +409,7 @@ async function main() {
       await client.shot("logger-all-set");
       await finish(client);
       await client.until(`/, done\\./.test(document.body.innerText)`, 30000);
-      const done = await dbDone(clientId);
+      const done = await dbDoneReaches(clientId, 1);
       if (done !== 1) throw new Error(`expected 1 finished session, found ${done}`);
       // What was stored: every set of the plan, the third bench set heavier than its own target (115), the unweighted exercise without a weight.
       const sets = await prisma.setLog.findMany({ where: { workoutLog: { clientId } }, select: { setNumber: true, weight: true, completed: true, exercise: { select: { name: true } } }, orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }] });
@@ -444,7 +454,7 @@ async function main() {
       await logSession(client, { all: false });
       await finish(client);
       await client.until(`/, done\\./.test(document.body.innerText)`, 30000);
-      const done = await dbDone(clientId);
+      const done = await dbDoneReaches(clientId, 3);
       if (done !== 3) throw new Error(`expected 3 finished sessions, found ${done}`);
     });
 
