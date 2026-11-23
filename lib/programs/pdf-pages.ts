@@ -14,6 +14,20 @@ export const PDF_FAILED = "Couldn't read this PDF. Try screenshots of its pages 
 
 export class PdfError extends Error {}
 
+/** Shown for a .pdf while PDF import is switched off. Spreadsheets and screenshots don't depend on it. */
+export const PDF_OFF = "PDF import is temporarily unavailable. Use an .xlsx or .csv file, or screenshots of the plan.";
+
+/**
+ * IMPORT_PDF=on|off switches PDF import. Unset: off on the production site (until the PDF reader is checked on a
+ * Vercel preview), on everywhere else (local, previews).
+ */
+export function pdfImportOn(env: Record<string, string | undefined> = process.env): boolean {
+  const v = env.IMPORT_PDF?.trim().toLowerCase();
+  if (v === "on") return true;
+  if (v === "off") return false;
+  return env.VERCEL_ENV !== "production";
+}
+
 export const isPdf = (bytes: Uint8Array): boolean => bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d;
 
 type Loader = () => Promise<{ PDFParse: typeof import("pdf-parse").PDFParse }>;
@@ -23,6 +37,8 @@ export async function pdfToImages(
   load: Loader = () => import("pdf-parse")
 ): Promise<{ images: ImageInput[]; texts: string[]; pages: number; truncated: boolean }> {
   if (!isPdf(bytes)) throw new PdfError("That doesn't look like a PDF.");
+  // Switched off: nothing is drawn, and the native drawing module is never loaded.
+  if (!pdfImportOn()) throw new PdfError(PDF_OFF);
   let parser: InstanceType<Awaited<ReturnType<Loader>>["PDFParse"]> | null = null;
   try {
     const { PDFParse } = await load();

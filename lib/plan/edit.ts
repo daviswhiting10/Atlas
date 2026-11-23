@@ -35,7 +35,7 @@ export class PlanEditError extends Error {
 const notFound = (what = "That workout") => new PlanEditError("not_found", `${what} isn't part of this plan.`);
 const invalid = (message: string) => new PlanEditError("invalid", message);
 
-export const LIMITS = { workoutsPerWeek: 14, exercisesPerWorkout: 12, sets: 10, reps: 100, seconds: 600, weight: 1000, note: 2000, name: 60 } as const;
+export const LIMITS = { workoutsPerWeek: 14, exercisesPerWorkout: 12, sets: 10, reps: 100, seconds: 14400, weight: 1000, note: 2000, name: 60 } as const;
 
 const DAY_MS = 86_400_000;
 /** The plan an edit may touch: the named one (live or a coach's draft), or else the live plan. */

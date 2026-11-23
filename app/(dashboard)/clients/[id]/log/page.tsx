@@ -35,6 +35,8 @@ export type LoggerExercise = {
   exerciseId: string;
   name: string;
   movementPattern: string;
+  /** The coach's note on this exercise (it says what a timed one is: a hold, steady cardio). */
+  notes: string | null;
   section: string | null; // "warmup" | "block_a" | "block_b" | "finisher" | null
   prescribedSets: PrescribedSet[];
   lastSets: Array<{
@@ -300,6 +302,7 @@ export default async function LogPage({
         exerciseId: awe.exerciseId,
         name: awe.exercise.name,
         movementPattern: awe.exercise.movementPattern,
+        notes: awe.notes ?? null,
         section,
         prescribedSets,
         lastSets,

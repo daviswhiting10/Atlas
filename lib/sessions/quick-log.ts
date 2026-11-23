@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { durationLabel } from "./duration";
 
 export const QUICK_LIMITS = {
   exercises: 30,
@@ -162,12 +163,13 @@ export function describeLogged(sets: QuickSet[], unit: "reps" | "secs"): string 
 
 function describeSets(sets: QuickSet[], unitKind: "reps" | "secs"): string {
   if (sets.length === 0) return "";
-  const unit = unitKind === "secs" ? " s" : "";
+  const timed = unitKind === "secs";
+  const show = (r: number | null) => (timed && r != null ? durationLabel(r) : String(r));
   const reps = sets.map((s) => s.reps);
   const sameReps = reps.every((r) => r === reps[0]);
   const count = sameReps
-    ? `${sets.length} × ${reps[0]}${unit}`
-    : `${reps.join(", ")}${unit}`;
+    ? `${sets.length} × ${show(reps[0])}`
+    : timed ? reps.map(show).join(", ") : reps.join(", ");
   const weights = Array.from(
     new Set(sets.map((s) => s.weight).filter((w): w is number => w != null)),
   );

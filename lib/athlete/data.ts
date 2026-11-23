@@ -26,6 +26,7 @@ import { DAY_MS, iso, localDay, referenceSession, safeTimeZone, weekOf } from ".
 import { finishedTotals } from "./totals";
 import { loadCalendar } from "@/lib/history/load";
 import type { HistoryCalendar } from "@/lib/history/calendar";
+import { timedHasLoad, timedKind, type TimedKind } from "@/lib/plan/timed";
 
 /** Upper bound on sets per exercise in one workout. */
 export const MAX_SETS = 20;
@@ -321,6 +322,8 @@ export type LoggerExercise = {
   loaded: boolean;
   increment: number;
   unit: "reps" | "secs";
+  /** For a timed exercise: a hold, steady cardio (a bike) or intervals. Null for reps. */
+  timedKind: TimedKind | null;
   repMin: number;
   repMax: number;
   restSeconds: number;
@@ -457,8 +460,13 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     const everLoaded = series.some((p) => p.weight != null);
     const bodyweight = cat ? cat.tool === "bodyweight" : /body ?only|bodyweight|n\/?a/i.test(e.exercise.equipment) && !everLoaded;
     const increment = bodyweight ? 0 : cat?.inc ?? 5;
+    // A timed exercise is a hold, steady cardio or intervals: that decides the first-time wording, and whether a weight field is shown.
+    const kind = unit === "secs" ? timedKind(e.exercise.name, e.notes) : null;
+    const hasLoad =
+      unit !== "secs" ||
+      timedHasLoad({ name: e.exercise.name, equipment: e.exercise.equipment, tool: cat?.tool, prescribedWeight: prescribed.some((p) => typeof p.weight === "number" && p.weight > 0), everLoaded });
 
-    const computed = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit, deload: deloadWeek });
+    const computed = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit, timed: kind ?? "hold", deload: deloadWeek });
     // A weight written into the plan (by the athlete mid-session, or by a
     // coach) is the target. Otherwise it is worked out from the last session.
     const setWeight = typeof first.weight === "number" && first.weight > 0 && !bodyweight ? first.weight : null;
@@ -495,7 +503,8 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       picture: pictureFor({ name: displayName(e.exercise.slug, e.exercise.name), gifUrl: e.exercise.gifUrl }),
       muscles: cat?.muscles ?? ((e.exercise.primaryMuscles as string[] | null) ?? []),
       role: e.section,
-      loaded: !bodyweight,
+      loaded: !bodyweight && hasLoad,
+      timedKind: kind,
       increment,
       unit,
       repMin,

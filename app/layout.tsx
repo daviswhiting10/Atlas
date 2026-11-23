@@ -5,6 +5,7 @@ import "./globals.css";
 import "./dusk.css";
 import { Toaster } from "@/components/ui/sonner";
 import { PressFeedback } from "@/components/nav/PressFeedback";
+import { ModeSwitchProvider } from "@/components/mode/ModeSwitchProvider";
 
 const geist = localFont({
   src: "./fonts/GeistVF.woff",
@@ -53,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}>
       <body className="antialiased font-body">
-        {children}
+        <ModeSwitchProvider>{children}</ModeSwitchProvider>
         <PressFeedback />
         <Toaster position="top-center" />
       </body>

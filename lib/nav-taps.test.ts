@@ -37,7 +37,6 @@ describe("tab taps", () => {
     expect(read("components/athlete/AppNav.tsx")).toContain('<Link href="/today" prefetch');
     expect(read("components/coach/CoachNav.tsx")).toContain('<Link href="/log" prefetch');
     const toggle = read("components/ModeToggle.tsx");
-    expect(toggle).toContain('<Link href="/log" prefetch');
-    expect(toggle).toContain('<Link href="/today" prefetch');
+    expect(toggle).toMatch(/href=\{HOME\[side\]\}\n\s+prefetch/);
   });
 });

@@ -131,9 +131,6 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
       <div className="space-y-4">
         <div>
           <p className="text-[15px] font-semibold text-ink">Read as {summary.readAs}</p>
-          <p className="mt-0.5 text-[13px] text-ink-mute">
-            {summary.exercises} exercises · week 1 started {shortDay(summary.weekOneStart)}
-          </p>
         </div>
         {read_.found ? (
           <FoundInFile found={read_.found} detail={(i) => (summary.days[i] ? describeDay(summary.days[i]) : null)} />

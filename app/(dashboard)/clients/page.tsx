@@ -23,7 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Search, Upload, Users } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Upload, Users } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { lastLogged } from "@/lib/coach/last-logged";
 import { SwipeRow } from "@/components/coach/SwipeRow";
@@ -326,6 +327,17 @@ export default function ClientsPage() {
                     >
                       Log →
                     </Link>
+                    {/* Desktop: the same Delete as the swipe (same sheet that says what goes). A phone keeps the swipe. */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger aria-label={`More for ${client.fullName}`} className="press mr-3 hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted md:flex">
+                        <MoreHorizontal className="h-5 w-5" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[180px]">
+                        <DropdownMenuItem className="min-h-11 text-destructive" onClick={() => void askDelete(client.id)}>
+                          Delete client
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     </div>
                     </SwipeRow>
                   ))}

@@ -7,6 +7,7 @@ import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
 import { Logo } from "./Logo";
 import { HeaderActions } from "@/components/nav/HeaderActions";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
+import { useRegisterChrome } from "@/components/mode/context";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -18,18 +19,21 @@ const TABS = [
 
 /** `isCoach`: a coach on their own training gets the Coach | Me toggle (the way back to their clients).
  *  There's no avatar: the person is the You tab. */
-export function AppNav({ isDemo, isCoach = false, hasProgress = true }: { isDemo: boolean; isCoach?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean }) {
-  const pathname = usePathname();
+export function AppNav({ isDemo, isCoach = false, hasProgress = true, preview }: { isDemo: boolean; isCoach?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
+  const real = usePathname();
+  const pathname = preview ?? real;
+  useRegisterChrome(preview ? {} : { demo: isDemo, hasProgress });
   const router = useRouter();
 
   // Tell the server which timezone to bucket logged sessions in. On a first
   // visit the cookie is missing, so set it and re-render once with real dates.
   useEffect(() => {
+    if (preview) return;
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!tz || document.cookie.split("; ").includes(`tz=${tz}`)) return;
     document.cookie = `tz=${tz}; path=/; max-age=31536000; samesite=lax`;
     router.refresh();
-  }, [router]);
+  }, [router, preview]);
 
   const tabs = hasProgress ? TABS : TABS.filter((t) => t.href !== "/progress");
   const inWorkout = pathname.startsWith("/workouts/");
