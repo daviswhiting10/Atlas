@@ -35,7 +35,7 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
 
   const client = await prisma.clientProfile.findFirst({
     where: { id: params.id, workspaceId, deletedAt: null },
-    select: { id: true, fullName: true, programAssignments: { where: { status: "ACTIVE" }, select: { id: true } } },
+    select: { id: true, fullName: true, email: true, userId: true, programAssignments: { where: { status: "ACTIVE" }, select: { id: true } } },
   });
   if (!client) notFound();
 
@@ -109,7 +109,14 @@ export default async function ClientPlanPage({ params }: { params: { id: string;
 
         {draft && (
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-            <AssignPanel clientId={client.id} clientName={client.fullName} assignmentId={plan.id} startDate={plan.startDate} hasLivePlan={client.programAssignments.length > 0} />
+            <AssignPanel
+              clientId={client.id}
+              clientName={client.fullName}
+              assignmentId={plan.id}
+              startDate={plan.startDate}
+              hasLivePlan={client.programAssignments.length > 0}
+              notInvited={!client.userId && !!client.email?.trim()}
+            />
           </aside>
         )}
       </div>
