@@ -18,9 +18,12 @@ export function PlanUpNext({ view, totalWeeks, canEdit, base = "" }: { view: UpN
           <p className="mt-0.5 text-[13px] text-ink-mute">{next.meta}</p>
           <ul className="mb-3.5 mt-3">
             {next.lines.map((l, i) => (
-              <li key={`${l.name}-${i}`} className="flex justify-between gap-3 border-t border-line py-2 text-[14px] text-ink-soft first:border-t-0">
-                <span className="min-w-0 truncate">{l.name}</span>
-                <span className="tnum shrink-0">{l.rx}</span>
+              <li key={`${l.name}-${i}`} className="border-t border-line py-2 text-[14px] text-ink-soft first:border-t-0">
+                <div className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate">{l.name}</span>
+                  <span className="tnum shrink-0">{l.rx}</span>
+                </div>
+                {l.cue && <p className="mt-0.5 text-[13px] leading-snug text-ink-mute">{l.cue}</p>}
               </li>
             ))}
             {next.more > 0 && <li className="border-t border-line py-2 text-[14px] text-ink-soft">+ {next.more} more</li>}
