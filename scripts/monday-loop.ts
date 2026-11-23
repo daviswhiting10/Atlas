@@ -296,7 +296,8 @@ async function main() {
   }
 
   /**
-   * Finish is a button in the logger header (ux-finish-early). With sets left unticked it asks "Finish now?" first.
+   * Finish is a button in the logger header (ux-finish-early). With sets left unticked it asks first (finish-sheet: "N sets
+   * not logged"); the loop answers "Finish with only what I logged".
    * With every set ticked the logger finishes by itself; offline, that finish is queued and the header button is hidden
    * ("Finishes when you're back"), so there is nothing to tap and the caller checks that it saves.
    */
@@ -307,7 +308,9 @@ async function main() {
       throw new Error("no Finish button in the logger header");
     }
     await sleep(700);
-    await phone.ev(`(()=>{const b=[...document.querySelectorAll('[role=dialog][aria-label="Finish now?"] button')].find(b=>b.innerText.trim()==='Finish');if(b)b.click()})()`);
+    // finish-sheet: "N sets not logged" offers Mark remaining and finish / Finish with only what I logged / Cancel. The loop
+    // finishes with what was logged (the old "Finish now?" → Finish), so a short session stays short.
+    await phone.ev(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(b=>['Finish with only what I logged','Finish'].includes(b.innerText.trim()));if(b)b.click()})()`);
   }
 
   const dbDone = (cid: string) => prisma.workoutLog.count({ where: { clientId: cid, completedAt: { not: null } } });
