@@ -5,14 +5,14 @@ import { prisma } from "@/lib/db/client";
 import { ROSTER } from "@/lib/db/roster";
 import { callAI, MODELS } from "@/lib/ai/client";
 import { buildProgramSheetPrompt } from "@/lib/ai/prompts/program-import";
-import { readGrid } from "@/lib/programs/sheet-plan";
+import { plannedCount, readGrid } from "@/lib/programs/sheet-plan";
 import { summarizeSheetImport } from "@/lib/programs/sheet-summary";
 import { NO_CONTEXT, pagesContext, contextFromText, contextWarnings, describeReadAs, mergeContext, modelContextFromReply, type PlanContext } from "@/lib/programs/plan-context";
 import { saveSheetPlan } from "@/lib/programs/save-sheet-plan";
-import { SheetError, fetchSheetCsv, parseSheetLink, tidyCsv } from "@/lib/programs/sheet";
+import { SheetError, fetchSheetPlan, parseSheetLink, tidyCsv } from "@/lib/programs/sheet";
 import { CATEGORIES } from "@/lib/programs/categories";
 import { rateLimiter } from "@/lib/password";
-import { CHOOSE_A_FILE, PlanFileError, planFileFromForm, readPlanFile } from "@/lib/programs/read-plan-file";
+import { CHOOSE_A_FILE, NO_EXERCISES, PlanFileError, planFileFromForm, readPlanFile } from "@/lib/programs/read-plan-file";
 
 export const maxDuration = 120;
 
@@ -82,11 +82,13 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
 
   // 1. The sheet's contents.
   let csv: string;
+  let sheetTab: string | null = null;
+  let sheetNote: string | null = null;
   if (parsed.data.sheetUrl) {
     const link = parseSheetLink(parsed.data.sheetUrl);
     if (!link) return NextResponse.json({ error: "That isn't a Google Sheets link. Copy it from the sheet's address bar or its Share button." }, { status: 400 });
     try {
-      csv = await fetchSheetCsv(link);
+      ({ csv, tab: sheetTab, note: sheetNote } = await fetchSheetPlan(link));
     } catch (err) {
       return NextResponse.json({ error: err instanceof SheetError ? err.message : "Couldn't read that sheet." }, { status: 400 });
     }
@@ -110,6 +112,8 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
     return NextResponse.json({ error: "Couldn't read the plan right now. Please try again." }, { status: 502 });
   }
   if (!grid) return NextResponse.json({ error: "Couldn't find workouts in that sheet. Check it lists exercises with sets and reps." }, { status: 422 });
+  if (plannedCount(grid) === 0) return NextResponse.json({ error: NO_EXERCISES }, { status: 422 });
+  if (sheetNote) grid.note = sheetNote;
 
   // The coach's note beats what the sheet suggests (e.g. "start fresh" ignores last block's loads).
   const context = notes ? mergeContext(contextFromText(notes), modelContext) : NO_CONTEXT;
@@ -119,7 +123,10 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
     context,
     summary,
     readAs: summary.readAs,
-    warnings: contextWarnings(context, { days: summary.daysPerWeek }, "sheet"),
+    warnings: [
+      ...(sheetTab ? [`Read the "${sheetTab}" tab${sheetNote ? "; the other tabs are kept as a note on the plan" : ""}.`] : []),
+      ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet"),
+    ],
   });
 });
 

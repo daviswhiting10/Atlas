@@ -12,16 +12,20 @@ const MAX_SHEET_BYTES = 5_000_000;
 const ext = (f: File) => f.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
 export const isPdfFile = (f: File) => f.type === "application/pdf" || ext(f) === "pdf";
 
-/** A spreadsheet as CSV text, or what to do instead. */
-export async function sheetToCsv(f: File): Promise<string> {
+/**
+ * A spreadsheet as CSV text, or what to do instead. A workbook sends the tab that holds the plan (`tab`), with the
+ * sentences on its other tabs ("How to use") as `note` for the plan.
+ */
+export async function sheetToCsv(f: File): Promise<{ csv: string; tab: string | null; note: string | null }> {
   const e = ext(f);
   if (e === "numbers") throw new Error("That's a Numbers file. In Numbers, File → Export To → Excel, then drop the .xlsx here.");
   if (e === "xls") throw new Error("That's an old .xls file. Open it in Excel and save it as .xlsx.");
   if (e !== "xlsx" && e !== "csv") throw new Error("Choose a PDF, a spreadsheet (.xlsx or .csv) or screenshots of the plan.");
   if (f.size > MAX_SHEET_BYTES) throw new Error("That file is too big for a plan. Save just the plan's tabs and try again.");
-  if (e === "csv") return f.text();
-  const { xlsxToCsv } = await import("@/lib/programs/xlsx");
-  return xlsxToCsv(new Uint8Array(await f.arrayBuffer()));
+  if (e === "csv") return { csv: await f.text(), tab: null, note: null };
+  const { xlsxPlan } = await import("@/lib/programs/xlsx");
+  const { csv, tab, note } = xlsxPlan(new Uint8Array(await f.arrayBuffer()));
+  return { csv, tab, note };
 }
 
 /** A screenshot made smaller before upload (a phone photo is often 3–5 MB; this is a few hundred KB). Kept as is if it can't be. */
@@ -49,7 +53,10 @@ export async function planForm(list: File[]): Promise<{ form: FormData; name: st
   const visual = list.every((f) => isPdfFile(f) || PHOTO_TYPES.includes(f.type));
   if (!visual) {
     if (list.length > 1) throw new Error("Choose one spreadsheet, or a PDF, or screenshots.");
-    form.append("csv", await sheetToCsv(list[0]));
+    const sheet = await sheetToCsv(list[0]);
+    form.append("csv", sheet.csv);
+    if (sheet.tab) form.append("sheetTab", sheet.tab);
+    if (sheet.note) form.append("sheetNote", sheet.note);
     return { form, name: list[0].name, kind: "sheet" };
   }
   const pdf = list.some(isPdfFile);

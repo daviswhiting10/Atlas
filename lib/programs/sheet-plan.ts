@@ -22,7 +22,8 @@ import { sectionsFromSheet } from "@/lib/workouts/structure";
 export type GridWeek = { week: number; setsReps?: string; load?: string };
 export type GridExercise = { name: string; notes?: string; /** The sheet's group label ("A", "1A", "Warm-up"), carried down its group. */ label?: string; weeks: GridWeek[] };
 export type GridDay = { name: string; exercises: GridExercise[] };
-export type SheetGrid = { programName?: string; days: GridDay[] };
+/** `note`: the sentences on a workbook's other tabs or a PDF's other pages ("How to use"), kept on the plan. */
+export type SheetGrid = { programName?: string; note?: string; days: GridDay[] };
 
 export type Rx = { sets: number; repMin: number; repMax: number; unit: "reps" | "secs"; note: string | null; /** The time unit was guessed (minutes); the preview asks. */ unclear?: boolean };
 export type Load = { weight: number | null; band: string | null; note: string | null };
@@ -52,7 +53,8 @@ export function readGrid(raw: string): SheetGrid | null {
           })),
       }))
       .filter((d) => d.exercises.length > 0);
-    return days.length > 0 ? { programName: typeof g.programName === "string" ? g.programName.slice(0, 120) : undefined, days } : null;
+    const note = typeof g.note === "string" && g.note.trim() ? g.note.trim().slice(0, 2000) : undefined;
+    return days.length > 0 ? { programName: typeof g.programName === "string" ? g.programName.slice(0, 120) : undefined, ...(note ? { note } : {}), days } : null;
   } catch {
     return null;
   }
@@ -251,4 +253,9 @@ export function inferWeekOneStart(lastLoggedWeek: number, today: Date): Date {
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   monday.setDate(monday.getDate() - lastLoggedWeek * 7);
   return monday;
+}
+
+/** How many exercises the plan would have, week 1 to the end. 0 means nothing in the file read as sets and reps. */
+export function plannedCount(grid: SheetGrid): number {
+  return planFromGrid(grid).weeks.reduce((n, w) => n + w.days.reduce((m, d) => m + d.entries.length, 0), 0);
 }
