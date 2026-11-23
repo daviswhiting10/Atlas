@@ -318,14 +318,6 @@ export default function ClientsPage() {
                         </div>
                       </div>
                     </Link>
-                    {/* The direct way to the logger; the row itself opens the profile. */}
-                    <Link
-                      href={`/clients/${client.id}/log`}
-                      aria-label={`Log a session for ${client.fullName}`}
-                      className="press flex min-h-[60px] min-w-[64px] shrink-0 items-center justify-center pr-5 text-sm font-semibold text-primary"
-                    >
-                      Log →
-                    </Link>
                     </div>
                     </SwipeRow>
                   ))}
