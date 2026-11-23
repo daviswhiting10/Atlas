@@ -34,7 +34,7 @@ export function GoalsPanel({ prefs, canRebuild, isGuest, initiallyOpen, extra }:
 
       {open && (
         <section className="fade-in rule mt-8 pt-8">
-          <PlanWizard mode="rebuild" initial={prefs} />
+          <PlanWizard mode="rebuild" initial={prefs} importer={!isGuest} />
           {extra && <div className="rule mt-8 pt-8">{extra}</div>}
         </section>
       )}

@@ -62,15 +62,10 @@ function LighterWeeksSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
   }
 
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <p id="lighter-weeks-label" className="text-[15px] font-medium text-ink">
-          Lighter every 4th week
-        </p>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-ink-mute">
-          Weeks {BLOCK_WEEKS}, {BLOCK_WEEKS * 2}, {BLOCK_WEEKS * 3}…: same weights, stop each set two or three reps early. Those sessions never count as a record or a stall.
-        </p>
-      </div>
+    <div className="flex items-center justify-between gap-4">
+      <p id="lighter-weeks-label" className="min-w-0 text-[15px] font-medium text-ink">
+        Lighter weeks
+      </p>
       <button
         type="button"
         role="switch"
@@ -88,20 +83,110 @@ function LighterWeeksSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
   );
 }
 
+/**
+ * HOOK, not built: "Atlas suggests changes from your notes". A future action reads a workout's note and its past
+ * session notes and proposes plan edits (through the same PlanActions the editor uses). It renders nothing today;
+ * WorkoutNotes already passes it everything it would need.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- the hook takes what it will need; nothing uses it yet
+function AtlasSuggestsFromNotes(_props: { workoutId: string; note: string | null; history: WorkoutSummary["history"] }) {
+  return null;
+}
+
+const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+/**
+ * A workout's notes: the saved note under the workout (or a small "Add note" link, no empty box), and the notes from
+ * its past sessions as history. The box opens only when asked for.
+ */
+function WorkoutNotes({ workout: w, locked, onSave }: { workout: WorkoutSummary; locked: boolean; onSave: (text: string) => Promise<Result> }) {
+  const [note, setNote] = useState(w.note?.trim() || null);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setNote(w.note?.trim() || null), [w.note]);
+
+  return (
+    <div className="mt-4 space-y-3">
+      {editing ? (
+        <NoteField
+          label="Note"
+          value={note}
+          autoFocus
+          placeholder="How it felt, what to change next time, anything to remember."
+          onSave={async (text) => {
+            const res = await onSave(text);
+            if (res.ok) setNote(text.trim() || null);
+            return res;
+          }}
+          onDone={() => setEditing(false)}
+        />
+      ) : note ? (
+        <div className="rounded-xl border border-line bg-paper px-4 py-3">
+          <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink-soft">{note}</p>
+          {!locked && (
+            <button type="button" onClick={() => setEditing(true)} className="press -mb-2 -ml-1 mt-1 min-h-11 px-1 text-[13px] font-medium text-ink-mute hover:text-ink">
+              Edit note
+            </button>
+          )}
+        </div>
+      ) : (
+        !locked && (
+          <button type="button" onClick={() => setEditing(true)} className="press -ml-1 flex min-h-11 items-center gap-1.5 px-1 text-[13px] font-medium text-ink-mute hover:text-ink">
+            <Plus className="h-3.5 w-3.5" /> Add note
+          </button>
+        )
+      )}
+
+      {w.history.length > 0 && (
+        <div>
+          <p className="eyebrow">Past sessions</p>
+          <ul className="mt-1.5 space-y-2">
+            {w.history.map((h) => (
+              <li key={`${h.date}-${h.week}`} className="text-[13px] leading-relaxed">
+                <span className="text-ink-mute">
+                  Week {h.week} · {shortDate(h.date)}
+                </span>
+                <span className="block whitespace-pre-line text-ink-soft">{h.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <AtlasSuggestsFromNotes workoutId={w.id} note={note} history={w.history} />
+    </div>
+  );
+}
+
 /** A notes field that saves when you leave it. */
-function NoteField({ value, placeholder, label, onSave }: { value: string | null; placeholder: string; label: string; onSave: (text: string) => Promise<Result> }) {
+function NoteField({
+  value,
+  placeholder,
+  label,
+  onSave,
+  autoFocus = false,
+  onDone,
+}: {
+  value: string | null;
+  placeholder: string;
+  label: string;
+  onSave: (text: string) => Promise<Result>;
+  autoFocus?: boolean;
+  /** Called after leaving the field (saved, or nothing to save). */
+  onDone?: () => void;
+}) {
   const [text, setText] = useState(value ?? "");
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const saved = useRef(value ?? "");
 
   async function save() {
-    if (text.trim() === saved.current.trim()) return;
+    if (text.trim() === saved.current.trim()) return void onDone?.();
     setState("saving");
     const res = await onSave(text);
     if (res.ok) {
       saved.current = text;
       setState("saved");
       setTimeout(() => setState("idle"), 1600);
+      onDone?.();
     } else {
       setState("idle");
       toast.error(res.error);
@@ -120,6 +205,7 @@ function NoteField({ value, placeholder, label, onSave }: { value: string | null
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={save}
+        autoFocus={autoFocus}
         rows={2}
         maxLength={2000}
         placeholder={placeholder}
@@ -331,19 +417,7 @@ function WorkoutCard({
             </button>
           )}
 
-          {locked ? (
-            w.note && <p className="mt-4 whitespace-pre-line rounded-xl border border-line bg-paper px-4 py-3 text-[15px] leading-relaxed text-ink-soft">{w.note}</p>
-          ) : (
-            <div className="mt-4">
-              <NoteField
-                key={w.id}
-                label="Notes for this workout"
-                value={w.note}
-                placeholder="How it felt, what to change next time, anything to remember."
-                onSave={(text) => actions.setWorkoutNote({ workoutId: w.id, text })}
-              />
-            </div>
-          )}
+          <WorkoutNotes key={w.id} workout={w} locked={locked} onSave={(text) => actions.setWorkoutNote({ workoutId: w.id, text })} />
 
           <div className="mt-4 flex flex-wrap gap-2">
             {workoutHref && (
@@ -503,7 +577,6 @@ export function PlanView({
   const weeks = Array.from({ length: plan.totalWeeks }, (_, i) => i + 1);
   const shown = plan.workouts.filter((w) => w.week === week);
   const blockIndex = plan.blocks.length > 0 ? Math.min(Math.floor((week - 1) / BLOCK_WEEKS), plan.blocks.length - 1) : -1;
-  const block = blockIndex >= 0 ? plan.blocks[blockIndex] : null;
   const isDeload = plan.lighterWeeks && week % BLOCK_WEEKS === 0;
 
   return (
@@ -568,7 +641,7 @@ export function PlanView({
           Week {week}
           {week === plan.currentWeek && <span className="ml-2 align-middle text-sm font-medium text-signal">current</span>}
         </h2>
-        {(block || isDeload) && <p className="truncate text-sm text-ink-mute">{isDeload ? "Lighter week — recover" : block?.focus}</p>}
+        {isDeload && <p className="shrink-0 text-sm text-ink-mute">Lighter week</p>}
       </div>
 
       <div key={week} className="fade-in mt-3 space-y-3">

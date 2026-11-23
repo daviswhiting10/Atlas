@@ -15,6 +15,7 @@ import { BuildingOverlay, useGuestSignIn } from "./guest";
 import { CredentialFields, GoogleButton, PENDING_PLAN_KEY, inputClass, signInWithPassword } from "./account";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
+import { AthleteImport } from "./AthleteImport";
 
 const GOAL_ICONS: Record<Goal, typeof Dumbbell> = { muscle: Dumbbell, strength: Trophy, fat_loss: Flame, general: HeartPulse };
 const EQUIPMENT_ICONS: Record<Equipment, typeof Dumbbell> = { gym: Warehouse, dumbbells: Home, bodyweight: PersonStanding };
@@ -131,10 +132,19 @@ export function PlanWizard({
   mode,
   initial,
   initialName = "",
+  after = "/plan",
+  first = false,
+  importer = false,
 }: {
   mode: "signup" | "rebuild";
   initial: Prefs;
   initialName?: string;
+  /** Where a rebuilt plan lands (Today's empty card sends it back to Today). */
+  after?: string;
+  /** There is no plan yet: it is built, not rebuilt. */
+  first?: boolean;
+  /** Offer "bring your own plan" on the first step (the shared importer): an account that makes its own plan. */
+  importer?: boolean;
 }) {
   const router = useRouter();
   const [prefs, setPrefs] = useState<Prefs>(initial);
@@ -147,6 +157,8 @@ export function PlanWizard({
   const [creating, setCreating] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [accountWeak, setAccountWeak] = useState(false);
+  // A plan read from a file is showing for a check: the wizard steps back and its Continue saves that plan.
+  const [imported, setImported] = useState(false);
 
   const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setPrefs((p) => ({ ...p, [key]: value }));
   const reading = useMemo(() => interpretGoal(prefs.goalText), [prefs.goalText]);
@@ -322,7 +334,8 @@ export function PlanWizard({
       try {
         await rebuildPlan(prefs);
         toast.success("Your new plan is ready");
-        router.push("/plan");
+        router.push(after);
+        if (after === location.pathname) router.refresh();
       } catch {
         toast.error("Couldn't rebuild your plan. Please try again.");
       }
@@ -344,10 +357,16 @@ export function PlanWizard({
           <div key={step} className="rise">
             <h1 className="font-display text-[34px] leading-[1.1] text-ink sm:text-[40px]">{current.title}</h1>
             <p className="mt-2.5 text-[15px] leading-relaxed text-ink-mute">{current.hint}</p>
-            <div className="mt-7">{current.body}</div>
+            {!imported && <div className="mt-7">{current.body}</div>}
+            {step === 0 && importer && (
+              <div className={imported ? "mt-7" : "rule mt-8 pt-6"}>
+                {!imported && <p className="eyebrow mb-2">Or bring your own plan</p>}
+                <AthleteImport saveLabel="Continue" title="Drop your plan here, or choose a file" onRead={setImported} />
+              </div>
+            )}
           </div>
 
-          <div className="mt-8 flex items-center gap-3">
+          <div className={cn("mt-8 flex items-center gap-3", imported && "hidden")}>
             {step > 0 && (
               <button
                 type="button"
@@ -368,7 +387,7 @@ export function PlanWizard({
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : last ? (
-                <>{mode === "signup" ? "Create account & build my plan" : "Rebuild my plan"} <Sparkles className="h-4 w-4" /></>
+                <>{mode === "signup" ? "Create account & build my plan" : first ? "Build my plan" : "Rebuild my plan"} <Sparkles className="h-4 w-4" /></>
               ) : (
                 <>Continue <ArrowRight className="h-4 w-4" /></>
               )}
@@ -382,14 +401,15 @@ export function PlanWizard({
               </button>
             </p>
           )}
-          {mode === "rebuild" && (
+          {mode === "rebuild" && !first && !imported && (
             <p className="mt-4 text-[13px] leading-relaxed text-ink-mute">
               Rebuilding starts a fresh 12 weeks from today. Everything you&apos;ve logged stays, so your charts carry on.
             </p>
           )}
         </div>
 
-        <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />
+        {/* While a plan read from a file is showing, that is the plan: no generated one beside it. */}
+        {!imported && <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />}
       </div>
       <BuildingOverlay mode={creating ? "plan" : pending} />
     </>

@@ -6,6 +6,8 @@ import type { PlanOverview } from "@/lib/plan/overview";
 import { BLOCK_WEEKS } from "@/lib/plan/generator";
 import { PendingPlan } from "@/components/athlete/PendingPlan";
 import { EmptyStart } from "@/components/athlete/EmptyStart";
+import { NoPlanCard } from "@/components/athlete/NoPlanCard";
+import { todayEmptyState } from "@/lib/athlete/empty-state";
 import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 
 const label = "text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute";
@@ -22,7 +24,7 @@ export function TodayScreen({
   report,
   nutrition,
 }: {
-  athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe">;
+  athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe" | "prefs">;
   plan: PlanOverview | null;
   /** The running goal's card (nothing when there isn't one). */
   goal: ReactNode;
@@ -32,6 +34,7 @@ export function TodayScreen({
   nutrition?: ReactNode;
 }) {
   const next = plan?.nextUp ?? null;
+  const empty = todayEmptyState({ hasPlan: !!plan, selfServe: athlete.selfServe, isCoach: athlete.isCoach, isGuest: athlete.isGuest });
   const lighterWeek = plan != null && plan.lighterWeeks && next != null && next.week % BLOCK_WEEKS === 0;
   // This week, at a glance: the plan's workouts for the week, done or not. Shown once one is done (never a row of zeros).
   const week = plan ? plan.workouts.filter((w) => w.week === plan.currentWeek && w.status !== "SKIPPED") : [];
@@ -86,14 +89,16 @@ export function TodayScreen({
           the way to a plan as secondary text. */}
       {report}
 
-      {!plan && !athlete.selfServe && !athlete.isCoach && (
+      {empty === "coached" && (
         <>
           <EmptyStart />
           {/* Her coach may assign the plan any moment: it should appear without a reload. */}
           <RefreshWhileEmpty />
         </>
       )}
-      {!plan && (athlete.selfServe || athlete.isCoach) && (
+      {empty === "card" && <NoPlanCard prefs={athlete.prefs} />}
+      {/* A guest keeps the plain fallback: the doors (reading a file costs money) are for accounts. */}
+      {empty === "guest" && (
         <section className="rise">
           <Link href="/workouts/new" className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
             Log a workout

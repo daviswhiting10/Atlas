@@ -22,7 +22,11 @@ const MAX_PART_BYTES = 30_000_000;
 /** Stop reading once there's far more than the model is ever sent. */
 const MAX_CSV_CHARS = 900_000;
 
-export function xlsxToCsv(bytes: Uint8Array): string {
+/** A workbook tab: its name and rows of shown cell values. */
+export type Tab = { name: string; rows: string[][] };
+
+/** Every visible tab with anything in it, in workbook order. */
+export function readWorkbook(bytes: Uint8Array): Tab[] {
   if (bytes.byteLength > MAX_XLSX_BYTES) throw new WorkbookError("That file is too big for a plan. Save just the plan's tabs and try again.");
   // .xlsx files are zips ("PK"). An old .xls starts D0 CF.
   if (bytes[0] === 0xd0 && bytes[1] === 0xcf) throw new WorkbookError("That's an old .xls file. Open it in Excel and save it as .xlsx.");
@@ -52,7 +56,7 @@ export function xlsxToCsv(bytes: Uint8Array): string {
   const date1904 = /<workbookPr\b[^>]*\bdate1904="(1|true)"/.test(workbook);
   const targets = readRels(text("xl/_rels/workbook.xml.rels"));
 
-  const blocks: string[] = [];
+  const tabs: Tab[] = [];
   let size = 0;
   for (const sheet of readSheets(workbook)) {
     if (sheet.hidden) continue;
@@ -62,15 +66,21 @@ export function xlsxToCsv(bytes: Uint8Array): string {
     if (!xml) continue;
     const rows = readRows(xml, shared, dateStyles, date1904);
     if (rows.length === 0) continue;
-    const csv = Papa.unparse(rows, { newline: "\n" });
-    blocks.push(`Tab: ${sheet.name}\n${csv}`);
-    size += csv.length;
+    tabs.push({ name: sheet.name, rows });
+    size += rows.reduce((n, r) => n + r.join(",").length + 1, 0);
     if (size > MAX_CSV_CHARS) break;
   }
-  if (blocks.length === 0) throw new WorkbookError("That workbook looks empty.");
-  // A single tab needs no heading.
-  if (blocks.length === 1) return blocks[0].replace(/^Tab: [^\n]*\n/, "");
-  return blocks.join("\n\n");
+  if (tabs.length === 0) throw new WorkbookError("That workbook looks empty.");
+  return tabs;
+}
+
+const toCsv = (rows: string[][]) => Papa.unparse(rows, { newline: "\n" });
+
+/** Every tab as CSV, each headed "Tab: <name>" (a single tab needs no heading). */
+export function xlsxToCsv(bytes: Uint8Array): string {
+  const tabs = readWorkbook(bytes);
+  if (tabs.length === 1) return toCsv(tabs[0].rows);
+  return tabs.map((t) => `Tab: ${t.name}\n${toCsv(t.rows)}`).join("\n\n");
 }
 
 // ── Parts of the workbook ──────────────────────────────────────────────────
