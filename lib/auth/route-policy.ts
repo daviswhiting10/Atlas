@@ -50,7 +50,7 @@ export function decide(path: string, user: RouteUser): Decision {
   if (user.guest && GUEST_BLOCKED.some((re) => re.test(path))) return { kind: "json", status: 403, error: "Not available in the demo" };
 
   const isAthlete = user.role === "CLIENT";
-  const home = isAthlete ? "/today" : "/log";
+  const home = isAthlete ? "/today" : "/dashboard";
 
   // The set-password step: every page leads to it until a password is set (or snoozed).
   // API calls are left alone; the step's own form posts to its own page.

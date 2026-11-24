@@ -11,9 +11,9 @@
 export type Mode = "coach" | "me";
 
 /** Where each side opens. */
-export const HOME: Record<Mode, string> = { coach: "/log", me: "/today" };
+export const HOME: Record<Mode, string> = { coach: "/dashboard", me: "/today" };
 
-const COACH_PATHS = ["/log", "/clients", "/programs", "/exercises", "/intake", "/settings"];
+const COACH_PATHS = ["/dashboard", "/log", "/clients", "/programs", "/exercises", "/intake", "/settings"];
 
 /** The side a page belongs to (the coach's screens, or the athlete app: Today, Plan, Progress, You, workouts, goals). */
 export function modeOf(pathname: string): Mode {

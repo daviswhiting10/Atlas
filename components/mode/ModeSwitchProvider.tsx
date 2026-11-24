@@ -91,7 +91,7 @@ export function ModeSwitchProvider({ children }: { children: React.ReactNode }) 
           {state.shown === "me" ? (
             <AppNav isDemo={chrome.demo} isCoach hasProgress={chrome.hasProgress} preview="/today" />
           ) : (
-            <CoachNav demo={chrome.demo} preview="/log" />
+            <CoachNav demo={chrome.demo} preview="/dashboard" />
           )}
           <main aria-busy className="mx-auto max-w-5xl px-4 pt-5 sm:px-8" />
         </div>

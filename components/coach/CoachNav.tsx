@@ -4,7 +4,7 @@ import { SheetLock } from "@/components/ui/sheet-lock";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardPen, MoreHorizontal, Users, X } from "lucide-react";
+import { ClipboardPen, LayoutGrid, MoreHorizontal, Users, X } from "lucide-react";
 import { HeaderActions } from "@/components/nav/HeaderActions";
 import { signOutToLogin } from "@/lib/sign-out";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
@@ -13,11 +13,12 @@ import { cn } from "@/lib/utils";
 import { useEscape } from "@/hooks/use-escape";
 
 /**
- * Logging comes first: it's what the coach opens the app to do. Items with an
+ * The Dashboard is the landing (every client at a glance); logging is one tap away. Items with an
  * icon are phone tabs; the rest sit behind More. Programs is in More: a plan is
  * assigned from the client's page, which also links to the library.
  */
 const ITEMS = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { href: "/log", label: "Log session", icon: ClipboardPen },
   { href: "/clients", label: "Roster", icon: Users },
   { href: "/programs", label: "Programs" },

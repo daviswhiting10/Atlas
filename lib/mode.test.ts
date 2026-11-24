@@ -4,13 +4,13 @@ import { HOME, initial, modeOf, sync, tap, type SwitchState } from "./mode";
 
 describe("modeOf", () => {
   it("the coach's screens are the coach side", () => {
-    for (const p of ["/log", "/clients", "/clients/abc/log", "/clients/abc/progress", "/programs", "/programs/x", "/exercises", "/intake", "/settings"]) expect(modeOf(p)).toBe("coach");
+    for (const p of ["/dashboard", "/log", "/clients", "/clients/abc/log", "/clients/abc/progress", "/programs", "/programs/x", "/exercises", "/intake", "/settings"]) expect(modeOf(p)).toBe("coach");
   });
   it("the athlete app is the Me side", () => {
     for (const p of ["/today", "/plan", "/progress", "/you", "/workouts/abc", "/workouts/new", "/goals/new", "/goals/abc"]) expect(modeOf(p)).toBe("me");
   });
   it("only whole path segments count (/logbook is not /log)", () => expect(modeOf("/logbook")).toBe("me"));
-  it("each side opens on its home", () => expect([HOME.coach, HOME.me]).toEqual(["/log", "/today"]));
+  it("each side opens on its home", () => expect([HOME.coach, HOME.me]).toEqual(["/dashboard", "/today"]));
 });
 
 describe("the toggle's state machine", () => {
