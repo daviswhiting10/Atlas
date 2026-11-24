@@ -18,6 +18,9 @@ const PLACEHOLDER = `A few sentences in your own words. Worth covering:
 
 const field = "w-full rounded-xl border border-line-strong bg-dusk-raised px-3.5 text-[15px] text-ink outline-none focus:border-ink/40";
 
+/** The four goals most intakes are about; the others are behind "More goals" (a goal already picked always shows). */
+const COMMON_GOALS = ["Weight Loss", "Hypertrophy", "Strength", "General Fitness"];
+
 export function IntakeForm({
   clients,
   programs,
@@ -33,6 +36,7 @@ export function IntakeForm({
   const [clientId, setClientId] = useState(initialClientId || (clients.length === 0 ? "new" : ""));
   const [newName, setNewName] = useState("");
   const [tag, setTag] = useState("");
+  const [moreGoals, setMoreGoals] = useState(false);
   const [notes, setNotes] = useState("");
   const [programId, setProgramId] = useState("");
   const [startDate, setStartDate] = useState(() => new Date().toLocaleDateString("en-CA"));
@@ -87,7 +91,7 @@ export function IntakeForm({
       <section>
         <p className="text-sm font-semibold text-ink">Goal</p>
         <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Goal">
-          {categories.map((c) => (
+          {categories.filter((c) => moreGoals || COMMON_GOALS.includes(c.tag) || c.tag === tag).map((c) => (
             <button
               key={c.tag}
               type="button"
@@ -102,6 +106,11 @@ export function IntakeForm({
               {c.label}
             </button>
           ))}
+          {!moreGoals && categories.some((c) => !COMMON_GOALS.includes(c.tag) && c.tag !== tag) && (
+            <button type="button" onClick={() => setMoreGoals(true)} className="press rounded-full px-3 py-2 text-sm font-medium text-ink-mute hover:text-ink">
+              More goals
+            </button>
+          )}
         </div>
       </section>
 
