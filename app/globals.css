@@ -282,3 +282,9 @@ nav a[data-pressed="true"], nav button[data-pressed="true"], header a[data-press
   font-weight: 400;
   letter-spacing: -0.01em;
 }
+
+/* A bottom sheet is open (hooks/use-sheet-lock): the bottom navigation steps aside instead of showing through the dim or
+   jumping up above the keyboard. */
+body[data-sheet-open] [data-bottom-nav] {
+  visibility: hidden;
+}

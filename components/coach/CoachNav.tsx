@@ -68,7 +68,7 @@ export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn 
         </div>
       </header>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <nav data-bottom-nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="mx-auto flex max-w-md">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = chosen(href);
