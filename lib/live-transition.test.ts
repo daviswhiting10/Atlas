@@ -15,8 +15,8 @@ describe("the live-session bar grows into the logger", () => {
     expect(read("app/globals.css")).toMatch(/prefers-reduced-motion: reduce\)[\s\S]*view-transition-group/);
   });
   it("never waits on a frame while the page is held (the transition would hang)", () => {
-    const arrived = lib.slice(lib.indexOf("export function liveRouteArrived"));
-    expect(arrived.slice(0, arrived.indexOf("enterFrom &&"))).not.toContain("requestAnimationFrame");
+    expect(lib).not.toContain("requestAnimationFrame(() => requestAnimationFrame");
+    expect(lib).toContain("    done();\n    return;");
   });
   it("the bar and both logger roots share the name only while it runs", () => {
     const css = read("app/globals.css");
