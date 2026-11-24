@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { requestDay } from "@/lib/sessions/request-day";
 import { planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -38,7 +39,9 @@ export const GET = withWorkspace<Ctx>(async (_req, { workspaceId }, { params }) 
 
   if (!log) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json(log);
+  // Both notes, by author (the coach's falls back to clientNotes for a note saved by older code).
+  const notes = (await loadSessionNotes([{ id: log.id, clientNotes: log.clientNotes }])).get(log.id)!;
+  return NextResponse.json({ ...log, notes });
 });
 
 const PatchSchema = z.object({
@@ -104,11 +107,16 @@ export const PATCH = withWorkspace<Ctx>(async (req, { workspaceId }, { params })
         where: { id: workoutLogId },
         data: {
           ...(newDate !== undefined && { date: newDate }),
-          ...(clientNotes !== undefined && { clientNotes }),
+          // The coach's note: written below as a SessionNote (clientNotes too, for one release).
           ...(durationMin !== undefined && { durationMin }),
           ...(assignedWorkoutId !== undefined && { assignedWorkoutId }),
         },
       });
+
+      if (clientNotes !== undefined) {
+        const log = await tx.workoutLog.findUniqueOrThrow({ where: { id: workoutLogId }, select: { clientId: true, date: true } });
+        await saveSessionNote({ workoutLogId, clientId: log.clientId, date: log.date, role: "COACH", text: clientNotes }, tx);
+      }
 
       // Keep AssignedWorkout.scheduledDate in sync when date changes
       const effectiveSlotId =

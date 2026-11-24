@@ -4,6 +4,7 @@
  */
 
 import { localDay } from "@/lib/athlete/sessions";
+import { loadSessionNotes } from "@/lib/sessions/notes";
 import { prisma } from "@/lib/db/client";
 import type { PrescribedSet } from "@/lib/plan/prescription";
 import { finishedByClient } from "./finished-by";
@@ -15,6 +16,8 @@ export type LatestSession = {
   date: string;
   minutes: number | null;
   note: string | null;
+  /** The athlete's own note on the session (Session complete), shown under the coach's. */
+  athleteNote: string | null;
   /** The client tapped Finish on this workout (AssignedWorkout.loggedBy); says nothing about who entered each set. */
   finishedByClient: boolean;
   review: Review;
@@ -55,12 +58,14 @@ export async function loadLatestSession({
   );
   // A workout with no prescription has nothing to judge against.
   if (review.planned === 0) return null;
+  const notes = (await loadSessionNotes([{ id: log.id, clientNotes: log.clientNotes }])).get(log.id)!;
   return {
     logId: log.id,
     workout: log.assignedWorkout.name,
     date: log.date.toISOString(),
     minutes: log.durationMin,
-    note: log.clientNotes,
+    note: notes.coach,
+    athleteNote: notes.athlete,
     finishedByClient: finishedByClient({ loggedBy: log.assignedWorkout.loggedBy, completedAt: log.completedAt }),
     review,
     day: localDay(log.date, timeZone),

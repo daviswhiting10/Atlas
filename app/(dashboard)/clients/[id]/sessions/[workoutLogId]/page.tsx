@@ -32,6 +32,8 @@ type SessionDetail = {
   durationMin: number | null;
   rpeAvg: number | null;
   clientNotes: string | null;
+  /** Both notes, by author. */
+  notes?: { coach: string | null; athlete: string | null };
   source: "PLAN" | "GENERATED" | "MANUAL" | "SCREENSHOT" | "OFF_PLAN";
   title: string | null;
   client: { id: string; fullName: string };
@@ -510,8 +512,21 @@ export default function SessionDetailPage() {
           </Button>
         </div>
 
-        {session.clientNotes && (
-          <p className="text-sm text-muted-foreground border-t pt-3">{session.clientNotes}</p>
+        {(session.notes?.coach || session.notes?.athlete || session.clientNotes) && (
+          <div className="space-y-2 border-t pt-3">
+            {(session.notes?.coach ?? session.clientNotes) && (
+              <p className="text-sm text-muted-foreground">
+                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground">Coach</span>
+                {session.notes?.coach ?? session.clientNotes}
+              </p>
+            )}
+            {session.notes?.athlete && (
+              <p className="text-sm text-muted-foreground">
+                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground">{session.client.fullName.split(" ")[0]}</span>
+                {session.notes.athlete}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

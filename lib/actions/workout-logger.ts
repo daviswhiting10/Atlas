@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { saveSessionNote } from "@/lib/sessions/notes";
 import { requestDay } from "@/lib/sessions/request-day";
 import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
@@ -252,6 +253,10 @@ export async function completeSession(input: {
       data: { lastContactAt: new Date() },
     }),
   ]);
+  // The coach's note on the session (a SessionNote by author; clientNotes too, for one release).
+  if (input.clientNotes !== undefined) {
+    await saveSessionNote({ workoutLogId: input.workoutLogId, clientId: input.clientId, date: workoutLog.date, role: "COACH", text: input.clientNotes });
+  }
 
   // Fire-and-forget: session milestones
   checkSessionMilestones(workspaceId, input.clientId).catch(

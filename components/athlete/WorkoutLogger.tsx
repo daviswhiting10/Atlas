@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
-import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveSet } from "@/lib/actions/athlete";
+import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet } from "@/lib/actions/athlete";
+import { MySessionNote } from "@/components/athlete/MySessionNote";
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { TargetEditor } from "./TargetEditor";
@@ -141,8 +142,10 @@ export type LoggerActions = {
   planRemoveExercise: typeof planRemoveExercise;
   planSetTargets: typeof planSetTargets;
   planSwapExercise: typeof planSwapExercise;
+  /** The athlete's own note on the session (Session complete). Optional so older stand-ins still fit. */
+  saveNote?: typeof saveMySessionNote;
 };
-const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise };
+const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote };
 
 export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { data: LoggerData; /** The saves; the demo passes in-memory stand-ins. */ actions?: LoggerActions; /** Prefix for links ("/demo"). */ base?: string }) {
   const router = useRouter();
@@ -851,6 +854,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
             })}
           </ul>
         )}
+
+        {actions.saveNote && <MySessionNote assignedWorkoutId={data.id} initial={data.myNote} save={actions.saveNote} />}
 
         <div className="mt-auto pt-10">
           <Link href={`${base}/today`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">

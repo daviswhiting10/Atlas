@@ -2,6 +2,7 @@
 
 import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
+import { MAX_SESSION_NOTE, loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
 import { TARGET_LIMIT_MESSAGE } from "@/lib/sessions/duration";
@@ -129,6 +130,26 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
       ).id;
 
   return { workoutLogId: log.id, setLogId };
+}
+
+/**
+ * The athlete's own note on a session, from Session complete (an ATHLETE SessionNote; the coach's note is separate).
+ * Only their own session; empty text removes it.
+ */
+export async function saveMySessionNote(raw: { assignedWorkoutId: string; text: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const input = z.object({ assignedWorkoutId: z.string().min(1).max(64), text: z.string().max(MAX_SESSION_NOTE * 2) }).safeParse(raw);
+  if (!input.success) return { ok: false, error: "That note is too long." };
+  try {
+    const { clientId } = await requireAthlete();
+    const log = await prisma.workoutLog.findFirst({ where: { assignedWorkoutId: input.data.assignedWorkoutId, clientId }, select: { id: true, date: true } });
+    if (!log) return { ok: false, error: "Log a set first, then add your note." };
+    await saveSessionNote({ workoutLogId: log.id, clientId, date: log.date, role: "ATHLETE", text: input.data.text });
+    refresh();
+    return { ok: true };
+  } catch (err) {
+    console.error("[session note]", err);
+    return { ok: false, error: "Couldn't save your note. Please try again." };
+  }
 }
 
 const QuickCardioInput = z.object({
@@ -382,7 +403,8 @@ export async function startMyProgram(raw: { programId: string; startDate: string
 
 
 /** A finished session's sets for the read-only summary: each exercise with what was done, in the order it was done. */
-export type SessionSummary = { lines: Array<{ name: string; sets: string }> };
+/** What a History day shows for a session: each exercise's sets, and the session's notes by author ("Coach", "You"). */
+export type SessionSummary = { lines: Array<{ name: string; sets: string }>; notes?: Array<{ label: string; text: string }> };
 
 export async function sessionSummary(workoutLogId: string): Promise<SessionSummary | null> {
   const { clientId } = await requireAthlete();
@@ -390,6 +412,8 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
   const log = await prisma.workoutLog.findFirst({
     where: { id, clientId },
     select: {
+      id: true,
+      clientNotes: true,
       sets: {
         where: { completed: true },
         orderBy: [{ createdAt: "asc" }, { setNumber: "asc" }],
@@ -411,5 +435,9 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
     const text = timed ? `${s.reps} sec` : s.weight != null && s.weight > 0 ? `${s.weight}×${s.reps}` : `${s.reps}`;
     byName.set(name, [...(byName.get(name) ?? []), text]);
   }
-  return { lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })) };
+  const notes = (await loadSessionNotes([{ id: log.id, clientNotes: log.clientNotes }])).get(log.id)!;
+  return {
+    lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })),
+    notes: [...(notes.coach ? [{ label: "Coach", text: notes.coach }] : []), ...(notes.athlete ? [{ label: "You", text: notes.athlete }] : [])],
+  };
 }
