@@ -5,6 +5,7 @@
  * the app's own pure builders, from the sessions below.
  */
 
+import { exerciseKind } from "@/lib/plan/workout-kind";
 import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import type { ProgressData, LoggerData, ExerciseProgress } from "@/lib/athlete/data";
 import type { HistorySession } from "@/lib/history/types";
@@ -198,6 +199,7 @@ function summary(week: number, wo: (typeof WORKOUTS)[number]): WorkoutSummary {
       aweId: awe(week, wo.key, e.id),
       exerciseId: e.id,
       slug: e.slug,
+      kind: exerciseKind(e.muscles),
       name: e.name,
       sets: deload(week) ? Math.ceil(e.sets / 2) : e.sets,
       reps: repsLabel(e),

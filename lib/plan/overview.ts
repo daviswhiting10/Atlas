@@ -17,6 +17,7 @@ import { isLighterWeek, lighterWeeksOn } from "./lighter";
 import { weekOf } from "@/lib/athlete/sessions";
 import { noteHistory, type SessionNote } from "./note-history";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
+import { exerciseKind, type ExerciseKind } from "./workout-kind";
 import { mediaPictures } from "@/lib/exercises/media";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -58,6 +59,8 @@ export type WorkoutSummary = {
     note?: string | null;
     /** What the movement looks like, when the library has it. */
     picture: Picture | null;
+    /** Strength, cardio or mobility (from the exercise's muscles): what the Plan week grid's icon says. */
+    kind?: ExerciseKind;
     /** Warm-up, block or cool-down, as stored (read with lib/workouts/structure). */
     section: string | null;
   }>;
@@ -155,7 +158,7 @@ export async function loadPlanOverview({
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
-            select: { id: true, exerciseId: true, prescribedSets: true, notes: true, section: true, exercise: { select: { name: true, slug: true, gifUrl: true } } },
+            select: { id: true, exerciseId: true, prescribedSets: true, notes: true, section: true, exercise: { select: { name: true, slug: true, gifUrl: true, primaryMuscles: true } } },
           },
         },
       },
@@ -189,6 +192,7 @@ export async function loadPlanOverview({
         aweId: e.id,
         exerciseId: e.exerciseId,
         slug: e.exercise.slug,
+        kind: exerciseKind(e.exercise.primaryMuscles),
         name: displayName(e.exercise.slug, e.exercise.name),
         sets: sets.length,
         reps: repLabel(sets),
