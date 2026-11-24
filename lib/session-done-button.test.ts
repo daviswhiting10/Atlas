@@ -28,11 +28,11 @@ describe("Session complete (coach)", () => {
 });
 
 describe("the finish screen on the athlete side", () => {
-  it("the main button is 'Done — back to your plan' and goes home (Today), solid as before", () => {
-    const at = athlete.indexOf("Done — back to your plan");
+  it("the main button is 'Done — see your progress' and lands on Progress, solid as before", () => {
+    const at = athlete.indexOf("Done — see your progress");
     expect(at).toBeGreaterThan(0);
     const link = athlete.slice(at - 330, at);
-    expect(link).toContain("href={`${base}/today`}");
+    expect(link).toContain("href={`${base}/progress`}");
     expect(link).toContain("bg-dusk-button");
   });
 });

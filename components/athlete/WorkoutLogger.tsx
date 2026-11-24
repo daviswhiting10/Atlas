@@ -24,7 +24,8 @@ import { TargetEditor } from "./TargetEditor";
 import { isRecord } from "@/lib/plan/overload";
 import { FOLD_DELAY_MS, RECORD_RING, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
+import { canMerge, groupOf, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
+import { pairRest, restDue } from "@/lib/sessions/superset-rest";
 // The coach logger's hold-and-drag (hold a card's header to lift it, drop between cards to reorder,
 // hold over a card to superset). Imported as it is; nothing in that folder is changed.
 import { useDragOrder } from "@/app/(dashboard)/clients/[id]/log/useDragOrder";
@@ -89,6 +90,7 @@ function Stepper({
   settled,
   showButtons,
   onArm,
+  bodyweight,
 }: {
   value: number | null;
   step: number;
@@ -104,6 +106,8 @@ function Stepper({
   showButtons: boolean;
   /** The number was tapped: this set's − and + show from now on. */
   onArm: () => void;
+  /** The unit under the number is the switch: lb, or BW (bodyweight: no weight to enter). */
+  bodyweight?: { on: boolean; toggle: () => void };
 }) {
   const bump = (dir: 1 | -1) => {
     if (!settled()) return;
@@ -122,8 +126,8 @@ function Stepper({
           min={0}
           max={unit === "lb" ? MAX_WEIGHT_LB : undefined}
           step={step}
-          value={value ?? ""}
-          placeholder="–"
+          value={bodyweight?.on ? "" : (value ?? "")}
+          placeholder={bodyweight?.on ? "BW" : "–"}
           aria-label={label}
           onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
           onFocus={(e) => {
@@ -132,7 +136,13 @@ function Stepper({
           }}
           className={cn("tnum w-full bg-transparent text-center text-[17px] leading-none outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
         />
-        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
+        {bodyweight ? (
+          <button type="button" onClick={bodyweight.toggle} aria-pressed={bodyweight.on} aria-label={bodyweight.on ? `${label}: bodyweight (tap to use a weight)` : `${label}: lb (tap for bodyweight)`} className={cn("press relative -mb-1 mt-0.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide before:absolute before:-inset-x-2 before:-inset-y-2", bodyweight.on ? "bg-signal/20 text-signal" : "text-ink-mute")}>
+            {bodyweight.on ? "BW" : unit}
+          </button>
+        ) : (
+          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
+        )}
       </label>
       <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Plus className="h-4 w-4" />
@@ -504,6 +514,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       if (j === i) return { ...s, ...patch };
       // Carry a weight change forward to the sets you haven't done yet.
       if (j > i && !s.done && patch.weight !== undefined && s.weight === before.weight) return { ...s, weight: patch.weight };
+      // The same for reps: type them once and the sets still to do follow.
+      if (j > i && !s.done && patch.reps !== undefined && s.reps === before.reps) return { ...s, reps: patch.reps };
       return s;
     });
     apply({ ...setsRef.current, [ex.aweId]: next });
@@ -624,21 +636,29 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     const label = recordFor(ex, list, i);
     if (label) setRecords((r) => ({ ...r, [key]: label }));
 
-    afterChange(ex, s.plan?.rest ?? undefined);
+    afterChange(ex, s.plan?.rest ?? undefined, s.setNumber);
   }
 
   /**
    * After a set is logged or deleted: the workout's last set finishes it (a few seconds later,
    * with an Undo); an exercise's last set moves on to the next exercise with sets left.
    */
-  function afterChange(ex: LoggerExercise, restSeconds = ex.restSeconds) {
+  function afterChange(ex: LoggerExercise, restSeconds = ex.restSeconds, setNumber?: number) {
     const lists = data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done));
     if (allDone(lists)) {
       setRest(null);
       return;
     }
-    restFor.current = ex.aweId;
-    setRest({ endsAt: Date.now() + restSeconds * 1000, total: restSeconds });
+    // A superset pair (3A / 3B) has one rest, started only when both are logged for that set; anything else rests after each set.
+    const group = groupOf(order, ex.aweId);
+    const logged = (id: string) => new Set((setsRef.current[id] ?? data.exercises.find((e) => e.aweId === id)?.sets ?? []).filter((x) => x.done).map((x) => x.setNumber));
+    const numbers = (id: string) => new Set((setsRef.current[id] ?? data.exercises.find((e) => e.aweId === id)?.sets ?? []).map((x) => x.setNumber));
+    if (setNumber != null && !restDue(group, ex.aweId, setNumber, logged, numbers)) setRest(null);
+    else {
+      restFor.current = ex.aweId;
+      const total = group.length > 1 ? pairRest(group.map((id) => (id === ex.aweId ? restSeconds : (data.exercises.find((e) => e.aweId === id)?.restSeconds ?? 0)))) : restSeconds;
+      setRest({ endsAt: Date.now() + total * 1000, total });
+    }
     // An exercise's last set folds it and opens the next one with sets left (in the order on screen).
     const shown = exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).length > 0 && (setsRef.current[e.aweId] ?? e.sets).every((x) => x.done));
     const at = exercises.findIndex((e) => e.aweId === ex.aweId);
@@ -897,8 +917,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
         {actions.saveNote && <MySessionNote assignedWorkoutId={data.id} initial={data.myNote} save={actions.saveNote} />}
 
         <div className="mt-auto pt-10">
-          <Link href={`${base}/today`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
-            Done — back to your plan
+          <Link href={`${base}/progress`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
+            Done — see your progress
           </Link>
         </div>
       </div>
@@ -1044,7 +1064,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[180px]">
-                            <DropdownMenuItem className="min-h-11" onClick={() => addSet(ex)}>Add a set</DropdownMenuItem>
                             <DropdownMenuItem className="min-h-11" onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
                             {/* A coach's plan stays the coach's: swap, but no retargeting or removing. */}
                             {!data.coachPlan && <DropdownMenuItem className="min-h-11" onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
@@ -1102,7 +1121,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                             <li key={s.setNumber}>
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
                                 <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { weight: v })} />}
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { weight: v })} bodyweight={{ on: s.weight === 0, toggle: () => edit(ex, i, { weight: s.weight === 0 ? (list.find((x) => (x.weight ?? 0) > 0)?.weight ?? null) : 0 }) }} />}
                                 {timed ? (
                                   <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
                                 ) : (
@@ -1139,6 +1158,9 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                           );
                         })}
                       </ul>
+                      <button type="button" onClick={() => addSet(ex)} disabled={busy} className="press mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line-strong text-[14px] font-medium text-ink-soft hover:text-ink">
+                        <Plus className="h-4 w-4" /> Add set
+                      </button>
                       <div className="mt-2 flex items-center gap-1">
                         {data.status !== "LOGGED" && exerciseBulk(list.map((x) => x.done)) && (
                           <CheckAllButton mode={exerciseBulk(list.map((x) => x.done))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(list.map((x) => x.done))!)} />
@@ -1163,6 +1185,16 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           className="press flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 text-sm font-medium text-ink-mute hover:border-ink/30 hover:text-ink"
         >
           <Plus className="h-4 w-4" /> Add an exercise
+        </button>
+
+        {/* The way out, at the bottom where the last set leaves you: one big block of colour. */}
+        <button
+          type="button"
+          onClick={tapFinish}
+          disabled={finishing || doneCount === 0}
+          className="press mt-4 flex h-16 w-full items-center justify-center rounded-2xl bg-signal text-[19px] font-bold text-bone shadow-sm disabled:opacity-40"
+        >
+          {finishing ? <Loader2 className="h-5 w-5 animate-spin" aria-label="Finishing" /> : "Finish workout"}
         </button>
       </div>
 

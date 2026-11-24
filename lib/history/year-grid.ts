@@ -107,6 +107,12 @@ export function gridDay(day: string): string {
   return `${WEEKDAYS[p.wd]} ${MONTHS[p.m]} ${p.d}`;
 }
 
+/** "Nov 23": the tooltip's date. */
+export function shortDay(day: string): string {
+  const p = parts(day);
+  return `${MONTHS[p.m]} ${p.d}`;
+}
+
 export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number; /** Weeks the window is moved back from today's. */ back?: number }): YearGrid {
   const weeks = opts.weeks ?? YEAR_WEEKS;
   const lastMonday = addDays(mondayOf(opts.today), -7 * Math.max(0, opts.back ?? 0));
@@ -154,10 +160,22 @@ export function rawStats(c: Pick<GridCell, "sets" | "runMin" | "walkMin" | "mobM
 
 /** The one line under the grid: "Sat Nov 14 · Long run · 52 min · 75 Hard: not met". */
 export function readout(c: GridCell): string {
-  const head = gridDay(c.day);
+  const head = shortDay(c.day);
   if (c.future) return `${head} · not yet`;
   if (c.titles.length === 0) return `${head} · no session`;
-  return [head, c.titles.join(", "), rawStats(c)].filter(Boolean).join(" · ");
+  return [head, readTitles(c.titles), rawStats(c)].filter(Boolean).join(" · ");
+}
+
+/**
+ * A day's session names for the tooltip, tidied: "Day 1 — Upper: Push + Arms" reads "Upper Push + Arms", the same name twice
+ * shows once, and a bare "Workout" is dropped when something more specific is there.
+ */
+export function readTitles(titles: string[]): string {
+  const clean = titles.map((t) => t.replace(/^\s*Day\s*\d+\s*[—–-]\s*/i, "").replace(/:\s*/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const uniq = clean.filter((t) => (seen.has(t.toLowerCase()) ? false : (seen.add(t.toLowerCase()), true)));
+  const specific = uniq.filter((t) => t.toLowerCase() !== "workout");
+  return (specific.length > 0 ? specific : uniq).join(", ");
 }
 
 /** The most recent training day in the grid (what the readout shows before anything is touched), if any. */
