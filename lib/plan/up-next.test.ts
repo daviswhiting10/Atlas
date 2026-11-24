@@ -40,17 +40,15 @@ describe("Plan tab, up next first", () => {
     expect(v.eyebrow).toBe("Week 12 of 12 · Peak");
   });
 
-  it("one ⋯ on the Plan page: the header's, with Change goals; none under the title", () => {
+  it("the Plan page has no ⋯ of its own; the header's ⋯ no longer carries Edit plan or Change goals", () => {
     const page = readFileSync(new URL("../../app/(client)/plan/page.tsx", import.meta.url), "utf8");
     expect(page).not.toContain("PlanMenu");
     expect(page).not.toMatch(/onDelete|deleteMyPlan/);
     expect(page).toMatch(/searchParams\?\.view === "edit" && !locked/);
     const header = readFileSync(new URL("../../components/nav/HeaderActions.tsx", import.meta.url), "utf8");
-    expect(header).toContain('changeGoals && pathname.startsWith("/plan")');
-    expect(header).toContain("Change goals");
-    const layout = readFileSync(new URL("../../app/(client)/layout.tsx", import.meta.url), "utf8");
-    expect(layout).toContain("changeGoals={athlete.selfServe}");
+    expect(header).not.toContain("changeGoals");
   });
+
 
 });
 
