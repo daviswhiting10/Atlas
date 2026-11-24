@@ -306,6 +306,10 @@ export default function ClientsPage() {
                     <div className="group flex items-center hover:bg-muted/40 transition-colors">
                     <Link
                       href={`/clients/${client.id}`}
+                      // No prefetch: the page's frame (its loading.tsx) streams first anyway, and a prefetch per row on render was
+                      // a server request per client. Not a full prefetch on press either: Next reuses one for 5 minutes, so a
+                      // session the client just logged could be missing.
+                      prefetch={false}
                       draggable={false}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 px-5 min-h-[60px] active:bg-muted/60"
                     >

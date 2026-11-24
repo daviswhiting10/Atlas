@@ -24,7 +24,7 @@ import { loginStatus } from "@/lib/coach/login-status";
 import { ClientGlance } from "@/components/coach/ClientGlance";
 import { glanceStats, lastDays } from "@/lib/coach/glance";
 import { overallProgress } from "@/lib/progress/overall";
-import { ClientDetail } from "./ClientDetail";
+import { ClientDetail } from "../ClientDetail";
 
 
 export const metadata: Metadata = { title: "Client" };
