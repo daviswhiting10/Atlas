@@ -47,7 +47,7 @@ describe("historyView: only what the heatmap draws is sent", () => {
   } as unknown as HistoryCalendar;
   const v = historyView(grid);
   it("a grid keeps the day totals and drops rows, ids, links and record flags", () => {
-    expect(v).toEqual({ kind: "grid", sessions: 2, today: "2026-11-23", summary: "1 of the last 1 weeks active, 2 sessions", challenge: null, days: { "2026-11-20": { sets: 16, minutes: 100, units: 16, runMin: 0, walkMin: 0, mobMin: 0, titles: ["Upper A", "Upper A"], mode: "S", ring: null } } });
+    expect(v).toEqual({ kind: "grid", sessions: 2, today: "2026-11-23", summary: "1 of the last 1 weeks active, 2 sessions", days: { "2026-11-20": { sets: 16, minutes: 100, units: 16, runMin: 0, walkMin: 0, mobMin: 0, titles: ["Upper A", "Upper A"], mode: "S" } } });
     expect(JSON.stringify(v)).not.toMatch(/rows|href|record|"id"/);
   });
   it("empty and thin pass through", () => {
