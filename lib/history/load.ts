@@ -10,7 +10,6 @@
 import { exerciseGroup } from "@/lib/exercises/muscles";
 import { localDay } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
-import { activeGoalId, loadGoal } from "@/lib/goals/data";
 import { chapterSpan, historyCalendar, type HistoryCalendar } from "./calendar";
 import type { HistorySession } from "./types";
 
