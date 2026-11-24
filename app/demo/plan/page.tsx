@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { PlanUpNext } from "@/components/athlete/PlanUpNext";
+import { DemoPlanHome } from "@/components/demo/DemoPlanHome";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
-import { WeekNotesList } from "@/components/plan/WeekNoteCard";
-import { upNextView } from "@/lib/plan/up-next";
 import { DEMO_PLAN } from "@/lib/demo/sample";
 import { demoNoEdit } from "@/lib/demo/plan-actions";
 
@@ -36,17 +34,5 @@ export default function DemoPlan({ searchParams }: { searchParams?: { view?: str
       </div>
     );
   }
-  const upNext = upNextView(DEMO_PLAN);
-  return (
-    <div>
-      <div className="rise mb-5">
-        <p className="eyebrow">{upNext.eyebrow}</p>
-        <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{DEMO_PLAN.name}</h1>
-      </div>
-      <div className="mb-6 max-w-3xl">
-        <WeekNotesList notes={DEMO_PLAN.weekNotes} currentWeek={DEMO_PLAN.currentWeek} />
-      </div>
-      <PlanUpNext view={upNext} totalWeeks={DEMO_PLAN.totalWeeks} canEdit={false} base="/demo" />
-    </div>
-  );
+  return <DemoPlanHome />;
 }

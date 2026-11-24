@@ -118,3 +118,24 @@ describe("the way in", () => {
     expect(menu).toContain("/demo?from=${encodeURIComponent(pathname)}");
   });
 });
+
+import { planAfter } from "./plan-after";
+import { DEMO_PLAN as PLAN_FOR_AFTER } from "./sample";
+describe("finishing a demo workout moves Up next on", () => {
+  it("nothing finished: the plan as it is", () => {
+    expect(planAfter(PLAN_FOR_AFTER, new Set())).toBe(PLAN_FOR_AFTER);
+  });
+  it("the finished workout reads as done and the next planned one is up", () => {
+    const first = PLAN_FOR_AFTER.nextUp!;
+    const after = planAfter(PLAN_FOR_AFTER, new Set([first.id]));
+    expect(after.workouts.find((w) => w.id === first.id)!.status).toBe("LOGGED");
+    expect(after.nextUp?.id).not.toBe(first.id);
+    expect(after.nextUp?.status).toBe("PLANNED");
+    expect(after.done).toBe(PLAN_FOR_AFTER.done + 1);
+  });
+  it("the original is untouched (Reset goes back to the sample)", () => {
+    const first = PLAN_FOR_AFTER.nextUp!;
+    planAfter(PLAN_FOR_AFTER, new Set([first.id]));
+    expect(PLAN_FOR_AFTER.nextUp!.id).toBe(first.id);
+  });
+});
