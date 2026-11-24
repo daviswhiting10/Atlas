@@ -78,10 +78,10 @@ describe("the quick-log sheet", () => {
   it("Save waits for valid minutes and a valid distance", () => {
     expect(sheet).toContain("disabled={pending || !minutesOk || !distanceOk}");
   });
-  it("is on the athlete's Progress, in both the sparse and the full history", () => {
-    expect(read("components/athlete/ProgressScreen.tsx")).toContain("quickLog />");
-    const h = read("components/athlete/HistoryCalendar.tsx");
-    expect(h).toContain("{quickLog && (");
-    expect(h.indexOf("{quickLog && (")).toBeGreaterThan(h.indexOf("calendar.kind === \"thin\""));
+  it("is reached from Today's Log button (not from Progress)", () => {
+    expect(read("components/athlete/ProgressScreen.tsx")).not.toContain("quickLog");
+    expect(read("components/athlete/HistoryCalendar.tsx")).not.toContain("QuickCardioSheet");
+    expect(read("components/athlete/LogPill.tsx")).toContain("<QuickCardioSheet");
   });
+
 });

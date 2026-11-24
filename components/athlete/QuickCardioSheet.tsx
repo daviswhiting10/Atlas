@@ -7,11 +7,16 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { logCardio } from "@/lib/actions/athlete";
 import { cn } from "@/lib/utils";
 
-const TYPES = [
-  { id: "OTHER", label: "Cardio" },
-  { id: "WALK", label: "Walk" },
+/** What can be logged. A swim is "other" cardio that is named Swim. */
+export const QUICK_TYPES = [
+  { id: "WALK", activity: "WALK", label: "Walk" },
+  { id: "RUN", activity: "RUN", label: "Run" },
+  { id: "SWIM", activity: "OTHER", label: "Swim" },
+  { id: "OTHER", activity: "OTHER", label: "Cardio" },
 ] as const;
-type Kind = (typeof TYPES)[number]["id"];
+export type QuickKind = (typeof QUICK_TYPES)[number]["id"];
+const TYPES = QUICK_TYPES;
+type Kind = QuickKind;
 const CHIPS = [20, 30, 45];
 const KEY = "atlas.quickcardio.type";
 
@@ -19,7 +24,7 @@ const KEY = "atlas.quickcardio.type";
  * Log cardio or a walk in two taps: a minutes chip, then Save. The type starts as the one used last; the minutes can also
  * be typed; the distance is optional. It counts today.
  */
-export function QuickCardioSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function QuickCardioSheet({ open, onClose, initial }: { open: boolean; onClose: () => void; /** Open on this type (from the Log button); otherwise on the one used last. */ initial?: QuickKind }) {
   const router = useRouter();
   const [kind, setKind] = useState<Kind>("OTHER");
   const [minutes, setMinutes] = useState("");
@@ -29,11 +34,17 @@ export function QuickCardioSheet({ open, onClose }: { open: boolean; onClose: ()
   useEffect(() => {
     try {
       const k = window.localStorage.getItem(KEY);
-      if (k === "WALK" || k === "OTHER") setKind(k);
+      if (!initial && (k === "WALK" || k === "RUN" || k === "SWIM" || k === "OTHER")) setKind(k);
     } catch {
       // Private mode: the type just starts as Cardio.
     }
-  }, []);
+  }, [initial]);
+
+  // Opened for a type from the Log button: that type.
+  useEffect(() => {
+    if (open && initial) setKind(initial);
+  }, [open, initial]);
+  const chosen = QUICK_TYPES.find((t) => t.id === kind)!;
 
   const m = Number(minutes);
   const minutesOk = /^\d{1,3}$/.test(minutes.trim()) && m >= 1 && m <= 600;
@@ -41,7 +52,7 @@ export function QuickCardioSheet({ open, onClose }: { open: boolean; onClose: ()
 
   const save = () =>
     start(async () => {
-      const r = await logCardio({ activity: kind, minutes: m, distance: distance.trim() === "" ? null : Number(distance), unit: "mi" }).catch(() => ({ ok: false as const, error: "Couldn't save that." }));
+      const r = await logCardio({ activity: chosen.activity, ...(kind === "SWIM" ? { label: "Swim" } : {}), minutes: m, distance: distance.trim() === "" ? null : Number(distance), unit: "mi" }).catch(() => ({ ok: false as const, error: "Couldn't save that." }));
       if (!r.ok) {
         toast.error(r.error);
         return;
@@ -67,16 +78,16 @@ export function QuickCardioSheet({ open, onClose }: { open: boolean; onClose: ()
         style={{ backgroundColor: "var(--popover)", color: "var(--popover-foreground)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
       >
         <div className="flex items-center justify-between">
-          <DialogTitle className="font-body text-[22px] font-semibold tracking-[-0.02em]">Log cardio or a walk</DialogTitle>
+          <DialogTitle className="font-body text-[22px] font-semibold tracking-[-0.02em]">Log {chosen.label.toLowerCase()}</DialogTitle>
           <button type="button" onClick={onClose} disabled={pending} className="press -mr-2 flex h-11 items-center px-3 text-[15px] font-medium text-ink-soft">
             Close
           </button>
         </div>
         <DialogDescription className="sr-only">Pick cardio or walk, the minutes, and optionally how far. It counts today.</DialogDescription>
 
-        <div role="group" aria-label="Type" className="mt-2 flex rounded-2xl bg-ink/[0.06] p-1">
+        <div role="group" aria-label="Type" className="mt-2 grid grid-cols-4 rounded-2xl bg-ink/[0.06] p-1">
           {TYPES.map((t) => (
-            <button key={t.id} type="button" aria-pressed={kind === t.id} onClick={() => setKind(t.id)} className={cn("press h-12 flex-1 rounded-xl text-[16px] font-semibold", kind === t.id ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft")}>
+            <button key={t.id} type="button" aria-pressed={kind === t.id} onClick={() => setKind(t.id)} className={cn("press h-12 rounded-xl text-[15px] font-semibold", kind === t.id ? "bg-dusk-selected text-dusk-selected-text" : "text-ink-soft")}>
               {t.label}
             </button>
           ))}

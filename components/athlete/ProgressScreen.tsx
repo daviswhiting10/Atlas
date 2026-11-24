@@ -37,7 +37,7 @@ export function ProgressScreen({
   const lite = liteProgress(data);
   return (
     <div className="pt-4">
-      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} quickLog />} />
+      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} />} />
       <BodyWeightSection points={bodyWeight} />
       {chapters.length > 0 && (
         <section className="mt-14">

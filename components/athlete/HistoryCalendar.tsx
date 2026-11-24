@@ -10,7 +10,6 @@ import { shortDay, type CalendarSession } from "@/lib/history/calendar";
 import type { HistoryView } from "@/lib/history/view";
 import { useEscape } from "@/hooks/use-escape";
 import { YearHeatmap } from "./YearHeatmap";
-import { QuickCardioSheet } from "./QuickCardioSheet";
 
 /** "18 sets · 55 min", leaving out what isn't there (never a zero). */
 function detail(s: CalendarSession): string {
@@ -151,9 +150,8 @@ function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: 
  * History: the session count and the year of training as a heatmap (YearHeatmap, from lib/history/calendar).
  * Under three sessions: "Day one" and the first session.
  */
-export function HistoryCalendar({ calendar, summary, quickLog = false, compact = false }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ quickLog?: boolean }) {
+export function HistoryCalendar({ calendar, summary, compact = false }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [logging, setLogging] = useState(false);
   if (calendar.kind === "empty") return null;
 
   return (
@@ -182,14 +180,6 @@ export function HistoryCalendar({ calendar, summary, quickLog = false, compact =
           <div className={compact ? "mt-1" : "mt-6"}>
             <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} />
           </div>
-        </>
-      )}
-      {quickLog && (
-        <>
-          <button type="button" onClick={() => setLogging(true)} className="press mt-5 flex h-12 w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink md:max-w-xs">
-            + Log cardio or a walk
-          </button>
-          <QuickCardioSheet open={logging} onClose={() => setLogging(false)} />
         </>
       )}
     </section>

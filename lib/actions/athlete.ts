@@ -165,6 +165,8 @@ const QuickCardioInput = z.object({
   minutes: z.number().int().min(1).max(600),
   distance: z.number().finite().min(0).max(500).nullish(),
   unit: z.enum(["mi", "km"]).default("mi"),
+  /** What to call it when the type alone doesn't say (a swim is "other" cardio, named Swim). */
+  label: z.string().trim().min(1).max(30).optional(),
 });
 
 /**
@@ -175,13 +177,13 @@ export async function logCardio(raw: unknown): Promise<{ ok: true } | { ok: fals
   const { clientId } = await requireAthlete();
   const parsed = QuickCardioInput.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Minutes are a whole number from 1 to 600." };
-  const { activity, minutes, distance, unit } = parsed.data;
+  const { activity, minutes, distance, unit, label } = parsed.data;
   const now = new Date();
   await prisma.workoutLog.create({
     data: {
       clientId,
       source: "OFF_PLAN",
-      title: activity === "WALK" ? "Walk" : activity === "RUN" ? "Run" : "Cardio",
+      title: label ?? (activity === "WALK" ? "Walk" : activity === "RUN" ? "Run" : "Cardio"),
       date: now,
       completedAt: now,
       durationMin: minutes,
@@ -448,4 +450,18 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
     lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })),
     notes: [...(notes.coach ? [{ label: "Coach", text: notes.coach }] : []), ...(notes.athlete ? [{ label: "You", text: notes.athlete }] : [])],
   };
+}
+
+/**
+ * What the Log button on Today can offer right now: a plan session that was started and not finished (to continue). Own data
+ * only. (The running challenge is known to the page already.)
+ */
+export async function logOptions(): Promise<{ inProgress: { id: string; name: string } | null }> {
+  const { clientId } = await requireAthlete();
+  const open = await prisma.workoutLog.findFirst({
+    where: { clientId, completedAt: null, assignedWorkoutId: { not: null }, sets: { some: {} }, assignedWorkout: { status: { not: "SKIPPED" } } },
+    orderBy: { date: "desc" },
+    select: { assignedWorkoutId: true, assignedWorkout: { select: { name: true } } },
+  });
+  return { inProgress: open?.assignedWorkoutId ? { id: open.assignedWorkoutId, name: open.assignedWorkout?.name ?? "Workout" } : null };
 }
