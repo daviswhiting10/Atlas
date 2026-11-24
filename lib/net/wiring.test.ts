@@ -6,14 +6,14 @@ const src = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 
 describe("a dropped connection is said out loud, not swallowed", () => {
   it("the plan editor guards every save (athlete's Plan and the coach's plan editor are the same view)", () => {
     const s = src("components/athlete/PlanView.tsx");
-    expect(s).toContain("guardActions(rest, () => router.refresh())");
+    expect(s).toContain("guardActions(rest, router.refresh)");
     // setSkipped returns nothing and has its own try/catch: it must not be wrapped (a wrapped failure would read as success).
     expect(s).toMatch(/\{ \.\.\.guardActions\(rest[^)]*\)[^}]*, setSkipped \}/);
   });
   it("assigning and discarding a draft plan are guarded, and re-read the plan when the connection returns", () => {
     const s = src("components/coach/AssignPanel.tsx");
-    expect(s).toMatch(/guard\(\(\) => assignDraftPlan\(.*router\.refresh\(\)\)/);
-    expect(s).toMatch(/guard\(\(\) => discardDraftPlan\(.*router\.refresh\(\)\)/);
+    expect(s).toMatch(/guard\(\(\) => assignDraftPlan\(.*router\.refresh\)/);
+    expect(s).toMatch(/guard\(\(\) => discardDraftPlan\(.*router\.refresh\)/);
   });
   it("Add client keeps the form, says no connection, and looks for the first try's copy before adding again", () => {
     const s = src("app/(dashboard)/clients/page.tsx");

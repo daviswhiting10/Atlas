@@ -32,6 +32,14 @@ export default withPWA({
   publicExcludes: ["!credentials/**/*"],
   workboxOptions: {
     disableDevLogs: true,
+    // A new service worker waits until the app is closed and reopened instead of taking over a running page. Taking
+    // over at once deleted the old build's precached scripts while a page still needed them, and with no skew
+    // protection on Hobby the server no longer has them either: the page went dead. The first install still takes
+    // control at once (clientsClaim; there is nothing old to replace), and old precache entries are cleared when the
+    // new worker activates on the next cold start (cleanupOutdatedCaches only removes older Workbox formats).
+    skipWaiting: false,
+    clientsClaim: true,
+    cleanupOutdatedCaches: true,
     // Static files only. Replaces the plugin's defaults, which also cache
     // pages and API responses.
     runtimeCaching: [

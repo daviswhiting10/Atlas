@@ -6,6 +6,7 @@ import "./dusk.css";
 import { Toaster } from "@/components/ui/sonner";
 import { PressFeedback } from "@/components/nav/PressFeedback";
 import { ModeSwitchProvider } from "@/components/mode/ModeSwitchProvider";
+import { SKEW_HEAL_SCRIPT } from "@/lib/net/skew-heal";
 
 const geist = localFont({
   src: "./fonts/GeistVF.woff",
@@ -53,6 +54,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}>
+      <head>
+        {/* First, before the app's scripts: a page left behind by a deploy reloads once instead of going dead. */}
+        <script dangerouslySetInnerHTML={{ __html: SKEW_HEAL_SCRIPT }} />
+      </head>
       <body className="antialiased font-body">
         <ModeSwitchProvider>{children}</ModeSwitchProvider>
         <PressFeedback />

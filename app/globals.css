@@ -285,6 +285,10 @@ nav a[data-pressed="true"], nav button[data-pressed="true"], header a[data-press
 body[data-sheet-open] [data-bottom-nav] {
   visibility: hidden;
 }
+/* …and the page behind it doesn't scroll (hooks/use-sheet-lock pins it; no inline overflow to copy back wrong). */
+body[data-sheet-open] {
+  overflow: hidden;
+}
 
 /* The live-session bar grows into the logger and shrinks back (lib/live-transition). The name is on only while it runs. */
 html[data-live-vt] [data-live-bar],

@@ -2,11 +2,13 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { healChunkError } from "@/lib/net/skew-heal";
 
 /** Something broke while drawing a screen: never a raw error, always a way on. */
 export default function ErrorScreen({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.warn("[screen error]", error.digest ?? error.message);
+    healChunkError(error); // a script left behind by a deploy: one reload fetches the new one
   }, [error]);
   return (
     <main className="flex min-h-[70dvh] flex-col items-center justify-center px-6 text-center">
