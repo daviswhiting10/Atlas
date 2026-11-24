@@ -2258,6 +2258,7 @@ function SetTable({
           const extra = Boolean(entry.note.trim() || entry.rpe);
           const persist = () => entry.completed && onBlurPersist(idx);
           const open = detail === idx;
+          const showDetails = open || extra || entry.completed || entry.isBand || entry.isBodyweight || idx === sets.findIndex((x) => !x.completed);
           return (
             <div key={idx} role="group" aria-label={`Set ${idx + 1}`}>
               <HoldRow
@@ -2267,17 +2268,21 @@ function SetTable({
                 }}
                 className={cn(SET_GRID, "rounded-lg px-0.5", entry.completed && "bg-[var(--success)]/[0.07]")}
               >
-                <button
-                  type="button"
-                 
-                  onClick={() => setDetail(open ? null : idx)}
-                  aria-expanded={open}
-                  aria-label={`Set ${idx + 1}: load type, RPE and note`}
-                  className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
-                >
-                  {idx + 1}
-                  {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
-                </button>
+                {showDetails ? (
+                  <button
+                    type="button"
+                    onClick={() => setDetail(open ? null : idx)}
+                    aria-expanded={open}
+                    aria-label={`Set ${idx + 1}: load type, RPE and note`}
+                    className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
+                  >
+                    {idx + 1}
+                    {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
+                  </button>
+                ) : (
+                  // A set still to do, and not the next one: just its number. (The button is on the next set, on logged sets and on any with a note.)
+                  <span className="flex h-10 items-center justify-center text-[13px] font-semibold tabular-nums text-ink-mute">{idx + 1}</span>
+                )}
                 <span className="text-[12px] leading-tight tabular-nums text-ink-mute">{prevLabel}</span>
                 <span className="min-w-0">
                   {entry.isBand || entry.isBodyweight ? (

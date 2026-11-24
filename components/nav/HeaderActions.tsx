@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut, MoreHorizontal, PlayCircle, Scale, Settings } from "lucide-react";
+import { LogOut, MoreHorizontal, PlayCircle, RotateCcw, Scale, Settings } from "lucide-react";
 import { BodyWeightSheet } from "@/components/athlete/BodyWeightSheet";
+import { RestartPlanSheet } from "@/components/athlete/RestartPlanSheet";
 import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,10 +20,11 @@ const ICON = "press flex h-11 w-11 items-center justify-center rounded-full text
  * The header's right side, for both sides of the app (one component, not a copy in each header).
  * What shows where is decided by lib/header-actions.
  */
-export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boolean; isCoach: boolean }) {
+export function HeaderActions({ side, demo, isCoach, restartPlan = false }: { side: Side; demo: boolean; isCoach: boolean; /** ...and Restart plan (not a guest or a demo account). */ restartPlan?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [weighIn, setWeighIn] = useState(false);
+  const [restart, setRestart] = useState(false);
 
   const render = (a: HeaderAction) => {
     switch (a) {
@@ -49,6 +51,11 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
               <MoreHorizontal className="h-5 w-5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[200px]">
+              {restartPlan && pathname.startsWith("/plan") && (
+                <DropdownMenuItem className="min-h-11" onClick={() => setRestart(true)}>
+                  <RotateCcw className="mr-2 h-4 w-4" /> Restart plan
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="min-h-11" onClick={() => setWeighIn(true)}>
                 <Scale className="mr-2 h-4 w-4" /> Add body weight
               </DropdownMenuItem>
@@ -84,6 +91,7 @@ export function HeaderActions({ side, demo, isCoach }: { side: Side; demo: boole
         </div>
       ))}
       {weighIn && <BodyWeightSheet onClose={() => setWeighIn(false)} />}
+      {restart && <RestartPlanSheet onClose={() => setRestart(false)} />}
     </div>
   );
 }

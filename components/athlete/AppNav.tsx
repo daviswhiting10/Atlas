@@ -18,7 +18,7 @@ const TABS = [
 
 /** `isCoach`: a coach on their own training gets the Coach | Me toggle (the way back to their clients).
  *  There's no avatar: the person is the You tab. */
-export function AppNav({ isDemo, isCoach = false, hasProgress = true, preview }: { isDemo: boolean; isCoach?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
+export function AppNav({ isDemo, isCoach = false, hasProgress = true, restartPlan = false, preview }: { isDemo: boolean; isCoach?: boolean; /** ...and Restart plan. */ restartPlan?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
   const real = usePathname();
   const pathname = preview ?? real;
   useRegisterChrome(preview ? {} : { demo: isDemo, hasProgress });
@@ -62,7 +62,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true, preview }:
             ))}
           </nav>
 
-          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} />
+          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} restartPlan={restartPlan} />
         </div>
       </header>
 

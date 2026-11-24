@@ -18,6 +18,8 @@ import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
 import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
 import { displayName } from "@/lib/plan/catalog";
+import { resetPlanRows, sessionsOnPlan } from "@/lib/plan/reset-progress";
+import { isGuestEmail } from "@/lib/guest-rules";
 import {
   LIMITS,
   PlanEditError,
@@ -301,6 +303,53 @@ export async function startOwnPlan(): Promise<{ ok: true } | { ok: false; error:
   }
   refresh();
   return { ok: true };
+}
+
+// ── Restarting the plan ──────────────────────────────────────────────────────
+
+/**
+ * Who may restart a plan: someone who makes their own plan (a self-made account, a coach on their own training), on their
+ * own active plan. Not a coach's client (the same rule as editing the plan), not a guest, not a demo account.
+ */
+async function ownActivePlan(): Promise<{ ok: true; clientId: string; assignmentId: string } | { ok: false; error: string }> {
+  const session = await auth();
+  const identity = await athleteIdentity(session?.user);
+  if (!identity) throw new Error("Unauthorized");
+  const { clientId, workspaceId } = identity;
+  if (isGuestEmail(session?.user?.email ?? "")) return { ok: false, error: "Save your account to restart a plan." };
+  const profile = await prisma.clientProfile.findUnique({ where: { id: clientId }, select: { goalTargets: true } });
+  const meta = (profile?.goalTargets as { athlete?: { demo?: boolean } } | null)?.athlete;
+  if (!meta) return { ok: false, error: "Your plan is managed by your coach." };
+  if (meta.demo === true) return { ok: false, error: "The demo can't be restarted." };
+  const plan = await prisma.programAssignment.findFirst({ where: { clientId, workspaceId, status: "ACTIVE" }, orderBy: { createdAt: "desc" }, select: { id: true } });
+  if (!plan) return { ok: false, error: "You don't have a plan." };
+  return { ok: true, clientId, assignmentId: plan.id };
+}
+
+/** What a restart would delete: the sessions on your active plan (the confirm sheet's count), and the workouts it brings back. */
+export async function planProgressToReset(): Promise<{ ok: true; assignmentId: string; sessions: number; skipped: number } | { ok: false; error: string }> {
+  const own = await ownActivePlan();
+  if (!own.ok) return own;
+  const [sessions, skipped] = await Promise.all([
+    prisma.workoutLog.count({ where: sessionsOnPlan(own.assignmentId, own.clientId) }),
+    prisma.assignedWorkout.count({ where: { programAssignmentId: own.assignmentId, status: { not: "PLANNED" } } }),
+  ]);
+  return { ok: true, assignmentId: own.assignmentId, sessions, skipped };
+}
+
+/**
+ * Restart your plan: every session on it goes (sets, notes, challenge tags), skipped workouts come back, and up next is
+ * Week 1 Day 1. Only the plan the sheet counted: if it is no longer your active plan, nothing happens. Dates stay.
+ */
+export async function resetPlanProgress(raw: { assignmentId: string }): Promise<{ ok: true; sessions: number } | { ok: false; error: string }> {
+  const parsed = z.object({ assignmentId: z.string().min(1).max(64) }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "That plan isn't there." };
+  const own = await ownActivePlan();
+  if (!own.ok) return own;
+  if (own.assignmentId !== parsed.data.assignmentId) return { ok: false, error: "That plan isn't there." };
+  const { sessions } = await prisma.$transaction((tx) => resetPlanRows(tx, { assignmentId: own.assignmentId, clientId: own.clientId }), { timeout: 20_000, maxWait: 10_000 });
+  refresh();
+  return { ok: true, sessions };
 }
 
 // ── Editing the plan ─────────────────────────────────────────────────────────

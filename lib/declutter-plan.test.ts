@@ -21,3 +21,13 @@ describe("Plan: fewer things to tap on the first screen", () => {
     expect(p).toContain('view === "all" && rowsOf(reports.slice(1))');
   });
 });
+
+describe("the Plan ⋯ menu: Restart plan only", () => {
+  it("no Edit plan and no Change goals; Restart plan (W1's) stays, on the Plan tab", () => {
+    const h = src("components/nav/HeaderActions.tsx");
+    expect(h).not.toContain("Edit plan");
+    expect(h).not.toContain("Change goals");
+    expect(h).toContain('restartPlan && pathname.startsWith("/plan")');
+    expect(h).toContain("Restart plan");
+  });
+});
