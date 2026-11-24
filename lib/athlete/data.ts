@@ -388,7 +388,26 @@ export type LoggerData = {
 export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerData | null> {
   const athlete = await getAthlete();
   const tz = getTimeZone();
-  const workout = await prisma.assignedWorkout.findFirst({
+  // Two rounds, not four: the lifts' history goes with the workout (it needs only the workout's id: its lifts are found
+  // in the same query), and the week, the pictures and the note go together once the workout is known.
+  // The history is this athlete's own sets whatever the id; if the workout isn't theirs, nothing below is used.
+  const historyQuery = prisma.setLog.findMany({
+    where: {
+      exercise: { assignedExercises: { some: { assignedWorkoutId } } },
+      workoutLog: { clientId: athlete.clientId, NOT: { assignedWorkoutId } },
+    },
+    // Set number breaks ties (an imported session's sets share one instant), so a session's sets keep their order.
+    orderBy: [{ createdAt: "asc" }, { setNumber: "asc" }],
+    select: {
+      exerciseId: true,
+      weight: true,
+      reps: true,
+      completed: true,
+      workoutLogId: true,
+      workoutLog: WEEK_SOURCE,
+    },
+  });
+  const workoutQuery = prisma.assignedWorkout.findFirst({
     where: { id: assignedWorkoutId, programAssignment: { clientId: athlete.clientId } },
     select: {
       id: true,
@@ -421,6 +440,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       },
     },
   });
+  const [workout, history] = await Promise.all([workoutQuery, historyQuery]);
   if (!workout) return null;
 
   const start = workout.programAssignment.startDate.getTime();
@@ -429,28 +449,15 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
   const weekStart = new Date(start + (week - 1) * 7 * DAY_MS - DAY_MS / 2);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
 
-  const exerciseIds = workout.exercises.map((e) => e.exerciseId);
-  const [history, siblings] = await Promise.all([
-    prisma.setLog.findMany({
-      where: {
-        exerciseId: { in: exerciseIds },
-        workoutLog: { clientId: athlete.clientId, NOT: { assignedWorkoutId: workout.id } },
-      },
-      orderBy: { createdAt: "asc" },
-      select: {
-        exerciseId: true,
-        weight: true,
-        reps: true,
-        completed: true,
-        workoutLogId: true,
-        workoutLog: WEEK_SOURCE,
-      },
-    }),
+  const [siblings, own, notes] = await Promise.all([
     prisma.assignedWorkout.findMany({
       where: { programAssignmentId: workout.programAssignmentId, scheduledDate: { gte: weekStart, lt: weekEnd } },
       orderBy: { order: "asc" },
       select: { id: true, name: true, status: true, scheduledDate: true, workoutLog: { select: { completedAt: true } } },
     }),
+    // The coach's own photos and clips win over the library's.
+    mediaPictures(athlete.workspaceId, workout.exercises.map((e) => ({ exerciseId: e.exerciseId, name: displayName(e.exercise.slug, e.exercise.name) }))),
+    workout.workoutLog ? loadSessionNotes([{ id: workout.workoutLog.id }]) : null,
   ]);
 
   const sessionsByExercise = new Map<string, Map<string, Session>>();
@@ -552,10 +559,8 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       sets,
     };
   });
-  // The coach's own photos and clips win over the library's.
-  const own = await mediaPictures(athlete.workspaceId, exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name })));
   for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
-  const sessionNotes = workout.workoutLog ? (await loadSessionNotes([{ id: workout.workoutLog.id }])).get(workout.workoutLog.id) : undefined;
+  const sessionNotes = workout.workoutLog ? notes?.get(workout.workoutLog.id) : undefined;
   const myNote = sessionNotes?.athlete ?? null;
   const coachNote = sessionNotes?.coach ?? null;
 
