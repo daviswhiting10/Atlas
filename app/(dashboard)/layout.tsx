@@ -1,4 +1,5 @@
 import { CoachNav } from "@/components/coach/CoachNav";
+import { LiveTransitionGate } from "@/components/coach/LiveTransitionGate";
 import { LiveSessionBar } from "@/components/coach/LiveSessionBar";
 import { auth } from "@/lib/auth";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
@@ -19,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="coach-ui mx-auto max-w-5xl px-4 pb-28 pt-5 sm:px-8 md:pb-16 md:pt-9">
         {children}
         <LiveSessionBar owner={session.user.id ?? ""} />
+        <LiveTransitionGate />
       </main>
     </div>
   );
