@@ -345,7 +345,8 @@ export function QuickLog({
         </button>
       </div>
 
-      <h1 className="text-[28px] leading-tight text-ink">{heading}</h1>
+      <h1 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-ink">{heading}</h1>
+      {!initial && items.length === 0 && <p className="mt-1.5 text-[15px] text-ink-mute">Anything you did outside the plan. Add what you did; sets start from last time.</p>}
       {restored && (
         <p className="mt-1 text-[13px] text-ink-mute">
           Picked up where you left off ·{" "}
@@ -514,7 +515,7 @@ export function QuickLog({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onSearchKey}
-          placeholder="Add exercise"
+          placeholder={items.length === 0 ? "Search or type an exercise" : "Add another exercise"}
           aria-label="Add exercise"
           autoComplete="off"
           className={cn(field, "h-12 rounded-xl pl-10")}
@@ -546,7 +547,7 @@ export function QuickLog({
       ) : (
         recent.filter((r) => !added.has(r.id)).length > 0 && (
           <div className="mt-3">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Recent</p>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Recent · tap to add</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {recent
                 .filter((r) => !added.has(r.id))
@@ -590,7 +591,7 @@ export function QuickLog({
           className="press flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-lg font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:bg-ink/15 disabled:text-ink-mute"
         >
           {saving && <Loader2 className="h-5 w-5 animate-spin" />}
-          {initial ? "Save changes" : "Save workout"}
+          {initial ? "Save changes" : !canSave && items.length === 0 && !more ? "Add an exercise to save" : "Save workout"}
         </button>
       </div>
     </div>
