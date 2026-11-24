@@ -955,6 +955,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[180px]">
+                            <DropdownMenuItem className="min-h-11" onClick={() => addSet(ex)}>Add a set</DropdownMenuItem>
                             <DropdownMenuItem className="min-h-11" onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
                             {/* A coach's plan stays the coach's: swap, but no retargeting or removing. */}
                             {!data.coachPlan && <DropdownMenuItem className="min-h-11" onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
@@ -1050,9 +1051,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                         })}
                       </ul>
                       <div className="mt-2 flex items-center gap-1">
-                        <button type="button" onClick={() => addSet(ex)} className="press logger-quiet inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-medium text-ink-soft hover:text-ink">
-                          <Plus className="h-3.5 w-3.5" /> Add set
-                        </button>
                         {data.status !== "LOGGED" && exerciseBulk(list.map((x) => x.done)) && (
                           <CheckAllButton mode={exerciseBulk(list.map((x) => x.done))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(list.map((x) => x.done))!)} />
                         )}
