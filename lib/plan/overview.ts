@@ -7,6 +7,7 @@
  */
 
 import { prescriptionLabels, type PrescribedSet } from "./prescription";
+import { nextInPlan } from "./plan-order";
 import { readWeekNotes, type WeekNote } from "./week-notes";
 import { prisma } from "@/lib/db/client";
 import { planWorkoutStatus } from "@/lib/sessions/status";
@@ -154,6 +155,7 @@ export async function loadPlanOverview({
           id: true,
           name: true,
           scheduledDate: true,
+          order: true,
           status: true,
           workoutLog: { select: { completedAt: true, date: true, clientNotes: true } },
           notes: true,
@@ -238,7 +240,10 @@ export async function loadPlanOverview({
     }
   }
 
-  const nextUp = workouts.find((w) => w.status === "PLANNED") ?? null;
+  // Up next is in plan order, not by date: an unlogged workout from last week (or one whose session was deleted) comes first.
+  const orderOf = new Map(assignment.assignedWorkouts.map((w) => [w.id, w.order]));
+  const nextUp = nextInPlan(workouts.map((w) => ({ ...w, order: orderOf.get(w.id)! })));
+  const nextUpSummary = nextUp ? workouts.find((w) => w.id === nextUp.id)! : null;
   const totalWeeks = workouts.reduce((m, w) => Math.max(m, w.week), 1);
 
   return {
@@ -247,7 +252,7 @@ export async function loadPlanOverview({
     status: assignment.status,
     startDate: iso(assignment.startDate),
     totalWeeks,
-    currentWeek: nextUp?.week ?? totalWeeks,
+    currentWeek: nextUpSummary?.week ?? totalWeeks,
     generated,
     lighterWeeks,
     prefs,
@@ -257,7 +262,7 @@ export async function loadPlanOverview({
     blocks: plan?.blocks ?? [],
     rationale: plan?.rationale ?? [],
     workouts,
-    nextUp,
+    nextUp: nextUpSummary,
     done: workouts.filter((w) => w.status === "LOGGED").length,
     rx,
   };
