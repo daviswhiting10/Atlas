@@ -30,7 +30,7 @@ export type TodayView = {
   sessions: Array<{ id: string; title: string; minutes: number | null; tags: string[]; sets: number }>;
   marks: string[];
   needsDuration: Array<{ id: string; title: string }>;
-  /** Yesterday, while it can still be filled in. */
+  /** Yesterday, while it can still be filled in. Always null for a goal a miss fails (today only). */
   behind: {
     day: string;
     items: Array<{ key: string; label: string; kind: "sessions" | "check_in" }>;
@@ -63,7 +63,8 @@ export function todayView(l: LoadedGoal, now = new Date()): TodayView {
   const yesterdayDay = addDays(today, -1);
   const yesterday = result.periods.find((p) => p.day === yesterdayDay);
   const behindItems =
-    yesterday && !yesterday.carried && yesterday.state === "pending"
+    // A goal a miss fails only ever asks about today.
+    goal.rules.missFails !== true && yesterday && !yesterday.carried && yesterday.state === "pending"
       ? Object.entries(yesterday.rules).filter(([, s]) => s !== "met").flatMap(([key]) => { const r = ruleOf(key); return r ? [{ key, label: r.label, kind: r.kind }] : []; })
       : [];
 
