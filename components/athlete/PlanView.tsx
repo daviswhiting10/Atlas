@@ -1,7 +1,7 @@
 "use client";
 
 import { parts, structure } from "@/lib/workouts/structure";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useAutoGrow } from "@/hooks/use-auto-grow";
 import { onTablistKeyDown } from "@/lib/ui/tab-keys";
 import { ExerciseName } from "@/components/ExerciseName";
+import { guardActions } from "@/lib/net/guard";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -553,7 +554,7 @@ function AddWorkout({ week, workouts, actions }: { week: number; workouts: Worko
 
 export function PlanView({
   plan,
-  actions,
+  actions: rawActions,
   workoutBase,
   startLabel = "Start this workout",
   noteLabel = "Coaching notes",
@@ -576,6 +577,13 @@ export function PlanView({
   const [week, setWeek] = useState(plan.currentWeek);
   const [openId, setOpenId] = useState<string | null>(plan.nextUp?.id ?? null);
   const activeRef = useRef<HTMLButtonElement>(null);
+  // With no connection a save says so (and the page re-reads itself when it's back) instead of failing without a word.
+  // setSkipped has its own try/catch and no result to read, so it is passed through as it is.
+  const router = useRouter();
+  const actions = useMemo(() => {
+    const { setSkipped, ...rest } = rawActions;
+    return { ...guardActions(rest, () => router.refresh()), setSkipped } as PlanActions;
+  }, [rawActions, router]);
 
   // Centre the current week in the strip without scrolling the page itself.
   useEffect(() => {
