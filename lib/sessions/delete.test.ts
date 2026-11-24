@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { deleteSessionRows } from "./delete";
 
@@ -17,7 +18,6 @@ describe("deleting a logged session", () => {
 });
 
 describe("the athlete's delete is only for their own sessions", () => {
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
   const src = readFileSync(new URL("../actions/athlete.ts", import.meta.url), "utf8");
   it("looks the session up by the signed-in athlete's client id, and deletes in one transaction", () => {
     const fn = src.slice(src.indexOf("export async function deleteMySession"));
