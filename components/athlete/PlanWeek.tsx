@@ -27,7 +27,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * The Plan tab's first screen: the week as a Monday-to-Sunday grid (day number, an icon, done days ticked, the next workout
  * outlined, today dotted) above one card for the day you tap. It opens on today. The grid never scrolls.
  */
-export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan: PlanOverview; today: string; totalWeeks: number; canEdit: boolean; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
+export function PlanWeek({ plan, today, totalWeeks, base = "" }: { plan: PlanOverview; today: string; totalWeeks: number; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
   const [week, setWeek] = useState(plan.currentWeek);
   const grid = weekGrid(plan, week, today);
   const [pick, setPick] = useState<number | null>(null);
@@ -84,11 +84,6 @@ export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan
         <Link href={`${base}/plan?view=all`} className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
           All {totalWeeks} weeks
         </Link>
-        {canEdit && (
-          <Link href={`${base}/plan?view=edit`} className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
-            Edit plan
-          </Link>
-        )}
       </div>
     </div>
   );

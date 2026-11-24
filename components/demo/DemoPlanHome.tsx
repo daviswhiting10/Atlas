@@ -16,7 +16,7 @@ export function DemoPlanHome() {
         <p className="eyebrow">{upNext.eyebrow}</p>
         <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
-      <PlanWeek plan={plan} today={DEMO_TODAY} totalWeeks={plan.totalWeeks} canEdit={false} base="/demo" />
+      <PlanWeek plan={plan} today={DEMO_TODAY} totalWeeks={plan.totalWeeks} base="/demo" />
       <div className="mt-6 max-w-3xl">
         <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />
       </div>

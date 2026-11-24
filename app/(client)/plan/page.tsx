@@ -41,7 +41,7 @@ const ACTIONS: PlanActions = {
 
 /**
  * The Plan tab (option B): up next first, with its exercises and Start, then the rest of the week,
- * "All N weeks" and "Edit plan". Change goals sits in the header's ⋯ (HeaderActions).
+ * "All N weeks". Edit plan and Change goals sit in the header's ⋯ (HeaderActions). The newest progress report is a row under the plan; the older ones are on All weeks.
  * ?view=all shows every week; ?view=edit the same with editing (not for a coached athlete).
  */
 export default async function PlanPage({ searchParams }: { searchParams?: { view?: string } }) {
@@ -52,13 +52,17 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
     getPlanOverview(),
     getAthlete().then((a) => listReports(a.clientId, a.workspaceId, timeZone)),
   ]);
-  const reportRows = reports.length > 0 && (
-    <div className="mt-10 max-w-3xl space-y-2">
-      {reports.map((r) => (
-        <ReportLink key={`${r.assignmentId}-${r.block}`} entry={r} />
-      ))}
-    </div>
-  );
+  const rowsOf = (list: typeof reports, top = "mt-10") =>
+    list.length > 0 && (
+      <div className={`${top} max-w-3xl space-y-2`}>
+        {list.map((r) => (
+          <ReportLink key={`${r.assignmentId}-${r.block}`} entry={r} />
+        ))}
+      </div>
+    );
+  // With no plan, every report. On the Plan tab only the newest (one more thing to tap otherwise); the older ones are on All weeks.
+  const reportRows = rowsOf(reports);
+  const newestReport = rowsOf(reports.slice(0, 1));
 
   if (!plan) {
     return (
@@ -93,6 +97,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         <div className="max-w-3xl">
           <PlanView plan={plan} actions={ACTIONS} workoutBase="/workouts" locked={view === "all" || locked} />
         </div>
+        {view === "all" && rowsOf(reports.slice(1))}
       </div>
     );
   }
@@ -104,13 +109,13 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         <p className="eyebrow">{upNext.eyebrow}</p>
         <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
-      <PlanWeek plan={plan} today={localDay(new Date(), safeTimeZone(cookies().get(TZ_COOKIE)?.value))} totalWeeks={plan.totalWeeks} canEdit={!locked} />
+      <PlanWeek plan={plan} today={localDay(new Date(), safeTimeZone(cookies().get(TZ_COOKIE)?.value))} totalWeeks={plan.totalWeeks} />
       {plan.weekNotes.length > 0 && (
         <div className="mt-6 max-w-3xl">
           <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />
         </div>
       )}
-      {reportRows}
+      {newestReport}
     </div>
   );
 }
