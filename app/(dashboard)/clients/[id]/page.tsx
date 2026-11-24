@@ -21,6 +21,9 @@ import { LatestSession } from "@/components/coach/LatestSession";
 import { loadLatestSession } from "@/lib/coach/latest-session";
 import { sessionPrs } from "@/lib/coach/review";
 import { loginStatus } from "@/lib/coach/login-status";
+import { ClientGlance } from "@/components/coach/ClientGlance";
+import { glanceStats, lastDays } from "@/lib/coach/glance";
+import { overallProgress } from "@/lib/progress/overall";
 import { ClientDetail } from "./ClientDetail";
 
 
@@ -51,8 +54,16 @@ export default async function ClientPage({ params }: { params: { id: string } })
   const access = loginStatus({ hasEmail: !!details.email }, login ? { emailVerified: login.emailVerified, hasPassword: login.passwordHash != null } : null);
   const { data, metric } = progress;
 
+  // The first glance: the last 30 days, and a few numbers (this week, sessions, strength).
+  const change = hasProgressToShow(data) ? overallProgress(data.exercises).change : null;
+  const glance =
+    calendar.kind === "grid" ? (
+      <ClientGlance days={lastDays(calendar.byDay, calendar.today)} stats={glanceStats({ week: week ? { done: week.done, planned: week.planned } : null, sessions: calendar.sessions, change })} />
+    ) : null;
+
   return (
     <ClientDetail
+      glance={glance}
       // The same JSON /api/clients/[id] sends (dates as strings).
       initial={JSON.parse(JSON.stringify(details))}
       // Nothing to chart yet (a thin history): no Progress tab; the page opens on Sessions.
@@ -62,12 +73,12 @@ export default async function ClientPage({ params }: { params: { id: string } })
           <>
             {/* The line leaves lighter weeks out, so it can end before her latest session: say so. */}
             {newestIsLighter(data.exercises) && <p className="mb-4 text-[13px] text-ink-mute">Lighter week: its sessions aren&apos;t in the line.</p>}
-            <ProgressView data={data} goalMetric={metric} />
+            <ProgressView data={data} goalMetric={metric} history={calendar.kind === "grid" ? <HistoryCalendar calendar={historyView(calendar)} /> : undefined} />
           </>
         ) : null
       }
       // Under three sessions the list below already shows them all: no "Day one" on top of it.
-      history={calendar.kind === "grid" ? <HistoryCalendar calendar={historyView(calendar)} /> : null}
+      history={null}
       access={access}
       latest={latest ? <LatestSession clientId={params.id} session={latest} prs={sessionPrs(data.exercises, latest.day)} /> : null}
       report={reports[0] ? <ReportLink entry={reports[0]} className="sm:max-w-sm" /> : null}

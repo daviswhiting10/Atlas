@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 const REVEAL = 88; // px: the Delete button's width
 
 /**
- * A roster row that swipes left to reveal Delete. A short or vertical drag is a scroll or a tap; past halfway it
+ * A roster row that swipes left to reveal Delete, by touch only (a mouse never drags it). A short or vertical drag is a scroll or a tap; past halfway it
  * stays open. Tapping the row while it's open closes it instead of opening the client.
  */
 export function SwipeRow({ open, onOpenChange, onDelete, children }: { open: boolean; onOpenChange: (open: boolean) => void; onDelete: () => void; children: React.ReactNode }) {
@@ -31,10 +31,12 @@ export function SwipeRow({ open, onOpenChange, onDelete, children }: { open: boo
       </button>
       )}
       <div
-        className="relative bg-paper"
+        className="relative select-none bg-paper"
+        onDragStart={(e) => e.preventDefault()}
         style={{ transform: `translateX(${offset}px)`, transition: dx == null ? "transform 180ms ease-out" : "none", touchAction: "pan-y" }}
         onPointerDown={(e) => {
-          if (e.pointerType === "mouse" && e.button !== 0) return;
+          // Touch and pen only: with a mouse a row is never dragged (the ⋯ menu is the way to Delete).
+          if (e.pointerType === "mouse") return;
           start.current = { x: e.clientX, y: e.clientY, base: open ? -REVEAL : 0 };
           horizontal.current = false;
         }}

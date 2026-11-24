@@ -2,6 +2,8 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
+import { liveTransitionTo } from "@/lib/live-transition";
+import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { LIVE_EVENT, clearLive, mergeDraft, readLiveFor, startLive, writeLive, type LiveSession } from "@/lib/sessions/live";
@@ -359,6 +361,12 @@ export default function WorkoutLogger({
   const drag = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
   // The same on a desktop: its own list, so its own lift (the phone's list is not on screen there).
   const dragD = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  // Back to the client: the logger shrinks into the live-session bar (when the session is still open) instead of a page swap.
+  const leaveToClient = (e: React.MouseEvent) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    liveTransitionTo(router, `/clients/${clientId}`);
+  };
   /** Up, Down and "superset with the one above", for screen readers (useDragOrder's gestures, as buttons). */
   const moves = (aweId: string) => {
     const i = order.findIndex((o) => o.aweId === aweId);
@@ -1554,12 +1562,13 @@ export default function WorkoutLogger({
   // ═══════════════════════════════════════════════════════════════════════════
 
   const mobileView = (
-    <div className="md:hidden -mt-3 pb-28">
+    <div data-live-root className="md:hidden -mt-3 pb-28">
       {/* ── Top bar ───────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 -mx-4 px-4 py-2 mb-2 bg-background/95 backdrop-blur border-b">
         <div className="flex items-center justify-between">
         <Link
           href={`/clients/${clientId}`}
+          onClick={leaveToClient}
           className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2")}
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
@@ -1599,6 +1608,7 @@ export default function WorkoutLogger({
 
       {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
       <div ref={drag.listRef} className="relative space-y-4">
+        <SupersetOutline box={drag.groupBox} />
         {drag.lineTop != null && (
           <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
             <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
@@ -1786,10 +1796,11 @@ export default function WorkoutLogger({
   // ═══════════════════════════════════════════════════════════════════════════
 
   const desktopView = (
-    <div className="hidden md:block p-6 max-w-2xl pb-16">
+    <div data-live-root className="hidden md:block p-6 max-w-2xl pb-16">
       {/* Header */}
       <Link
         href={`/clients/${clientId}`}
+        onClick={leaveToClient}
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2 mb-4")}
       >
         <ArrowLeft className="w-4 h-4 mr-1" />
@@ -1839,6 +1850,7 @@ export default function WorkoutLogger({
       {/* Exercise cards — grouped by block. Drag a card by its grip (or hold its header), or use the keyboard on the grip. */}
       <div ref={dragD.listRef} className="relative space-y-4">
         <DragStatus message={dragD.status} />
+        <SupersetOutline box={dragD.groupBox} />
         {dragD.lineTop != null && (
           <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: dragD.lineTop - 1.5 }}>
             <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />

@@ -1,0 +1,179 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Check, ChevronLeft, ChevronRight, Dumbbell, Footprints, PersonStanding } from "lucide-react";
+import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
+import { cueOf } from "@/lib/plan/up-next";
+import { defaultDay, weekGrid, weekRange, type DayCell } from "@/lib/plan/week-grid";
+import { cn } from "@/lib/utils";
+
+const DOW = ["M", "T", "W", "T", "F", "S", "S"];
+const KIND_LABEL = { strength: "strength", cardio: "cardio", mobility: "mobility" } as const;
+
+/** The day's icon: a dumbbell, a shoe, a stretch, or (rest) a dot. */
+function DayIcon({ kind, className }: { kind: DayCell["kind"]; className?: string }) {
+  if (kind === "cardio") return <Footprints className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
+  if (kind === "mobility") return <PersonStanding className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
+  if (kind === "strength") return <Dumbbell className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
+  return <span aria-hidden className="flex h-5 w-5 items-center justify-center"><span className="h-1.5 w-1.5 rounded-full bg-current" /></span>;
+}
+const SHOWN = 3;
+const longDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+const rx = (e: WorkoutSummary["exercises"][number]) => `${e.sets} × ${e.reps}${e.weight != null ? ` at ${e.weight}` : ""}`;
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+/**
+ * The Plan tab's first screen: the week as a Monday-to-Sunday grid (day number, an icon, done days ticked, the next workout
+ * outlined, today dotted) above one card for the day you tap. It opens on today. The grid never scrolls.
+ */
+export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan: PlanOverview; today: string; totalWeeks: number; canEdit: boolean; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
+  const [week, setWeek] = useState(plan.currentWeek);
+  const grid = weekGrid(plan, week, today);
+  const [pick, setPick] = useState<number | null>(null);
+  const cells = grid?.cells ?? [];
+  const sel = cells.length ? (pick != null && pick < cells.length ? pick : defaultDay(cells)) : 0;
+  const cell = cells[sel];
+  const go = (w: number) => {
+    setWeek(w);
+    setPick(null);
+  };
+
+  return (
+    <div className="max-w-xl">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <button type="button" onClick={() => go(week - 1)} disabled={week <= 1} aria-label="Previous week" className="press flex h-11 w-11 items-center justify-center rounded-full border border-line text-ink-soft disabled:opacity-30">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <p className="text-[15px] font-semibold text-ink">
+          {grid ? weekRange(grid.monday) : `Week ${week}`}
+          {week === plan.currentWeek && <span className="ml-1.5 font-medium text-ink-mute">· This week</span>}
+        </p>
+        <button type="button" onClick={() => go(week + 1)} disabled={week >= totalWeeks} aria-label="Next week" className="press flex h-11 w-11 items-center justify-center rounded-full border border-line text-ink-soft disabled:opacity-30">
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      {grid ? (
+        <>
+          <div className="grid grid-cols-7 gap-1.5" role="group" aria-label={`Week ${week}`}>
+            {DOW.map((d, i) => (
+              <span key={i} className="text-center text-[11px] font-bold uppercase tracking-[0.08em] text-ink-mute">
+                {d}
+              </span>
+            ))}
+            {cells.map((c) => (
+              <DayButton key={c.date} c={c} selected={c.index === sel} onPick={() => setPick(c.index)} />
+            ))}
+          </div>
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-mute">
+            <span className="inline-flex items-center gap-1"><DayIcon kind="strength" className="h-3.5 w-3.5" /> Strength</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind="cardio" className="h-3.5 w-3.5" /> Cardio</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind="mobility" className="h-3.5 w-3.5" /> Mobility</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind={null} className="h-3.5 w-3.5" /> Rest</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
+            <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
+          </p>
+          <DayCard cell={cell} base={base} />
+        </>
+      ) : (
+        <p className="rise mt-6 rounded-2xl border border-line bg-paper p-4 text-[15px] text-ink-soft">Nothing planned for week {week}.</p>
+      )}
+
+      <div className="mt-1.5 flex items-center justify-between">
+        <Link href={`${base}/plan?view=all`} className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
+          All {totalWeeks} weeks
+        </Link>
+        {canEdit && (
+          <Link href={`${base}/plan?view=edit`} className="press inline-flex min-h-11 items-center text-[14px] font-medium text-ink-soft">
+            Edit plan
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onPick: () => void }) {
+  const done = c.workout?.status === "LOGGED";
+  const label = `${longDay(c.date)}${c.workout ? `, ${c.workout.name} (${KIND_LABEL[c.kind ?? "strength"]})${done ? ", done" : c.upNext ? ", up next" : ""}` : ", rest"}${c.today ? ", today" : ""}`;
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      aria-label={label}
+      aria-pressed={selected}
+      className={cn(
+        "press relative flex h-[76px] flex-col items-center justify-between rounded-[14px] border py-2",
+        !c.workout && "border-dashed border-line bg-transparent text-ink-mute",
+        c.workout && !done && "border-line bg-paper text-ink",
+        done && "border-signal/35 bg-signal/10 text-ink",
+        c.upNext && "border-2 border-signal",
+        selected && "ring-2 ring-signal ring-offset-2 ring-offset-bone"
+      )}
+    >
+      {done && (
+        <span className="absolute -right-1 -top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-signal text-dusk-button-text">
+          <Check className="h-3 w-3" strokeWidth={3.5} />
+        </span>
+      )}
+      <span className="tnum text-[15px] font-semibold">{Number(c.date.slice(8))}</span>
+      <DayIcon kind={c.kind} />
+      {c.today && <span aria-hidden className="absolute -bottom-2.5 h-1.5 w-1.5 rounded-full bg-signal" />}
+    </button>
+  );
+}
+
+function DayCard({ cell, base }: { cell: DayCell; base: string }) {
+  const w = cell.workout;
+  const eyebrow = (s: string) => <p className="eyebrow">{`${longDay(cell.date)} · ${s}`}</p>;
+  if (!w) {
+    return (
+      <section aria-label="Day" className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
+        {eyebrow("Rest")}
+        <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">Rest day</p>
+        <p className="mt-1 text-[14px] text-ink-mute">Nothing planned.</p>
+        <Link href={`${base}/workouts/new`} className="press mt-3.5 flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
+          Log a workout anyway
+        </Link>
+      </section>
+    );
+  }
+  const done = w.status === "LOGGED";
+  const meta = `${plural(w.exercises.length, "exercise")} · ~${w.estMinutes} min`;
+  return (
+    <section aria-label={cell.upNext ? "Up next" : "Day"} className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
+      {eyebrow(done ? "Done" : cell.upNext ? "Up next" : "Planned")}
+      <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">
+        {w.name}
+        {w.deload && <span className="ml-2 inline-block rounded-full bg-ink px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-[0.06em] text-paper">Lighter week</span>}
+      </p>
+      <p className="mt-0.5 text-[13px] text-ink-mute">{meta}</p>
+      <ul className="mb-3.5 mt-3">
+        {w.exercises.slice(0, SHOWN).map((e, i) => {
+          const cue = cueOf(e.note);
+          return (
+            <li key={`${e.aweId}-${i}`} className="border-t border-line py-2 text-[14px] text-ink-soft first:border-t-0">
+              <div className="flex justify-between gap-3">
+                <span className="min-w-0 truncate">{e.name}</span>
+                <span className="tnum shrink-0">{rx(e)}</span>
+              </div>
+              {cue && <p className="mt-0.5 text-[13px] leading-snug text-ink-mute">{cue}</p>}
+            </li>
+          );
+        })}
+        {w.exercises.length > SHOWN && <li className="border-t border-line py-2 text-[14px] text-ink-soft">+ {w.exercises.length - SHOWN} more</li>}
+      </ul>
+      <Link
+        href={`${base}/workouts/${w.id}`}
+        prefetch={cell.upNext}
+        className={cn(
+          "press flex h-[52px] w-full items-center justify-center rounded-2xl text-[17px] font-semibold",
+          cell.upNext ? "bg-dusk-button text-dusk-button-text hover:brightness-110" : "border border-line-strong text-ink"
+        )}
+      >
+        {done ? "View session" : cell.upNext ? "Start" : "Open workout"}
+      </Link>
+    </section>
+  );
+}

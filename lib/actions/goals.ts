@@ -227,6 +227,18 @@ export async function endGoal(raw: unknown): Promise<Result> {
   const done = await prisma.goal.updateMany({ where: { id: goalId, clientId, status: "ACTIVE" }, data: { status: "ENDED", endedAt: new Date() } });
   if (done.count === 0) return { ok: false, error: "That goal isn't running." };
   refresh(goalId);
+  revalidatePath("/you");
+  return { ok: true };
+}
+
+/** Remove a goal for good (running or finished), with its check-ins. Only your own. Its chip comes off Today. */
+export async function deleteGoal(raw: unknown): Promise<Result> {
+  const { clientId } = await me();
+  const { goalId } = z.object({ goalId: Id }).parse(raw);
+  const gone = await prisma.goal.deleteMany({ where: { id: goalId, clientId } });
+  if (gone.count === 0) return { ok: false, error: "That goal isn't there." };
+  refresh();
+  revalidatePath("/you");
   return { ok: true };
 }
 

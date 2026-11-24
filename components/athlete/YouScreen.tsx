@@ -20,6 +20,7 @@ export function YouScreen({
   goalsOpen,
   canStartGoal,
   nutrition = false,
+  challenges,
 }: {
   athlete: Pick<Athlete, "name" | "prefs" | "selfServe" | "isDemo" | "isGuest" | "isCoach">;
   account: { email: string | null; passwordHash: string | null } | null;
@@ -31,6 +32,8 @@ export function YouScreen({
   canStartGoal: boolean;
   /** The NUTRITION flag is on: a Profile | Nutrition switch at the top. */
   nutrition?: boolean;
+  /** The Challenges list (running and finished), streamed in. */
+  challenges?: React.ReactNode;
 }) {
   return (
     <div className="rise">
@@ -49,6 +52,8 @@ export function YouScreen({
           Start a goal <ArrowRight className="h-4 w-4 shrink-0 text-ink-soft" />
         </Link>
       )}
+
+      {challenges}
 
       {/* A demo account is sample data; a guest's own plan is worth keeping. */}
       {athlete.isDemo && (
