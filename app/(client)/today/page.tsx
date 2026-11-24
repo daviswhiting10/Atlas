@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
-import { HomeProgress } from "@/components/athlete/HomeProgressLoader";
+import { LogPill } from "@/components/athlete/LogPill";
 import { TodayScreen } from "@/components/athlete/TodayScreen";
 import { GoalToday } from "@/components/goals/GoalToday";
 import { TodayReport } from "@/components/report/TodayReport";
-import { preloadTodayGoal } from "@/lib/goals/today-data";
+import { preloadTodayGoal, todayGoalId } from "@/lib/goals/today-data";
 import { nutritionEnabled } from "@/lib/nutrition/flag";
 import { TodayNutrition } from "@/components/nutrition/TodayNutrition";
 
@@ -17,9 +17,9 @@ export default async function TodayPage() {
   const planP = getPlanOverview();
   const athlete = await getAthlete();
   preloadTodayGoal(athlete.clientId);
-  const plan = await planP;
+  const [plan, goalId] = await Promise.all([planP, todayGoalId(athlete.clientId)]);
   return (
-    <TodayScreen athlete={athlete} plan={plan} progress={<Suspense fallback={null}><HomeProgress athlete={athlete} /></Suspense>} nutrition={nutritionEnabled() ? <Suspense fallback={null}><TodayNutrition clientId={athlete.clientId} /></Suspense> : undefined} goal={<GoalToday clientId={athlete.clientId} />}
+    <TodayScreen athlete={athlete} plan={plan} log={<LogPill challengeId={goalId} />} nutrition={nutritionEnabled() ? <Suspense fallback={null}><TodayNutrition clientId={athlete.clientId} /></Suspense> : undefined} goal={<GoalToday clientId={athlete.clientId} />}
       report={
         <Suspense fallback={null}>
           <TodayReport clientId={athlete.clientId} workspaceId={athlete.workspaceId} />
