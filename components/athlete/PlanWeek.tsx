@@ -8,7 +8,8 @@ import { cueOf } from "@/lib/plan/up-next";
 import { defaultDay, weekGrid, weekRange, type DayCell } from "@/lib/plan/week-grid";
 import { cn } from "@/lib/utils";
 import type { SessionSummary } from "@/lib/actions/athlete";
-import { SessionMini } from "@/components/athlete/SessionMini";
+import { SessionMini, type SlotWeek } from "@/components/athlete/SessionMini";
+import { slotsByWeek } from "@/lib/sessions/reassign";
 
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
 const KIND_LABEL = { strength: "strength", cardio: "cardio", mobility: "mobility" } as const;
@@ -29,7 +30,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * The Plan tab's first screen: the week as a Monday-to-Sunday grid (day number, an icon, done days ticked, the next workout
  * outlined, today dotted) above one card for the day you tap. It opens on today. The grid never scrolls.
  */
-export function PlanWeek({ plan, today, totalWeeks, base = "", summary, deleteSession }: { plan: PlanOverview; today: string; totalWeeks: number; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
+export function PlanWeek({ plan, today, totalWeeks, base = "", summary, deleteSession, reassign }: { plan: PlanOverview; today: string; totalWeeks: number; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Move a logged session to another day of the plan. */ reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
   const [week, setWeek] = useState(plan.currentWeek);
   const grid = weekGrid(plan, week, today);
   const [pick, setPick] = useState<number | null>(null);
@@ -76,7 +77,7 @@ export function PlanWeek({ plan, today, totalWeeks, base = "", summary, deleteSe
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
             <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
           </p>
-          <DayCard cell={cell} base={base} summary={summary} deleteSession={deleteSession} />
+          <DayCard cell={cell} base={base} summary={summary} deleteSession={deleteSession} reassign={reassign} weeks={slotsByWeek(plan.workouts, cell.workout?.id ?? null)} />
         </>
       ) : (
         <p className="rise mt-6 rounded-2xl border border-line bg-paper p-4 text-[15px] text-ink-soft">Nothing planned for week {week}.</p>
@@ -121,7 +122,7 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
   );
 }
 
-function DayCard({ cell, base, summary, deleteSession }: { cell: DayCell; base: string; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
+function DayCard({ cell, weeks, reassign, base, summary, deleteSession }: { cell: DayCell; base: string; weeks: SlotWeek[]; reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
   const w = cell.workout;
   const eyebrow = (s: string) => <p className="eyebrow">{`${longDay(cell.date)} · ${s}`}</p>;
   if (!w) {
@@ -147,7 +148,7 @@ function DayCard({ cell, base, summary, deleteSession }: { cell: DayCell; base: 
       </p>
       <p className="mt-0.5 text-[13px] text-ink-mute">{meta}</p>
       {done && w.logId && summary ? (
-        <SessionMini logId={w.logId} href={`${base}/workouts/${w.id}`} load={summary} remove={deleteSession} />
+        <SessionMini logId={w.logId} href={`${base}/workouts/${w.id}`} load={summary} remove={deleteSession} move={reassign} weeks={weeks} />
       ) : (
         <>
       <ul className="mb-3.5 mt-3">
