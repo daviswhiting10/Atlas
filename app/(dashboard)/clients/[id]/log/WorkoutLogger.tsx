@@ -53,6 +53,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
+import { SetNote } from "@/components/logger/SetNote";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 
@@ -75,6 +76,7 @@ const store = () => {
 };
 import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@/lib/sessions/order";
 import { useDragOrder } from "./useDragOrder";
+import { DragHandle, DragStatus } from "@/components/logger/DragHandle";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useEscape } from "@/hooks/use-escape";
 
@@ -355,6 +357,8 @@ export default function WorkoutLogger({
   }, [planExercises, order]);
   // Hold a card's header to pick it up; drop between cards to reorder, hold over one to superset.
   const drag = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  // The same on a desktop: its own list, so its own lift (the phone's list is not on screen there).
+  const dragD = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
   /** Up, Down and "superset with the one above", for screen readers (useDragOrder's gestures, as buttons). */
   const moves = (aweId: string) => {
     const i = order.findIndex((o) => o.aweId === aweId);
@@ -547,9 +551,17 @@ export default function WorkoutLogger({
   const stateFor = (ex: LoggerExercise): ExerciseState => exState[ex.aweId] ?? freshState(ex);
 
   // ── Mobile-specific state ────────────────────────────────────────────────────
-  // Folded cards. An exercise folds by itself once every set is logged; a tap on its chevron
-  // folds (true) or opens (false) it by hand. Kept on this screen only, never saved.
-  const [foldOverride, setFoldOverride] = useState<Record<string, boolean>>({});
+  // Folded cards. The screen opens with every card folded except the first one with sets left (a long
+  // workout is one short list, not 100+ targets); an exercise folds by itself once every set is logged, and
+  // a tap on its row or chevron opens (false) or folds (true) it by hand. Kept on this screen only, never saved.
+  const [foldOverride, setFoldOverride] = useState<Record<string, boolean>>(() => {
+    const left = (ex: LoggerExercise) => {
+      const sets = stateFor(ex).sets;
+      return sets.length === 0 || sets.some((x) => !x.completed);
+    };
+    const first = exercises.find(left);
+    return Object.fromEntries(exercises.filter((ex) => ex !== first).map((ex) => [ex.aweId, true]));
+  });
   // When a card folds, opens or moves, the cards under the finger change: a set's tick right after
   // is a second tap meant for what was there (a double tap on a header, a tap just after a drop),
   // not a set logged. It's ignored until the screen has settled.
@@ -1197,11 +1209,22 @@ export default function WorkoutLogger({
   // ── Complete session ──────────────────────────────────────────────────────
   /** `partial`: the Finish button's "only what I logged". The automatic finish still needs every set. */
   async function handleCompleteSession(partial = false) {
+    if (!partial && !allDone(doneLists())) return;
+    // The finished screen shows at once, from what is on the phone; the saves and the finish go on behind it, and if
+    // they don't go through it goes back to the logger with a message. (Waiting for them first took up to 2.3 s.)
+    const before = { soap: soapOpen };
+    setSoapOpen(true);
+    setFinished(true);
+    const back = (message: string) => {
+      setFinished(false);
+      setSoapOpen(before.soap);
+      toast.error(message);
+    };
     startComplete(async () => {
       // The last ticks may still be saving: wait for them, and finish only if they all stuck.
       await saveChain.current;
       const workoutLogId = logIdRef.current;
-      if (!workoutLogId || (!partial && !allDone(doneLists()))) return;
+      if (!workoutLogId || (!partial && !allDone(doneLists()))) return void back("Couldn't finish the session. Please try again.");
       try {
         await completeSession({
           workoutLogId,
@@ -1214,11 +1237,8 @@ export default function WorkoutLogger({
         sentStructured.current = structuredNote;
         setSavedNotes(rawInput);
         toast.dismiss("finish");
-        // The notes stay open on the finished screen: they can be written now.
-        setSoapOpen(true);
-        setFinished(true);
       } catch {
-        toast.error("Failed to complete session");
+        back("Failed to complete session");
       }
     });
   }
@@ -1449,6 +1469,7 @@ export default function WorkoutLogger({
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (finished) {
+    const notesUnsaved = rawInput.trim() !== savedNotes.trim();
     let doneSetsAll = 0;
     let totalVolumeAll = 0;
     for (const ex of exercises) {
@@ -1501,22 +1522,29 @@ export default function WorkoutLogger({
           ))}
         </div>
 
-        {/* Notes can still be written: the session is finished, the notes aren't. */}
+        {/* Notes can still be written: the session is finished, the notes aren't. While there is typed text that isn't
+            saved, Save notes is the main button. With nothing unsaved (saved, or never written) the main button is Done. */}
         <div className="mb-6 w-full text-left">
           {soapPanel}
-          <Button
-            className="mt-3 w-full"
-            disabled={savingNotes || rawInput.trim() === savedNotes.trim()}
-            onClick={saveNotes}
-          >
-            {savingNotes ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-            {rawInput.trim() === savedNotes.trim() && savedNotes.trim() ? "Notes saved" : "Save notes"}
-          </Button>
+          {notesUnsaved ? (
+            <Button className="mt-3 w-full" disabled={savingNotes} onClick={saveNotes}>
+              {savingNotes ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Save notes
+            </Button>
+          ) : savedNotes.trim() ? (
+            <p className="mt-3 text-center text-sm text-muted-foreground" aria-live="polite">Notes saved</p>
+          ) : null}
         </div>
 
-        <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
-          Back to {clientName}
-        </Button>
+        {notesUnsaved ? (
+          <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
+            Back to {clientName}
+          </Button>
+        ) : (
+          <Button size="lg" className="h-12 w-full max-w-sm text-[16px] font-semibold" onClick={() => router.push(`/clients/${clientId}`)}>
+            Done — back to {clientName}
+          </Button>
+        )}
       </div>
     );
   }
@@ -1560,10 +1588,10 @@ export default function WorkoutLogger({
         type="button"
         onClick={() => setWhenOpen(true)}
         aria-haspopup="dialog"
-        className="mb-3 flex h-11 w-full items-center gap-2 rounded-xl border border-line-strong px-3 text-left text-[15px] font-medium text-ink touch-manipulation"
+        className="mb-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-line-strong px-3 py-2 text-left text-[15px] font-medium leading-snug text-ink touch-manipulation"
       >
         <Calendar className="h-4 w-4 shrink-0 text-ink-mute" />
-        <span className="min-w-0 flex-1 truncate">
+        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
           {dateLabel} · Week {currentWorkoutWeek} · {workoutName}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
@@ -1808,8 +1836,16 @@ export default function WorkoutLogger({
       {/* Day picker (desktop) */}
       {dayPicker}
 
-      {/* Exercise cards — grouped by block */}
-      <div className="space-y-4">
+      {/* Exercise cards — grouped by block. Drag a card by its grip (or hold its header), or use the keyboard on the grip. */}
+      <div ref={dragD.listRef} className="relative space-y-4">
+        <DragStatus message={dragD.status} />
+        {dragD.lineTop != null && (
+          <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: dragD.lineTop - 1.5 }}>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+            <span className="h-[3px] flex-1 rounded-full bg-dusk-teal" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
+          </div>
+        )}
         {groupIntoBlocks(exercises).map((block) =>
           block.exIndices.length === 0 ? null : (
             block.exIndices.map((exI, k) => {
@@ -1820,7 +1856,7 @@ export default function WorkoutLogger({
           const blockHeaderLabel = block.title;
 
           return (
-            <div key={ex.aweId}>
+            <div key={ex.aweId} data-exercise={ex.aweId} style={dragD.styleFor(ex.aweId)}>
               {showBlockHeader && (
                 <div className="flex items-center gap-3 pt-1 pb-0">
                   <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -1830,15 +1866,19 @@ export default function WorkoutLogger({
                 </div>
               )}
             {isFolded(ex) ? (
-              <div className="mt-2 rounded-xl border border-line bg-paper">
-                <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} />
+              <div className="mt-2 flex items-center rounded-xl border border-line bg-paper pl-1" data-drag-header="">
+                {!completed && <DragHandle props={dragD.handle(ex.aweId, ex.name)} />}
+                <div className="min-w-0 flex-1">
+                  <FoldedRow label={block.labels[k]} name={ex.name} sets={state.sets} unsaved={state.sets.some((x) => x.uid in unsaved)} onOpen={() => setFolded(ex.aweId, false)} hold={dragD.bind(ex.aweId)} />
+                </div>
               </div>
             ) : (
             <Card>
-              <CardHeader className="pb-2 pt-4 px-4">
+              <CardHeader className="no-select pb-2 pt-4 px-4" data-drag-header="" {...dragD.bind(ex.aweId)}>
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
+                      {!completed && <DragHandle props={dragD.handle(ex.aweId, ex.name)} className="-ml-2" />}
                       <ExerciseThumb picture={ex.picture} name={ex.name} className="h-9 w-9" />
                       <CardTitle className="text-base font-semibold leading-tight min-w-0"><ExerciseName name={labelled(block.labels[k], ex.name)} /></CardTitle>
                     </div>
@@ -2395,21 +2435,21 @@ function SetDetails({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-1.5">
-        <label className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-ink-mute">
+      <div className="flex flex-wrap items-start gap-1.5">
+        <label className="flex h-10 shrink-0 items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-ink-mute">
           RPE
           <span className="w-14">
             <NumField value={entry.rpe} onChange={(v) => onChange({ rpe: v })} onBlur={onBlur} label={`Set ${idx + 1} RPE`} decimal placeholder="–" />
           </span>
         </label>
-        <Input
+        <SetNote
           value={entry.note}
-          onChange={(e) => onChange({ note: e.target.value })}
+          onChange={(note) => onChange({ note })}
           onBlur={onBlur}
-          placeholder="Set note…"
-          aria-label={`Set ${idx + 1} note`}
-          className="logger-cell h-10 px-2"
-          style={{ fontSize: "16px" }}
+          label={`Set ${idx + 1} note`}
+          // Beside RPE at rest; while it is being written it takes the whole row (a 190 px box wraps five short lines into eight).
+          className="logger-cell min-w-0 flex-1 basis-0 rounded-md border border-input bg-transparent px-2 py-[9px] text-ink outline-none placeholder:text-muted-foreground focus:basis-full focus:border-ring"
+          fontSize="16px"
         />
       </div>
       {!entry.completed && (
@@ -2710,11 +2750,11 @@ function DesktopSetRow({
 
       {/* Per-set note (desktop) */}
       <div className="pl-7">
-        <Input
+        <SetNote
           value={entry.note}
-          onChange={(e) => onChange({ note: e.target.value })}
-          placeholder="Set note…"
-          className="h-6 text-xs px-2 text-muted-foreground border-transparent hover:border-border focus:border-border bg-transparent"
+          onChange={(note) => onChange({ note })}
+          label="Set note"
+          className="rounded-md border border-transparent bg-transparent px-2 py-[3px] text-xs text-muted-foreground outline-none hover:border-border focus:border-border"
         />
       </div>
     </div>

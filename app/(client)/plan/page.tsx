@@ -21,7 +21,7 @@ import { isCoached } from "@/lib/athlete/coached";
 import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
 import { PlanUpNext } from "@/components/athlete/PlanUpNext";
-import { PlanMenu } from "@/components/athlete/PlanMenu";
+import { WeekNotesList } from "@/components/plan/WeekNoteCard";
 import { upNextView } from "@/lib/plan/up-next";
 
 export const metadata: Metadata = { title: "Plan" };
@@ -41,7 +41,7 @@ const ACTIONS: PlanActions = {
 
 /**
  * The Plan tab (option B): up next first, with its exercises and Start, then the rest of the week,
- * "All N weeks" and "Edit plan". Change goals (and Delete plan, once it exists) sit under ⋯.
+ * "All N weeks" and "Edit plan". Change goals sits in the header's ⋯ (HeaderActions).
  * ?view=all shows every week; ?view=edit the same with editing (not for a coached athlete).
  */
 export default async function PlanPage({ searchParams }: { searchParams?: { view?: string } }) {
@@ -100,13 +100,15 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
   const upNext = upNextView(plan);
   return (
     <div>
-      <div className="rise mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="eyebrow">{upNext.eyebrow}</p>
-          <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
-        </div>
-        <PlanMenu changeGoals={athlete.selfServe} />
+      <div className="rise mb-5">
+        <p className="eyebrow">{upNext.eyebrow}</p>
+        <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
+      {plan.weekNotes.length > 0 && (
+        <div className="mb-6 max-w-3xl">
+          <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />
+        </div>
+      )}
       <PlanUpNext view={upNext} totalWeeks={plan.totalWeeks} canEdit={!locked} />
       {reportRows}
     </div>

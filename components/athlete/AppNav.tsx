@@ -4,7 +4,6 @@ import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ChartLine, House, UserRound } from "lucide-react";
-import { Logo } from "./Logo";
 import { HeaderActions } from "@/components/nav/HeaderActions";
 import { useTabSwitch } from "@/components/nav/useTabSwitch";
 import { useRegisterChrome } from "@/components/mode/context";
@@ -19,7 +18,7 @@ const TABS = [
 
 /** `isCoach`: a coach on their own training gets the Coach | Me toggle (the way back to their clients).
  *  There's no avatar: the person is the You tab. */
-export function AppNav({ isDemo, isCoach = false, hasProgress = true, preview }: { isDemo: boolean; isCoach?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
+export function AppNav({ isDemo, isCoach = false, hasProgress = true, changeGoals = false, preview }: { isDemo: boolean; isCoach?: boolean; /** Self-serve: the header ⋯ offers Change goals on Plan. */ changeGoals?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
   const real = usePathname();
   const pathname = preview ?? real;
   useRegisterChrome(preview ? {} : { demo: isDemo, hasProgress });
@@ -44,9 +43,6 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true, preview }:
     <>
       <header className={cn("sticky top-0 z-30 border-b border-line bg-bone/80 backdrop-blur-xl", inWorkout && "hidden md:block")}>
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-8 md:h-16">
-          <Link href="/today" prefetch aria-label="Atlas home" className="flex min-h-11 items-center">
-            <Logo />
-          </Link>
 
           <nav className="hidden items-center gap-1 rounded-full border border-line bg-paper/80 p-1 md:flex" aria-label="Main">
             {tabs.map(({ href, label }) => (
@@ -66,7 +62,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true, preview }:
             ))}
           </nav>
 
-          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} />
+          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} changeGoals={changeGoals} />
         </div>
       </header>
 

@@ -6,9 +6,10 @@
 import { RECHECK_MS } from "./session-policy";
 
 /** Pages anyone can see without signing in. */
-export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password", "/invite", "/api/invite"];
+export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/forgot-password", "/reset-password", "/invite", "/api/invite", "/demo"];
 /** Public pages a signed-in visitor may also read, whatever their role. */
-export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password", "/invite", "/api/invite"];
+/** (/demo: fixed sample data, no account, nothing stored; open to anyone, and a signed-in session is left alone.) */
+export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password", "/invite", "/api/invite", "/demo"];
 /** The athlete app. Coaches use it too, for their own training ("My training"). */
 export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals", "/report"];
 /** The set-password step: signed in, any role. */

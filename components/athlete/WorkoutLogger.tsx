@@ -19,6 +19,7 @@ import { canMerge, mergeWith, sessionOrder, stepOrder, type OrderEntry } from "@
 // The coach logger's hold-and-drag (hold a card's header to lift it, drop between cards to reorder,
 // hold over a card to superset). Imported as it is; nothing in that folder is changed.
 import { useDragOrder } from "@/app/(dashboard)/clients/[id]/log/useDragOrder";
+import { DragHandle, DragStatus } from "@/components/logger/DragHandle";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
 import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
@@ -74,6 +75,8 @@ function Stepper({
   dim,
   muted = false,
   settled,
+  showButtons,
+  onArm,
 }: {
   value: number | null;
   step: number;
@@ -85,6 +88,10 @@ function Stepper({
   muted?: boolean;
   /** False just after cards fold, open or move: a +/− tapped now was meant for what was there (it would change a logged set). */
   settled: () => boolean;
+  /** − and + show on the active set only (and on a set you tapped into); elsewhere they keep their room but can't be touched. */
+  showButtons: boolean;
+  /** The number was tapped: this set's − and + show from now on. */
+  onArm: () => void;
 }) {
   const bump = (dir: 1 | -1) => {
     if (!settled()) return;
@@ -93,7 +100,7 @@ function Stepper({
   };
   return (
     <div className={cn("flex h-[52px] min-w-0 flex-1 items-center rounded-2xl border bg-dusk-raised", dim ? "border-signal/25 bg-signal/[0.04]" : "border-line-strong")}>
-      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
+      <button type="button" onClick={() => bump(-1)} aria-label={`Decrease ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Minus className="h-4 w-4" />
       </button>
       <label className="flex min-w-0 flex-1 flex-col items-center justify-center self-stretch">
@@ -107,12 +114,15 @@ function Stepper({
           placeholder="–"
           aria-label={label}
           onChange={(e) => onChange(e.target.value === "" ? null : Math.min(Math.max(0, Number(e.target.value)), unit === "lb" ? MAX_WEIGHT_LB : 999))}
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => {
+            onArm();
+            e.target.select();
+          }}
           className={cn("tnum w-full bg-transparent text-center text-[17px] leading-none outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
         />
         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
       </label>
-      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className="press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink">
+      <button type="button" onClick={() => bump(1)} aria-label={`Increase ${label}`} className={cn("press relative flex h-full w-9 shrink-0 items-center justify-center text-ink-mute before:absolute before:-inset-x-1 before:inset-y-0 hover:text-ink", !showButtons && "invisible")}>
         <Plus className="h-4 w-4" />
       </button>
     </div>
@@ -121,7 +131,18 @@ function Stepper({
 
 // ── Logger ──────────────────────────────────────────────────────────────────
 
-export function WorkoutLogger({ data }: { data: LoggerData }) {
+/** The saves the logger makes. Real ones by default; the demo (lib/demo/actions) passes stand-ins that keep everything in memory. */
+export type LoggerActions = {
+  saveSet: typeof saveSet;
+  finishWorkout: typeof finishWorkout;
+  planAddExercise: typeof planAddExercise;
+  planRemoveExercise: typeof planRemoveExercise;
+  planSetTargets: typeof planSetTargets;
+  planSwapExercise: typeof planSwapExercise;
+};
+const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise };
+
+export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { data: LoggerData; /** The saves; the demo passes in-memory stand-ins. */ actions?: LoggerActions; /** Prefix for links ("/demo"). */ base?: string }) {
   const router = useRouter();
   const [sets, setSetsState] = useState<SetMap>(() => Object.fromEntries(data.exercises.map((e) => [e.aweId, e.sets])));
   const setsRef = useRef(sets);
@@ -149,6 +170,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const [records, setRecords] = useState<Record<string, string>>({});
   /** Sets whose save failed, or has waited offline a while: one small amber dot on that row. Never shown for a save that worked. */
   const [unsaved, setUnsaved] = useState<Record<string, true>>({});
+  // The set whose number was last tapped into: it gets − and + like the active set (the first one not done) does.
+  const [armed, setArmed] = useState<string | null>(null);
   const stuckTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const markUnsaved = useCallback((key: string, on: boolean) => setUnsaved((u) => (on === (key in u) ? u : on ? { ...u, [key]: true } : Object.fromEntries(Object.entries(u).filter(([k]) => k !== key)))), []);
   const clearStuck = useCallback(
@@ -281,7 +304,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
   const offline = usePendingExercises(data.id, async (op, exercise) => {
     if (data.exercises.some((e) => e.exerciseId === exercise.id)) return true; // already in: an earlier send got through
     await queue.current;
-    const res = op.target.mode === "swap" ? await planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await planAddExercise({ workoutId: data.id, exerciseId: exercise.id });
+    const res = op.target.mode === "swap" ? await actions.planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await actions.planAddExercise({ workoutId: data.id, exerciseId: exercise.id });
     if (!res.ok) {
       toast.error(res.error);
       return false;
@@ -334,7 +357,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         const s = setsRef.current[aweId]?.find((x) => x.setNumber === setNumber);
         if (!s || (!s.done && !s.setLogId)) return;
         try {
-          const res = await saveSet({
+          const res = await actions.saveSet({
             assignedWorkoutId: data.id,
             aweId,
             setNumber,
@@ -380,7 +403,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         }
       });
     },
-    [apply, data.id, clearStuck, markUnsaved]
+    [apply, data.id, clearStuck, markUnsaved, actions]
   );
 
   const deloadWeek = data.deloadWeek;
@@ -680,17 +703,25 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
 
   function finish() {
     setCountdown(null);
+    const loggedNow = () => data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done));
+    // The finished screen shows at once, from what is on the phone; the saves and the finish go on behind it. If the
+    // finish doesn't go through, it goes back to the logger with a message. (Waiting for them first took up to 2 s.)
+    const localMinutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
+    if (loggedNow()) {
+      setRest(null);
+      setSummary({ minutes: localMinutes });
+    }
     startFinish(async () => {
       try {
         // The last ticks may still be saving: wait for them, and finish only if they all stuck.
         await queue.current;
         // Everything logged, or finished early with at least one set logged.
-        if (!data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done))) return;
+        if (!loggedNow()) return void setSummary(null);
         const res = await sendFinish({
           send: (m) => finishWorkout({ assignedWorkoutId: data.id, durationMin: data.status === "LOGGED" ? undefined : m }),
           storage: store(),
           workoutId: data.id,
-          minutes: Math.max(1, Math.round((Date.now() - startedAt.current) / 60000)),
+          minutes: localMinutes,
           isOffline: isNetworkError,
         });
         if (res.kind === "done") {
@@ -698,10 +729,15 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
           setRest(null);
           setSummary({ minutes: res.minutes });
         } else if (res.kind === "queued") {
+          setSummary(null);
           setNoSignal(true);
           setFinishQueued(true);
-        } else toast.error("Couldn't finish the workout. Please try again.");
+        } else {
+          setSummary(null);
+          toast.error("Couldn't finish the workout. Please try again.");
+        }
       } catch {
+        setSummary(null);
         toast.error("Couldn't finish the workout. Please try again.");
       }
     });
@@ -815,8 +851,8 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         )}
 
         <div className="mt-auto pt-10">
-          <Link href="/today" className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
-            Back to Today
+          <Link href={`${base}/today`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90">
+            Done — back to your plan
           </Link>
         </div>
       </div>
@@ -829,12 +865,12 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 -mx-4 border-b border-line bg-bone/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-8 sm:px-8 md:top-16">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => router.push("/today")} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+          <button type="button" onClick={() => router.push(`${base}/today`)} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
             <span className="min-w-0">
-              <span className="block truncate font-display text-2xl leading-tight text-ink">{data.name}</span>
+              <span className="block font-display text-[22px] leading-[1.15] text-ink [overflow-wrap:anywhere]">{data.name}</span>
               <span className="tnum block truncate text-xs text-ink-mute">
                 {doneCount}/{totalCount} sets{data.status === "LOGGED" ? " · logged" : ` · ${clock(elapsed)}`} · Week {data.week}
                 {data.deloadWeek ? " · Lighter week" : ""}
@@ -880,6 +916,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
         {data.note && <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink-soft">{data.note}</p>}
 
         <div ref={drag.listRef} className="relative space-y-4">
+          <DragStatus message={drag.status} />
           {drag.lineTop != null && (
             <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
               <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
@@ -902,7 +939,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                     const logged = list.filter((x) => x.done).length;
                     return (
                       <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={section}>
-                        <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} unsaved={list.some((s) => `${ex.aweId}:${s.setNumber}` in unsaved)} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                        {/* From a desktop width, a grip (mouse drag, or the keyboard); a phone holds the row, as before. */}
+                        <div className="flex items-center" data-drag-header="">
+                          <DragHandle props={drag.handle(ex.aweId, ex.name)} className="hidden md:flex" />
+                          <div className="min-w-0 flex-1">
+                            <FoldedRow label={label} name={ex.name} logged={logged} total={list.length} unsaved={list.some((s) => `${ex.aweId}:${s.setNumber}` in unsaved)} onOpen={() => setOpenFor(ex.aweId, true)} hold={drag.bind(ex.aweId)} />
+                          </div>
+                        </div>
                         <MoveButtons name={ex.name} {...moves(ex.aweId)} />
                       </section>
                     );
@@ -911,12 +954,14 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                     <section key={ex.aweId} data-exercise={ex.aweId} style={drag.styleFor(ex.aweId)} className={cn(section, "px-3 pb-3 pt-2")}>
                       <div
                         {...drag.bind(ex.aweId)}
+                        data-drag-header=""
                         onClick={(e) => {
                           // A tap folds the card; its own buttons (the picture, the ⋯) do their own thing.
                           if (!(e.target as HTMLElement).closest("button, [role=menu], [role=menuitem]")) setOpenFor(ex.aweId, false);
                         }}
                         className="mb-1 flex cursor-pointer select-none items-center gap-2 [-webkit-touch-callout:none]"
                       >
+                        <DragHandle props={drag.handle(ex.aweId, ex.name)} className="-ml-1 hidden md:flex" />
                         <ExerciseThumb picture={ex.picture} name={ex.name} />
                         <div className="min-w-0 flex-1">
                           <ExerciseName as="h3" name={labelled(label, ex.name)} className="text-[17px] font-semibold leading-tight text-ink" />
@@ -954,7 +999,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                             disabled={busy}
                             onClick={() => {
                               setConfirmRemove(null);
-                              change(() => planRemoveExercise({ aweId: ex.aweId, workoutId: data.id }), `${ex.name} removed`);
+                              change(() => actions.planRemoveExercise({ aweId: ex.aweId, workoutId: data.id }), `${ex.name} removed`);
                             }}
                             className="press min-h-11 rounded-lg bg-dusk-button px-3 font-semibold text-dusk-button-text"
                           >
@@ -975,7 +1020,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                             onCancel={() => setEditingTarget(null)}
                             onSave={async (values) => {
                               setEditingTarget(null);
-                              change(() => planSetTargets({ aweId: ex.aweId, workoutId: data.id, ...values }), "Target updated for this session");
+                              change(() => actions.planSetTargets({ aweId: ex.aweId, workoutId: data.id, ...values }), "Target updated for this session");
                             }}
                           />
                         </div>
@@ -984,15 +1029,17 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                       <ul className="space-y-2">
                         {list.map((s, i) => {
                           const record = records[`${ex.aweId}:${s.setNumber}`];
+                          const key = `${ex.aweId}:${s.setNumber}`;
+                          const showButtons = i === list.findIndex((x) => !x.done) || armed === key;
                           return (
                             <li key={s.setNumber}>
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
                                 <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} onChange={(v) => edit(ex, i, { weight: v })} />}
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { weight: v })} />}
                                 {timed ? (
-                                  <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
+                                  <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
                                 ) : (
-                                  <Stepper value={s.reps} step={1} unit={unit} label={`Set ${s.setNumber} reps`} dim={s.done} settled={settled} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
+                                  <Stepper value={s.reps} step={1} unit={unit} label={`Set ${s.setNumber} reps`} dim={s.done} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
                                 )}
                                 <button
                                   type="button"
@@ -1099,13 +1146,13 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
             setPicker(null);
             if (at.mode === "add") {
               change(async () => {
-                const res = await planAddExercise({ workoutId: data.id, exerciseId: chosen.id });
+                const res = await actions.planAddExercise({ workoutId: data.id, exerciseId: chosen.id });
                 if (res.ok) jumpTo.current = res.aweId;
                 return res;
               }, `${chosen.name} added`);
             } else {
               swapped.current.add(at.aweId);
-              change(() => planSwapExercise({ aweId: at.aweId, workoutId: data.id, exerciseId: chosen.id }), `Swapped for ${chosen.name}`);
+              change(() => actions.planSwapExercise({ aweId: at.aweId, workoutId: data.id, exerciseId: chosen.id }), `Swapped for ${chosen.name}`);
             }
           }}
         />
@@ -1159,7 +1206,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 return (
                   <li key={w.id}>
                     <Link
-                      href={`/workouts/${w.id}`}
+                      href={`${base}/workouts/${w.id}`}
                       onClick={() => setSwitching(false)}
                       aria-current={here ? "page" : undefined}
                       className={cn("press flex items-center gap-3 rounded-2xl border bg-paper p-3.5", here ? "border-ink" : "border-line hover:border-ink/20")}
@@ -1176,7 +1223,7 @@ export function WorkoutLogger({ data }: { data: LoggerData }) {
                 );
               })}
             </ul>
-            <Link href="/plan" className="press mt-3 flex h-12 items-center justify-center rounded-2xl text-sm font-semibold text-signal hover:bg-signal/5">
+            <Link href={`${base}/plan`} className="press mt-3 flex h-12 items-center justify-center rounded-2xl text-sm font-semibold text-signal hover:bg-signal/5">
               See the full plan
             </Link>
           </div>

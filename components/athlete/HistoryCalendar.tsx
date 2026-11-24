@@ -141,14 +141,17 @@ function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: 
  * History: the session count and the year of training as a heatmap (YearHeatmap, from lib/history/calendar).
  * Under three sessions: "Day one" and the first session.
  */
-export function HistoryCalendar({ calendar, summary, quickLog = false }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** The athlete's own screen: a button to log cardio or a walk. */ quickLog?: boolean }) {
+export function HistoryCalendar({ calendar, summary, quickLog = false, compact = false }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ quickLog?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const [logging, setLogging] = useState(false);
   if (calendar.kind === "empty") return null;
 
   return (
     <section>
-      <h2 className="mb-3 flex min-h-11 items-center text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">History</h2>
+      <h2 className="mb-3 flex min-h-11 items-center justify-between text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">
+        History
+        {compact && calendar.kind === "grid" && <span className="normal-case tracking-normal">{calendar.sessions} {calendar.sessions === 1 ? "session" : "sessions"}</span>}
+      </h2>
       {calendar.kind === "thin" ? (
         <>
           <p className="text-[44px] font-semibold leading-none tracking-[-0.04em] text-ink">Day one</p>
@@ -159,12 +162,14 @@ export function HistoryCalendar({ calendar, summary, quickLog = false }: { calen
         </>
       ) : (
         <>
-          <p className="flex items-baseline gap-2">
-            <span className="text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{calendar.sessions}</span>
-            <span className="text-[15px] font-medium text-ink-mute">{calendar.sessions === 1 ? "session" : "sessions"}</span>
-          </p>
+          {!compact && (
+            <p className="flex items-baseline gap-2">
+              <span className="text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{calendar.sessions}</span>
+              <span className="text-[15px] font-medium text-ink-mute">{calendar.sessions === 1 ? "session" : "sessions"}</span>
+            </p>
+          )}
           <p className="sr-only">{calendar.summary}</p>
-          <div className="mt-6">
+          <div className={compact ? "mt-1" : "mt-6"}>
             <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} challenge={calendar.challenge} />
           </div>
         </>

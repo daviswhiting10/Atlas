@@ -8,6 +8,7 @@ import type { FocusMetric } from "@/lib/plan/generator";
 import { formatValue, metricFor, shortFor, unitFor } from "@/lib/plan/overload";
 import { overallProgress, type Overall } from "@/lib/progress/overall";
 import type { SessionPoint } from "@/lib/plan/overload";
+import { defaultLift } from "@/lib/progress/default-lift";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
 import { useEscape } from "@/hooks/use-escape";
@@ -117,8 +118,9 @@ function Big({ value, label, accent = false }: { value: string; label?: string; 
  * latest record. A section with nothing to show renders nothing, heading included (no
  * overall line yet means no Strength section): never a chart of two points or a row of zeros.
  */
-export function ProgressView({ data, goalMetric, history, overall: given, loadSeries }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode; /** The overall line, when the server worked it out (then `data.exercises` need not carry their series). */ overall?: Overall; /** Fetches one lift's history when it is picked, for exercises sent without it. */ loadSeries?: (input: { exerciseIds: string[] }) => Promise<Record<string, SessionPoint[]>> }) {
-  const [exerciseId, setExerciseId] = useState<string | null>(null);
+export function ProgressView({ data, goalMetric, history, overall: given, loadSeries, records = true, compact = false }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode; /** Home: tighter, so the heatmap fits the first screen. */ compact?: boolean; /** False on Home: the latest record stays on Progress. */ records?: boolean; /** The overall line, when the server worked it out (then `data.exercises` need not carry their series). */ overall?: Overall; /** Fetches one lift's history when it is picked, for exercises sent without it. */ loadSeries?: (input: { exerciseIds: string[] }) => Promise<Record<string, SessionPoint[]>> }) {
+  // Opens on the lift done most (its curve and its lighter weeks); "All lifts" is in the chooser.
+  const [exerciseId, setExerciseId] = useState<string | null>(() => defaultLift(data.exercises, THIN));
   const [sheet, setSheet] = useState(false);
   const overall = useMemo(() => given ?? overallProgress(data.exercises), [given, data.exercises]);
   const picked = data.exercises.find((e) => e.exerciseId === exerciseId) ?? null;
@@ -162,7 +164,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
   }, [exercise, metric]);
 
   const sessions = data.totals.sessions;
-  const record = data.recentPRs[0] ?? null;
+  const record = records ? (data.recentPRs[0] ?? null) : null;
   const chooser =
     data.exercises.length > 0 ? (
       <button type="button" onClick={() => setSheet(true)} className="press inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-ink-soft hover:text-ink">
@@ -174,7 +176,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
   if (sessions === 0) return null;
 
   return (
-    <div className="space-y-14">
+    <div className={compact ? "space-y-5" : "space-y-14"}>
       {exercise ? (
         <Section title="Strength" control={chooser}>
           {loading && <div className="h-[56px]" aria-busy />}
@@ -188,7 +190,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
           {loading && <div className="mt-5 h-[200px]" aria-busy />}
           {exercise.series.length >= THIN && (
             <div className="mt-5">
-              {ProgressC ? <ProgressC series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} /> : <ChartSpace />}
+              {ProgressC ? <ProgressC series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={compact ? 130 : 200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} /> : <ChartSpace />}
             </div>
           )}
         </Section>
@@ -199,7 +201,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
             <Big value={`${overall.change > 0 ? "+" : ""}${overall.change}%`} label={`since ${day(overall.since)}`} accent={overall.change > 0} />
             {sessions >= THIN && (
               <div className="mt-5">
-                {OverallC ? <OverallC points={overall.points} height={200} /> : <ChartSpace />}
+                {OverallC ? <OverallC points={overall.points} height={compact ? 130 : 200} /> : <ChartSpace />}
               </div>
             )}
           </Section>
@@ -213,7 +215,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
           <div className="flex items-baseline justify-between gap-3 border-t border-line py-3.5">
             <ExerciseName name={record.exercise} className="text-[17px] font-semibold text-ink" />
             <span className="shrink-0 text-[17px] text-ink-soft">
-              {formatValue(record.value, "weight")} {record.unit}
+              {formatValue(record.value, "weight")} {record.unit} · {day(record.date)}
             </span>
           </div>
         </Section>

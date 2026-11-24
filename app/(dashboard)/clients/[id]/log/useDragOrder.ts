@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { canMerge, dropAt, mergeWith, type OrderEntry } from "@/lib/sessions/order";
+import { kbKey, type KbResult, type KbState } from "@/lib/sessions/kb-reorder";
 
 /** Holding a card's header this long picks it up. */
 export const LIFT_MS = 250;
@@ -9,6 +10,8 @@ export const LIFT_MS = 250;
 export const MERGE_MS = 500;
 /** A finger that moves this far before the lift is scrolling, not holding. */
 const SLOP = 8;
+/** A mouse that moves this far from the grip lifts at once: a click-and-drag, with no hold to wait for. */
+const MOUSE_LIFT = 4;
 /** Space between two cards, added to the lifted card's height for the slot it opens. */
 const SPACING = 8;
 /** Edge zones (px from the top and bottom of the screen) where the page scrolls under a lifted card. */
@@ -52,11 +55,16 @@ const buzz = (ms: number) => {
  * reorders (never merges); holding over a card's middle for MERGE_MS and letting go supersets
  * the two (lib/sessions/order). The page doesn't scroll under a lifted card; near the top or
  * bottom edge it scrolls by itself.
+ *
+ * The same moves, for a mouse and a keyboard: `handle` is a grip on the card (focusable). A mouse lifts from it as soon as
+ * it moves; Up and Down move focus between grips; Space picks a card up, Up and Down move it, Space drops it, Escape
+ * puts it back (lib/sessions/kb-reorder). `status` says each step for a screen reader. With reduced motion, nothing
+ * scales or slides on its own: a lifted card still follows the pointer and the others jump instead of gliding.
  */
 export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]; enabled: boolean; onChange: (o: OrderEntry[]) => void }) {
   const [drag, setDragState] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  const press = useRef<{ id: string; x: number; y: number; header: HTMLElement; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const press = useRef<{ id: string; x: number; y: number; header: HTMLElement; timer: ReturnType<typeof setTimeout>; immediate: boolean } | null>(null);
   const swallowClick = useRef(false);
   const swallowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +74,49 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
   orderRef.current = order;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  // ── Keyboard: picked up with Space, moved with the arrows (lib/sessions/kb-reorder) ──
+  const [kb, setKbState] = useState<KbState>(null);
+  const kbRef = useRef<KbState>(null);
+  const [status, setStatus] = useState("");
+  const pendingFocus = useRef<string | null>(null);
+  const setKb = (k: KbState) => {
+    kbRef.current = k;
+    setKbState(k);
+  };
+  function applyKb(r: KbResult) {
+    setKb(r.kb);
+    if (r.order) {
+      // At once, so a second key pressed before React has re-rendered moves from where the card is now.
+      orderRef.current = r.order;
+      onChangeRef.current(r.order);
+    }
+    if (r.message) setStatus(r.message);
+    if (r.focus) {
+      // A move of focus alone changes nothing to re-render for: do it now. After a reorder, the card has a new place in
+      // the list: its grip takes focus back once it has been drawn there (below).
+      if (!r.order) listRef.current?.querySelector<HTMLElement>(`[data-drag-handle="${r.focus}"]`)?.focus();
+      else pendingFocus.current = r.focus;
+    }
+  }
+  // After a move the card is in a new place in the list: its grip takes focus back.
+  useLayoutEffect(() => {
+    const f = pendingFocus.current;
+    if (!f) return;
+    pendingFocus.current = null;
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-drag-handle="${f}"]`);
+    if (el && document.activeElement !== el) el.focus();
+  });
+
+  // Reduced motion: no scaling or gliding (the pointer still carries the lifted card).
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduce(q.matches);
+    const on = (e: MediaQueryListEvent) => setReduce(e.matches);
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
 
   const setDrag = (d: Drag | null) => {
     dragRef.current = d;
@@ -284,13 +335,32 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     clientY.current = e.clientY;
     const p = press.current;
     if (!dragRef.current) {
+      if (!p) return;
+      const away = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+      // From the grip, a mouse lifts as soon as it moves.
+      if (p.immediate && away > MOUSE_LIFT) {
+        clearTimeout(p.timer);
+        lift(p.id);
+        update(e.clientY + window.scrollY);
+        return;
+      }
       // Moving before the lift is a scroll: let it be.
-      if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > SLOP) end(false);
+      if (away > SLOP) end(false);
       return;
     }
     update(e.clientY + window.scrollY);
   }
   moveRef.current = onMove;
+
+  function startPress(e: React.PointerEvent, id: string, header: HTMLElement, immediate: boolean) {
+    swallowClick.current = false;
+    end(false);
+    clientY.current = e.clientY;
+    press.current = { id, x: e.clientX, y: e.clientY, header, immediate, timer: setTimeout(() => lift(id), LIFT_MS) };
+    window.addEventListener("pointermove", listeners.move);
+    window.addEventListener("pointerup", listeners.up);
+    window.addEventListener("pointercancel", listeners.cancel);
+  }
 
   /** Spread onto a card's header: the hold that picks it up. */
   const bind = (id: string) =>
@@ -298,13 +368,45 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
       ? {
           onPointerDown: (e: React.PointerEvent) => {
             if (e.button !== 0 || (e.target as HTMLElement).closest("input, textarea")) return;
-            swallowClick.current = false;
-            end(false);
-            clientY.current = e.clientY;
-            press.current = { id, x: e.clientX, y: e.clientY, header: e.currentTarget as HTMLElement, timer: setTimeout(() => lift(id), LIFT_MS) };
-            window.addEventListener("pointermove", listeners.move);
-            window.addEventListener("pointerup", listeners.up);
-            window.addEventListener("pointercancel", listeners.cancel);
+            startPress(e, id, e.currentTarget as HTMLElement, false);
+          },
+        }
+      : {};
+
+  /**
+   * Spread onto a grip inside the card: the same pick-up for a mouse (it lifts as soon as it moves) and for a touch (the
+   * hold), and the whole keyboard flow. `name` is the exercise, for the screen reader.
+   */
+  const handle = (id: string, name: string) =>
+    enabled
+      ? {
+          "data-drag-handle": id,
+          tabIndex: 0,
+          role: "button" as const,
+          "aria-roledescription": "reorder handle",
+          "aria-label": `Reorder ${name}`,
+          "aria-pressed": kb?.id === id,
+          onPointerDown: (e: React.PointerEvent) => {
+            if (e.button !== 0) return;
+            e.stopPropagation(); // the header's own hold must not start a second press
+            const el = e.currentTarget as HTMLElement;
+            const header = (el.closest("[data-drag-header]") ?? el.closest("[data-exercise]")?.firstElementChild ?? el) as HTMLElement;
+            startPress(e, id, header, e.pointerType === "mouse");
+          },
+          onKeyDown: (e: React.KeyboardEvent) => {
+            const r = kbKey(e.key, { id, name, order: orderRef.current, kb: kbRef.current });
+            if (!r.handled) return;
+            e.preventDefault();
+            applyKb(r);
+          },
+          // Leaving the grip while a card is picked up drops it where it is (after a move, focus comes straight back).
+          onBlur: () => {
+            setTimeout(() => {
+              if (kbRef.current?.id === id && document.activeElement?.getAttribute("data-drag-handle") !== id) {
+                setKb(null);
+                setStatus("");
+              }
+            }, 0);
           },
         }
       : {};
@@ -312,28 +414,29 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
   /** The card's look while something is lifted: following the finger, sliding aside, or glowing as the merge target. */
   function styleFor(id: string): React.CSSProperties | undefined {
     const d = drag;
-    if (!d) return undefined;
+    // Picked up from the keyboard: it is outlined, and the list reorders under it.
+    if (!d) return kb && id === kb.id ? { position: "relative", zIndex: 30, boxShadow: "0 0 0 2px var(--dusk-teal)", borderRadius: 14 } : undefined;
     if (id === d.id) {
       return {
         position: "relative",
         zIndex: 30,
         translate: `0 ${d.y - d.startY}px`,
-        scale: "1.03",
+        scale: reduce ? undefined : "1.03",
         maxHeight: d.compact,
         overflow: "hidden",
         // Over a merge target: see-through, so the glowing card under it shows.
         opacity: d.merge ? 0.6 : 1,
         boxShadow: "0 18px 40px -12px rgba(0,0,0,0.85)",
-        transition: "scale 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms ease-out",
+        transition: reduce ? "none" : "scale 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms ease-out",
       };
     }
     const k = d.others.indexOf(id);
     const glow = d.merge === id;
     return {
       translate: `0 ${shiftOf(d, k)}px`,
-      scale: glow ? "1.025" : undefined,
+      scale: glow && !reduce ? "1.025" : undefined,
       boxShadow: glow ? "0 0 0 2px var(--dusk-teal), 0 0 28px -6px var(--dusk-teal)" : undefined,
-      transition: "translate 160ms cubic-bezier(0.2, 0.8, 0.2, 1), scale 120ms ease-out, box-shadow 120ms ease-out",
+      transition: reduce ? "none" : "translate 160ms cubic-bezier(0.2, 0.8, 0.2, 1), scale 120ms ease-out, box-shadow 120ms ease-out",
     };
   }
 
@@ -341,7 +444,7 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
   function headingStyle(id: string): React.CSSProperties | undefined {
     const d = drag;
     if (!d || id === d.id) return undefined;
-    return { translate: `0 ${shiftOf(d, d.others.indexOf(id))}px`, transition: "translate 160ms cubic-bezier(0.2, 0.8, 0.2, 1)" };
+    return { translate: `0 ${shiftOf(d, d.others.indexOf(id))}px`, transition: reduce ? "none" : "translate 160ms cubic-bezier(0.2, 0.8, 0.2, 1)" };
   }
 
   /** Where the insertion line goes, relative to the list (null: no line). */
@@ -356,5 +459,5 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     lineTop = y - listTop;
   }
 
-  return { listRef, bind, styleFor, headingStyle, lineTop, lifted: drag?.id ?? null, mergeTarget: drag?.merge ?? null };
+  return { listRef, bind, handle, status, styleFor, headingStyle, lineTop, lifted: drag?.id ?? null, mergeTarget: drag?.merge ?? null };
 }

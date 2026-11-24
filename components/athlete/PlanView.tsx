@@ -14,6 +14,7 @@ import { ExercisePicker, type PickerExercise } from "@/components/exercises/Exer
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { TargetEditor, type TargetValues } from "./TargetEditor";
 import { cn } from "@/lib/utils";
+import { useAutoGrow } from "@/hooks/use-auto-grow";
 import { onTablistKeyDown } from "@/lib/ui/tab-keys";
 import { ExerciseName } from "@/components/ExerciseName";
 
@@ -165,6 +166,7 @@ function NoteField({
   onSave,
   autoFocus = false,
   onDone,
+  grow,
 }: {
   value: string | null;
   placeholder: string;
@@ -173,10 +175,14 @@ function NoteField({
   autoFocus?: boolean;
   /** Called after leaving the field (saved, or nothing to save). */
   onDone?: () => void;
+  /** Fill the width, start at `min` lines and grow with the text up to `max` lines, then scroll. */
+  grow?: { min: number; max: number };
 }) {
+  const box = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(value ?? "");
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const saved = useRef(value ?? "");
+  useAutoGrow(box, text, grow?.min ?? 2, grow?.max ?? 2);
 
   async function save() {
     if (text.trim() === saved.current.trim()) return void onDone?.();
@@ -202,14 +208,18 @@ function NoteField({
         </span>
       </span>
       <textarea
+        ref={box}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={save}
         autoFocus={autoFocus}
-        rows={2}
+        rows={grow?.min ?? 2}
         maxLength={2000}
         placeholder={placeholder}
-        className="mt-1.5 w-full resize-y rounded-lg border border-line-strong bg-dusk-raised px-3 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute focus:border-ink/40"
+        className={cn(
+          "mt-1.5 block w-full rounded-lg border border-line-strong bg-dusk-raised px-3 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-mute focus:border-ink/40",
+          grow ? "resize-none" : "resize-y"
+        )}
       />
     </label>
   );
@@ -656,7 +666,7 @@ export function PlanView({
         {locked ? (
           plan.note && <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink-soft">{plan.note}</p>
         ) : (
-          <NoteField key={plan.id} label={noteLabel} value={plan.note} placeholder="Anything about the plan as a whole: what it's for, what to watch, when to revisit it." onSave={actions.setPlanNote} />
+          <NoteField key={plan.id} label={noteLabel} value={plan.note} placeholder="Anything about the plan as a whole: what it's for, what to watch, when to revisit it." onSave={actions.setPlanNote} grow={{ min: 4, max: 12 }} />
         )}
         {!locked && actions.setLighterWeeks && (
           <div className="mt-6">

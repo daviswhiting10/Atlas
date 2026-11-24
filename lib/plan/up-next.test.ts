@@ -13,7 +13,7 @@ const plan = (workouts: WorkoutSummary[]): PlanOverview => {
   const nextUp = workouts.find((w) => w.status === "PLANNED") ?? null;
   return {
     id: "p", name: "Build muscle", status: "ACTIVE", startDate: "2026-11-16", totalWeeks: 12, currentWeek: nextUp?.week ?? 12,
-    generated: true, lighterWeeks: true, prefs: null, goalText: null, note: null,
+    generated: true, lighterWeeks: true, prefs: null, goalText: null, note: null, weekNotes: [],
     blocks: [{ name: "Foundation", weeks: 4, focus: "" }, { name: "Build", weeks: 4, focus: "" }, { name: "Peak", weeks: 4, focus: "" }],
     rationale: [], workouts, nextUp, done: workouts.filter((w) => w.status === "LOGGED").length, rx: {},
   };
@@ -40,12 +40,16 @@ describe("Plan tab, up next first", () => {
     expect(v.eyebrow).toBe("Week 12 of 12 · Peak");
   });
 
-  it("the page: Change goals under ⋯, no Delete plan until deleteMyPlan exists, edit hidden from coached athletes", () => {
+  it("one ⋯ on the Plan page: the header's, with Change goals; none under the title", () => {
     const page = readFileSync(new URL("../../app/(client)/plan/page.tsx", import.meta.url), "utf8");
-    expect(page).toContain("<PlanMenu changeGoals={athlete.selfServe} />");
+    expect(page).not.toContain("PlanMenu");
     expect(page).not.toMatch(/onDelete|deleteMyPlan/);
     expect(page).toMatch(/searchParams\?\.view === "edit" && !locked/);
-    const menu = readFileSync(new URL("../../components/athlete/PlanMenu.tsx", import.meta.url), "utf8");
-    expect(menu).toContain("if (!changeGoals && !onDelete) return null;");
+    const header = readFileSync(new URL("../../components/nav/HeaderActions.tsx", import.meta.url), "utf8");
+    expect(header).toContain('changeGoals && pathname.startsWith("/plan")');
+    expect(header).toContain("Change goals");
+    const layout = readFileSync(new URL("../../app/(client)/layout.tsx", import.meta.url), "utf8");
+    expect(layout).toContain("changeGoals={athlete.selfServe}");
   });
+
 });
