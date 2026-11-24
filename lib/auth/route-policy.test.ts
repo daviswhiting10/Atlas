@@ -25,7 +25,7 @@ describe("decide: signed in", () => {
     for (const u of [coach, athlete]) for (const p of ["/forgot-password", "/reset-password", "/error", "/agents", "/invite", "/api/invite/continue"]) expect(decide(p, u)).toEqual(next);
   });
   it("sends the marketing and sign-in pages home", () => {
-    expect(decide("/login", coach)).toEqual(go("/log"));
+    expect(decide("/login", coach)).toEqual(go("/dashboard"));
     expect(decide("/", athlete)).toEqual(go("/today"));
   });
   it("keeps athletes in the athlete app (and /api/mcp)", () => {
@@ -61,7 +61,7 @@ describe("decide: signed in", () => {
     expect(decide("/goals/clx9abc123", null)).toEqual(go("/login"));
   });
   it("sends anyone who doesn't need the step away from /set-password", () => {
-    expect(decide("/set-password", coach)).toEqual(go("/log"));
+    expect(decide("/set-password", coach)).toEqual(go("/dashboard"));
     expect(decide("/set-password", athlete)).toEqual(go("/today"));
   });
 });
