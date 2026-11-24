@@ -6,8 +6,9 @@
  *   steps belong to the person, not to a fixed number of sets, and a light month still shows contrast. A session with no
  *   sets logged still counts as a training day (step 1, "present").
  * - Level 0 is a day with no session; a **future** day (after today, in the last week) is its own state.
- * - The window ends on the week of today. `weeks` is how many columns: a year on a desktop, the last 26 on a phone
- *   (the component shows the older ones only from the md breakpoint up).
+ * - The window ends on the week of today, or `back` weeks before it (the arrows above the grid). `weeks` is how many
+ *   columns: a year on a desktop, the last 13 (three months) on a phone (the component shows the older ones only from the
+ *   md breakpoint up).
  * - A month is named above the column that holds its 1st.
  */
 
@@ -32,8 +33,11 @@ export type YearGrid = { columns: GridColumn[]; thresholds: [number, number, num
 
 /** Columns on a desktop (a year of weeks, plus the partial one). */
 export const YEAR_WEEKS = 53;
-/** Columns on a phone: the last 26 weeks, so cells stay around 12 px. */
-export const PHONE_WEEKS = 26;
+/** Columns on a phone: the last 13 weeks (3 months), so cells are wide enough to hit and nothing touches the screen edge. */
+export const PHONE_WEEKS = 13;
+/** How far the arrows move the window: a phone's whole window, a desktop's year. */
+export const PHONE_STEP = PHONE_WEEKS;
+export const DESKTOP_STEP = 52;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -73,10 +77,10 @@ export function levelOf(work: number, t: [number, number, number] | null): GridL
   return work <= t[0] ? 1 : work <= t[1] ? 2 : work <= t[2] ? 3 : 4;
 }
 
-export function yearGrid(byDay: Record<string, CalendarSession[]>, opts: { today: string; weeks?: number }): YearGrid {
+export function yearGrid(byDay: Record<string, CalendarSession[]>, opts: { today: string; weeks?: number; /** Weeks the window is moved back from today's. */ back?: number }): YearGrid {
   const weeks = opts.weeks ?? YEAR_WEEKS;
   const thresholds = quartileSteps(byDay);
-  const lastMonday = mondayOf(opts.today);
+  const lastMonday = addDays(mondayOf(opts.today), -7 * Math.max(0, opts.back ?? 0));
   const columns: GridColumn[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const monday = addDays(lastMonday, -7 * i);
@@ -118,4 +122,19 @@ export function latestTrained(g: YearGrid): GridCell | null {
     }
   }
   return null;
+}
+
+/** Is there any training before this Monday (so the back arrow has somewhere to go)? */
+export function hasEarlier(byDay: Record<string, CalendarSession[]>, monday: string): boolean {
+  return Object.entries(byDay).some(([day, s]) => s.length > 0 && day < monday);
+}
+
+/** What period the columns cover: "Aug – Nov 2026", or "Dec 2025 – Nov 2026" across a year. */
+export function rangeLabel(firstMonday: string, lastMonday: string): string {
+  const a = parts(firstMonday);
+  const lastDay = addDays(lastMonday, 6);
+  const b = parts(lastDay);
+  const ya = Number(firstMonday.slice(0, 4));
+  const yb = Number(lastDay.slice(0, 4));
+  return ya === yb ? `${MONTHS[a.m]} – ${MONTHS[b.m]} ${yb}` : `${MONTHS[a.m]} ${ya} – ${MONTHS[b.m]} ${yb}`;
 }

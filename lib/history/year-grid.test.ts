@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CalendarSession } from "./calendar";
-import { gridDay, latestTrained, levelOf, PHONE_WEEKS, quartileSteps, readout, YEAR_WEEKS, yearGrid } from "./year-grid";
+import { gridDay, hasEarlier, latestTrained, levelOf, PHONE_WEEKS, quartileSteps, rangeLabel, readout, YEAR_WEEKS, yearGrid } from "./year-grid";
 
 const s = (title: string, sets: number, minutes: number | null = null): CalendarSession => ({ id: title + sets, title, sets, minutes, record: false, href: null });
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
@@ -56,9 +56,9 @@ describe("yearGrid: weeks as columns, seven rows, Monday first", () => {
     const nov = g.columns.find((c) => c.month === "Nov" && c.cells.some((x) => x.day === "2026-11-01"));
     expect(nov?.cells.map((x) => x.day)).toContain("2026-11-01");
   });
-  it("a phone shows the last 26 of the columns, right-aligned to today", () => {
+  it("a phone shows the last 13 of the columns (three months), right-aligned to today", () => {
     const phone = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS });
-    expect(phone.columns).toHaveLength(26);
+    expect(phone.columns).toHaveLength(13);
     expect(phone.columns.at(-1)!.monday).toBe(g.columns.at(-1)!.monday);
     expect(phone.columns[0].monday).toBe(g.columns[YEAR_WEEKS - PHONE_WEEKS].monday);
   });
@@ -82,16 +82,16 @@ describe("the one-line readout", () => {
 
 describe("the heatmap component", () => {
   const c = read("components/athlete/YearHeatmap.tsx");
-  it("cells are display-only: no buttons, no fixed 44 px targets, no popover", () => {
-    expect(c).not.toContain("<button");
-    expect(c).not.toMatch(/h-11|min-h-11|w-11/);
-    expect(c).not.toMatch(/popover|Popover|Tooltip/);
+  it("cells are display-only (the arrows are the only buttons); a tap opens a small tooltip, not a line of text under the grid", () => {
+    expect(c.match(/<button/g)?.length).toBe(2);
+    expect(c).toContain('role="tooltip"');
+    expect(c).not.toMatch(/tnum mt-3 min-h-\[22px\]/);
   });
   it("one accent in four steps, not the purple of the reference", () => {
     expect(c).toContain("var(--dusk-teal)");
     expect(c).not.toMatch(/purple|violet/i);
   });
-  it("shows the last 26 weeks on a phone and the year from md up, with no sideways scroll", () => {
+  it("shows the last 13 weeks on a phone and the year from md up, with no sideways scroll", () => {
     expect(c).toContain("max-md:hidden");
     expect(c).not.toMatch(/overflow-x-(auto|scroll)/);
     expect(c).toContain("auto-cols-fr");
@@ -102,4 +102,23 @@ describe("the heatmap component", () => {
     expect(read("app/globals.css")).toContain("prefers-reduced-motion: reduce");
   });
   it("the History section uses it", () => expect(read("components/athlete/HistoryCalendar.tsx")).toContain("<YearHeatmap"));
+});
+
+describe("moving the window back", () => {
+  it("back N weeks ends N weeks earlier, with no future days", () => {
+    const now = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS });
+    const earlier = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS, back: PHONE_WEEKS });
+    expect(earlier.columns.at(-1)!.monday).toBe(now.columns[0].monday.replace(now.columns[0].monday, new Date(Date.parse(`${now.columns[0].monday}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10)));
+    expect(earlier.columns.flatMap((c) => c.cells).some((c) => c.future)).toBe(false);
+  });
+  it("the back arrow has somewhere to go only while there is training before the window", () => {
+    const byDay = { "2026-03-02": [{ id: "a", title: "Upper", sets: 5, minutes: null, record: false, href: null }] } as never;
+    expect(hasEarlier(byDay, "2026-08-24")).toBe(true);
+    expect(hasEarlier(byDay, "2026-03-02")).toBe(false);
+    expect(hasEarlier({}, "2026-08-24")).toBe(false);
+  });
+  it("the period reads as months, with the year only when it crosses one", () => {
+    expect(rangeLabel("2026-08-24", "2026-11-16")).toBe("Aug – Nov 2026");
+    expect(rangeLabel("2025-12-01", "2026-11-23")).toBe("Dec 2025 – Nov 2026");
+  });
 });
