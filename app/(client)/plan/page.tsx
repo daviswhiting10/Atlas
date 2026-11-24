@@ -110,7 +110,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         <p className="eyebrow">{upNext.eyebrow}</p>
         <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
-      <PlanWeek plan={plan} today={localDay(new Date(), safeTimeZone(cookies().get(TZ_COOKIE)?.value))} totalWeeks={plan.totalWeeks} summary={sessionSummary} deleteSession={deleteMySession} reassign={reassignMySession} />
+      <PlanWeek plan={plan} today={localDay(new Date(), timeZone)} timeZone={timeZone} totalWeeks={plan.totalWeeks} summary={sessionSummary} deleteSession={deleteMySession} reassign={reassignMySession} />
       {plan.weekNotes.length > 0 && (
         <div className="mt-6 max-w-3xl">
           <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />

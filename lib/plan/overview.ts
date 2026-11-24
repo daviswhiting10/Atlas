@@ -31,6 +31,8 @@ export type WorkoutSummary = {
   id: string;
   /** The finished session, when there is one (what a delete removes). */
   logId?: string | null;
+  /** When the finished session was logged (its own date, an ISO instant): the Plan calendar draws a done workout on this day in the athlete's timezone. */
+  sessionAt?: string | null;
   name: string;
   week: number;
   date: string;
@@ -184,6 +186,7 @@ export async function loadPlanOverview({
   const workouts: WorkoutSummary[] = assignment.assignedWorkouts.map((w) => ({
     id: w.id,
     logId: w.workoutLog?.completedAt ? w.workoutLog.id : null,
+    sessionAt: w.workoutLog?.completedAt ? w.workoutLog.date.toISOString() : null,
     name: w.name,
     week: weekOf(w.scheduledDate.getTime(), start),
     date: iso(w.scheduledDate),
