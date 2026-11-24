@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { compareWithLast, medalsOf, type WrapSet, type WrapUp } from "@/lib/coach/wrap-up";
+import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
 import { requestDay } from "@/lib/sessions/request-day";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
@@ -195,6 +196,9 @@ export async function logSet(input: {
 
 // ── Session complete: how it compared, new bests, what is next ───────────────────
 
+/** A wrap-up set: its numbers, its exercise, and whether its reps are seconds (lib/sessions/volume.ts). */
+const SET_SELECT = { exerciseId: true, weight: true, reps: true, exercise: { select: { name: true, slug: true } }, ...TIMED_SELECT } as const;
+
 const sameName = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
@@ -213,12 +217,13 @@ export async function sessionWrapUp(input: { workoutLogId: string }): Promise<Wr
       title: true,
       assignedWorkoutId: true,
       assignedWorkout: { select: { name: true, exercises: { select: { prescribedSets: true } } } },
-      sets: { where: { completed: true }, select: { exerciseId: true, weight: true, reps: true, exercise: { select: { name: true } } } },
+      sets: { where: { completed: true }, select: SET_SELECT },
     },
   });
   if (!log) return { compare: null, medals: [], next: null, athleteNote: null };
-  const rows = (sets: Array<{ exerciseId: string | null; weight: number | null; reps: number | null; exercise: { name: string } | null }>): WrapSet[] =>
-    sets.filter((x) => x.exerciseId).map((x) => ({ exerciseId: x.exerciseId!, name: x.exercise?.name ?? "Exercise", weight: x.weight, reps: x.reps }));
+  type Row = { exerciseId: string | null; weight: number | null; reps: number | null; exercise: { name: string; slug: string } | null } & Parameters<typeof isTimedSet>[0];
+  const rows = (sets: Row[]): WrapSet[] =>
+    sets.filter((x) => x.exerciseId).map((x) => ({ exerciseId: x.exerciseId!, name: x.exercise?.name ?? "Exercise", weight: x.weight, reps: x.reps, timed: isTimedSet(x, x.exercise?.slug) }));
   const cur = rows(log.sets);
   const name = log.assignedWorkout?.name ?? log.title;
   const planned = log.assignedWorkout ? log.assignedWorkout.exercises.reduce((n, e) => n + (Array.isArray(e.prescribedSets) ? e.prescribedSets.length : 0), 0) || null : null;
@@ -228,7 +233,7 @@ export async function sessionWrapUp(input: { workoutLogId: string }): Promise<Wr
     where: { clientId: log.clientId, completedAt: { not: null }, date: { lt: log.date }, id: { not: log.id } },
     orderBy: { date: "desc" },
     take: 30,
-    select: { title: true, assignedWorkout: { select: { name: true } }, sets: { where: { completed: true }, select: { exerciseId: true, weight: true, reps: true, exercise: { select: { name: true } } } } },
+    select: { title: true, assignedWorkout: { select: { name: true } }, sets: { where: { completed: true }, select: SET_SELECT } },
   });
   const last = earlier.find((e) => sameName(e.assignedWorkout?.name ?? e.title, name));
 

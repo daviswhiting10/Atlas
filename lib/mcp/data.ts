@@ -10,6 +10,7 @@ import { withDerivedStatus } from "@/lib/sessions/status";
 import { LIGHTER_SELECT, isLighterWeek } from "@/lib/plan/lighter";
 import { displayName } from "@/lib/plan/catalog";
 import { durationRange } from "@/lib/sessions/duration";
+import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
 import type { ClientLookup } from "./auth";
 import type { ScopedClient } from "./context";
 
@@ -46,6 +47,8 @@ export type SetRow = {
   date: Date;
   /** Logged in one of the plan's lighter weeks. */
   deload: boolean;
+  /** The reps are seconds (a hold, a carry, cardio): no tonnage. See lib/sessions/volume.ts. */
+  timed: boolean;
 };
 
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -74,6 +77,7 @@ export async function loadSetRows(
       rpe: true,
       completed: true,
       workoutLogId: true,
+      ...TIMED_SELECT,
       exercise: { select: { name: true, slug: true, movementPattern: true, primaryMuscles: true, secondaryMuscles: true } },
       workoutLog: {
         select: {
@@ -104,6 +108,7 @@ export async function loadSetRows(
         workoutLogId: r.workoutLogId,
         date: r.workoutLog.date,
         deload,
+        timed: isTimedSet(r, r.exercise.slug),
       },
     ];
   });

@@ -86,6 +86,16 @@ describe("sessionPoint", () => {
     expect(sessionPoint("2026-01-05", [set(null, 12), set(null, 10)])).toMatchObject({ weight: null, reps: 12, e1rm: null, volume: 22 });
   });
 
+  it("a timed exercise's volume is its total time, never weight × seconds", () => {
+    // A 60 lb carry for 45 s and 40 s: 85 sec, not 5,100 lb.
+    expect(sessionPoint("2026-01-05", [set(60, 45), set(60, 40)], false, true)).toMatchObject({ weight: 60, volume: 85 });
+    expect(sessionPoint("2026-01-05", [set(null, 60)], false, true)).toMatchObject({ volume: 60 });
+  });
+
+  it("weighted reps are unchanged", () => {
+    expect(sessionPoint("2026-01-05", [set(100, 10), set(100, 8)])?.volume).toBe(1800);
+  });
+
   it("returns nothing when no set was completed", () => {
     expect(sessionPoint("2026-01-05", [set(100, 5, false)])).toBeNull();
   });
@@ -230,6 +240,8 @@ describe("unitFor", () => {
     expect(unitFor("reps", false, true)).toBe("sec");
     expect(unitFor("volume", false, true)).toBe("sec total");
     expect(unitFor("weight", true, true)).toBe("lb");
+    // A loaded carry's volume is still its time.
+    expect(unitFor("volume", true, true)).toBe("sec total");
   });
 });
 

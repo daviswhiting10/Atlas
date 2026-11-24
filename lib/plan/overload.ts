@@ -10,6 +10,7 @@
 import type { FocusMetric } from "./generator";
 import { timedFirstReason, type TimedKind } from "@/lib/plan/timed";
 import { durationLabel } from "@/lib/sessions/duration";
+import { setVolume } from "@/lib/sessions/volume";
 
 export type LoggedSet = { weight: number | null; reps: number | null; completed: boolean };
 
@@ -215,8 +216,11 @@ export type SessionPoint = {
 
 type RawPoint = Omit<SessionPoint, "record" | "best" | "deload"> & { deload?: boolean };
 
-/** Collapse one session's sets for an exercise into a single chart point. */
-export function sessionPoint(date: string, sets: LoggedSet[], deload = false): RawPoint | null {
+/**
+ * Collapse one session's sets for an exercise into a single chart point.
+ * `timed`: the reps are seconds (a hold, a carry), so volume is the total time, never weight × seconds.
+ */
+export function sessionPoint(date: string, sets: LoggedSet[], deload = false, timed = false): RawPoint | null {
   const done = sets.filter((s) => s.completed && s.reps != null && s.reps > 0);
   if (done.length === 0) return null;
 
@@ -229,10 +233,9 @@ export function sessionPoint(date: string, sets: LoggedSet[], deload = false): R
       if (weight == null || s.weight > weight) weight = s.weight;
       const est = e1rm(s.weight, reps);
       if (best1rm == null || est > best1rm) best1rm = est;
-      volume += s.weight * reps;
-    } else {
-      volume += reps; // bodyweight: volume is total reps
     }
+    // Bodyweight: volume is total reps; timed: total seconds; loaded reps: weight × reps.
+    volume += timed ? reps : setVolume({ weight: s.weight, reps }) || reps;
   }
   const pool = weight == null ? done : done.filter((s) => s.weight === weight);
   const reps = Math.max(...pool.map((s) => s.reps as number));
@@ -313,6 +316,8 @@ export const recordLabel = (timed: boolean) => (timed ? "Longest hold" : "Person
 
 /** Unit for a charted value. Timed holds (a plank) are measured in seconds, not reps. */
 export function unitFor(metric: FocusMetric, loaded: boolean, timed = false): string {
+  // A timed exercise's volume is its total time, loaded or not.
+  if (timed && metric === "volume") return "sec total";
   const unit = METRICS[metric].unit(loaded);
   return timed ? unit.replace("reps", "sec") : unit;
 }

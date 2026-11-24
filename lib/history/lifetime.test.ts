@@ -29,7 +29,7 @@ describe("lifetimeStats: totals", () => {
     expect(s.records).toBe(0);
   });
 
-  it("moved is tonnage for loaded sets; bodyweight, band and timed reps are counted apart, not dropped", () => {
+  it("moved is tonnage for loaded sets; bodyweight and band reps are counted apart, not dropped", () => {
     const s = stats([
       sess("a", "2026-03-02T12:00:00Z", [
         set("bench", 225, 5), // 1125
@@ -41,6 +41,14 @@ describe("lifetimeStats: totals", () => {
       ]),
     ]);
     expect(s.moved).toEqual({ tonnageLb: 2250, unloadedReps: 37 });
+  });
+
+  it("a carry or a plank is never weight × seconds, nor bodyweight reps: it counts as a set only", () => {
+    const s = stats([
+      sess("a", "2026-03-02T12:00:00Z", [set("bench", 225, 5), set("carry", 60, 45, { timed: true }), set("plank", null, 60, { timed: true })]),
+    ]);
+    expect(s.moved).toEqual({ tonnageLb: 1125, unloadedReps: 0 });
+    expect(s.sets).toBe(3);
   });
 
   it("time is shown only when at least half of the sessions have a duration", () => {

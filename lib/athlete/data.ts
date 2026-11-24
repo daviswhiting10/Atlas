@@ -31,6 +31,7 @@ import { finishedTotals } from "./totals";
 import { loadCalendar } from "@/lib/history/load";
 import type { HistoryCalendar } from "@/lib/history/calendar";
 import { timedHasLoad, timedKind, type TimedKind } from "@/lib/plan/timed";
+import { isTimedSet, setVolume } from "@/lib/sessions/volume";
 
 /** Upper bound on sets per exercise in one workout. */
 export const MAX_SETS = 20;
@@ -223,8 +224,9 @@ export async function loadProgress({
       completed: true,
       workoutLogId: true,
       workoutLog: WEEK_SOURCE,
-      // The range the set was prescribed at: tells "the range moved up" from a hard day (see nextTarget).
-      assignedWorkoutExercise: { select: { prescribedSets: true } },
+      // The prescription the set was logged against: its range tells "the range moved up" from a hard day (see nextTarget),
+      // and its unit or mode whether the reps are seconds (lib/sessions/volume.ts).
+      assignedWorkoutExercise: { select: { prescribedSets: true, mode: true } },
       exercise: { select: { name: true, slug: true, primaryMuscles: true } },
     },
   });
@@ -242,6 +244,7 @@ export async function loadProgress({
   for (const s of sets) {
     if (!s.exerciseId || !s.exercise) continue;
     const date = s.workoutLog.date;
+    const timed = isTimedSet(s, s.exercise.slug);
     let entry = byExercise.get(s.exerciseId);
     if (!entry) {
       const cat = CATALOG_BY_SLUG[s.exercise.slug];
@@ -249,7 +252,7 @@ export async function loadProgress({
         name: displayName(s.exercise.slug, s.exercise.name),
         muscles: cat?.muscles ?? ((s.exercise.primaryMuscles as string[] | null) ?? []),
         inc: cat ? (cat.tool === "bodyweight" ? 0 : cat.inc) : 5,
-        timed: cat?.unit === "secs",
+        timed,
         sessions: new Map(),
       };
       byExercise.set(s.exerciseId, entry);
@@ -262,7 +265,7 @@ export async function loadProgress({
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
 
     if (s.completed && s.reps) {
-      totalVolume += (s.weight ?? 0) * s.reps;
+      totalVolume += setVolume({ weight: s.weight, reps: s.reps, timed });
       totalSets += 1;
     }
   }
@@ -274,7 +277,7 @@ export async function loadProgress({
   for (const [exerciseId, entry] of Array.from(byExercise.entries())) {
     const sessions = Array.from(entry.sessions.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
     const points = sessions
-      .map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload))
+      .map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload, entry.timed))
       .filter((p): p is NonNullable<typeof p> => p != null);
     if (points.length === 0) continue;
     const series = buildSeries(points);
@@ -294,7 +297,7 @@ export async function loadProgress({
   }
 
   // Biggest lifts first: order by the most volume moved in a single session.
-  const peak = (e: ExerciseProgress) => (e.loaded ? Math.max(...e.series.map((p) => p.volume)) : 0);
+  const peak = (e: ExerciseProgress) => (e.loaded && !e.timed ? Math.max(...e.series.map((p) => p.volume)) : 0);
   exercises.sort((a, b) => peak(b) - peak(a) || b.series.length - a.series.length || a.name.localeCompare(b.name));
   recentPRs.sort((a, b) => b.date.localeCompare(a.date) || a.exercise.localeCompare(b.exercise));
 
@@ -497,7 +500,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     );
     const lastSession = referenceSession(sessions);
     const series = buildSeries(
-      sessions.map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload)).filter((p): p is NonNullable<typeof p> => p != null)
+      sessions.map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload, unit === "secs")).filter((p): p is NonNullable<typeof p> => p != null)
     );
     const everLoaded = series.some((p) => p.weight != null);
     const bodyweight = cat ? cat.tool === "bodyweight" : /body ?only|bodyweight|n\/?a/i.test(e.exercise.equipment) && !everLoaded;

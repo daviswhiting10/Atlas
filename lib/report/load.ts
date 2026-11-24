@@ -6,6 +6,7 @@
 import { cache } from "react";
 import { iso, localDay } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
+import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
 import { LIGHTER_SELECT, lighterWeeksOn } from "@/lib/plan/lighter";
 import type { HistorySession } from "@/lib/history/types";
 import { buildReport, type Report } from "./build";
@@ -60,7 +61,13 @@ export async function loadReport({ assignmentId, block, viewer, timeZone }: { as
   const [logs, planned] = await Promise.all([
     prisma.workoutLog.findMany({
       where: { assignedWorkout: { programAssignmentId: assignmentId }, completedAt: { not: null } },
-      select: { id: true, date: true, completedAt: true, durationMin: true, sets: { select: { exerciseId: true, weight: true, reps: true, rpe: true, bandColor: true, completed: true, exercise: { select: { name: true } } } } },
+      select: {
+        id: true,
+        date: true,
+        completedAt: true,
+        durationMin: true,
+        sets: { select: { exerciseId: true, weight: true, reps: true, rpe: true, bandColor: true, completed: true, exercise: { select: { name: true, slug: true } }, ...TIMED_SELECT } },
+      },
     }),
     prisma.assignedWorkout.count({
       where: { programAssignmentId: assignmentId, status: { not: "SKIPPED" }, scheduledDate: { gte: new Date(start + "T00:00:00Z"), lt: new Date(new Date(start + "T00:00:00Z").getTime() + BLOCK_DAYS * 86_400_000) } },
@@ -72,9 +79,9 @@ export async function loadReport({ assignmentId, block, viewer, timeZone }: { as
     date: l.date,
     completedAt: l.completedAt,
     durationMin: l.durationMin,
-    sets: l.sets.map(({ exercise, ...s }) => {
+    sets: l.sets.map(({ exercise, assignedWorkoutExercise, ...s }) => {
       if (s.exerciseId && exercise) names[s.exerciseId] = exercise.name;
-      return s;
+      return { ...s, timed: isTimedSet({ assignedWorkoutExercise }, exercise?.slug) };
     }),
   }));
   return buildReport({ startDay: iso(plan.startDate), block, sessions, names, planned, lighterLastWeek: lighterWeeksOn(plan), timeZone });

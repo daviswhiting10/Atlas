@@ -82,6 +82,13 @@ describe("volumeByWeek", () => {
     expect(weeks[0].byMuscle).toEqual({ chest: { tonnageLb: 2000, sets: 2 }, lats: { tonnageLb: 0, sets: 1 } });
   });
 
+  it("a timed set (a carry) adds no tonnage: it is a set, counted with the unloaded ones", () => {
+    const w = volumeByWeek([...session("2026-11-02", [{ weight: 100, reps: 10 }]), ...session("2026-11-03", [{ weight: 60, reps: 45, timed: true }], { exerciseId: "carry" })], "UTC");
+    expect(w[0]).toMatchObject({ tonnageLb: 1000, sets: 2, unloadedSets: 1 });
+    const h = groupByExercise(session("2026-11-03", [{ weight: 60, reps: 45, timed: true }, { weight: 60, reps: 40, timed: true }], { exerciseId: "carry" }), "UTC");
+    expect(summarizeSession(h[0].sessions[0])).toMatchObject({ topWeight: 60, volumeLb: 0 });
+  });
+
   it("counts bodyweight and band sets as sets with no tonnage, and says how many", () => {
     expect(weeks[0].unloadedSets).toBe(1);
     expect(weeks[1]).toMatchObject({ tonnageLb: 1000, sets: 2, unloadedSets: 1 });

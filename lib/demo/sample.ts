@@ -13,6 +13,7 @@ import type { BodyWeightPoint } from "@/lib/athlete/body-weight";
 import type { WeekNote } from "@/lib/plan/week-notes";
 import { historyCalendar, type HistoryCalendar } from "@/lib/history/calendar";
 import { buildSeries, sessionPoint, type SessionPoint, type Target } from "@/lib/plan/overload";
+import { volumeOf } from "@/lib/sessions/volume";
 
 /** The demo's today (fixed, so every visit looks the same): Monday of week 20. */
 export const DEMO_TODAY = "2026-11-23";
@@ -144,6 +145,7 @@ function setsFor(e: Ex, week: number) {
     weight: w,
     reps: e.unit === "secs" ? top : Math.max(e.reps[0], top - (i === e.sets - 1 ? 1 : 0) - (week % 3 === 0 && i > 1 ? 1 : 0)),
     completed: true,
+    timed: e.unit === "secs",
   }));
 }
 
@@ -271,7 +273,7 @@ export const DEMO_PROGRESS: ProgressData = {
   exercises,
   totals: {
     sessions: DEMO_SESSIONS.length,
-    volume: Math.round(allSets.reduce((v, s) => v + (s.weight ?? 0) * (s.reps ?? 0), 0)),
+    volume: Math.round(volumeOf(allSets)),
     sets: allSets.length,
     prs: exercises.reduce((n, x) => n + x.series.filter((p) => p.record).length, 0),
     streak: 19,

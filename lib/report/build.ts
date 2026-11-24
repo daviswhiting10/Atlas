@@ -102,11 +102,13 @@ export function buildReport({
     for (const s of session.sets) if (s.exerciseId) byLift.set(s.exerciseId, [...(byLift.get(s.exerciseId) ?? []), s]);
     for (const [exerciseId, sets] of Array.from(byLift)) {
       const assisted = isAssisted(names[exerciseId] ?? "");
-      const point = sessionPoint(day, sets);
+      // A timed lift (a plank, a carry): its reps are seconds, so it adds nothing to the week's volume.
+      const timed = sets.some((s) => s.timed);
+      const point = sessionPoint(day, sets, false, timed);
       if (!point) continue;
       const best: Best | null = assisted ? assistedBest(sets) : { weight: point.weight ?? 0, reps: point.reps };
       if (!best) continue;
-      weekVolume.set(week, (weekVolume.get(week) ?? 0) + (assisted ? sets.filter(isLoggedSet).reduce((a, s) => a + (s.reps as number), 0) : point.volume));
+      if (!timed) weekVolume.set(week, (weekVolume.get(week) ?? 0) + (assisted ? sets.filter(isLoggedSet).reduce((a, s) => a + (s.reps as number), 0) : point.volume));
       const lift = lifts.get(exerciseId) ?? { assisted, weeks: new Map() };
       lifts.set(exerciseId, lift);
       const cur = lift.weeks.get(week);

@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { compareWithLast, medalsOf, volumeOf, type WrapSet } from "./wrap-up";
+import { compareWithLast, medalsOf, type WrapSet } from "./wrap-up";
 
 const s = (exerciseId: string, weight: number | null, reps: number | null, name = exerciseId): WrapSet => ({ exerciseId, name, weight, reps });
 
-describe("volume", () => {
-  it("weight times reps, over sets that have both", () => {
-    expect(volumeOf([s("a", 100, 5), s("a", 100, 5), s("b", null, 12), s("c", 0, 10)])).toBe(1000);
-  });
-});
 
 describe("against last time", () => {
   const cur = [s("a", 100, 10), s("a", 100, 10), s("a", 100, 10)];
@@ -24,6 +19,12 @@ describe("against last time", () => {
   });
   it("no weights to compare (bodyweight work): sets only, no percent", () => {
     expect(compareWithLast([s("a", null, 10)], [s("a", null, 8)], 1)).toMatchObject({ volumePct: null });
+  });
+  it("a carry or a plank adds no volume; weighted reps still compare", () => {
+    const carry = (reps: number): WrapSet => ({ ...s("carry", 60, reps), timed: true });
+    // Last time 2 × 100 × 10 and a 45 s carry; now 3 × 100 × 10 and a 90 s carry: +50%, as without the carries.
+    expect(compareWithLast([...cur, carry(90)], [...prev, carry(45)], 4)).toMatchObject({ volumePct: 50 });
+    expect(compareWithLast([carry(90)], [carry(45)], 1)).toMatchObject({ volumePct: null });
   });
   it("a lighter finished session says so: a negative percent", () => {
     expect(compareWithLast(prev, cur, 2)).toMatchObject({ volumePct: -33 });

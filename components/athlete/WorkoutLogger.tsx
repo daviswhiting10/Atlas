@@ -38,6 +38,7 @@ import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish } from "@/lib/sessions/finish";
 import { FinishSheet } from "@/components/logger/FinishSheet";
 import { summaryView } from "@/lib/sessions/summary-copy";
+import { loggedVolume } from "@/lib/sessions/volume";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -773,7 +774,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const all = data.exercises.flatMap((e) => listOf(e));
   const doneCount = all.filter((s) => s.done).length;
   const totalCount = all.length;
-  const volume = Math.round(all.reduce((sum, s) => (s.done && s.reps ? sum + (s.weight ?? 0) * s.reps : sum), 0));
+  // A timed or cardio exercise's reps are seconds: it adds no weight lifted.
+  const volume = Math.round(loggedVolume(data.exercises.map((e) => ({ unit: e.unit, sets: listOf(e) }))));
   /** The workout's parts in the order they're done, each exercise with its badge ("1A", "2", "W", "C"). */
   const blocks = useMemo(
     () =>

@@ -33,3 +33,36 @@ describe("work units: sets + cardio min ÷ 3 + walk min ÷ 10 + mobility min ÷ 
     expect(addWork([workOf(ses({ sets: [set(), set()] })), workOf(ses({ activity: "RUN", durationMin: 30 }))]).units).toBe(12);
   });
 });
+
+describe("work units: timed sets count by their time only", () => {
+  it("a plank or a carry is its seconds as minutes ÷ 3, never a set", () => {
+    // Three 45 s planks and three 60 lb carries of 60 s: 5.25 min ÷ 3 = 1.75 units, where they used to be 6 sets.
+    const holds = [...Array.from({ length: 3 }, () => set({ timed: true, weight: null, reps: 45 })), ...Array.from({ length: 3 }, () => set({ timed: true, weight: 60, reps: 60 }))];
+    const w = workOf(ses({ durationMin: 30, sets: holds }));
+    expect(w).toMatchObject({ sets: 0, holdMin: 5 });
+    expect(w.units).toBeCloseTo(5.25 / 3, 5);
+  });
+  it("next to lifting, the lifting still counts a unit a set", () => {
+    const w = workOf(ses({ durationMin: 60, sets: [...Array.from({ length: 10 }, () => set()), set({ timed: true, weight: null, reps: 60 })] }));
+    expect(w.sets).toBe(10);
+    expect(w.units).toBeCloseTo(10 + 1 / 3, 5);
+  });
+  it("a timed stretch stays mobility, and cardio stays cardio", () => {
+    expect(workOf(ses({ durationMin: 10, sets: [set({ timed: true, mobility: true, weight: null, reps: 60 })] }))).toMatchObject({ mobMin: 10, holdMin: 0, units: 2 });
+    expect(workOf(ses({ durationMin: 30, sets: [set({ timed: true, cardio: "RUN", weight: null, reps: 1800 })] }))).toMatchObject({ runMin: 30, holdMin: 0, units: 10 });
+  });
+  it("a day adds its timed minutes", () => {
+    const one = workOf(ses({ sets: [set({ timed: true, weight: null, reps: 90 })] }));
+    expect(addWork([one, one])).toMatchObject({ holdMin: 4 });
+  });
+});
+
+describe("work units: added sets and exercises added mid-session count", () => {
+  it("a set past the prescription, and sets of an exercise not in the plan, count like any other", () => {
+    // Nothing about a set's place in the plan is read: a completed set with reps is work (days.ts isLoggedSet).
+    const planned = Array.from({ length: 3 }, () => set({ exerciseId: "squat" }));
+    const extraSet = set({ exerciseId: "squat" });
+    const added = Array.from({ length: 2 }, () => set({ exerciseId: "added-curl", weight: 30, reps: 12 }));
+    expect(workOf(ses({ sets: [...planned, extraSet, ...added] }))).toMatchObject({ sets: 6, units: 6 });
+  });
+});

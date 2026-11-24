@@ -5,12 +5,10 @@
  * part out rather than showing a zero.
  */
 
-export type WrapSet = { exerciseId: string; name: string; weight: number | null; reps: number | null };
+import { volumeOf } from "@/lib/sessions/volume";
 
-/** Weight × reps over the sets that have both (bodyweight, band and timed sets add nothing). */
-export function volumeOf(sets: WrapSet[]): number {
-  return sets.reduce((n, s) => n + (s.weight != null && s.weight > 0 && s.reps != null && s.reps > 0 ? s.weight * s.reps : 0), 0);
-}
+/** `timed`: the reps are seconds (a hold, a carry, cardio), so the set adds no volume. */
+export type WrapSet = { exerciseId: string; name: string; weight: number | null; reps: number | null; timed?: boolean };
 
 /** Under this share of the planned sets, a session is partial: it is not compared with the last one. */
 export const PARTIAL_BELOW = 0.7;

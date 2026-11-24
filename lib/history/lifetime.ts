@@ -4,10 +4,11 @@
  *
  * - **Sessions:** finished sessions, any source.
  * - **Sets:** completed sets with reps.
- * - **Moved:** tonnage in lb for loaded sets (weight x reps). Bodyweight, band
- *   and timed sets have no weight, so they add nothing to tonnage and are
- *   counted separately in `unloadedReps`, for the hint "plus 9,400 bodyweight
- *   reps". Nothing is silently dropped.
+ * - **Moved:** tonnage in lb for loaded sets (weight x reps). Bodyweight and
+ *   band sets have no weight, so they add nothing to tonnage and are counted
+ *   separately in `unloadedReps`, for the hint "plus 9,400 bodyweight reps".
+ *   Timed sets (a plank, a carry) hold seconds, not reps: they are in neither
+ *   (a loaded carry is never weight x seconds), only in sets and time.
  * - **Time:** the sum of `durationMin`, shown only when at least half of the
  *   sessions have one, so the number never looks smaller than the truth.
  * - **Records** are new heaviest weights (gold); **bests** are new best
@@ -22,6 +23,7 @@
  * Pure: no I/O.
  */
 
+import { setVolume } from "@/lib/sessions/volume";
 import { datedFinished, isLoggedSet } from "./days";
 import { prsOverTime } from "./records";
 import { bestStretch, weeklyStreaks } from "./streaks";
@@ -61,7 +63,8 @@ export function lifetimeStats(sessions: HistorySession[], opts: { timeZone: stri
     for (const set of s.sets) {
       if (!isLoggedSet(set)) continue;
       sets += 1;
-      if (set.weight != null && set.weight > 0) tonnage += set.weight * (set.reps as number);
+      if (set.timed) continue;
+      if (set.weight != null && set.weight > 0) tonnage += setVolume(set);
       else unloadedReps += set.reps as number;
     }
   }

@@ -90,6 +90,12 @@ describe("the stats", () => {
     const r = run([session(1, [["sq", 100, 10]]), session(2, [["sq", 120, 10]])]);
     expect(r.third).toEqual({ kind: "volume", value: 20 });
   });
+  it("a heavier carry is not more volume: a timed lift's seconds never count as weight × reps", () => {
+    const carry = (week: number, weight: number, secs: number): HistorySession => ({ ...session(week, []), sets: [{ exerciseId: "carry", weight, reps: secs, completed: true, timed: true }] });
+    // Squat volume is flat; the carry went 60 lb × 45 s to 70 lb × 60 s. No volume rise.
+    const r = run([session(1, [["sq", 100, 10]]), carry(1, 60, 45), session(2, [["sq", 100, 10]]), carry(2, 70, 60)]);
+    expect(r.third?.kind).not.toBe("volume");
+  });
   it("a lighter last week is not the comparison", () => {
     const r = run([session(1, [["sq", 100, 10]]), session(2, [["sq", 100, 10]]), session(4, [["sq", 50, 10]])]);
     expect(r.third?.kind).not.toBe("volume");
