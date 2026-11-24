@@ -6,6 +6,7 @@
  * and the outline moves to the next one in sequence.
  */
 import type { PlanOverview, WorkoutSummary } from "./overview";
+import { workoutKind, type ExerciseKind } from "./workout-kind";
 
 /** Which of the seven days the week's workouts fall on, by how many there are. */
 const SPREAD: Record<number, number[]> = {
@@ -25,6 +26,8 @@ export type DayCell = {
   index: number;
   /** The workout on this day; none for a rest day. */
   workout: WorkoutSummary | null;
+  /** Its icon: strength, cardio or mobility (from its exercises); null on a rest day. */
+  kind: ExerciseKind | null;
   today: boolean;
   /** The plan's next workout (outlined). */
   upNext: boolean;
@@ -50,7 +53,7 @@ export function weekGrid(plan: PlanOverview, week: number, today: string): { mon
     const at = slots.indexOf(i);
     const date = addDays(monday, i);
     const workout = at >= 0 ? inWeek[at] : null;
-    return { date, index: i, workout, today: date === today, upNext: workout != null && plan.nextUp?.id === workout.id };
+    return { date, index: i, workout, kind: workout ? workoutKind(workout.exercises) : null, today: date === today, upNext: workout != null && plan.nextUp?.id === workout.id };
   });
   return { monday, cells };
 }

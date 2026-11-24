@@ -2,13 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Dumbbell, Minus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Dumbbell, Footprints, PersonStanding } from "lucide-react";
 import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import { cueOf } from "@/lib/plan/up-next";
 import { defaultDay, weekGrid, weekRange, type DayCell } from "@/lib/plan/week-grid";
 import { cn } from "@/lib/utils";
 
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
+const KIND_LABEL = { strength: "strength", cardio: "cardio", mobility: "mobility" } as const;
+
+/** The day's icon: a dumbbell, a shoe, a stretch, or (rest) a dot. */
+function DayIcon({ kind, className }: { kind: DayCell["kind"]; className?: string }) {
+  if (kind === "cardio") return <Footprints className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
+  if (kind === "mobility") return <PersonStanding className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
+  if (kind === "strength") return <Dumbbell className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
+  return <span aria-hidden className="flex h-5 w-5 items-center justify-center"><span className="h-1.5 w-1.5 rounded-full bg-current" /></span>;
+}
 const SHOWN = 3;
 const longDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 const rx = (e: WorkoutSummary["exercises"][number]) => `${e.sets} × ${e.reps}${e.weight != null ? ` at ${e.weight}` : ""}`;
@@ -58,8 +67,10 @@ export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan
             ))}
           </div>
           <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-mute">
-            <span className="inline-flex items-center gap-1"><Dumbbell className="h-3.5 w-3.5 text-signal" /> Workout</span>
-            <span className="inline-flex items-center gap-1"><Minus className="h-3.5 w-3.5" /> Rest</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind="strength" className="h-3.5 w-3.5" /> Strength</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind="cardio" className="h-3.5 w-3.5" /> Cardio</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind="mobility" className="h-3.5 w-3.5" /> Mobility</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind={null} className="h-3.5 w-3.5" /> Rest</span>
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
             <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
           </p>
@@ -85,7 +96,7 @@ export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan
 
 function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onPick: () => void }) {
   const done = c.workout?.status === "LOGGED";
-  const label = `${longDay(c.date)}${c.workout ? `, ${c.workout.name}${done ? ", done" : c.upNext ? ", up next" : ""}` : ", rest"}${c.today ? ", today" : ""}`;
+  const label = `${longDay(c.date)}${c.workout ? `, ${c.workout.name} (${KIND_LABEL[c.kind ?? "strength"]})${done ? ", done" : c.upNext ? ", up next" : ""}` : ", rest"}${c.today ? ", today" : ""}`;
   return (
     <button
       type="button"
@@ -107,7 +118,7 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
         </span>
       )}
       <span className="tnum text-[15px] font-semibold">{Number(c.date.slice(8))}</span>
-      {c.workout ? <Dumbbell className="h-5 w-5 text-signal" /> : <Minus className="h-5 w-5" />}
+      <DayIcon kind={c.kind} />
       {c.today && <span aria-hidden className="absolute -bottom-2.5 h-1.5 w-1.5 rounded-full bg-signal" />}
     </button>
   );
