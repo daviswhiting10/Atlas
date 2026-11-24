@@ -15,6 +15,7 @@ import { liveExercise } from "@/lib/exercises/find";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { CATALOG_BY_SLUG } from "./catalog";
 import { ensureCatalog } from "./persist";
+import { groupIn, splitIn, type PlanRow, type RowChange } from "./superset";
 
 /**
  * Whose plan, and which one. Without an assignmentId the edit applies to the
@@ -60,7 +61,7 @@ const cleanText = (text: unknown, max: number): string | null => {
 async function ownWorkout(scope: PlanScope, workoutId: string) {
   const w = await prisma.assignedWorkout.findFirst({
     where: { id: workoutId, workspaceId: scope.workspaceId, programAssignment: planWhere(scope) },
-    select: { id: true, name: true, order: true, scheduledDate: true, status: true, programAssignmentId: true, _count: { select: { exercises: true } } },
+    select: { id: true, name: true, order: true, scheduledDate: true, status: true, programAssignmentId: true, sourceWorkoutId: true, _count: { select: { exercises: true } } },
   });
   if (!w) throw notFound();
   return w;
@@ -266,6 +267,63 @@ export async function setTargets(scope: PlanScope, input: { aweId: string } & Ta
   const previous = (e.prescribedSets as SetShape[] | null) ?? [];
   const unit = previous[0]?.unit === "secs" ? "secs" : "reps";
   await prisma.assignedWorkoutExercise.update({ where: { id: e.id }, data: { prescribedSets: buildSets(input, unit, previous) } });
+}
+
+// ── Supersets kept in the plan ──────────────────────────────────────────────
+
+export type Grouping = { kind: "group"; aweIds: string[] } | { kind: "split"; aweId: string };
+
+/**
+ * Keep a superset made (or split) mid-session: in this workout and in every later instance of it that isn't logged yet.
+ * "The same workout" is the one made from the same template workout (sourceWorkoutId), or, for a plan with no template,
+ * the one with the same name; later is after it in plan order, still planned, with no session. Each instance is matched by
+ * exerciseId; one that lacks an exercise is skipped and counted. Logged workouts are never touched. One transaction.
+ */
+export async function keepGrouping(scope: PlanScope, input: { workoutId: string } & Grouping): Promise<{ updated: number; skipped: number }> {
+  const w = await ownWorkout(scope, input.workoutId);
+  const rowSelect = { id: true, exerciseId: true, order: true, section: true } as const;
+  const toRows = (rs: Array<{ id: string; exerciseId: string; order: number; section: string | null }>): PlanRow[] => rs.map((r) => ({ aweId: r.id, exerciseId: r.exerciseId, order: r.order, section: r.section }));
+  const mine = toRows(await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkoutId: w.id }, select: rowSelect }));
+  const ids = input.kind === "group" ? input.aweIds : [input.aweId];
+  if (new Set(ids).size !== ids.length) throw invalid("Pick two different exercises.");
+  const exerciseIds = ids.map((id) => mine.find((r) => r.aweId === id)?.exerciseId);
+  if (exerciseIds.some((x) => x == null)) throw notFound("That exercise");
+  const change = (rows: PlanRow[]) => (input.kind === "group" ? groupIn(rows, exerciseIds as string[]) : splitIn(rows, exerciseIds[0]!));
+
+  const here = change(mine);
+  if (here == null) throw notFound("That exercise");
+
+  const later = await prisma.assignedWorkout.findMany({
+    where: {
+      programAssignmentId: w.programAssignmentId,
+      order: { gt: w.order },
+      status: "PLANNED",
+      workoutLog: { is: null },
+      ...(w.sourceWorkoutId ? { sourceWorkoutId: w.sourceWorkoutId } : { sourceWorkoutId: null, name: w.name }),
+    },
+    select: { id: true, exercises: { select: rowSelect } },
+  });
+  let skipped = 0;
+  const writes: Array<{ workoutId: string; later: boolean; change: RowChange }> = here.map((c) => ({ workoutId: w.id, later: false, change: c }));
+  let updated = 0;
+  for (const inst of later) {
+    const c = change(toRows(inst.exercises));
+    if (c == null) skipped++;
+    else if (c.length > 0) {
+      updated++;
+      for (const x of c) writes.push({ workoutId: inst.id, later: true, change: x });
+    }
+  }
+  await prisma.$transaction(
+    writes.map(({ workoutId, later, change: c }) =>
+      prisma.assignedWorkoutExercise.updateMany({
+        // A later instance logged meanwhile is left alone (this workout itself may have its session open).
+        where: { id: c.aweId, assignedWorkoutId: workoutId, ...(!later ? {} : { assignedWorkout: { status: "PLANNED", workoutLog: { is: null } } }) },
+        data: { order: c.order, section: c.section },
+      })
+    )
+  );
+  return { updated, skipped };
 }
 
 // ── Notes ───────────────────────────────────────────────────────────────────

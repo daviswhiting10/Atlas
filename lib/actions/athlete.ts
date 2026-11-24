@@ -27,6 +27,7 @@ import {
   PlanEditError,
   addExercise,
   addWorkout,
+  keepGrouping,
   removeExercise,
   removeWorkout,
   setPlanNote,
@@ -421,6 +422,18 @@ export async function planSwapExercise(raw: { aweId: string; slug?: string; exer
 export async function planSetTargets(raw: { aweId: string; workoutId: string } & z.input<typeof Targets>) {
   const input = Targets.extend({ aweId: Ref, workoutId: Ref }).parse(raw);
   return edit((scope) => setTargets(scope, input), input.workoutId, true);
+}
+
+/**
+ * "Keep for this workout from now on": a superset made (or split) in the logger goes into the plan, for this workout and
+ * its later instances not yet logged. Says how many later workouts changed and how many lacked an exercise.
+ */
+export async function planKeepSuperset(raw: { workoutId: string; aweIds: string[] } | { workoutId: string; split: string }) {
+  const input = z
+    .union([z.object({ workoutId: Ref, aweIds: z.array(Ref).min(2).max(LIMITS.exercisesPerWorkout) }), z.object({ workoutId: Ref, split: Ref })])
+    .parse(raw);
+  const grouping = "aweIds" in input ? { kind: "group" as const, aweIds: input.aweIds } : { kind: "split" as const, aweId: input.split };
+  return edit((scope) => keepGrouping(scope, { workoutId: input.workoutId, ...grouping }), input.workoutId, true);
 }
 
 export async function planSetWorkoutNote(raw: { workoutId: string; text: string }) {

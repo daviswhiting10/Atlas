@@ -65,8 +65,11 @@ describe("both loggers use it", () => {
     expect(handle).toContain("focus-visible:ring-2");
     expect(handle).toContain('role="status" aria-live="assertive"');
   });
-  it("the plan's own order is never changed, only this session's (as on the phone)", () => {
-    expect(coach).toContain("onChange: setSavedOrder");
+  it("a drag changes only this session's order; the plan changes only from the Keep sheet (as on the phone)", () => {
+    expect(coach).toContain("onChange: moveTo");
+    expect(coach).toMatch(/const moveTo = [\s\S]*?setSavedOrder\(o\);/);
+    expect(coach).toContain("onKeep={() => keepSuperset(keepAsk)}");
     expect(athlete).toContain("onChange: setSavedOrder");
+    expect(athlete).toContain("onKeep={() => keepSuperset(keepAsk)}");
   });
 });
