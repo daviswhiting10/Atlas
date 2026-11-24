@@ -3,6 +3,7 @@
 import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
 import { deleteSessionRows } from "@/lib/sessions/delete";
+import { remapSets } from "@/lib/sessions/reassign";
 import { MAX_SESSION_NOTE, loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -530,4 +531,45 @@ export async function freshLoggerSets(raw: { assignedWorkoutId: string }): Promi
   if (!parsed.success) return null;
   const data = await getLoggerData(parsed.data.assignedWorkoutId);
   return data ? { sets: Object.fromEntries(data.exercises.map((e) => [e.aweId, e.sets])) } : null;
+}
+
+/**
+ * Move one of your own logged sessions to another day of your plan. The session keeps the date it was really done; its sets and
+ * notes go with it (the sets re-pointed at the same lifts in the new workout, kept even where the new workout lacks the lift).
+ * Only a free day (no session on it) of your own plan; the old day goes back to scheduled, and up next follows by itself.
+ */
+export async function reassignMySession(raw: { workoutLogId: string; toAssignedWorkoutId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = await requireAthlete();
+  const parsed = z.object({ workoutLogId: z.string().min(1).max(64), toAssignedWorkoutId: z.string().min(1).max(64) }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "That day isn't there." };
+  const { workoutLogId, toAssignedWorkoutId } = parsed.data;
+  const log = await prisma.workoutLog.findFirst({
+    where: { id: workoutLogId, clientId },
+    select: { id: true, assignedWorkoutId: true, source: true, sets: { select: { id: true, exerciseId: true } }, assignedWorkout: { select: { loggedBy: true } } },
+  });
+  if (!log) return { ok: false, error: "That session isn't there." };
+  if (log.assignedWorkoutId === toAssignedWorkoutId) return { ok: false, error: "It's already on that day." };
+  const target = await prisma.assignedWorkout.findFirst({
+    where: { id: toAssignedWorkoutId, programAssignment: { clientId }, status: { not: "SKIPPED" }, workoutLog: { is: null } },
+    select: { id: true, exercises: { select: { id: true, exerciseId: true } }, programAssignment: { select: { sourceProgram: { select: { isTemplate: true } } } } },
+  });
+  if (!target) return { ok: false, error: "That day already has a session, or isn't part of your plan." };
+  const moves = remapSets(log.sets, target.exercises);
+  const sets = log.sets.length;
+  await prisma.$transaction(async (tx) => {
+    for (const m of moves) await tx.setLog.update({ where: { id: m.setId }, data: { assignedWorkoutExerciseId: m.assignedWorkoutExerciseId } });
+    await tx.workoutLog.update({
+      where: { id: log.id },
+      data: { assignedWorkoutId: target.id, ...(log.source === "OFF_PLAN" ? { source: planSessionSource(target.programAssignment.sourceProgram) } : {}) },
+    });
+    if (log.assignedWorkout) {
+      // Who finished it goes with the session.
+      await tx.assignedWorkout.update({ where: { id: target.id }, data: { loggedBy: log.assignedWorkout.loggedBy } });
+      await tx.assignedWorkout.update({ where: { id: log.assignedWorkoutId! }, data: { loggedBy: "TRAINER" } });
+    }
+    // Nothing is lost on the way: the same sets, still on this session.
+    if ((await tx.setLog.count({ where: { workoutLogId: log.id } })) !== sets) throw new Error("A set went missing; nothing was moved.");
+  });
+  refresh();
+  return { ok: true };
 }
