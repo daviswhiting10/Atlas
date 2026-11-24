@@ -15,6 +15,8 @@ import { liveExercise } from "@/lib/exercises/find";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { CATALOG_BY_SLUG } from "./catalog";
 import { ensureCatalog } from "./persist";
+import { DONE } from "@/lib/sessions/status";
+import { lastAdded, recordAdded, sameWorkout } from "@/lib/sessions/added-store";
 
 /**
  * Whose plan, and which one. Without an assignmentId the edit applies to the
@@ -266,6 +268,87 @@ export async function setTargets(scope: PlanScope, input: { aweId: string } & Ta
   const previous = (e.prescribedSets as SetShape[] | null) ?? [];
   const unit = previous[0]?.unit === "secs" ? "secs" : "reps";
   await prisma.assignedWorkoutExercise.update({ where: { id: e.id }, data: { prescribedSets: buildSets(input, unit, previous) } });
+}
+
+/**
+ * The card's two actions: add what was added last time to this workout ("Add to today only"), or to this one and every
+ * later unfinished one of the same workout in the plan ("Add to plan from now on"). A workout that has the exercise
+ * already, or is full, is skipped. One transaction. The ones added today go on today's session's list too, as if added
+ * by hand (the session is started if need be, on `date` or today).
+ */
+export async function addLastTime(
+  scope: PlanScope,
+  input: { workoutId: string; fromNowOn: boolean; exerciseIds?: string[]; date?: Date }
+): Promise<{ today: number; laterWorkouts: number; laterRows: number; skipped: number; workoutLogId: string | null }> {
+  const w = await prisma.assignedWorkout.findFirst({
+    where: { id: input.workoutId, workspaceId: scope.workspaceId, programAssignment: planWhere(scope) },
+    select: { id: true, name: true, order: true, programAssignmentId: true, sourceWorkoutId: true, workoutLog: { select: { completedAt: true } }, exercises: { select: { exerciseId: true } } },
+  });
+  if (!w) throw notFound();
+  let offer = await lastAdded({
+    clientId: scope.clientId,
+    workout: { ...w, done: w.workoutLog?.completedAt != null, exerciseIds: w.exercises.map((e) => e.exerciseId) },
+  });
+  if (input.exerciseIds) offer = offer.filter((e) => input.exerciseIds!.includes(e.exerciseId));
+  if (offer.length === 0) throw invalid("Those are in this workout already.");
+
+  // Last time's rows say how it was done (and any change made to it since); the stored prescription stands in once a row is gone.
+  const [rows, live] = await Promise.all([
+    prisma.assignedWorkoutExercise.findMany({ where: { id: { in: offer.map((e) => e.aweId) } }, select: { id: true, prescribedSets: true, mode: true, activity: true } }),
+    Promise.all(offer.map((e) => liveExercise(e.exerciseId))),
+  ]);
+  const items = offer.map((e, i) => {
+    const row = rows.find((r) => r.id === e.aweId);
+    const raw = (Array.isArray(row?.prescribedSets) ? row.prescribedSets : Array.isArray(e.prescribedSets) ? e.prescribedSets : null) as SetShape[] | null;
+    // The weight is worked out from last time, so none is written in.
+    const sets = raw?.length ? raw.map((x) => ({ ...x, weight: null })) : buildSets({}, "reps");
+    return { exerciseId: live[i]?.id ?? e.exerciseId, prescribedSets: sets, mode: row?.mode ?? ("STRENGTH" as const), activity: row?.activity ?? null };
+  });
+
+  return prisma.$transaction(
+    async (tx) => {
+      const later = input.fromNowOn
+        ? await tx.assignedWorkout.findMany({
+            where: { ...sameWorkout(w), id: { not: w.id }, order: { gt: w.order }, NOT: DONE },
+            select: { id: true },
+          })
+        : [];
+      const targets = [w.id, ...later.map((x) => x.id)];
+      const existing = await tx.assignedWorkoutExercise.findMany({ where: { assignedWorkoutId: { in: targets } }, select: { assignedWorkoutId: true, exerciseId: true, order: true } });
+      let skipped = 0;
+      const todayIds: string[] = [];
+      const laterRows: Prisma.AssignedWorkoutExerciseCreateManyInput[] = [];
+      for (const target of targets) {
+        const mine = existing.filter((e) => e.assignedWorkoutId === target);
+        let order = mine.reduce((m, e) => Math.max(m, e.order), 0);
+        let count = mine.length;
+        for (const it of items) {
+          if (mine.some((e) => e.exerciseId === it.exerciseId) || count >= LIMITS.exercisesPerWorkout) {
+            skipped++;
+            continue;
+          }
+          const row = {
+            workspaceId: scope.workspaceId,
+            assignedWorkoutId: target,
+            exerciseId: it.exerciseId,
+            order: ++order,
+            prescribedSets: it.prescribedSets as Prisma.InputJsonValue,
+            section: "accessory",
+            mode: it.mode,
+            activity: it.activity,
+          };
+          count++;
+          if (target === w.id) todayIds.push((await tx.assignedWorkoutExercise.create({ data: row, select: { id: true } })).id);
+          else laterRows.push(row);
+        }
+      }
+      if (laterRows.length) await tx.assignedWorkoutExercise.createMany({ data: laterRows });
+      let workoutLogId: string | null = null;
+      for (const aweId of todayIds) ({ workoutLogId } = await recordAdded({ clientId: scope.clientId, assignedWorkoutId: w.id, aweId, date: input.date }, tx));
+      return { today: todayIds.length, laterWorkouts: new Set(laterRows.map((r) => r.assignedWorkoutId)).size, laterRows: laterRows.length, skipped, workoutLogId };
+    },
+    { timeout: 20_000, maxWait: 10_000 }
+  );
 }
 
 // ── Notes ───────────────────────────────────────────────────────────────────

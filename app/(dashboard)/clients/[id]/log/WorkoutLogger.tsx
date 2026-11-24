@@ -50,7 +50,10 @@ import {
   addExerciseNote,
   updateSessionDate,
 } from "@/lib/actions/workout-logger";
-import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
+import { coachAddExercise, coachAddLastTime, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
+import { AddedLastTime } from "@/components/logger/AddedLastTime";
+import { addedToast } from "@/lib/sessions/added";
+import type { AddedOffer } from "@/lib/sessions/added-store";
 import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
@@ -324,6 +327,7 @@ export default function WorkoutLogger({
   sessionDate,
   existingSetLogs,
   availableWorkouts,
+  lastAdded,
 }: {
   clientId: string;
   clientName: string;
@@ -346,6 +350,8 @@ export default function WorkoutLogger({
   sessionDate: string | null;
   existingSetLogs: ExistingSetLog[];
   availableWorkouts: WorkoutOption[];
+  /** "Last time you added …": the last session of this workout added these, and today's doesn't have them. */
+  lastAdded?: AddedOffer | null;
 }) {
   const router = useRouter();
 
@@ -1117,12 +1123,50 @@ export default function WorkoutLogger({
     return change(() => coachRemoveExercise(clientId, assignmentId, { aweId: ex.aweId, workoutId: assignedWorkoutId }), `Dropped ${ex.name} from today`);
   }
 
+  /** Added mid-session: it goes on the session's list too, which starts the session (on the day shown) if need be. */
+  const addToSession = async (exerciseId: string) => {
+    const res = await coachAddExercise(clientId, assignmentId, { workoutId: assignedWorkoutId, exerciseId, sets: 3, session: true, date: logIdRef.current ? undefined : logDate });
+    if (res.ok) adoptLog(res.workoutLogId);
+    return res;
+  };
+  /** The session the add started: the next tick (and a date change) belongs to it. */
+  function adoptLog(id: string | undefined) {
+    if (id && !logIdRef.current) {
+      logIdRef.current = id;
+      setWorkoutLogId(id);
+    }
+  }
+
   async function handleAddExercise(newEx: PickerExercise) {
-    const ok = await change(
-      () => coachAddExercise(clientId, assignmentId, { workoutId: assignedWorkoutId, exerciseId: newEx.id, sets: 3 }),
-      `Added ${newEx.name}`
-    );
+    const ok = await change(() => addToSession(newEx.id), `Added ${newEx.name}`);
     if (ok) setAdding(false);
+  }
+
+  /** The "Last time you added …" card: today only, or the plan from now on. */
+  async function handleAddLastTime(fromNowOn: boolean): Promise<boolean> {
+    if (!lastAdded) return false;
+    setBusy(true);
+    try {
+      const res = await coachAddLastTime(clientId, assignmentId, {
+        workoutId: assignedWorkoutId,
+        fromNowOn,
+        exerciseIds: lastAdded.exercises.map((e) => e.exerciseId),
+        date: logIdRef.current ? undefined : logDate,
+      });
+      if (!res.ok) {
+        toast.error(res.error);
+        return false;
+      }
+      adoptLog(res.workoutLogId ?? undefined);
+      toast.success(addedToast(res));
+      router.refresh();
+      return true;
+    } catch {
+      toast.error("Couldn't save that change. Please try again.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
 
   // An exercise typed with no connection is put in (or swapped in) when it's back.
@@ -1130,7 +1174,7 @@ export default function WorkoutLogger({
     if (exercises.some((e) => e.exerciseId === newEx.id)) return true; // already in: an earlier send got through
     return op.target.mode === "swap"
       ? change(() => coachSwapExercise(clientId, assignmentId, { aweId: op.target.mode === "swap" ? op.target.aweId : "", workoutId: assignedWorkoutId, exerciseId: newEx.id }), `Switched to ${newEx.name}`)
-      : change(() => coachAddExercise(clientId, assignmentId, { workoutId: assignedWorkoutId, exerciseId: newEx.id, sets: 3 }), `Added ${newEx.name}`);
+      : change(() => addToSession(newEx.id), `Added ${newEx.name}`);
   });
 
   // ── Structure SOAP note ───────────────────────────────────────────────────
@@ -1595,6 +1639,12 @@ export default function WorkoutLogger({
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-ink-mute" />
       </button>
+
+      {lastAdded && !completed && (
+        <div className="mb-3">
+          <AddedLastTime workoutId={assignedWorkoutId} names={lastAdded.exercises.map((e) => e.name)} canPlan busy={busy} onAdd={handleAddLastTime} />
+        </div>
+      )}
 
       {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
       <div ref={drag.listRef} className="relative space-y-4">

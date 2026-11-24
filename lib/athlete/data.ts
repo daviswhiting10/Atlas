@@ -3,6 +3,7 @@
  * athlete's own ClientProfile — the id always comes from the session.
  */
 
+import { addedOffer, type AddedOffer } from "@/lib/sessions/added-store";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { progressVersion } from "@/lib/progress/version";
@@ -383,6 +384,8 @@ export type LoggerData = {
   /** Other workouts from the same week, for quick switching. */
   siblings: Array<{ id: string; name: string; status: WorkoutSummary["status"]; date: string }>;
   metric: FocusMetric;
+  /** "Last time you added …": what was added in the last session of this workout and isn't in it now (own plans only). */
+  lastAdded?: AddedOffer | null;
 };
 
 export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerData | null> {
@@ -416,6 +419,8 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       notes: true,
       scheduledDate: true,
       programAssignmentId: true,
+      sourceWorkoutId: true,
+      order: true,
       programAssignment: { select: LIGHTER_SELECT },
       exercises: {
         orderBy: { order: "asc" },
@@ -449,7 +454,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
   const weekStart = new Date(start + (week - 1) * 7 * DAY_MS - DAY_MS / 2);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
 
-  const [siblings, own, notes] = await Promise.all([
+  const [siblings, own, notes, lastAdded] = await Promise.all([
     prisma.assignedWorkout.findMany({
       where: { programAssignmentId: workout.programAssignmentId, scheduledDate: { gte: weekStart, lt: weekEnd } },
       orderBy: { order: "asc" },
@@ -458,6 +463,10 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     // The coach's own photos and clips win over the library's.
     mediaPictures(athlete.workspaceId, workout.exercises.map((e) => ({ exerciseId: e.exerciseId, name: displayName(e.exercise.slug, e.exercise.name) }))),
     workout.workoutLog ? loadSessionNotes([{ id: workout.workoutLog.id }]) : null,
+    // Only someone who makes their own plan may add to it.
+    athlete.selfServe
+      ? addedOffer({ clientId: athlete.clientId, workout: { ...workout, done: workout.workoutLog?.completedAt != null, exerciseIds: workout.exercises.map((e) => e.exerciseId) } })
+      : null,
   ]);
 
   const sessionsByExercise = new Map<string, Map<string, Session>>();
@@ -576,6 +585,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     deloadWeek,
     exercises,
     coachPlan: !athlete.selfServe,
+    lastAdded,
     siblings: siblings.map((s) => ({ id: s.id, name: s.name, status: planWorkoutStatus(s.status, s.workoutLog), date: iso(s.scheduledDate) })),
     metric: athlete.metric,
   };

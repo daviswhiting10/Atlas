@@ -11,7 +11,9 @@ import { pushOrLoad } from "@/lib/nav-watchdog";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
-import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet, freshLoggerSets } from "@/lib/actions/athlete";
+import { finishWorkout, planAddExercise, planAddLastTime, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet, freshLoggerSets } from "@/lib/actions/athlete";
+import { AddedLastTime } from "@/components/logger/AddedLastTime";
+import { addedToast } from "@/lib/sessions/added";
 import { reconcile } from "@/lib/sessions/reconcile";
 import { MySessionNote } from "@/components/athlete/MySessionNote";
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
@@ -150,8 +152,10 @@ export type LoggerActions = {
   saveNote?: typeof saveMySessionNote;
   /** Read this session's sets again when the logger opens (the demo has none). */
   freshSets?: typeof freshLoggerSets;
+  /** The "Last time you added …" card's two actions (the demo has no card). */
+  addLastTime?: typeof planAddLastTime;
 };
-const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote, freshSets: freshLoggerSets };
+const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote, freshSets: freshLoggerSets, addLastTime: planAddLastTime };
 
 export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { data: LoggerData; /** The saves; the demo passes in-memory stand-ins. */ actions?: LoggerActions; /** Prefix for links ("/demo"). */ base?: string }) {
   const router = useRouter();
@@ -336,7 +340,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const offline = usePendingExercises(data.id, async (op, exercise) => {
     if (data.exercises.some((e) => e.exerciseId === exercise.id)) return true; // already in: an earlier send got through
     await queue.current;
-    const res = op.target.mode === "swap" ? await actions.planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await actions.planAddExercise({ workoutId: data.id, exerciseId: exercise.id });
+    const res = op.target.mode === "swap" ? await actions.planSwapExercise({ aweId: op.target.aweId, workoutId: data.id, exerciseId: exercise.id }) : await actions.planAddExercise({ workoutId: data.id, exerciseId: exercise.id, session: true });
     if (!res.ok) {
       toast.error(res.error);
       return false;
@@ -928,6 +932,27 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       {/* ── The exercises: tap a header to fold or open; hold it to move the card ───── */}
       <div className="mt-4 space-y-4">
         {data.note && <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink-soft">{data.note}</p>}
+        {data.lastAdded && !data.coachPlan && data.status !== "LOGGED" && actions.addLastTime && (
+          <AddedLastTime
+            workoutId={data.id}
+            names={data.lastAdded.exercises.map((e) => e.name)}
+            canPlan
+            busy={busy}
+            onAdd={async (fromNowOn) => {
+              const addLastTime = actions.addLastTime!;
+              const exerciseIds = data.lastAdded!.exercises.map((e) => e.exerciseId);
+              await queue.current; // sets already tapped are saved first
+              const res = await addLastTime({ workoutId: data.id, fromNowOn, exerciseIds }).catch(() => ({ ok: false as const, error: "Couldn't save that change. Please try again." }));
+              if (!res.ok) {
+                toast.error(res.error);
+                return false;
+              }
+              toast.success(addedToast(res));
+              router.refresh();
+              return true;
+            }}
+          />
+        )}
 
         <div ref={drag.listRef} className="relative space-y-4">
           <DragStatus message={drag.status} />
@@ -1146,7 +1171,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
             setPicker(null);
             if (at.mode === "add") {
               change(async () => {
-                const res = await actions.planAddExercise({ workoutId: data.id, exerciseId: chosen.id });
+                const res = await actions.planAddExercise({ workoutId: data.id, exerciseId: chosen.id, session: true });
                 if (res.ok) jumpTo.current = res.aweId;
                 return res;
               }, `${chosen.name} added`);
