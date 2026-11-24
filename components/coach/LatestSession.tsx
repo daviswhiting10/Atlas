@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import { FINISHED_BY_CLIENT } from "@/lib/coach/finished-by";
 import { lastLogged } from "@/lib/coach/last-logged";
 import type { LatestSession as Latest } from "@/lib/coach/latest-session";
@@ -75,16 +74,16 @@ export function LatestSession({ clientId, session: s, prs }: { clientId: string;
 
       {(s.note || s.athleteNote) && (
         <div className="mt-3 space-y-1.5 rounded-xl border border-line px-3 py-2 text-[14px] leading-snug text-ink-soft">
-          {s.note && (
-            <p>
-              <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink">Coach</span>
-              {s.note}
-            </p>
-          )}
           {s.athleteNote && (
             <p>
               <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink">Client</span>
               {s.athleteNote}
+            </p>
+          )}
+          {s.note && (
+            <p>
+              <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink">Coach</span>
+              {s.note}
             </p>
           )}
         </div>
@@ -107,13 +106,9 @@ export function LatestSession({ clientId, session: s, prs }: { clientId: string;
       )}
 
       {counts.met > 0 && (
-        <p className="mt-2 flex items-center justify-between border-t border-line text-[13px] text-ink-mute">
-          <span>
-            <span className="tnum font-semibold text-ink-soft">{counts.met}</span> {counts.met === 1 ? "set" : "sets"}, as written
-          </span>
-          <Link href={`/clients/${clientId}/sessions/${s.logId}`} className="-mr-2 inline-flex min-h-11 items-center gap-0.5 px-2 font-medium text-ink-soft">
-            All sets <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
+        // The card's title is the link to every set; a second link beside this line went to the same page.
+        <p className="mt-2 border-t border-line pt-2 text-[13px] text-ink-mute">
+          <span className="tnum font-semibold text-ink-soft">{counts.met}</span> {counts.met === 1 ? "set" : "sets"}, as written
         </p>
       )}
     </section>

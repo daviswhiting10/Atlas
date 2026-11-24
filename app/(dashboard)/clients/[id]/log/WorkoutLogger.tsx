@@ -4,6 +4,9 @@
 
 import { SheetLock } from "@/components/ui/sheet-lock";
 import { liveTransitionTo } from "@/lib/live-transition";
+import { summaryView } from "@/lib/sessions/summary-copy";
+import { AthleteNote, CompareCard, Medals, NextFor } from "@/components/coach/FinishedPanels";
+import type { WrapUp } from "@/lib/coach/wrap-up";
 import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
@@ -41,6 +44,7 @@ import {
 import {
   logSet,
   completeSession,
+  sessionWrapUp,
   addExerciseNote,
   updateSessionDate,
 } from "@/lib/actions/workout-logger";
@@ -59,6 +63,7 @@ import { DayInput } from "@/components/ui/day-input";
 import { SetNote } from "@/components/logger/SetNote";
 import { allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+import { conflictMessage } from "@/lib/sessions/replay";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -739,6 +744,8 @@ export default function WorkoutLogger({
   const serverSets = useRef(new Map<string, { setLogId: string | null; completed: boolean }>());
   /** Saves still to run for each set: a failed one only rolls back when nothing newer is coming. */
   const pendingSaves = useRef(new Map<string, number>());
+  /** Sets whose save is being sent again after a dropped connection (or a reload): they say what the server had, so a change made meanwhile on another device isn't overwritten. */
+  const replay = useRef(new Set<string>());
   /** Remember a set's server state before the screen first changes it. */
   function noteServer(entry: SetEntry) {
     if (!serverSets.current.has(entry.uid)) serverSets.current.set(entry.uid, { setLogId: entry.setLogId, completed: entry.setLogId ? entry.completed : false });
@@ -767,9 +774,22 @@ export default function WorkoutLogger({
           note: want.note.trim() || null,
           completed: want.completed,
           date: logIdRef.current ? undefined : logDate, // only when this save creates the session
+          expectDone: replay.current.has(uid) ? server.completed : undefined,
         });
         // A failed answer can come back as nothing rather than an error: that's a refusal too.
         if (!result?.setLogId || !result.workoutLogId) throw new Error("The set wasn't saved");
+        replay.current.delete(uid);
+        // Changed on another device while this one was offline: theirs stands, and this screen shows it.
+        if (result.conflict) {
+          const c = result.conflict;
+          logIdRef.current = result.workoutLogId;
+          serverSets.current.set(uid, { setLogId: result.setLogId, completed: c.done });
+          clearStuck(uid);
+          clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
+          setSet(aweId, uid, { completed: c.done, setLogId: result.setLogId, ...(c.weight != null && !want.isBodyweight && !want.isBand ? { weight: String(c.weight) } : {}), ...(c.reps != null ? { reps: String(c.reps) } : {}) });
+          toast(conflictMessage(idx + 1));
+          return;
+        }
         logIdRef.current = result.workoutLogId;
         serverSets.current.set(uid, { setLogId: result.setLogId, completed: want.completed });
         clearStuck(uid);
@@ -784,6 +804,7 @@ export default function WorkoutLogger({
         // No connection: the tick stays (it's the truth on this phone) and is sent when the
         // connection is back. Only a refusal from the server puts the set back.
         if (isNetworkError(e)) {
+          replay.current.add(uid);
           if (!stuckTimers.current.has(uid)) stuckTimers.current.set(uid, setTimeout(() => markUnsaved(uid, true), STUCK_MS));
           return;
         }
@@ -967,6 +988,7 @@ export default function WorkoutLogger({
       }
       noteServer(entry);
       if (entry.completed !== tick.done) setSet(aweId, entry.uid, { completed: tick.done });
+      replay.current.add(entry.uid); // sent again after a reload or a dropped connection
       saveSet(aweId, ex.exerciseId, entry.uid, { ...entry, completed: tick.done }, idx);
     }
   }
@@ -1128,6 +1150,8 @@ export default function WorkoutLogger({
   // completeSession saves them again on a finished session (it keeps when it was first finished).
   // A structured (AI) note is sent once, so saving again never makes a second SessionNote.
   const [savedNotes, setSavedNotes] = useState("");
+  // What the finished screen adds beyond the totals (against last time, new bests, the athlete's note, what is next). Empty until it arrives.
+  const [wrap, setWrap] = useState<WrapUp | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
   const sentStructured = useRef<Record<string, unknown> | null>(null);
   async function saveNotes() {
@@ -1184,8 +1208,11 @@ export default function WorkoutLogger({
         sentStructured.current = structuredNote;
         setSavedNotes(rawInput);
         toast.dismiss("finish");
-      } catch {
-        back("Failed to complete session");
+        // Never in the way: if it can't be worked out, the screen is just the totals and the notes.
+        void sessionWrapUp({ workoutLogId }).then(setWrap).catch(() => {});
+      } catch (e) {
+        // No connection: the sets are kept on the phone (they're sent when it's back); only the finish needs a second tap.
+        back(isNetworkError(e) ? "No connection. Your sets are saved on this phone. Tap Finish when you're back." : "Failed to complete session");
       }
     });
   }
@@ -1429,48 +1456,44 @@ export default function WorkoutLogger({
       }
     }
 
+    // Session complete (coach): the totals as a sentence, new bests, against last time, the athlete's note, the coach's own, Back.
+    const first = clientName.split(" ")[0];
+    const view = summaryView({ sets: doneSetsAll, volume: totalVolumeAll, minutes: Math.round(sessionElapsedSec / 60), who: first });
     return (
-      <div className="px-6 pt-16 pb-16 max-w-lg mx-auto flex flex-col items-center text-center">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
-          style={{ background: "var(--blue)" }}
-        >
-          <Check className="w-6 h-6 text-dusk-button-text" strokeWidth={3} />
-        </div>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--blue)" }}>
-          Session complete
-        </p>
-        <h2 className="font-display text-2xl mb-1.5" style={{ color: "var(--ink)" }}>
-          {workoutName}
-        </h2>
-        <p className="text-sm mb-8" style={{ color: "var(--ink-mute)" }}>
-          {clientName} · {formatRest(sessionElapsedSec)} elapsed
-        </p>
+      <div className="rise-intro mx-auto flex max-w-lg flex-col px-5 pb-16 pt-10 text-center md:pt-14">
+        <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone shadow-[0_0_0_8px_rgb(124_199_189/0.14),0_0_0_18px_rgb(124_199_189/0.06)]">
+          <Check className="h-8 w-8" strokeWidth={3} />
+        </span>
+        <h1 className="mt-7 font-display text-4xl leading-tight text-ink">{workoutName}, done.</h1>
+        <p className="mt-1 text-[15px] text-ink-mute">{clientName}</p>
 
-        <div className="flex mb-9 rounded-[18px] overflow-hidden" style={{ border: "1px solid var(--line)" }}>
-          {[
-            { label: "Sets", value: String(doneSetsAll) },
-            { label: "Lbs lifted", value: totalVolumeAll.toLocaleString() },
-            { label: "Duration", value: formatRest(sessionElapsedSec) },
-          ].map((stat, i) => (
-            <div
-              key={stat.label}
-              className="px-5 py-3.5 text-center"
-              style={i < 2 ? { borderRight: "1px solid var(--line)" } : undefined}
-            >
-              <p className="font-display text-xl tabular-nums" style={{ color: "var(--ink)" }}>
-                {stat.value}
-              </p>
-              <p className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: "var(--ink-mute)" }}>
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </div>
+        {view.kind === "sentence" ? (
+          <p className="mx-auto mt-4 max-w-sm text-[22px] leading-snug text-ink-soft">
+            {view.parts.map((p, i) => (p.strong ? <strong key={i} className="tnum font-semibold text-ink">{p.text}</strong> : <span key={i}>{p.text}</span>))}
+          </p>
+        ) : (
+          <div className="mt-6 flex justify-center gap-10">
+            {view.tiles.map((t) => (
+              <div key={t.label}>
+                <p className="tnum text-[44px] font-semibold leading-none tracking-[-0.04em] text-ink">
+                  {t.value}
+                  {t.unit && <span className="ml-1.5 text-[18px] font-medium tracking-normal text-ink-mute">{t.unit}</span>}
+                </p>
+                <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{t.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* All of these come a moment after the screen itself, and any of them can be missing: they only add. */}
+        <Medals medals={wrap?.medals ?? []} />
+        <CompareCard compare={wrap?.compare ?? null} />
+        {/* The athlete's note first (what the coach wants to read), the coach's own under it. */}
+        <AthleteNote name={first} text={wrap?.athleteNote ?? null} />
 
         {/* Notes can still be written: the session is finished, the notes aren't. While there is typed text that isn't
             saved, Save notes is the main button. With nothing unsaved (saved, or never written) the main button is Done. */}
-        <div className="mb-6 w-full text-left">
+        <div className="mb-6 mt-3 w-full text-left">
           {soapPanel}
           {notesUnsaved ? (
             <Button className="mt-3 w-full" disabled={savingNotes} onClick={saveNotes}>
@@ -1483,14 +1506,15 @@ export default function WorkoutLogger({
         </div>
 
         {notesUnsaved ? (
-          <Button variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
+          <Button className="mx-auto h-12 w-full max-w-sm" variant="outline" onClick={() => router.push(`/clients/${clientId}`)}>
             Back to {clientName}
           </Button>
         ) : (
-          <Button size="lg" className="h-12 w-full max-w-sm text-[16px] font-semibold" onClick={() => router.push(`/clients/${clientId}`)}>
+          <Button size="lg" className="mx-auto h-14 w-full max-w-sm text-[17px] font-semibold" onClick={() => router.push(`/clients/${clientId}`)}>
             Done — back to {clientName}
           </Button>
         )}
+        <NextFor name={first} next={wrap?.next ?? null} />
       </div>
     );
   }
@@ -2239,6 +2263,7 @@ function SetTable({
           const extra = Boolean(entry.note.trim() || entry.rpe);
           const persist = () => entry.completed && onBlurPersist(idx);
           const open = detail === idx;
+          const showDetails = open || extra || entry.completed || entry.isBand || entry.isBodyweight || idx === sets.findIndex((x) => !x.completed);
           return (
             <div key={idx} role="group" aria-label={`Set ${idx + 1}`}>
               <HoldRow
@@ -2248,17 +2273,21 @@ function SetTable({
                 }}
                 className={cn(SET_GRID, "rounded-lg px-0.5", entry.completed && "bg-[var(--success)]/[0.07]")}
               >
-                <button
-                  type="button"
-                 
-                  onClick={() => setDetail(open ? null : idx)}
-                  aria-expanded={open}
-                  aria-label={`Set ${idx + 1}: load type, RPE and note`}
-                  className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
-                >
-                  {idx + 1}
-                  {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
-                </button>
+                {showDetails ? (
+                  <button
+                    type="button"
+                    onClick={() => setDetail(open ? null : idx)}
+                    aria-expanded={open}
+                    aria-label={`Set ${idx + 1}: load type, RPE and note`}
+                    className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
+                  >
+                    {idx + 1}
+                    {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
+                  </button>
+                ) : (
+                  // A set still to do, and not the next one: just its number. (The button is on the next set, on logged sets and on any with a note.)
+                  <span className="flex h-10 items-center justify-center text-[13px] font-semibold tabular-nums text-ink-mute">{idx + 1}</span>
+                )}
                 <span className="text-[12px] leading-tight tabular-nums text-ink-mute">{prevLabel}</span>
                 <span className="min-w-0">
                   {entry.isBand || entry.isBodyweight ? (
