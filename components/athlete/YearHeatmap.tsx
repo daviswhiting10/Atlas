@@ -39,7 +39,7 @@ function Ring({ met }: { met: boolean }) {
 }
 
 /**
- * The year of training, v3: weeks as columns, seven day rows (Monday first). Colour is the minutes logged that day in five
+ * The year of training, v3: weeks as columns, seven day rows (Monday first). Colour is the work done that day (sets, and minutes of cardio, walking and mobility, as one number) in five
  * fixed bands; the corner icon is how it was done; a ring marks a running challenge's days (closed when met, open when not).
  *
  * A desktop shows 26 weeks and a phone the last 13, right-aligned to today, so each cell is about 24 px and can carry an
@@ -98,7 +98,7 @@ function Legend({ challenge }: { challenge: string | null }) {
   return (
     <div className="mt-4 space-y-2 text-[11px] text-ink-mute">
       <div className={row}>
-        <span>minutes</span>
+        <span>work</span>
         {([1, 2, 3, 4, 5] as const).map((l) => (
           <span key={l} className="inline-flex items-center gap-1.5">
             <i className="inline-block h-[11px] w-[11px] rounded-[3px]" style={{ background: BAND[l] }} />

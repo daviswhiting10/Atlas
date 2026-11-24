@@ -26,6 +26,7 @@ import { datedFinished, isLoggedSet } from "./days";
 import { heatmap, type HeatLevel } from "./heatmap";
 import { prsOverTime } from "./records";
 import { sessionMode, type DayMode } from "./mode";
+import { workOf, type Work } from "./work";
 import type { HistorySession } from "./types";
 
 /** Under this many finished sessions, no grid ("Day one"). */
@@ -38,6 +39,8 @@ export type CalendarSession = {
   /** Logged sets; 0 for a session with only a name and a time. */
   sets: number;
   minutes: number | null;
+  /** The work in it (lib/history/work): strength sets, and minutes of cardio, walking and mobility. */
+  work: Work;
   /** How it was done (strength, run, walk, or a mix); null when nothing says. */
   mode: DayMode | null;
   /** Set a heaviest-weight record on some lift. */
@@ -132,6 +135,7 @@ export function historyCalendar(
     title: opts.meta[s.id]?.title ?? "Workout",
     sets: s.sets.filter(isLoggedSet).length,
     minutes: s.durationMin,
+    work: workOf(s),
     mode: sessionMode(s),
     record: recordSessions.has(s.id),
     href: opts.meta[s.id]?.href ?? null,

@@ -7,6 +7,7 @@
  * asking. Days are read in the request's timezone (the cookie) for now.
  */
 
+import { exerciseGroup } from "@/lib/exercises/muscles";
 import { localDay } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
 import { activeGoalId, loadGoal } from "@/lib/goals/data";
@@ -40,7 +41,7 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
         source: true,
         assignedWorkoutId: true,
         assignedWorkout: { select: { name: true } },
-        sets: { select: { exerciseId: true, weight: true, reps: true, rpe: true, bandColor: true, completed: true, assignedWorkoutExercise: { select: { mode: true, activity: true } } } },
+        sets: { select: { exerciseId: true, weight: true, reps: true, rpe: true, bandColor: true, completed: true, exercise: { select: { primaryMuscles: true } }, assignedWorkoutExercise: { select: { mode: true, activity: true } } } },
       },
     }),
     prisma.goal.findMany({
@@ -57,7 +58,7 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
     durationMin: r.durationMin,
     activity: r.activity,
     // A set of a plan exercise logged as cardio says what kind (and is not strength work).
-    sets: r.sets.map(({ assignedWorkoutExercise: awe, ...set }) => ({ ...set, cardio: awe?.mode === "CARDIO" ? (awe.activity ?? "OTHER") : null })),
+    sets: r.sets.map(({ assignedWorkoutExercise: awe, exercise, ...set }) => ({ ...set, cardio: awe?.mode === "CARDIO" ? (awe.activity ?? "OTHER") : null, mobility: exerciseGroup(exercise?.primaryMuscles) === "Mobility" })),
   }));
   const meta = Object.fromEntries(rows.map((r) => [r.id, { title: r.title ?? r.assignedWorkout?.name ?? "Workout", href: sessionHref(viewer, r) }]));
   const today = localDay(new Date(), timeZone);

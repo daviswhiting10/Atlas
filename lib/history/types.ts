@@ -16,6 +16,8 @@ export type HistorySet = {
   bandColor?: string | null;
   /** When the set was of a plan exercise logged as cardio: what kind. Such a set is not strength work. */
   cardio?: "RUN" | "WALK" | "OTHER" | null;
+  /** An exercise from the mobility group (stretches, foam rolling): counted in minutes, not sets. */
+  mobility?: boolean;
   completed: boolean;
 };
 

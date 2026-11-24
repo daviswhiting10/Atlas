@@ -2,33 +2,47 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CalendarSession } from "./calendar";
 import type { DayMode } from "./mode";
-import { BAND_LABELS, BANDS, DESKTOP_WEEKS, PHONE_WEEKS, bandOf, gridDay, heatDays, latestTrained, readout, yearGrid } from "./year-grid";
+import { BAND_LABELS, BANDS, DESKTOP_WEEKS, PHONE_WEEKS, bandOf, gridDay, heatDays, latestTrained, rawStats, readout, yearGrid } from "./year-grid";
 
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
-const s = (title: string, minutes: number | null, mode: DayMode | null = "S", sets = 10): CalendarSession => ({ id: title + minutes, title, sets, minutes, mode, record: false, href: null });
+// A session: strength sets for "S" (and mixed), minutes of run or walk for "R" and "W", as the work units are made.
+const s = (title: string, minutes: number | null, mode: DayMode | null = "S", sets = 10): CalendarSession => {
+  const strength = mode === "S" || mode === "M" ? sets : 0;
+  const runMin = mode === "R" || mode === "M" ? (minutes ?? 0) : 0;
+  const walkMin = mode === "W" ? (minutes ?? 0) : 0;
+  return { id: title + minutes, title, sets: strength, minutes, mode, record: false, href: null, work: { sets: strength, runMin, walkMin, mobMin: 0, units: strength + runMin / 3 + walkMin / 10 } };
+};
 // 2026-11-23 is a Monday (so 2026-11-11 is a Wednesday).
 const TODAY = "2026-11-23";
 const cell = (g: ReturnType<typeof yearGrid>, d: string) => g.columns.flatMap((c) => c.cells).find((c) => c.day === d)!;
 
-describe("minute bands: fixed, one colour", () => {
-  it("1-29, 30-59, 60-89, 90-119 and 120+ are five steps; none is empty", () => {
-    expect(BANDS).toEqual([1, 30, 60, 90, 120]);
-    expect(BAND_LABELS).toEqual(["1-29", "30-59", "60-89", "90-119", "120+"]);
-    expect([1, 29, 30, 59, 60, 89, 90, 119, 120, 300].map((m) => bandOf(m, true))).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+describe("work-unit bands: fixed, one colour", () => {
+  it("1-5, 6-10, 11-20, 21-35 and 36+ are five steps; none is empty", () => {
+    expect(BANDS).toEqual([1, 6, 11, 21, 36]);
+    expect(BAND_LABELS).toEqual(["1-5", "6-10", "11-20", "21-35", "36+"]);
+    expect([1, 5, 6, 10, 11, 20, 21, 35, 36, 90].map((u) => bandOf(u, true))).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
     expect(bandOf(0, false)).toBe(0);
   });
-  it("a session with no minutes written down still makes it a training day, at the lightest band", () => {
+  it("units are rounded to whole units before they are banded", () => {
+    expect(bandOf(5.4, true)).toBe(1);
+    expect(bandOf(5.5, true)).toBe(2);
+  });
+  it("a session with no work worked out still makes it a training day, at the lightest band", () => {
     expect(bandOf(0, true)).toBe(1);
     const g = yearGrid(heatDays({ "2026-11-17": [s("Walk", null, "W")] }), { today: TODAY, weeks: 2 });
     expect(cell(g, "2026-11-17").level).toBe(1);
   });
-  it("a day's minutes are all its sessions added", () => {
+  it("a day's work is all its sessions added: 10 sets + a 45 min run (15) = 25 units", () => {
     const g = yearGrid(heatDays({ "2026-11-17": [s("Upper", 50), s("Run", 45, "R")] }), { today: TODAY, weeks: 2 });
-    expect(cell(g, "2026-11-17")).toMatchObject({ minutes: 95, level: 4 });
+    expect(cell(g, "2026-11-17")).toMatchObject({ units: 25, sets: 10, runMin: 45, level: 4 });
+  });
+  it("kinds weigh the same scale: 30 sets, a 90 min run, and a 3 hour walk are all 30 units", () => {
+    const g = yearGrid(heatDays({ "2026-11-16": [s("Heavy", 60, "S", 30)], "2026-11-17": [s("Long run", 90, "R")], "2026-11-18": [s("Hike", 300, "W")] }), { today: TODAY, weeks: 2 });
+    expect(["2026-11-16", "2026-11-17", "2026-11-18"].map((d) => [cell(g, d).units, cell(g, d).level])).toEqual([[30, 4], [30, 4], [30, 4]]);
   });
   it("the bands do not depend on how the athlete usually trains (a light month stays light)", () => {
-    const a = yearGrid(heatDays({ "2026-11-17": [s("Short", 20)] }), { today: TODAY, weeks: 2 });
-    const b = yearGrid(heatDays({ "2026-11-17": [s("Short", 20)], "2026-11-18": [s("Long", 150)] }), { today: TODAY, weeks: 2 });
+    const a = yearGrid(heatDays({ "2026-11-17": [s("Short", 20, "S", 4)] }), { today: TODAY, weeks: 2 });
+    const b = yearGrid(heatDays({ "2026-11-17": [s("Short", 20, "S", 4)], "2026-11-18": [s("Long", 150, "S", 40)] }), { today: TODAY, weeks: 2 });
     expect(cell(a, "2026-11-17").level).toBe(cell(b, "2026-11-17").level);
   });
   it("days with nothing are unshaded; the days after today are future", () => {
@@ -53,7 +67,7 @@ describe("the ring: the running challenge", () => {
   const challenge = { name: "75 Hard", days: { "2026-11-16": "met" as const, "2026-11-17": "open" as const, "2026-11-23": "open" as const } };
   const g = yearGrid(heatDays({ "2026-11-16": [s("Upper", 70)] }, challenge), { today: TODAY, weeks: 2 });
   it("closed when met, open when not; a challenge day with nothing logged is an empty cell with an open ring", () => {
-    expect(cell(g, "2026-11-16")).toMatchObject({ ring: "met", level: 3 });
+    expect(cell(g, "2026-11-16")).toMatchObject({ ring: "met", level: 2 });
     expect(cell(g, "2026-11-17")).toMatchObject({ ring: "open", level: 0 });
   });
   it("days outside the challenge have no ring", () => {
@@ -83,19 +97,35 @@ describe("the window: weeks as columns, seven rows, Monday first", () => {
   it("names a day", () => expect(gridDay("2026-11-11")).toBe("Wed Nov 11"));
 });
 
+describe("raw stats in the readout, not the units", () => {
+  it('"22 sets · 45 min run"', () => {
+    const d = heatDays({ "2026-11-17": [s("Upper", 50, "S", 22), s("Run", 45, "R")] });
+    const g = yearGrid(d, { today: TODAY, weeks: 2 });
+    expect(rawStats(cell(g, "2026-11-17"))).toBe("22 sets · 45 min run");
+    expect(readout(cell(g, "2026-11-17"))).toBe("Tue Nov 17 · Upper, Run · 22 sets · 45 min run");
+  });
+  it("a walk and mobility say their minutes", () => {
+    expect(rawStats({ sets: 0, runMin: 0, walkMin: 30, mobMin: 15, minutes: 45 })).toBe("30 min walk · 15 min mobility");
+  });
+  it("a session with only a time keeps showing it", () => {
+    expect(rawStats({ sets: 0, runMin: 0, walkMin: 0, mobMin: 0, minutes: 40 })).toBe("40 min");
+    expect(rawStats({ sets: 0, runMin: 0, walkMin: 0, mobMin: 0, minutes: 0 })).toBeNull();
+  });
+});
+
 describe("the one-line readout", () => {
   const challenge = { name: "75 Hard", today: TODAY };
   const d = heatDays({ "2026-11-14": [s("Long run", 52, "R")], "2026-11-11": [s("Lower A", 64)], "2026-11-12": [s("Imported", null, null, 0)] }, { name: "75 Hard", days: { "2026-11-14": "open", "2026-11-11": "met", "2026-11-23": "open" } });
   const g = yearGrid(d, { today: TODAY });
-  it("day, workout, minutes, and the challenge", () => {
-    expect(readout(cell(g, "2026-11-14"), challenge)).toBe("Sat Nov 14 · Long run · 52 min · 75 Hard: not met");
-    expect(readout(cell(g, "2026-11-11"), challenge)).toBe("Wed Nov 11 · Lower A · 64 min · 75 Hard: met");
+  it("day, workout, raw stats (never the units), and the challenge", () => {
+    expect(readout(cell(g, "2026-11-14"), challenge)).toBe("Sat Nov 14 · Long run · 52 min run · 75 Hard: not met");
+    expect(readout(cell(g, "2026-11-11"), challenge)).toBe("Wed Nov 11 · Lower A · 10 sets · 75 Hard: met");
   });
   it("today's open ring says it is still going", () => {
     expect(readout(cell(g, "2026-11-23"), challenge)).toBe("Mon Nov 23 · no session · 75 Hard: still open");
   });
   it("without a challenge, no challenge text; with no minutes, nothing is invented", () => {
-    expect(readout(cell(g, "2026-11-14"))).toBe("Sat Nov 14 · Long run · 52 min");
+    expect(readout(cell(g, "2026-11-14"))).toBe("Sat Nov 14 · Long run · 52 min run");
     expect(readout(cell(g, "2026-11-12"))).toBe("Thu Nov 12 · Imported");
   });
   it("a day to come, and before anything is touched the latest training day", () => {
