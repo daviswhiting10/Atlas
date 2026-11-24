@@ -870,7 +870,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           </button>
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
             <span className="min-w-0">
-              <span className="block truncate font-display text-2xl leading-tight text-ink">{data.name}</span>
+              <span className="block font-display text-[22px] leading-[1.15] text-ink [overflow-wrap:anywhere]">{data.name}</span>
               <span className="tnum block truncate text-xs text-ink-mute">
                 {doneCount}/{totalCount} sets{data.status === "LOGGED" ? " · logged" : ` · ${clock(elapsed)}`} · Week {data.week}
                 {data.deloadWeek ? " · Lighter week" : ""}
