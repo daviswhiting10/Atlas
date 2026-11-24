@@ -320,7 +320,6 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
           Log session
         </Link>
       )}
-      {report && <div className="-mt-3 mb-8">{report}</div>}
       {glance}
       {latest}
       <div className="mb-12">
@@ -549,6 +548,8 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
               ) : null}
         </div>
       )}
+      {/* The latest progress report: under the tabs, not above them (one less thing to tap before what she's here for). */}
+      {report && <div className="mt-2">{report}</div>}
     </div>
   );
 }
