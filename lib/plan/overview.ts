@@ -29,6 +29,8 @@ export type WorkoutStatus = "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
 
 export type WorkoutSummary = {
   id: string;
+  /** The finished session, when there is one (what a delete removes). */
+  logId?: string | null;
   name: string;
   week: number;
   date: string;
@@ -157,7 +159,7 @@ export async function loadPlanOverview({
           scheduledDate: true,
           order: true,
           status: true,
-          workoutLog: { select: { completedAt: true, date: true, clientNotes: true } },
+          workoutLog: { select: { id: true, completedAt: true, date: true, clientNotes: true } },
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
@@ -181,6 +183,7 @@ export async function loadPlanOverview({
 
   const workouts: WorkoutSummary[] = assignment.assignedWorkouts.map((w) => ({
     id: w.id,
+    logId: w.workoutLog?.completedAt ? w.workoutLog.id : null,
     name: w.name,
     week: weekOf(w.scheduledDate.getTime(), start),
     date: iso(w.scheduledDate),
