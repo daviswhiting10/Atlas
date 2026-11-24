@@ -3,12 +3,10 @@ import { Suspense } from "react";
 import { ArrowRight } from "lucide-react";
 import { todayGoal, todayGoalId } from "@/lib/goals/today-data";
 import { todayView } from "@/lib/goals/today";
-import { endGoal, logWorkout, removeWorkout, setDiet, tagSession, tickRule } from "@/lib/actions/goals";
-import { GoalCard } from "./GoalCard";
-import { GoalCardSkeleton } from "./Skeletons";
+import { GoalChip } from "./GoalChip";
 
 /**
- * The goal card on Today while a goal is running; nothing otherwise (starting a goal lives on You).
+ * The challenge chip on Home while a goal is running; nothing otherwise (starting a goal lives on You; the full card is on its own page).
  *
  * Finding out whether there is a goal is one light query, so it comes first with no
  * placeholder (someone with no goal never sees one). Loading the goal itself is the
@@ -18,7 +16,7 @@ export async function GoalToday({ clientId }: { clientId: string }) {
   const id = await todayGoalId(clientId);
   if (!id) return null;
   return (
-    <Suspense fallback={<GoalCardSkeleton />}>
+    <Suspense fallback={null}>
       <LoadedGoal id={id} clientId={clientId} />
     </Suspense>
   );
@@ -34,5 +32,5 @@ async function LoadedGoal({ id, clientId }: { id: string; clientId: string }) {
       </Link>
     ) : null;
   }
-  return <GoalCard view={todayView(loaded)} actions={{ tickRule, tagSession, logWorkout, removeWorkout, setDiet, endGoal }} />;
+  return <GoalChip view={todayView(loaded)} />;
 }
