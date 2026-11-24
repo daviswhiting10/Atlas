@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
+import { Suspense } from "react";
+import { ChallengesList } from "@/components/challenges/ChallengesList";
 import { YouScreen } from "@/components/athlete/YouScreen";
 import { libraryForPicker } from "@/lib/programs/library";
 import { prisma } from "@/lib/db/client";
@@ -21,5 +23,5 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
     // Starting a goal lives here (Today shows the goal's card once one is running).
     athlete.isGuest || isCoached(athlete) ? null : activeGoalId(athlete.clientId),
   ]);
-  return <YouScreen athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} nutrition={nutritionEnabled()} />;
+  return <YouScreen challenges={athlete.isGuest && !athlete.isDemo ? undefined : <Suspense fallback={null}><ChallengesList clientId={athlete.clientId} /></Suspense>} athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} nutrition={nutritionEnabled()} />;
 }
