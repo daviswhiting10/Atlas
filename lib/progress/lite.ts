@@ -6,9 +6,12 @@
  */
 import type { ExerciseProgress, ProgressData } from "@/lib/athlete/data";
 import { overallProgress, type Overall } from "./overall";
+import { defaultLift } from "./default-lift";
 
 export function liteProgress(data: ProgressData): { data: ProgressData; overall: Overall } {
   const overall = overallProgress(data.exercises);
-  const exercises: ExerciseProgress[] = data.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name, muscles: [], loaded: e.loaded, timed: e.timed, series: [], count: e.series.length, target: null }));
+  // The lift the screen opens on keeps its history, so its chart draws with the page instead of after a second trip.
+  const opens = defaultLift(data.exercises);
+  const exercises: ExerciseProgress[] = data.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name, muscles: [], loaded: e.loaded, timed: e.timed, series: e.exerciseId === opens ? e.series : [], count: e.series.length, target: null }));
   return { data: { ...data, exercises }, overall };
 }

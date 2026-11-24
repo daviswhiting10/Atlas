@@ -6,6 +6,7 @@ import type { CalendarSession, HistoryCalendar } from "@/lib/history/calendar";
 import { historyView } from "@/lib/history/view";
 import { liteProgress } from "./lite";
 import { overallProgress } from "./overall";
+import { defaultLift } from "./default-lift";
 
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
 const pt = (date: string, e1rm: number): SessionPoint => ({ date, weight: e1rm, reps: 5, e1rm, volume: e1rm * 5, sets: 3, deload: false, record: false } as SessionPoint);
@@ -21,12 +22,18 @@ describe("liteProgress", () => {
   it("the overall line the server works out is the one the browser used to", () => {
     expect(lite.overall).toEqual(overallProgress(full.exercises));
   });
-  it("each lift keeps its id, name, kind and session count, and loses its history", () => {
+  it("each lift keeps its id, name, kind and session count, and loses its history, except the one the screen opens on", () => {
     expect(lite.data.exercises.map((e) => [e.exerciseId, e.name, e.loaded, e.timed, e.count, e.series.length])).toEqual([
-      ["bench", "bench", true, false, 12, 0],
+      ["bench", "bench", true, false, 12, 12],
       ["squat", "squat", true, false, 12, 0],
       ["row", "row", true, false, 3, 0],
     ]);
+    expect(lite.data.exercises[0].series).toEqual(full.exercises[0].series);
+  });
+  it("the opening lift is the one ProgressView opens on, so it never fetches it", () => {
+    expect(defaultLift(lite.data.exercises)).toBe("bench");
+    expect(read("components/athlete/ProgressView.tsx")).toContain("defaultLift(data.exercises, THIN)");
+    expect(read("components/athlete/ProgressView.tsx")).toContain("const THIN = 3;"); // the same bar as defaultLift's default
   });
   it("everything else in the data is untouched", () => {
     expect(lite.data.totals).toEqual(full.totals);
