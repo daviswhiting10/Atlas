@@ -59,6 +59,9 @@ const GOAL_LABELS: Record<string, string> = {
 
 const sel = (setter: (v: string) => void) => (v: string | null) => { if (v) setter(v); };
 
+/** Search appears with more clients than this (fewer fit on one screen). */
+const SEARCH_FROM = 8;
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
@@ -86,8 +89,10 @@ export default function ClientsPage() {
 
   // Search only: with a roster this size a status filter is one more control than it's worth.
   // Deleting a client lives in the client page's ⋯ menu, not on every row.
+  // With the box hidden (a short list) nothing is filtered, whatever was typed before the list shrank.
+  const searching = clients.length > SEARCH_FROM;
   const filtered = clients.filter(
-    (c) => c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
+    (c) => !searching || c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   async function askDelete(id: string) {
@@ -160,10 +165,6 @@ export default function ClientsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-        <Link href="/clients/import" className={buttonVariants({ variant: "outline" })}>
-          <Upload className="w-4 h-4 mr-1.5" />
-          Import
-        </Link>
         <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) firstTry.current = null; }}>
           <DialogTrigger>
             <span className={buttonVariants()}>
@@ -237,9 +238,15 @@ export default function ClientsPage() {
                   </Select>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Add Client</Button>
+              <div className="flex items-center justify-between gap-2 pt-2">
+                {/* Import is a second way to add clients: it lives here, not as its own button above the list. */}
+                <Link href="/clients/import" className="press inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink">
+                  <Upload className="w-4 h-4" /> Import a spreadsheet
+                </Link>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit">Add Client</Button>
+                </div>
               </div>
             </form>
           </DialogContent>
@@ -247,8 +254,8 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 mb-6">
+      {/* Filters: a search box earns its place once the list is longer than a screen. */}
+      {searching && <div className="flex gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -258,7 +265,7 @@ export default function ClientsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-      </div>
+      </div>}
 
       <div className="relative">
         {phase !== "done" && (
