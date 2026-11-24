@@ -56,3 +56,18 @@ describe("each cell's kind drives its icon", () => {
     expect(g.cells.map((c) => c.kind)).toEqual(["strength", null, "cardio", null, "mobility", null, null]);
   });
 });
+
+import { readFileSync } from "node:fs";
+describe("any day can be started", () => {
+  const src = readFileSync(new URL("../../components/athlete/PlanWeek.tsx", import.meta.url), "utf8");
+  it("every workout day that isn't done says Start (past, today or ahead), not only the next one", () => {
+    expect(src).toContain('{done ? "View session" : "Start"}');
+    expect(src).not.toContain('"Open workout"');
+  });
+  it("only a finished day is the quiet button; the others are the solid one", () => {
+    expect(src).toContain('done ? "border border-line-strong text-ink" : "bg-dusk-button text-dusk-button-text hover:brightness-110"');
+  });
+  it("a day behind us that wasn't done says so", () => {
+    expect(src).toContain('cell.date < today ? "Not done"');
+  });
+});
