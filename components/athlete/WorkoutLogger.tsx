@@ -11,7 +11,9 @@ import { pushOrLoad } from "@/lib/nav-watchdog";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
-import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet, freshLoggerSets } from "@/lib/actions/athlete";
+import { finishWorkout, planAddExercise, planKeepSuperset, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet, freshLoggerSets } from "@/lib/actions/athlete";
+import { keptMessage, supersetChange } from "@/lib/plan/superset";
+import { KeepSupersetSheet } from "@/components/logger/KeepSupersetSheet";
 import { reconcile } from "@/lib/sessions/reconcile";
 import { MySessionNote } from "@/components/athlete/MySessionNote";
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
@@ -150,8 +152,10 @@ export type LoggerActions = {
   saveNote?: typeof saveMySessionNote;
   /** Read this session's sets again when the logger opens (the demo has none). */
   freshSets?: typeof freshLoggerSets;
+  /** Keep a superset made here in the plan, from now on (not in the demo). */
+  planKeepSuperset?: typeof planKeepSuperset;
 };
-const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote, freshSets: freshLoggerSets };
+const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote, freshSets: freshLoggerSets, planKeepSuperset };
 
 export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { data: LoggerData; /** The saves; the demo passes in-memory stand-ins. */ actions?: LoggerActions; /** Prefix for links ("/demo"). */ base?: string }) {
   const router = useRouter();
@@ -201,14 +205,34 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const debounce = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // ── This session's order (hold a card's header and drag it) ─────────────────────
-  // Kept on this phone for the session; the plan is never changed, and sets follow their exercise.
+  // Kept on this phone for the session, and sets follow their exercise. A superset made here (or one the plan has, split) can
+  // also be kept in the plan for this workout from now on: asked once, right after the move.
   const orderKey = `atlas:order:${data.id}`;
   const [savedOrder, setSavedOrderState] = useState<OrderEntry[] | null>(null);
+  const [keepAsk, setKeepAsk] = useState<null | { kind: "group"; aweIds: string[] } | { kind: "split"; aweId: string }>(null);
+  /** Only someone who makes their own plan (a coach's client keeps the plan as the coach wrote it). */
+  const canKeep = !!actions.planKeepSuperset && !data.coachPlan && data.status !== "LOGGED";
   const setSavedOrder = (o: OrderEntry[] | null) => {
+    if (o && canKeep) {
+      const asked = supersetChange(order, o, sessionOrder(data.exercises.map((e) => ({ aweId: e.aweId, section: e.role })), null));
+      if (asked) setKeepAsk(asked);
+    }
     setSavedOrderState(o);
     try {
       if (o) store()?.setItem(orderKey, JSON.stringify(o));
     } catch {}
+  };
+  const keepSuperset = (k: NonNullable<typeof keepAsk>) => {
+    setKeepAsk(null);
+    const keep = actions.planKeepSuperset;
+    if (!keep) return;
+    startBusy(async () => {
+      await queue.current; // sets already tapped are saved first
+      const res = await keep(k.kind === "group" ? { workoutId: data.id, aweIds: k.aweIds } : { workoutId: data.id, split: k.aweId });
+      if (!res.ok) return void toast.error(res.error);
+      toast.success(keptMessage(res.updated, res.skipped));
+      router.refresh();
+    });
   };
   useEffect(() => {
     try {
@@ -1173,6 +1197,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           }}
         />
       )}
+
+      {keepAsk != null && <KeepSupersetSheet split={keepAsk.kind === "split"} onToday={() => setKeepAsk(null)} onKeep={() => keepSuperset(keepAsk)} />}
 
       {confirmAll != null && (
         <CheckAllSheet
