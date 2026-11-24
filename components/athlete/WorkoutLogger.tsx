@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
-import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet } from "@/lib/actions/athlete";
+import { finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveMySessionNote, saveSet, freshLoggerSets } from "@/lib/actions/athlete";
+import { reconcile } from "@/lib/sessions/reconcile";
 import { MySessionNote } from "@/components/athlete/MySessionNote";
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
@@ -145,8 +146,10 @@ export type LoggerActions = {
   planSwapExercise: typeof planSwapExercise;
   /** The athlete's own note on the session (Session complete). Optional so older stand-ins still fit. */
   saveNote?: typeof saveMySessionNote;
+  /** Read this session's sets again when the logger opens (the demo has none). */
+  freshSets?: typeof freshLoggerSets;
 };
-const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote };
+const REAL_ACTIONS: LoggerActions = { saveSet, finishWorkout, planAddExercise, planRemoveExercise, planSetTargets, planSwapExercise, saveNote: saveMySessionNote, freshSets: freshLoggerSets };
 
 export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { data: LoggerData; /** The saves; the demo passes in-memory stand-ins. */ actions?: LoggerActions; /** Prefix for links ("/demo"). */ base?: string }) {
   const router = useRouter();
@@ -240,6 +243,27 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     setsRef.current = next;
     setSetsState(next);
   }, []);
+
+  // The page this opened from can be an old copy (the app keeps and prefetches pages), so a tick saved last time may not be in
+  // it. Opening the logger reads this session's sets again: what hasn't been touched since opening takes the fresh sets.
+  const openedSets = useRef(sets);
+  const freshSets = actions.freshSets;
+  useEffect(() => {
+    if (!freshSets) return;
+    let live = true;
+    freshSets({ assignedWorkoutId: data.id })
+      .then((r) => {
+        if (!live || !r) return;
+        const mine = (list: LoggerSet[]) => JSON.stringify(list.map((x) => [x.setNumber, x.weight, x.reps, x.done, x.setLogId]));
+        apply(reconcile(setsRef.current, openedSets.current, r.sets, (a, b) => mine(a) === mine(b)));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // Once, when the logger opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.id]);
 
   /** Sets for an exercise: what's been edited here, or the server's list for one that just arrived. */
   const listOf = (e: LoggerExercise) => sets[e.aweId] ?? e.sets;

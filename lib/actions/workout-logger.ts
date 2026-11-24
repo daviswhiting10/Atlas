@@ -192,6 +192,27 @@ export async function logSet(input: {
   return { workoutLogId, setLogId };
 }
 
+// ── freshSessionSets ───────────────────────────────────────────────────────────
+
+/**
+ * This workout's session as it is now: its id and its sets (for the logger to bring itself up to date when it opens: the page
+ * it opened from can be an old copy). The caller's workspace only; null when the workout has no session yet.
+ */
+export async function freshSessionSets(input: { assignedWorkoutId: string }) {
+  const { workspaceId } = await requireWorkspace();
+  const log = await prisma.workoutLog.findFirst({
+    where: { assignedWorkoutId: input.assignedWorkoutId, client: { workspaceId } },
+    select: {
+      id: true,
+      sets: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, exerciseId: true, assignedWorkoutExerciseId: true, setNumber: true, weight: true, bandColor: true, reps: true, rpe: true, note: true, completed: true },
+      },
+    },
+  });
+  return log;
+}
+
 // ── completeSession ────────────────────────────────────────────────────────────
 //
 // Called when trainer presses "Save & Complete Session".

@@ -4,6 +4,7 @@
 
 import { SheetLock } from "@/components/ui/sheet-lock";
 import { liveTransitionTo } from "@/lib/live-transition";
+import { reconcile } from "@/lib/sessions/reconcile";
 import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
@@ -41,6 +42,7 @@ import {
 import {
   logSet,
   completeSession,
+  freshSessionSets,
   addExerciseNote,
   updateSessionDate,
 } from "@/lib/actions/workout-logger";
@@ -390,6 +392,32 @@ export default function WorkoutLogger({
   // The latest sets, for code that runs later than the render it was made in (a toast's Undo, a timer).
   const exStateRef = useRef(exState);
   exStateRef.current = exState;
+  // The sets this opened with, to tell later whether anything has been typed or ticked since.
+  const openedState = useRef(exState);
+  // The page this opened from can be an old copy (the app keeps and prefetches pages), so a set logged last time may not be
+  // in it. Opening the logger reads the session again: what hasn't been touched since opening takes the fresh sets.
+  useEffect(() => {
+    let live = true;
+    freshSessionSets({ assignedWorkoutId })
+      .then((log) => {
+        if (!live || !log) return;
+        const fresh = buildInitialState(exercises, log.sets as ExistingSetLog[]);
+        // (each entry's uid is made fresh every time, so it is left out of the comparison)
+        const mine = (s: ExerciseState) => JSON.stringify(s.sets.map((x) => ({ ...x, uid: 0 })));
+        setExState((cur) => reconcile(cur, openedState.current, fresh, (a, b) => mine(a) === mine(b)));
+        // The session the page didn't know about yet: this is the one the next tick belongs to.
+        if (log.id && !logIdRef.current) {
+          logIdRef.current = log.id;
+          setWorkoutLogId(log.id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // Once, when the logger opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignedWorkoutId]);
   const [soapOpen, setSoapOpen] = useState(false);
   const [rawInput, setRawInput] = useState("");
   const [structuredNote, setStructuredNote] = useState<Record<string, unknown> | null>(null);
