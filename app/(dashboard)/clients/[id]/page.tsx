@@ -5,6 +5,7 @@ import { loadClientProgress } from "@/lib/coach/progress";
 import { getClient } from "@/lib/db/clients";
 import { ProgressView } from "@/components/athlete/ProgressView";
 import { HistoryCalendar } from "@/components/athlete/HistoryCalendar";
+import { historyView } from "@/lib/history/view";
 import { cookies } from "next/headers";
 import { safeTimeZone } from "@/lib/athlete/sessions";
 import { TZ_COOKIE } from "@/lib/athlete/data";
@@ -72,7 +73,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
           <>
             {/* The line leaves lighter weeks out, so it can end before her latest session: say so. */}
             {newestIsLighter(data.exercises) && <p className="mb-4 text-[13px] text-ink-mute">Lighter week: its sessions aren&apos;t in the line.</p>}
-            <ProgressView data={data} goalMetric={metric} history={calendar.kind === "grid" ? <HistoryCalendar calendar={calendar} /> : undefined} />
+            <ProgressView data={data} goalMetric={metric} history={calendar.kind === "grid" ? <HistoryCalendar calendar={historyView(calendar)} /> : undefined} />
           </>
         ) : null
       }
