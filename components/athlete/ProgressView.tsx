@@ -105,9 +105,15 @@ function Section({ title, control, children }: { title: string; control?: React.
 }
 
 /** Big number, tiny label. */
+/** The baseline the percentage is measured from: "reps since Nov 21", "est. 1RM since Nov 21". */
+export function sinceLabel(metricName: string, since: string): string {
+  const name = metricName === "Est. 1RM" ? "est. 1RM" : metricName.toLowerCase();
+  return `${name} since ${format(parseISO(since), "MMM d")}`;
+}
+
 function Big({ value, label, accent = false }: { value: string; label?: string; accent?: boolean }) {
   return (
-    <p className="flex items-baseline gap-2">
+    <p className="flex flex-wrap items-baseline gap-x-2">
       <span className={cn("text-[56px] font-semibold leading-none tracking-[-0.04em]", accent ? "text-signal" : "text-ink")}>{value}</span>
       {label && <span className="text-[15px] font-medium text-ink-mute">{label}</span>}
     </p>
@@ -163,7 +169,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
     if (counted.length === 0) return null;
     const first = counted[0][metric] as number;
     const latest = counted[counted.length - 1][metric] as number;
-    return { latest, change: counted.length > 1 && first ? Math.round(((latest - first) / first) * 100) : null, sessions: counted.length };
+    return { latest, change: counted.length > 1 && first ? Math.round(((latest - first) / first) * 100) : null, sessions: counted.length, since: counted[0].date as string };
   }, [exercise, metric]);
 
   const sessions = data.totals.sessions;
@@ -186,7 +192,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
           {one && (
             <Big
               value={one.change != null && one.sessions >= THIN ? `${one.change > 0 ? "+" : ""}${one.change}%` : formatValue(one.latest, metric)}
-              label={one.change != null && one.sessions >= THIN ? shortFor(metric, exercise.timed) : unitFor(metric, exercise.loaded, exercise.timed)}
+              label={one.change != null && one.sessions >= THIN ? sinceLabel(shortFor(metric, exercise.timed), one.since) : unitFor(metric, exercise.loaded, exercise.timed)}
               accent={one.change != null && one.change > 0 && one.sessions >= THIN}
             />
           )}
