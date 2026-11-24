@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nextInPlan } from "@/lib/plan/plan-order";
 import { isLighterWeek, lighterWeeksOn } from "@/lib/plan/lighter";
 import { prisma } from "@/lib/db/client";
 import { getClient } from "@/lib/db/clients";
@@ -50,7 +51,10 @@ export const getActiveProgram = clientTool({
         };
       }),
     }));
-    const next = workouts.find((w) => w.status === "PLANNED") ?? null;
+    // In plan order, like Today and Plan: an unlogged workout from an earlier date is still next.
+    const orderOf = new Map(assignment.assignedWorkouts.map((w) => [w.id, w.order]));
+    const nextId = nextInPlan(workouts.map((w) => ({ id: w.assignedWorkoutId, week: w.week, status: w.status, order: orderOf.get(w.assignedWorkoutId)! })))?.id;
+    const next = workouts.find((w) => w.assignedWorkoutId === nextId) ?? null;
     const totalWeeks = workouts.reduce((m, w) => Math.max(m, w.week), 1);
     const currentWeek = next?.week ?? totalWeeks;
 
