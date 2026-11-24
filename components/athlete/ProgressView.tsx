@@ -1,18 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { overlayBox, useSheetLock } from "@/hooks/use-sheet-lock";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ChevronDown, Search, X } from "lucide-react";
 import type { ExerciseProgress, ProgressData } from "@/lib/athlete/data";
 import type { FocusMetric } from "@/lib/plan/generator";
 import { formatValue, metricFor, shortFor, unitFor } from "@/lib/plan/overload";
-import { overallProgress } from "@/lib/progress/overall";
+import { overallProgress, type Overall } from "@/lib/progress/overall";
+import type { SessionPoint } from "@/lib/plan/overload";
 import { defaultLift } from "@/lib/progress/default-lift";
-import { OverallChart } from "./OverallChart";
-import { ProgressChart } from "./ProgressChart";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
 import { useEscape } from "@/hooks/use-escape";
+// The charts (recharts, the heaviest code on this screen) load after the page, not with it. A plain effect and state, not
+// Suspense: React holds back a Suspense reveal for 300 ms even when the code is already there, and a pick should not wait.
+function useLoaded<C>(load: () => Promise<C>, enabled: boolean): C | null {
+  const [C, setC] = useState<C | null>(null);
+  useEffect(() => {
+    if (!enabled || C) return;
+    let live = true;
+    load().then((c) => live && setC(() => c));
+    return () => {
+      live = false;
+    };
+  }, [enabled, C, load]);
+  return C;
+}
+const loadOverall = () => import("./OverallChart").then((m) => m.OverallChart);
+const loadProgress = () => import("./ProgressChart").then((m) => m.ProgressChart);
+/** The chart's own height, so nothing moves when it arrives. */
+const ChartSpace = () => <div className="h-[200px]" aria-busy />;
 
 const day = (iso: string) => format(parseISO(iso), "MMM d");
 
@@ -21,8 +39,10 @@ const THIN = 3;
 
 /** "All lifts ▾": a sheet with a search box and every lift, most-trained first. */
 function LiftSheet({ exercises, value, onChange, onClose }: { exercises: ExerciseProgress[]; value: string | null; onChange: (id: string | null) => void; onClose: () => void }) {
+  const vp = useSheetLock();
+  const box = overlayBox(vp);
   const [query, setQuery] = useState("");
-  const ranked = useMemo(() => [...exercises].sort((a, b) => b.series.length - a.series.length), [exercises]);
+  const ranked = useMemo(() => [...exercises].sort((a, b) => (b.count ?? b.series.length) - (a.count ?? a.series.length)), [exercises]);
   const q = query.trim().toLowerCase();
   const matches = q ? ranked.filter((e) => e.name.toLowerCase().includes(q)) : ranked;
   const pick = (id: string | null) => {
@@ -31,7 +51,7 @@ function LiftSheet({ exercises, value, onChange, onClose }: { exercises: Exercis
   };
   useEscape(true, onClose);
   return (
-    <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm" onClick={onClose}>
+    <div className={`fade-in fixed z-50 ${box.className} flex items-end bg-night/50 backdrop-blur-sm`} style={box.style} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -101,13 +121,40 @@ function Big({ value, label, accent = false }: { value: string; label?: string; 
  * latest record. A section with nothing to show renders nothing, heading included (no
  * overall line yet means no Strength section): never a chart of two points or a row of zeros.
  */
-export function ProgressView({ data, goalMetric, history, records = true, compact = false }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode; /** Home: tighter, so the heatmap fits the first screen. */ compact?: boolean; /** False on Home: the latest record stays on Progress. */ records?: boolean }) {
+export function ProgressView({ data, goalMetric, history, overall: given, loadSeries, records = true, compact = false }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode; /** Home: tighter, so the heatmap fits the first screen. */ compact?: boolean; /** False on Home: the latest record stays on Progress. */ records?: boolean; /** The overall line, when the server worked it out (then `data.exercises` need not carry their series). */ overall?: Overall; /** Fetches one lift's history when it is picked, for exercises sent without it. */ loadSeries?: (input: { exerciseIds: string[] }) => Promise<Record<string, SessionPoint[]>> }) {
   // Opens on the lift done most (its curve and its lighter weeks); "All lifts" is in the chooser.
   const [exerciseId, setExerciseId] = useState<string | null>(() => defaultLift(data.exercises, THIN));
   const [sheet, setSheet] = useState(false);
-  const overall = useMemo(() => overallProgress(data.exercises), [data.exercises]);
-  const exercise = data.exercises.find((e) => e.exerciseId === exerciseId) ?? null;
+  const overall = useMemo(() => given ?? overallProgress(data.exercises), [given, data.exercises]);
+  const picked = data.exercises.find((e) => e.exerciseId === exerciseId) ?? null;
+  // A lift sent without its history gets it from the server: all of them when the chooser opens (so a pick is usually
+  // instant by the time one is made), or just the picked one if that comes first.
+  const [fetched, setFetched] = useState<Record<string, SessionPoint[]>>({});
+  const asked = useRef(new Set<string>());
+  const fetchSeries = (ids: string[]) => {
+    const fresh = ids.filter((id) => !asked.current.has(id));
+    if (fresh.length === 0 || !loadSeries) return;
+    fresh.forEach((id) => asked.current.add(id));
+    loadSeries({ exerciseIds: fresh }).then(
+      (r) => setFetched((f) => ({ ...f, ...r })),
+      () => fresh.forEach((id) => asked.current.delete(id))
+    );
+  };
+  const needs = picked != null && picked.series.length === 0 && (picked.count ?? 0) > 0 && fetched[picked.exerciseId] == null && loadSeries != null;
+  useEffect(() => {
+    if (needs && picked) fetchSeries([picked.exerciseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needs, picked]);
+  useEffect(() => {
+    // Opening the chooser is the sign a lift is about to be picked: its history starts loading now (and its chart code, below).
+    if (sheet) fetchSeries(data.exercises.filter((e) => e.series.length === 0 && (e.count ?? 0) > 0).map((e) => e.exerciseId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet]);
+  const exercise = useMemo(() => (picked ? { ...picked, series: picked.series.length ? picked.series : (fetched[picked.exerciseId] ?? []) } : null), [picked, fetched]);
+  const loading = needs;
   const metric = exercise ? metricFor(goalMetric, exercise.series) : goalMetric;
+  const OverallC = useLoaded(loadOverall, true);
+  const ProgressC = useLoaded(loadProgress, sheet || exercise != null);
 
   const one = useMemo(() => {
     if (!exercise) return null;
@@ -135,6 +182,7 @@ export function ProgressView({ data, goalMetric, history, records = true, compac
     <div className={compact ? "space-y-5" : "space-y-14"}>
       {exercise ? (
         <Section title="Strength" control={chooser}>
+          {loading && <div className="h-[56px]" aria-busy />}
           {one && (
             <Big
               value={one.change != null && one.sessions >= THIN ? `${one.change > 0 ? "+" : ""}${one.change}%` : formatValue(one.latest, metric)}
@@ -142,9 +190,10 @@ export function ProgressView({ data, goalMetric, history, records = true, compac
               accent={one.change != null && one.change > 0 && one.sessions >= THIN}
             />
           )}
+          {loading && <div className="mt-5 h-[200px]" aria-busy />}
           {exercise.series.length >= THIN && (
             <div className="mt-5">
-              <ProgressChart series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={compact ? 130 : 200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} />
+              {ProgressC ? <ProgressC series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={compact ? 130 : 200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} /> : <ChartSpace />}
             </div>
           )}
         </Section>
@@ -155,7 +204,7 @@ export function ProgressView({ data, goalMetric, history, records = true, compac
             <Big value={`${overall.change > 0 ? "+" : ""}${overall.change}%`} label={`since ${day(overall.since)}`} accent={overall.change > 0} />
             {sessions >= THIN && (
               <div className="mt-5">
-                <OverallChart points={overall.points} height={compact ? 130 : 200} />
+                {OverallC ? <OverallC points={overall.points} height={compact ? 130 : 200} /> : <ChartSpace />}
               </div>
             )}
           </Section>

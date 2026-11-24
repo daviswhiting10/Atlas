@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
@@ -9,6 +10,7 @@ export type DeletePreview = { name: string; sessions: number; login: string | nu
 
 /** Exactly what goes, then a red Delete. Nothing is deleted until it's pressed. */
 export function DeleteClientSheet({ preview, onDelete, onClose }: { preview: DeletePreview; onDelete: () => Promise<void>; onClose: () => void }) {
+  useSheetLock();
   const [busy, setBusy] = useState(false);
   useEscape(true, onClose);
   const first = preview.name.split(" ")[0];

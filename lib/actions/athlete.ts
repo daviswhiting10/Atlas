@@ -1,5 +1,6 @@
 "use server";
 
+import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
 import { MAX_SESSION_NOTE, loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
@@ -12,7 +13,9 @@ import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createHandBuiltPlan, createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
-import { MAX_SETS } from "@/lib/athlete/data";
+import { MAX_SETS, getProgress } from "@/lib/athlete/data";
+import type { SessionPoint } from "@/lib/plan/overload";
+import { toMetres } from "@/lib/cardio";
 import { displayName } from "@/lib/plan/catalog";
 import {
   LIMITS,
@@ -149,6 +152,53 @@ export async function saveMySessionNote(raw: { assignedWorkoutId: string; text: 
   }
 }
 
+const QuickCardioInput = z.object({
+  activity: z.enum(["RUN", "WALK", "OTHER"]),
+  minutes: z.number().int().min(1).max(600),
+  distance: z.number().finite().min(0).max(500).nullish(),
+  unit: z.enum(["mi", "km"]).default("mi"),
+});
+
+/**
+ * A quick log of cardio or a walk: a finished session with the type, the minutes and, if they said, how far. It counts
+ * today (the heatmap's colour is minutes, and its corner icon is the type). No plan exercise is behind it.
+ */
+export async function logCardio(raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = await requireAthlete();
+  const parsed = QuickCardioInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Minutes are a whole number from 1 to 600." };
+  const { activity, minutes, distance, unit } = parsed.data;
+  const now = new Date();
+  await prisma.workoutLog.create({
+    data: {
+      clientId,
+      source: "OFF_PLAN",
+      title: activity === "WALK" ? "Walk" : activity === "RUN" ? "Run" : "Cardio",
+      date: now,
+      completedAt: now,
+      durationMin: minutes,
+      activity,
+      distanceM: distance ? toMetres(distance, unit) : null,
+    },
+  });
+  refresh();
+  return { ok: true };
+}
+
+/**
+ * Lifts' histories for Progress's charts, fetched when the lift chooser opens or a lift is picked (the page itself no
+ * longer carries every lift's). Only the signed-in athlete's own, by lift id.
+ */
+export async function exerciseSeries(raw: unknown): Promise<Record<string, SessionPoint[]>> {
+  await requireAthlete();
+  const { exerciseIds } = z.object({ exerciseIds: z.array(z.string().min(1).max(64)).min(1).max(60) }).parse(raw);
+  const wanted = new Set(exerciseIds);
+  const progress = await getProgress();
+  const out: Record<string, SessionPoint[]> = {};
+  for (const e of progress.exercises) if (wanted.has(e.exerciseId)) out[e.exerciseId] = e.series;
+  return out;
+}
+
 export async function finishWorkout(raw: { assignedWorkoutId: string; durationMin?: number }): Promise<void> {
   const { clientId, workspaceId } = await requireAthlete();
   const input = WorkoutRef.extend({ durationMin: z.number().optional() }).parse(raw);
@@ -281,7 +331,7 @@ const Targets = z.object({
   repMin: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   repMax: z.number().int().min(1).max(LIMITS.seconds, TARGET_LIMIT_MESSAGE).optional(),
   weight: z.number().min(0).max(LIMITS.weight).nullable().optional(),
-});
+}).merge(CardioTarget);
 
 export async function planAddWorkout(raw: { week: number; name: string; copyFromWorkoutId?: string }) {
   const input = z.object({ week: z.number().int().min(1).max(52), name: z.string().max(200), copyFromWorkoutId: Ref.optional() }).parse(raw);

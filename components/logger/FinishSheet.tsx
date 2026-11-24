@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { FINISH_LABELS, markPrompt, unloggedText } from "@/lib/sessions/finish";
 
 /**
@@ -7,6 +8,7 @@ import { FINISH_LABELS, markPrompt, unloggedText } from "@/lib/sessions/finish";
  * "N sets not logged. Mark them as done and finish?" with three ways out. When every set is logged this never opens.
  */
 export function FinishSheet({ unlogged, onMark, onPartial, onCancel }: { unlogged: number; onMark: () => void; onPartial: () => void; onCancel: () => void }) {
+  useSheetLock();
   return (
     <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 sm:items-center" onClick={onCancel}>
       <div

@@ -1,5 +1,6 @@
 "use client";
 
+import { overlayBox, useSheetLock } from "@/hooks/use-sheet-lock";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
@@ -23,6 +24,8 @@ export function InviteConfirm({
   onSaveEmail: (email: string) => Promise<string | null>;
   onClose: () => void;
 }) {
+  const vp = useSheetLock();
+  const box = overlayBox(vp);
   const [editing, setEditing] = useState(!email);
   const [draft, setDraft] = useState(email ?? "");
   const [busy, setBusy] = useState<"save" | "send" | null>(null);
@@ -54,7 +57,7 @@ export function InviteConfirm({
   // Drawn on <body>: inside the page's animated container it would sit under the live-session bar.
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    <div className={`fade-in fixed z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center ${box.className}`} style={box.style} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

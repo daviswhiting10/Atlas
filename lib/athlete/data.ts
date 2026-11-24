@@ -138,6 +138,8 @@ export type ExerciseProgress = {
   /** Measured in seconds rather than reps (planks, carries). */
   timed: boolean;
   series: SessionPoint[];
+  /** How many sessions the lift has, when `series` was left out of what is sent to the browser (lib/progress/lite). */
+  count?: number;
   /** What to aim for next session, when the exercise is still in the plan. */
   target: Target | null;
 };
