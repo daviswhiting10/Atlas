@@ -23,6 +23,7 @@ import { PlanStart } from "@/components/coach/PlanStart";
 import { SheetPlanUpload } from "@/components/coach/SheetPlanUpload";
 import { initialDoor } from "@/lib/plan-start";
 import { deletePlan } from "@/lib/actions/coach-plan";
+import { NO_CONNECTION } from "@/lib/net/guard";
 import { categoryLabel } from "@/lib/programs/categories";
 import { FINISHED_BY_CLIENT, finishedByClient } from "@/lib/coach/finished-by";
 import {
@@ -150,7 +151,14 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
 
   async function inviteClient() {
     if (!client?.email) { toast.error("Add an email first"); return; }
-    const res = await fetch(`/api/clients/${id}/invite`, { method: "POST" });
+    let res: Response;
+    try {
+      res = await fetch(`/api/clients/${id}/invite`, { method: "POST" });
+    } catch {
+      // No connection (or no answer). Nothing is shown as sent; a second try just makes a fresh link.
+      toast.error(NO_CONNECTION);
+      return;
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       toast.error(err?.error ?? "Invite failed");
@@ -320,7 +328,6 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
           Log session
         </Link>
       )}
-      {report && <div className="-mt-3 mb-8">{report}</div>}
       {glance}
       {latest}
       <div className="mb-12">
@@ -549,6 +556,8 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
               ) : null}
         </div>
       )}
+      {/* The latest progress report: under the tabs, not above them (one less thing to tap before what she's here for). */}
+      {report && <div className="mt-2">{report}</div>}
     </div>
   );
 }

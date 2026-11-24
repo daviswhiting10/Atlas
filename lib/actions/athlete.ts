@@ -17,6 +17,7 @@ import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS, getProgress } from "@/lib/athlete/data";
 import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
+import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
 import { displayName } from "@/lib/plan/catalog";
 import {
   LIMITS,
@@ -55,6 +56,8 @@ const SaveSetInput = z.object({
   reps: z.number().nullable(),
   done: z.boolean(),
   setLogId: z.string().max(64).nullish(),
+  /** Only on a save replayed after being offline: whether the phone last knew this set as ticked on the server. */
+  expectDone: z.boolean().optional(),
 });
 const WorkoutRef = z.object({ assignedWorkoutId: z.string().min(1).max(64) });
 
@@ -67,7 +70,7 @@ function refresh() {
 }
 
 /** Save (or update) one set. Creates today's workout log on the first set. */
-export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ workoutLogId: string; setLogId: string }> {
+export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ workoutLogId: string; setLogId: string; conflict?: ServerSetState }> {
   const { clientId } = await requireAthlete();
   const input = SaveSetInput.parse(raw);
 
@@ -109,11 +112,16 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
   };
 
   const existing = input.setLogId
-    ? await prisma.setLog.findFirst({ where: { id: input.setLogId, workoutLogId: log.id }, select: { id: true } })
+    ? await prisma.setLog.findFirst({ where: { id: input.setLogId, workoutLogId: log.id }, select: { id: true, completed: true, weight: true, reps: true } })
     : await prisma.setLog.findFirst({
         where: { workoutLogId: log.id, assignedWorkoutExerciseId: input.aweId, setNumber: input.setNumber },
-        select: { id: true },
+        select: { id: true, completed: true, weight: true, reps: true },
       });
+
+  // A save replayed after being offline: if another device changed this set meanwhile, keep theirs and say so.
+  if (input.expectDone !== undefined && existing && replayConflict(input.expectDone, existing)) {
+    return { workoutLogId: log.id, setLogId: existing.id, conflict: { done: existing.completed, weight: existing.weight == null ? null : Number(existing.weight), reps: existing.reps } };
+  }
 
   const setLogId = existing
     ? (await prisma.setLog.update({ where: { id: existing.id }, data, select: { id: true } })).id

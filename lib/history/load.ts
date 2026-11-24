@@ -10,8 +10,7 @@
 import { exerciseGroup } from "@/lib/exercises/muscles";
 import { localDay } from "@/lib/athlete/sessions";
 import { prisma } from "@/lib/db/client";
-import { activeGoalId, loadGoal } from "@/lib/goals/data";
-import { chapterSpan, historyCalendar, type Challenge, type HistoryCalendar } from "./calendar";
+import { chapterSpan, historyCalendar, type HistoryCalendar } from "./calendar";
 import type { HistorySession } from "./types";
 
 /** Where a session opens: the athlete's own pages, or the coach's session page. */
@@ -28,7 +27,7 @@ export function sessionHref(viewer: Viewer, s: Row): string | null {
 }
 
 export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: { clientId: string; workspaceId: string; timeZone: string; viewer: Viewer }): Promise<HistoryCalendar> {
-  const [rows, goals, challenge] = await Promise.all([
+  const [rows, goals] = await Promise.all([
     prisma.workoutLog.findMany({
       where: { clientId, client: { workspaceId }, completedAt: { not: null } },
       select: {
@@ -48,7 +47,6 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
       where: { clientId, client: { workspaceId }, status: { in: ["COMPLETED", "ENDED"] } },
       select: { name: true, startDay: true, endedAt: true },
     }),
-    loadChallenge(clientId),
   ]);
 
   const sessions: HistorySession[] = rows.map((r) => ({
@@ -62,13 +60,5 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
   }));
   const meta = Object.fromEntries(rows.map((r) => [r.id, { title: r.title ?? r.assignedWorkout?.name ?? "Workout", href: sessionHref(viewer, r) }]));
   const today = localDay(new Date(), timeZone);
-  return historyCalendar(sessions, { timeZone, today, meta, chapters: goals.map((g) => chapterSpan(g, timeZone, today)), challenge });
-}
-
-/** The running goal's days for the heatmap's ring: met, or open (a missed day, or one still going). */
-async function loadChallenge(clientId: string): Promise<Challenge | null> {
-  const id = await activeGoalId(clientId);
-  const loaded = id ? await loadGoal(id, clientId) : null;
-  if (!loaded || loaded.goal.status !== "ACTIVE") return null;
-  return { name: loaded.goal.name, days: Object.fromEntries(loaded.result.periods.map((p) => [p.day, p.state === "met" ? ("met" as const) : ("open" as const)])) };
+  return historyCalendar(sessions, { timeZone, today, meta, chapters: goals.map((g) => chapterSpan(g, timeZone, today)) });
 }
