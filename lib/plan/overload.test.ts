@@ -13,16 +13,8 @@ describe("nextTarget", () => {
     expect(nextTarget({ last: [set(150, 8), set(150, 8), set(150, 7)], ...range })).toMatchObject({ kind: "add_reps", weight: 150, reps: 9 });
   });
 
-  it("adds weight once the top of the range is reached", () => {
-    expect(nextTarget({ last: [set(150, 10), set(150, 9)], ...range })).toMatchObject({ kind: "add_weight", weight: 155, reps: 8 });
-  });
-
   it("holds the weight when one rep short of the range", () => {
     expect(nextTarget({ last: [set(150, 5)], ...range })).toMatchObject({ kind: "hold", weight: 150, reps: 6 });
-  });
-
-  it("lowers the weight when two or more reps short of the range", () => {
-    expect(nextTarget({ last: [set(150, 4)], ...range })).toMatchObject({ kind: "reset", weight: 140, reps: 6 });
   });
 
   it("judges by the heaviest weight used, not a lighter back-off set", () => {
@@ -36,6 +28,50 @@ describe("nextTarget", () => {
   it("progresses bodyweight work by reps and timed work by seconds", () => {
     expect(nextTarget({ last: [set(null, 12)], repMin: 8, repMax: 15, increment: 0 })).toMatchObject({ kind: "add_reps", weight: null, reps: 13 });
     expect(nextTarget({ last: [set(null, 40)], repMin: 30, repMax: 60, increment: 0, unit: "secs" }).reps).toBe(45);
+  });
+});
+
+describe("nextTarget — the rep-range rule", () => {
+  const top = [set(150, 10), set(150, 10), set(150, 10)];
+
+  it("below the range holds the weight: a hard day never drops it", () => {
+    expect(nextTarget({ last: [set(150, 4)], ...range })).toMatchObject({ kind: "hold", weight: 150, reps: 6 });
+    // One set under the minimum is enough to hold, even with others inside the range.
+    expect(nextTarget({ last: [set(150, 8), set(150, 5)], ...range })).toMatchObject({ kind: "hold", weight: 150 });
+    // The same range last time is a hard day too, however far short.
+    expect(nextTarget({ last: [set(150, 3)], lastRange: { repMin: 6, repMax: 10 }, ...range }).kind).toBe("hold");
+  });
+
+  it("mixed (one set at the top, one under) is no increase, even after a session at the top", () => {
+    const t = nextTarget({ last: [set(150, 10), set(150, 9)], before: top, ...range });
+    expect(t).toMatchObject({ kind: "add_reps", weight: 150, reps: 10 });
+    expect(t.oneMore).toBeUndefined();
+  });
+
+  it("every set at the top once holds, with the one-more line", () => {
+    const t = nextTarget({ last: top, ...range });
+    expect(t).toMatchObject({ kind: "hold", weight: 150, reps: 10, oneMore: true });
+    expect(t.reason).toBe("One more session like that and you go up.");
+    // A session before that wasn't at the top doesn't count either.
+    expect(nextTarget({ last: top, before: [set(150, 10), set(150, 8)], ...range })).toMatchObject({ kind: "hold", oneMore: true });
+  });
+
+  it("every set at the top twice in a row at the same weight adds the increment", () => {
+    expect(nextTarget({ last: top, before: [set(150, 11), set(150, 10)], ...range })).toMatchObject({ kind: "add_weight", weight: 155, reps: 8 });
+  });
+
+  it("at the top twice but at different weights holds", () => {
+    expect(nextTarget({ last: top, before: [set(145, 10), set(145, 10)], ...range })).toMatchObject({ kind: "hold", weight: 150, oneMore: true });
+  });
+
+  it("judges the top at the working weight: a lighter warm-up under the range doesn't hold it back", () => {
+    expect(nextTarget({ last: [set(95, 5), ...top], before: [set(95, 5), ...top], ...range }).kind).toBe("add_weight");
+  });
+
+  it("timed and bodyweight work progress as before, one session at a time", () => {
+    expect(nextTarget({ last: [set(null, 15)], repMin: 8, repMax: 15, increment: 0 })).toMatchObject({ kind: "add_reps", reps: 16 });
+    expect(nextTarget({ last: [set(null, 60)], repMin: 30, repMax: 60, increment: 0, unit: "secs" })).toMatchObject({ kind: "add_reps", reps: 65 });
+    expect(nextTarget({ last: [set(25, 60)], repMin: 30, repMax: 60, increment: 5, unit: "secs" })).toMatchObject({ kind: "add_reps", weight: 25, reps: 65 });
   });
 });
 
@@ -128,7 +164,7 @@ describe("buildSeries", () => {
 });
 
 describe("targetValue", () => {
-  const target = nextTarget({ last: [set(150, 10)], ...range });
+  const target = nextTarget({ last: [set(150, 10)], before: [set(150, 10)], ...range });
 
   it("projects the next point for the metric being charted", () => {
     expect(targetValue(target, "weight")).toBe(155);
@@ -160,18 +196,26 @@ describe("nextTarget — lighter weeks", () => {
 describe("nextTarget — when the rep range moves up", () => {
   it("works the load back from the estimated max instead of holding a heavy weight", () => {
     // Strength plan (3–6) rebuilt as fat loss (8–12): 315 × 4 must not become "315 × 8".
-    const t = nextTarget({ last: [set(315, 4)], repMin: 8, repMax: 12, increment: 5 });
+    const t = nextTarget({ last: [set(315, 4)], lastRange: { repMin: 3, repMax: 6 }, repMin: 8, repMax: 12, increment: 5 });
     expect(t.kind).toBe("reset");
     expect(t.reps).toBe(8);
     expect(t.weight).toBeLessThan(315);
     expect(e1rm(t.weight as number, 8)).toBeLessThanOrEqual(e1rm(315, 4));
   });
 
+  it("drops by the same amount as before when the range moved up (150 × 4 at 3–5, now 6–10)", () => {
+    expect(nextTarget({ last: [set(150, 4)], lastRange: { repMin: 3, repMax: 5 }, ...range })).toMatchObject({ kind: "reset", weight: 140, reps: 6 });
+  });
+
+  it("holds when the range is unknown (an imported or unplanned session): it can't tell a new range from a hard day", () => {
+    expect(nextTarget({ last: [set(315, 4)], lastRange: null, repMin: 8, repMax: 12, increment: 5 }).kind).toBe("hold");
+  });
+
 });
 
 describe("nextTarget — load jumps", () => {
   it("adds the increment exactly, without rounding an odd weight up", () => {
-    expect(nextTarget({ last: [set(22.5, 10)], ...range }).weight).toBe(27.5);
+    expect(nextTarget({ last: [set(22.5, 10)], before: [set(22.5, 10)], ...range }).weight).toBe(27.5);
   });
 });
 

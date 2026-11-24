@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, prescriptionLabels, setPlan } from "./prescription";
+import { clock, prescribedRange, prescriptionLabels, setPlan } from "./prescription";
 
 describe("prescriptionLabels", () => {
   it("shows one weight, or the range across the sets", () => {
@@ -39,5 +39,15 @@ describe("clock", () => {
   it("is m:ss", () => {
     expect(clock(75)).toBe("1:15");
     expect(clock(120)).toBe("2:00");
+  });
+});
+
+describe("prescribedRange", () => {
+  it("is the first set's rep range, or null for a timed or missing prescription", () => {
+    expect(prescribedRange([{ repMin: 6, repMax: 10 }, { repMin: 8, repMax: 12 }])).toEqual({ repMin: 6, repMax: 10 });
+    expect(prescribedRange([{ repMin: 5 }])).toEqual({ repMin: 5, repMax: 5 });
+    expect(prescribedRange([{ repMin: 30, repMax: 60, unit: "secs" }])).toBeNull();
+    expect(prescribedRange([])).toBeNull();
+    expect(prescribedRange(null)).toBeNull();
   });
 });

@@ -1,8 +1,9 @@
 /**
  * Progressive overload — pure, no I/O.
  *
- * `nextTarget` decides what the athlete should aim for today from what they
- * did last time (double progression). `sessionPoint` and `buildSeries` turn
+ * `nextTarget` decides what the athlete should aim for today from their last
+ * two sessions (double progression: reps first, then weight once every set
+ * has reached the top twice running). `sessionPoint` and `buildSeries` turn
  * raw set logs into the per-session numbers the charts plot.
  */
 
@@ -18,12 +19,24 @@ export type Target = {
   kind: "first" | "add_weight" | "add_reps" | "hold" | "reset" | "deload" | "custom";
   headline: string;
   reason: string;
+  /** Every set reached the top once: one more session like it and the weight goes up. */
+  oneMore?: true;
 };
 
 const round = (v: number, step: number) => (step > 0 ? Math.round(v / step) * step : v);
 
+/** A session's completed sets at its heaviest weight: the working sets a progression is judged on. */
+function workingSets(sets: LoggedSet[]) {
+  const done = sets.filter((s) => s.completed && s.reps != null && s.reps > 0);
+  const weight = done.reduce<number | null>((max, s) => (s.weight != null && (max == null || s.weight > max) ? s.weight : max), null);
+  const reps = (weight == null ? done : done.filter((s) => s.weight === weight)).map((s) => s.reps as number);
+  return { done, weight, reps };
+}
+
 export function nextTarget({
   last,
+  before = [],
+  lastRange = null,
   repMin,
   repMax,
   increment,
@@ -37,6 +50,14 @@ export function nextTarget({
    * becomes the bar to beat. Empty = never done.
    */
   last: LoggedSet[];
+  /** Sets from the counted session before that one (same rule). A weight goes up only after two sessions at the top. */
+  before?: LoggedSet[];
+  /**
+   * The rep range `last` was prescribed at, when known. A drop in weight is only
+   * suggested when the range has moved up since (a new block, a rebuilt plan);
+   * unknown means a hard day at the same range, so the weight holds.
+   */
+  lastRange?: { repMin: number; repMax: number } | null;
   repMin: number;
   repMax: number;
   /** Load jump in lb. 0 = bodyweight / unloaded. */
@@ -49,7 +70,7 @@ export function nextTarget({
 }): Target {
   // A time reads as minutes and seconds ("15 min"); reps as "10 reps".
   const amt = (n: number) => (unit === "secs" ? durationLabel(n) : `${n} reps`);
-  const done = last.filter((s) => s.completed && s.reps != null && s.reps > 0);
+  const { done, weight: topWeight, reps: working } = workingSets(last);
 
   if (done.length === 0) {
     return {
@@ -67,12 +88,7 @@ export function nextTarget({
     };
   }
 
-  const topWeight = done.reduce<number | null>(
-    (max, s) => (s.weight != null && (max == null || s.weight > max) ? s.weight : max),
-    null
-  );
-  const atTop = topWeight == null ? done : done.filter((s) => s.weight === topWeight);
-  const bestReps = Math.max(...atTop.map((s) => s.reps as number));
+  const bestReps = Math.max(...working);
 
   // Lighter week: same load, stop short. No progression is asked for.
   if (deload) {
@@ -100,7 +116,23 @@ export function nextTarget({
     };
   }
 
-  if (bestReps >= repMax) {
+  const lowest = Math.min(...working);
+
+  // At the top: every working set reached repMax. The weight goes up only the
+  // second session running at the same weight; the first time, it holds.
+  if (lowest >= repMax) {
+    const prev = workingSets(before);
+    const twice = prev.weight === topWeight && prev.reps.length > 0 && Math.min(...prev.reps) >= repMax;
+    if (!twice) {
+      return {
+        weight: topWeight,
+        reps: repMax,
+        kind: "hold",
+        oneMore: true,
+        headline: `${topWeight} lb × ${repMax}`,
+        reason: "One more session like that and you go up.",
+      };
+    }
     const weight = Math.round((topWeight + increment) * 100) / 100;
     const reps = Math.max(repMin, repMax - 2);
     return {
@@ -108,15 +140,18 @@ export function nextTarget({
       reps,
       kind: "add_weight",
       headline: `Go up to ${weight} lb`,
-      reason: `You hit ${bestReps} reps at ${topWeight} lb — the top of your range. Add ${increment} lb and aim for ${reps}.`,
+      reason: `Every set hit ${repMax} reps at ${topWeight} lb, two sessions in a row. Add ${increment} lb and aim for ${reps}.`,
     };
   }
 
-  if (bestReps < repMin) {
-    // Well short of the range — usually because the range itself moved up
-    // (a rebuilt plan, a new block). Asking for the old weight at far more
-    // reps would be unsafe, so work the load back from the estimated max.
-    if (repMin - bestReps >= 2) {
+  // Below the range: hold the weight. A hard day is not a reason to drop.
+  if (lowest < repMin) {
+    // The one exception: the range itself moved up (a new block, a rebuilt plan),
+    // so last time's reps sit under a minimum they were never aimed at. Asking
+    // for the old weight at far more reps would be unsafe, so work the load
+    // back from the estimated max.
+    const rangeUp = lastRange != null && lastRange.repMin < repMin;
+    if (rangeUp && repMin - bestReps >= 2) {
       const est = e1rm(topWeight, bestReps);
       const weight = Math.max(increment, round(Math.floor(est / (1 + repMin / 30) / increment) * increment, increment));
       if (weight < topWeight) {
@@ -134,17 +169,21 @@ export function nextTarget({
       reps: repMin,
       kind: "hold",
       headline: `Stay at ${topWeight} lb`,
-      reason: `You got ${bestReps} reps last time. Own ${repMin} at this weight before adding more.`,
+      reason: `You got ${lowest} reps on a set last time. Own ${repMin} on every set at this weight before adding more.`,
     };
   }
 
+  // Inside the range: same weight, one more rep, until every set reaches the top.
   const reps = Math.min(repMax, bestReps + 1);
   return {
     weight: topWeight,
     reps,
     kind: "add_reps",
     headline: `${topWeight} lb × ${reps}`,
-    reason: `Same weight as last time, one more rep (${bestReps} → ${reps}). At ${repMax} you add weight.`,
+    reason:
+      bestReps >= repMax
+        ? `Same weight. Get every set to ${repMax}, then you add weight.`
+        : `Same weight as last time, one more rep (${bestReps} → ${reps}). With every set at ${repMax}, you add weight.`,
   };
 }
 

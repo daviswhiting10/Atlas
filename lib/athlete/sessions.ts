@@ -43,7 +43,20 @@ export function weekOf(time: number, start: number): number {
  * completed set, skipping lighter weeks (a planned back-off is not the bar to
  * beat). Falls back to a lighter-week session if that is all there is.
  */
+const usable = (s: { sets: LoggedSet[] }) => s.sets.some((x) => x.completed && x.reps != null && x.reps > 0);
+
 export function referenceSession<T extends { deload: boolean; sets: LoggedSet[] }>(sessions: T[]): T | null {
-  const usable = sessions.filter((s) => s.sets.some((x) => x.completed && x.reps != null && x.reps > 0));
-  return [...usable].reverse().find((s) => !s.deload) ?? usable[usable.length - 1] ?? null;
+  const counted = sessions.filter(usable);
+  return [...counted].reverse().find((s) => !s.deload) ?? counted[counted.length - 1] ?? null;
+}
+
+/**
+ * The counted session before the reference one (same rule, never a lighter
+ * week): "two sessions in a row at the top" is judged on these two. Null when
+ * the reference is itself a lighter-week fallback or there is nothing earlier.
+ */
+export function sessionBefore<T extends { deload: boolean; sets: LoggedSet[] }>(sessions: T[], ref: T | null): T | null {
+  if (!ref || ref.deload) return null;
+  const i = sessions.indexOf(ref);
+  return [...sessions.slice(0, i)].reverse().find((s) => !s.deload && usable(s)) ?? null;
 }

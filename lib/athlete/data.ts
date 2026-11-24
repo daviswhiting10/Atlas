@@ -25,8 +25,8 @@ import { LIGHTER_SELECT, isLighterWeek, type LighterSource } from "@/lib/plan/li
 import { loadPlanOverview, type PlanOverview, type WorkoutSummary } from "@/lib/plan/overview";
 
 export type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
-import { setPlan, type PrescribedSet } from "@/lib/plan/prescription";
-import { DAY_MS, iso, localDay, referenceSession, safeTimeZone, weekOf } from "./sessions";
+import { prescribedRange, setPlan, type PrescribedSet } from "@/lib/plan/prescription";
+import { DAY_MS, iso, localDay, referenceSession, safeTimeZone, sessionBefore, weekOf } from "./sessions";
 import { finishedTotals } from "./totals";
 import { loadCalendar } from "@/lib/history/load";
 import type { HistoryCalendar } from "@/lib/history/calendar";
@@ -46,7 +46,7 @@ export { safeTimeZone };
 const getTimeZone = () => safeTimeZone(cookies().get(TZ_COOKIE)?.value);
 
 type Session =
- { date: Date; deload: boolean; sets: LoggedSet[] };
+ { date: Date; deload: boolean; sets: LoggedSet[]; range: { repMin: number; repMax: number } | null };
 
 
 /** Select shape that lets a logged set be traced back to its plan week. */
@@ -223,6 +223,8 @@ export async function loadProgress({
       completed: true,
       workoutLogId: true,
       workoutLog: WEEK_SOURCE,
+      // The range the set was prescribed at: tells "the range moved up" from a hard day (see nextTarget).
+      assignedWorkoutExercise: { select: { prescribedSets: true } },
       exercise: { select: { name: true, slug: true, primaryMuscles: true } },
     },
   });
@@ -254,7 +256,7 @@ export async function loadProgress({
     }
     let session = entry.sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date, deload: isDeloadSession(s.workoutLog, selfServe), sets: [] };
+      session = { date, deload: isDeloadSession(s.workoutLog, selfServe), sets: [], range: prescribedRange(s.assignedWorkoutExercise?.prescribedSets) };
       entry.sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
@@ -278,8 +280,9 @@ export async function loadProgress({
     const series = buildSeries(points);
     const loaded = series.some((p) => p.weight != null);
     const rx = plan?.rx[exerciseId];
+    const ref = referenceSession(sessions);
     const target = rx
-      ? nextTarget({ last: referenceSession(sessions)?.sets ?? [], ...rx, increment: loaded ? entry.inc || 5 : 0 })
+      ? nextTarget({ last: ref?.sets ?? [], before: sessionBefore(sessions, ref)?.sets, lastRange: ref?.range, ...rx, increment: loaded ? entry.inc || 5 : 0 })
       : null;
     exercises.push({ exerciseId, name: entry.name, muscles: entry.muscles, loaded, timed: entry.timed, series, target });
 
@@ -405,6 +408,8 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       completed: true,
       workoutLogId: true,
       workoutLog: WEEK_SOURCE,
+      // The range the set was prescribed at: tells "the range moved up" from a hard day (see nextTarget).
+      assignedWorkoutExercise: { select: { prescribedSets: true } },
     },
   });
   const workoutQuery = prisma.assignedWorkout.findFirst({
@@ -470,7 +475,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     }
     let session = sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [] };
+      session = { date: s.workoutLog.date, deload: isDeloadSession(s.workoutLog, athlete.selfServe), sets: [], range: prescribedRange(s.assignedWorkoutExercise?.prescribedSets) };
       sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
@@ -503,7 +508,17 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       unit !== "secs" ||
       timedHasLoad({ name: e.exercise.name, equipment: e.exercise.equipment, tool: cat?.tool, prescribedWeight: prescribed.some((p) => typeof p.weight === "number" && p.weight > 0), everLoaded });
 
-    const computed = nextTarget({ last: lastSession?.sets ?? [], repMin, repMax, increment, unit, timed: kind ?? "hold", deload: deloadWeek });
+    const computed = nextTarget({
+      last: lastSession?.sets ?? [],
+      before: sessionBefore(sessions, lastSession)?.sets,
+      lastRange: lastSession?.range,
+      repMin,
+      repMax,
+      increment,
+      unit,
+      timed: kind ?? "hold",
+      deload: deloadWeek,
+    });
     // A weight written into the plan (by the athlete mid-session, or by a
     // coach) is the target. Otherwise it is worked out from the last session.
     const setWeight = typeof first.weight === "number" && first.weight > 0 && !bodyweight ? first.weight : null;

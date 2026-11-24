@@ -13,6 +13,13 @@ export type PrescribedSet = {
   notes?: string | null;
 };
 
+/** The rep range a rep-based prescription was set at (its first set), or null when it isn't one. */
+export function prescribedRange(raw: unknown): { repMin: number; repMax: number } | null {
+  const first = Array.isArray(raw) ? (raw[0] as PrescribedSet | undefined) : undefined;
+  if (!first || first.unit === "secs" || typeof first.repMin !== "number") return null;
+  return { repMin: first.repMin, repMax: typeof first.repMax === "number" ? first.repMax : first.repMin };
+}
+
 const num = (n: number) => (Number.isInteger(n) ? String(n) : (Math.round(n * 10) / 10).toString());
 
 /** "2:00" for 120 seconds. */

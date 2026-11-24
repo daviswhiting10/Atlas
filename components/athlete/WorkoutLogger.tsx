@@ -983,8 +983,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">
                             {list.length} × {timed ? durationRange(ex.repMin, ex.repMax) : `${ex.repMin === ex.repMax ? ex.repMax : `${ex.repMin}–${ex.repMax}`} ${unit}`}
                           </p>
-                          {/* Only a first time (nothing to go on) gets a word of guidance; a hold is timed, so it never asks for "N reps". */}
-                          {ex.target.kind === "first" && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
+                          {/* Only a first time (nothing to go on) and "at the top once, one more to go up" get a word of guidance; a hold is timed, so it never asks for "N reps". */}
+                          {(ex.target.kind === "first" || ex.target.oneMore) && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
                           {/* The coach's note on the exercise, as written. */}
                           {ex.note && <p className="mt-1 text-[13px] leading-snug text-ink-soft">{ex.note}</p>}
                         </div>
