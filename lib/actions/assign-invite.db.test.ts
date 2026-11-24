@@ -18,7 +18,7 @@ const RUN = !!process.env.ATLAS_DB_TEST;
 describe.skipIf(!RUN)("assign and invite", () => {
   let prisma: typeof import("@/lib/db/client").prisma;
   let ws = "";
-  const tag = Date.now().toString(36);
+  const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const mail = (who: string) => `${tag}-${who}@guest.atlas.app`;
 
   beforeAll(async () => {

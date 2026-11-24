@@ -26,6 +26,7 @@
     "@modelcontextprotocol/server": "^2.4.0",
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/adapter-neon": "^7.8.0",
+    "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "^7.8.0",
     "@radix-ui/react-select": "^2.2.6",
     "@vercel/blob": "2.8.2",

@@ -6,6 +6,7 @@ Start with `HANDOFF.md` (where things stand, decisions, build order). Design doc
 
 ## Databases
 - Production is the Neon branch `production` (endpoint `ep-nameless-field…`). Local development points at a Neon branch (`dev-sessions`), never production.
+- Fuzz runs, the Monday loop and DB tests use the local Postgres (`DATABASE_URL_LOCAL`, docs/local-postgres.md). Rehearsals stay on Neon branches.
 - Never run migrations, tests, seeds or data scripts against production while developing. Rehearse on a fresh branch copy of production first.
 - Changing production data: take a full backup (`pg_dump`, saved outside the repo, checked with `pg_restore --list`), rehearse on a branch, compare before/after counts, then apply. Stop if any count differs.
 - `prisma/seed.ts` refuses to run against production (`lib/db/production.ts`): it rewrites the exercise library and deletes exercises missing from its list.

@@ -21,7 +21,7 @@ describe.skipIf(!process.env.ATLAS_DB_TEST)("up next in plan order, after a sess
   let athleteUser = "";
   let clientId = "";
   let plan: Array<{ id: string; name: string; aweId: string }> = [];
-  const tag = Date.now().toString(36);
+  const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const asCoach = () => (current.user = { id: coachId, role: "TRAINER", workspaceId: ws });
   const asAthlete = () => (current.user = { id: athleteUser, role: "CLIENT", workspaceId: ws, clientProfileId: clientId });
 

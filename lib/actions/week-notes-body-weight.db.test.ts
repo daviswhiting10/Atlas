@@ -17,7 +17,7 @@ describe.skipIf(!process.env.ATLAS_DB_TEST)("week notes and body weight", () => 
   let clientId = "";
   let clientUserId = "";
   let planId = "";
-  const tag = Date.now().toString(36);
+  const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
   beforeAll(async () => {
     ({ prisma } = await import("@/lib/db/client"));

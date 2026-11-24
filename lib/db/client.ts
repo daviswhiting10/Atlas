@@ -1,5 +1,7 @@
 import { PrismaClient } from "@/app/generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { isLocalDatabase } from "./local";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -9,7 +11,9 @@ function createPrismaClient(): PrismaClient {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set. Add it to .env.local and restart.");
   }
-  const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL });
+  const connectionString = process.env.DATABASE_URL;
+  // Neon's driver speaks Neon's protocol; a plain Postgres (the local Docker one, docs/local-postgres.md) needs node-postgres.
+  const adapter = isLocalDatabase(connectionString) ? new PrismaPg({ connectionString }) : new PrismaNeon({ connectionString });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return new PrismaClient({ adapter } as any);
 }
