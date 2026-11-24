@@ -282,3 +282,30 @@ nav a[data-pressed="true"], nav button[data-pressed="true"], header a[data-press
   font-weight: 400;
   letter-spacing: -0.01em;
 }
+
+/* The live-session bar grows into the logger and shrinks back (lib/live-transition). The name is on only while it runs. */
+html[data-live-vt] [data-live-bar],
+html[data-live-vt] [data-live-root] {
+  view-transition-name: live-session;
+}
+::view-transition-group(live-session) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-old(live-session),
+::view-transition-new(live-session) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+html[data-live-vt]::view-transition-old(root),
+html[data-live-vt]::view-transition-new(root) {
+  animation-duration: 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

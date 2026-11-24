@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { addWork, workOf } from "./work";
+import type { HistorySession, HistorySet } from "./types";
+
+const set = (o: Partial<HistorySet> = {}): HistorySet => ({ exerciseId: "e", weight: 100, reps: 8, completed: true, ...o });
+const ses = (o: Partial<HistorySession>): HistorySession => ({ id: "s", date: new Date("2026-11-17T12:00:00Z"), completedAt: new Date("2026-11-17T13:00:00Z"), durationMin: null, sets: [], ...o });
+
+describe("work units: sets + cardio min ÷ 3 + walk min ÷ 10 + mobility min ÷ 5", () => {
+  it("strength is one unit a set", () => {
+    expect(workOf(ses({ durationMin: 60, sets: Array.from({ length: 22 }, () => set()) }))).toMatchObject({ sets: 22, units: 22 });
+  });
+  it("a quick-logged run is its minutes ÷ 3, a walk its minutes ÷ 10", () => {
+    expect(workOf(ses({ activity: "RUN", durationMin: 45 }))).toMatchObject({ runMin: 45, units: 15 });
+    expect(workOf(ses({ activity: "OTHER", durationMin: 30 }))).toMatchObject({ runMin: 30, units: 10 });
+    expect(workOf(ses({ activity: "WALK", durationMin: 60 }))).toMatchObject({ walkMin: 60, units: 6 });
+  });
+  it("mobility sets share the session's time, ÷ 5", () => {
+    expect(workOf(ses({ durationMin: 20, sets: Array.from({ length: 4 }, () => set({ mobility: true, weight: null })) }))).toMatchObject({ mobMin: 20, sets: 0, units: 4 });
+  });
+  it("a mixed session shares its time by logged sets: 10 lifting sets and 10 cardio sets in 60 min", () => {
+    const sets = [...Array.from({ length: 10 }, () => set()), ...Array.from({ length: 10 }, () => set({ cardio: "RUN", weight: null, reps: 60 }))];
+    const w = workOf(ses({ durationMin: 60, sets }));
+    expect(w).toMatchObject({ sets: 10, runMin: 30 });
+    expect(Math.round(w.units)).toBe(20);
+  });
+  it("no duration: strength sets only, nothing invented", () => {
+    expect(workOf(ses({ sets: [set(), set({ cardio: "RUN", weight: null, reps: 30 })] }))).toMatchObject({ sets: 1, runMin: 0, units: 1 });
+  });
+  it("sets not completed do not count", () => {
+    expect(workOf(ses({ durationMin: 30, sets: [set({ completed: false })] })).units).toBe(0);
+  });
+  it("a day adds its sessions", () => {
+    expect(addWork([workOf(ses({ sets: [set(), set()] })), workOf(ses({ activity: "RUN", durationMin: 30 }))]).units).toBe(12);
+  });
+});

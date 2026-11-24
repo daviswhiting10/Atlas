@@ -437,14 +437,19 @@ enum WorkoutStatus {
 }
 
 model AssignedWorkoutExercise {
-  id                String  @id @default(cuid())
+  id                String          @id @default(cuid())
   workspaceId       String
   assignedWorkoutId String
   exerciseId        String
   order             Int
   prescribedSets    Json // SetShape[]
-  notes             String? @db.Text
+  notes             String?         @db.Text
   section           String? // "warmup" | "block_a" | "block_b" | "finisher" — copied from WorkoutExercise
+  /// How it is logged: sets of weight and reps, or a cardio entry (distance, time, pace, splits). Chosen when the exercise
+  /// is added to the plan; there is no per-session switch.
+  mode              ExerciseMode    @default(STRENGTH)
+  /// Cardio only: a run, a walk or other (the heatmap's corner icon).
+  activity          CardioActivity?
 
   assignedWorkout AssignedWorkout @relation(fields: [assignedWorkoutId], references: [id], onDelete: Cascade)
   exercise        Exercise        @relation(fields: [exerciseId], references: [id])
@@ -456,6 +461,19 @@ model AssignedWorkoutExercise {
 // ─────────────────────────────────────────────
 // SESSIONS: every workout done, from a plan or not
 // ─────────────────────────────────────────────
+
+/// How a plan exercise is logged.
+enum ExerciseMode {
+  STRENGTH
+  CARDIO
+}
+
+/// What kind of cardio it was.
+enum CardioActivity {
+  RUN
+  WALK
+  OTHER
+}
 
 /// Where a session came from.
 enum SessionSource {
@@ -481,6 +499,9 @@ model WorkoutLog {
   date              DateTime // the day it was actually done (never the scheduled day)
   completedAt       DateTime? // finished; null while in progress
   durationMin       Int?
+  /// A quick log of cardio or a walk (no plan exercise behind it): what it was, and how far if they said.
+  activity          CardioActivity?
+  distanceM         Float?
   rpeAvg            Float?
   clientNotes       String?          @db.Text
   trainerSeen       Boolean          @default(false)
@@ -504,6 +525,9 @@ model SetLog {
   reps                      Int?
   rpe                       Float? // per-set RPE (1–10)
   note                      String?                  @db.Text // per-set coach note
+  /// Cardio exercises (mode CARDIO): metres covered, and the seconds each split took, in order. `reps` holds the seconds.
+  distanceM                 Float?
+  splits                    Json?
   completed                 Boolean                  @default(true)
   createdAt                 DateTime                 @default(now())
 

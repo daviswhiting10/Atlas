@@ -2,18 +2,47 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { CalendarSession } from "@/lib/history/calendar";
-import { DESKTOP_STEP, hasEarlier, PHONE_STEP, PHONE_WEEKS, rangeLabel, readout, YEAR_WEEKS, yearGrid, type GridCell } from "@/lib/history/year-grid";
+import { BAND_LABELS, DESKTOP_STEP, hasEarlier, PHONE_STEP, PHONE_WEEKS, rangeLabel, readout, YEAR_WEEKS, yearGrid, type GridCell, type GridLevel, type HeatDays } from "@/lib/history/year-grid";
 import { cn } from "@/lib/utils";
+import { ModeIcon, MODE_LABEL } from "./HeatIcons";
 
-/** One accent, four steps. Empty days are a very light gray, future days fainter still. */
-const STEP = ["", "36%", "58%", "80%", "100%"].map((p) => (p ? `color-mix(in srgb, var(--dusk-teal) ${p}, transparent)` : undefined));
+/** One accent, five bands. Empty days are a very light gray, future days fainter still. */
+const BAND: Record<GridLevel, string | undefined> = {
+  0: undefined,
+  1: "color-mix(in srgb, var(--dusk-teal) 30%, transparent)",
+  2: "color-mix(in srgb, var(--dusk-teal) 48%, transparent)",
+  3: "color-mix(in srgb, var(--dusk-teal) 66%, transparent)",
+  4: "color-mix(in srgb, var(--dusk-teal) 83%, transparent)",
+  5: "var(--dusk-teal)",
+};
 const EMPTY = "bg-ink/[0.07]";
 const FUTURE = "bg-ink/[0.035]";
+/** The corner icon is dark on the strong bands and light on the pale ones, so it reads on both. */
+const iconColor = (l: GridLevel) => (l >= 4 ? "#0f2a27" : "#ece8e1");
+
+/** The challenge ring: a closed circle when the day's rules were met, a circle with a gap when not. */
+function Ring({ met }: { met: boolean }) {
+  const r = 10.4;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg viewBox="0 0 24 24" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden>
+      <circle
+        cx="12"
+        cy="12"
+        r={r}
+        fill="none"
+        stroke="#f1e9de"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        {...(met ? {} : { strokeDasharray: `${(c * 0.72).toFixed(1)} ${(c * 0.28).toFixed(1)}`, transform: "rotate(-70 12 12)" })}
+      />
+    </svg>
+  );
+}
 
 /**
- * The year of training: weeks as columns, seven day rows (Monday first), small rounded squares with an even 2 px gap, a
- * month name above the first week of each month. Intensity is logged sets in the day (lib/history/year-grid).
+ * The year of training, v3: weeks as columns, seven day rows (Monday first). Colour is the work done that day (sets, and minutes of cardio, walking and mobility, as one number) in five
+ * fixed bands; the corner icon is how it was done; a ring marks a running challenge's days (closed when met, open when not).
  *
  * A desktop shows the whole year; a phone the last 13 weeks (three months), right-aligned, so the squares are big enough
  * to hit and stay off the screen edge. Arrows above the grid move the window back (and forward again), a phone by its
@@ -22,7 +51,7 @@ const FUTURE = "bg-ink/[0.035]";
  * Colour is the answer: there is no line of text under the grid. Touching or hovering a day opens a small tooltip over it
  * with that day's detail (the same words, "Tue Nov 11 · Lower A · 14 sets").
  */
-export function YearHeatmap({ byDay, today, summary }: { byDay: Record<string, CalendarSession[]>; today: string; summary: string }) {
+export function YearHeatmap({ byDay, today, summary, challenge }: { byDay: HeatDays; today: string; summary: string; challenge: string | null }) {
   const [back, setBack] = useState(0);
   const grid = useMemo(() => yearGrid(byDay, { today, weeks: YEAR_WEEKS, back }), [byDay, today, back]);
   const cells = useMemo(() => new Map(grid.columns.flatMap((c) => c.cells).map((c) => [c.day, c] as const)), [grid]);
@@ -32,6 +61,7 @@ export function YearHeatmap({ byDay, today, summary }: { byDay: Record<string, C
   const cols = grid.columns;
   const last = cols[cols.length - 1].monday;
   const shown: GridCell | null = tip ? (cells.get(tip.day) ?? null) : null;
+  const info = challenge ? { name: challenge, today } : null;
 
   // A tap anywhere else closes the tooltip.
   useEffect(() => {
@@ -95,9 +125,12 @@ export function YearHeatmap({ byDay, today, summary }: { byDay: Record<string, C
                   key={c.day}
                   data-day={c.day}
                   aria-hidden
-                  className={"block aspect-square rounded-[3px] " + (c.future ? FUTURE : c.level === 0 ? EMPTY : "") + (tip?.day === c.day ? " ring-1 ring-ink" : "")}
-                  style={c.level > 0 && !c.future ? { background: STEP[c.level] } : undefined}
-                />
+                  className={"relative block aspect-square rounded-[3px] " + (c.future ? FUTURE : c.level === 0 ? EMPTY : "") + (tip?.day === c.day ? " outline outline-1 outline-offset-1 outline-ink" : "")}
+                  style={c.level > 0 && !c.future ? { background: BAND[c.level] } : undefined}
+                >
+                  {c.mode && <ModeIcon mode={c.mode} color={iconColor(c.level)} className={"pointer-events-none absolute right-[8%] top-[8%] block h-[38%] " + (c.mode === "M" ? "w-[56%]" : "w-[38%]")} />}
+                  {c.ring && <Ring met={c.ring === "met"} />}
+                </span>
               ))}
             </div>
           ))}
@@ -109,13 +142,56 @@ export function YearHeatmap({ byDay, today, summary }: { byDay: Record<string, C
             // Centred over the day, and slid toward the nearer edge so it never leaves the box.
             style={{ left: tip.x, top: tip.y, transform: `translate(-${(tip.x / tip.w) * 100}%, -100%)` }}
           >
-            {readout(shown)}
+            {readout(shown, info)}
           </div>
         )}
       </div>
       <p aria-live="polite" className="sr-only">
-        {shown ? readout(shown) : ""}
+        {shown ? readout(shown, info) : ""}
       </p>
+      <Legend challenge={challenge} />
+    </div>
+  );
+}
+
+/** What the colours, icons and rings mean. Shown the way a map key is: small, below the grid. */
+function Legend({ challenge }: { challenge: string | null }) {
+  const row = "flex flex-wrap items-center gap-x-4 gap-y-1.5";
+  return (
+    <div className="mt-4 space-y-2 text-[11px] text-ink-mute">
+      <div className={row}>
+        <span>work</span>
+        {([1, 2, 3, 4, 5] as const).map((l) => (
+          <span key={l} className="inline-flex items-center gap-1.5">
+            <i className="inline-block h-[11px] w-[11px] rounded-[3px]" style={{ background: BAND[l] }} />
+            {BAND_LABELS[l - 1]}
+          </span>
+        ))}
+      </div>
+      <div className={row}>
+        {(["S", "R", "W", "M"] as const).map((m) => (
+          <span key={m} className="inline-flex items-center gap-1.5">
+            <ModeIcon mode={m} color="currentColor" className={"block h-3 " + (m === "M" ? "w-5" : "w-3")} />
+            {MODE_LABEL[m]}
+          </span>
+        ))}
+      </div>
+      {challenge && (
+        <div className={row}>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="relative inline-block h-[14px] w-[14px] text-ink">
+              <Ring met />
+            </span>
+            {challenge} day met
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="relative inline-block h-[14px] w-[14px] text-ink">
+              <Ring met={false} />
+            </span>
+            not met
+          </span>
+        </div>
+      )}
     </div>
   );
 }
