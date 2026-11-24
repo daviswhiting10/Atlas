@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db/client";
 import { activeGoalId } from "@/lib/goals/data";
 import { isCoached } from "@/lib/athlete/coached";
 import { nutritionEnabled } from "@/lib/nutrition/flag";
+import { youPlan } from "@/lib/athlete/you-summary";
 
 export const metadata: Metadata = { title: "You" };
 
@@ -18,10 +19,10 @@ export default async function YouPage({ searchParams }: { searchParams: { goals?
   const [account, plan, programs, goalId] = await Promise.all([
     // Real accounts (not guests or the demo) can set or change a password here.
     athlete.isGuest ? null : prisma.user.findUnique({ where: { id: athlete.userId }, select: { email: true, passwordHash: true } }),
-    athlete.isCoach ? getPlanOverview() : null,
+    getPlanOverview(),
     athlete.isCoach ? libraryForPicker(athlete.workspaceId) : [],
     // Starting a goal lives here (Today shows the goal's card once one is running).
     athlete.isGuest || isCoached(athlete) ? null : activeGoalId(athlete.clientId),
   ]);
-  return <YouScreen challenges={athlete.isGuest && !athlete.isDemo ? undefined : <Suspense fallback={null}><ChallengesList clientId={athlete.clientId} /></Suspense>} athlete={athlete} account={account} hasPlan={plan != null} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} nutrition={nutritionEnabled()} />;
+  return <YouScreen challenges={athlete.isGuest && !athlete.isDemo ? undefined : <Suspense fallback={null}><ChallengesList clientId={athlete.clientId} /></Suspense>} athlete={athlete} account={account} hasPlan={plan != null} plan={youPlan(plan)} programs={programs} goalsOpen={searchParams.goals === "1"} canStartGoal={!athlete.isGuest && !isCoached(athlete) && !goalId} nutrition={nutritionEnabled()} />;
 }
