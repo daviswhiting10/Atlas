@@ -85,12 +85,7 @@ export type HistoryCalendar =
       summary: string;
       /** What a tap on a day shows: that day's sessions, newest first. */
       byDay: Record<string, CalendarSession[]>;
-      /** The running challenge, with each of its days met or not (the ring on the heatmap); null when none is running. */
-      challenge: Challenge | null;
     };
-
-/** A running challenge's days: met (the day's rules all done) or open (not met, or not over yet). */
-export type Challenge = { name: string; days: Record<string, "met" | "open"> };
 
 export type SessionMeta = { title: string; href: string | null };
 export type ChapterSpan = { name: string; from: string; to: string };
@@ -119,7 +114,7 @@ export function shortDay(day: string): string {
 
 export function historyCalendar(
   sessions: HistorySession[],
-  opts: { timeZone: string; today: string; meta: Record<string, SessionMeta>; chapters?: ChapterSpan[]; challenge?: Challenge | null }
+  opts: { timeZone: string; today: string; meta: Record<string, SessionMeta>; chapters?: ChapterSpan[] }
 ): HistoryCalendar {
   const dated = datedFinished(sessions, opts.timeZone, opts.today);
   if (dated.length === 0) return { kind: "empty" };
@@ -182,7 +177,6 @@ export function historyCalendar(
     rows,
     summary: `${heat.activeWeeks} of the last ${plural(heat.weeksInRange, "week", "weeks")} active, ${plural(dated.length, "session", "sessions")}`,
     byDay,
-    challenge: opts.challenge ?? null,
   };
 }
 

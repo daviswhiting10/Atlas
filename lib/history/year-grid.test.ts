@@ -48,7 +48,7 @@ describe("work-unit bands: fixed, one colour", () => {
   it("days with nothing are unshaded; the days after today are future", () => {
     const g = yearGrid(heatDays({ "2026-11-24": [s("Oops", 90)] }), { today: TODAY, weeks: 2 });
     expect(cell(g, "2026-11-20").level).toBe(0);
-    expect(cell(g, "2026-11-24")).toMatchObject({ future: true, level: 0, mode: null, ring: null });
+    expect(cell(g, "2026-11-24")).toMatchObject({ future: true, level: 0, mode: null });
   });
 });
 
@@ -63,19 +63,16 @@ describe("the corner icon: a day's mode", () => {
   });
 });
 
-describe("the ring: the running challenge", () => {
-  const challenge = { name: "75 Hard", days: { "2026-11-16": "met" as const, "2026-11-17": "open" as const, "2026-11-23": "open" as const } };
-  const g = yearGrid(heatDays({ "2026-11-16": [s("Upper", 70)] }, challenge), { today: TODAY, weeks: 2 });
-  it("closed when met, open when not; a challenge day with nothing logged is an empty cell with an open ring", () => {
-    expect(cell(g, "2026-11-16")).toMatchObject({ ring: "met", level: 2 });
-    expect(cell(g, "2026-11-17")).toMatchObject({ ring: "open", level: 0 });
+describe("no rings: colour is the whole answer", () => {
+  it("a day carries no challenge state, only the work", () => {
+    const g = yearGrid(heatDays({ "2026-11-16": [s("Upper", 70)] }), { today: TODAY, weeks: 2 });
+    expect(Object.keys(cell(g, "2026-11-16")).sort()).not.toContain("ring");
+    expect(cell(g, "2026-11-17")).toMatchObject({ level: 0, titles: [] });
   });
-  it("days outside the challenge have no ring", () => {
-    expect(cell(g, "2026-11-18").ring).toBeNull();
-  });
-  it("without a running challenge there are no rings at all", () => {
-    const none = yearGrid(heatDays({ "2026-11-16": [s("Upper", 70)] }), { today: TODAY, weeks: 2 });
-    expect(none.columns.flatMap((c) => c.cells).every((c) => c.ring === null)).toBe(true);
+  it("the grid and the legend have no ring at all", () => {
+    const c = read("components/athlete/YearHeatmap.tsx");
+    expect(c).not.toMatch(/<Ring\b|function Ring|challenge/i);
+    expect(read("lib/history/load.ts")).not.toContain("loadChallenge");
   });
 });
 
@@ -114,18 +111,14 @@ describe("raw stats in the readout, not the units", () => {
 });
 
 describe("the one-line readout", () => {
-  const challenge = { name: "75 Hard", today: TODAY };
-  const d = heatDays({ "2026-11-14": [s("Long run", 52, "R")], "2026-11-11": [s("Lower A", 64)], "2026-11-12": [s("Imported", null, null, 0)] }, { name: "75 Hard", days: { "2026-11-14": "open", "2026-11-11": "met", "2026-11-23": "open" } });
+  const d = heatDays({ "2026-11-14": [s("Long run", 52, "R")], "2026-11-11": [s("Lower A", 64)], "2026-11-12": [s("Imported", null, null, 0)] });
   const g = yearGrid(d, { today: TODAY });
-  it("day, workout, raw stats (never the units), and the challenge", () => {
-    expect(readout(cell(g, "2026-11-14"), challenge)).toBe("Sat Nov 14 · Long run · 52 min run · 75 Hard: not met");
-    expect(readout(cell(g, "2026-11-11"), challenge)).toBe("Wed Nov 11 · Lower A · 10 sets · 75 Hard: met");
-  });
-  it("today's open ring says it is still going", () => {
-    expect(readout(cell(g, "2026-11-23"), challenge)).toBe("Mon Nov 23 · no session · 75 Hard: still open");
-  });
-  it("without a challenge, no challenge text; with no minutes, nothing is invented", () => {
+  it("day, workout and raw stats (never the units)", () => {
     expect(readout(cell(g, "2026-11-14"))).toBe("Sat Nov 14 · Long run · 52 min run");
+    expect(readout(cell(g, "2026-11-11"))).toBe("Wed Nov 11 · Lower A · 10 sets");
+  });
+  it("a day with nothing says so; with no minutes, nothing is invented", () => {
+    expect(readout(cell(g, "2026-11-23"))).toBe("Mon Nov 23 · no session");
     expect(readout(cell(g, "2026-11-12"))).toBe("Thu Nov 12 · Imported");
   });
   it("a day to come, and before anything is touched the latest training day", () => {
@@ -141,10 +134,9 @@ describe("the heatmap component", () => {
     expect(c).toContain('role="tooltip"');
     expect(c).not.toMatch(/tnum mt-3 min-h-\[22px\]/);
   });
-  it("one accent (not the purple of the reference); the ring is a closed circle or one with a gap", () => {
+  it("one accent (not the purple of the reference)", () => {
     expect(c).toContain("var(--dusk-teal)");
     expect(c).not.toMatch(/purple|violet/i);
-    expect(c).toContain("strokeDasharray");
   });
   it("shows the last 13 weeks on a phone and the year from md up, with no sideways scroll", () => {
     expect(c).toContain("max-md:hidden");
@@ -155,7 +147,7 @@ describe("the heatmap component", () => {
     expect(c).toContain("fade-in");
     expect(c).not.toMatch(/transition|animate-/);
   });
-  it("has a legend for the bands, the icons and the ring", () => {
+  it("has a legend for the bands and the icons", () => {
     expect(c).toContain("function Legend");
     expect(c).toContain("BAND_LABELS");
     expect(c).toContain("MODE_LABEL");

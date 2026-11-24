@@ -180,7 +180,7 @@ export function HistoryCalendar({ calendar, summary, quickLog = false, compact =
           )}
           <p className="sr-only">{calendar.summary}</p>
           <div className={compact ? "mt-1" : "mt-6"}>
-            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} challenge={calendar.challenge} />
+            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} />
           </div>
         </>
       )}
