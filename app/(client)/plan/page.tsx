@@ -41,7 +41,7 @@ const ACTIONS: PlanActions = {
 
 /**
  * The Plan tab (option B): up next first, with its exercises and Start, then the rest of the week,
- * "All N weeks". Edit plan and Change goals sit in the header's ⋯ (HeaderActions). The newest progress report is a row under the plan; the older ones are on All weeks.
+ * "All N weeks". Edit plan and Change goals are two quiet buttons at the bottom (the header's ⋯ no longer has them). The newest progress report is a row under the plan; the older ones are on All weeks.
  * ?view=all shows every week; ?view=edit the same with editing (not for a coached athlete).
  */
 export default async function PlanPage({ searchParams }: { searchParams?: { view?: string } }) {
@@ -116,6 +116,19 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         </div>
       )}
       {newestReport}
+      {/* Changing the plan or the goals: quiet, last on the page (they are not part of reading the week). */}
+      <div className="mt-10 flex max-w-3xl flex-col gap-2 sm:flex-row">
+        {!locked && (
+          <Link href="/plan?view=edit" className="press flex h-12 flex-1 items-center justify-center rounded-xl border border-line-strong text-[15px] font-semibold text-ink hover:bg-ink/5">
+            Edit plan
+          </Link>
+        )}
+        {athlete.selfServe && (
+          <Link href="/you?goals=1" className="press flex h-12 flex-1 items-center justify-center rounded-xl border border-line-strong text-[15px] font-semibold text-ink hover:bg-ink/5">
+            Change goals
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
