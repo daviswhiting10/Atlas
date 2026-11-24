@@ -23,6 +23,7 @@ import {
   PlanEditError,
   addExercise,
   addWorkout,
+  keepGrouping,
   removeExercise,
   removeWorkout,
   setLighterWeeks,
@@ -141,6 +142,17 @@ export async function coachSetTargets(clientId: string, assignmentId: string, ra
     const input = Targets.extend({ aweId: Ref, workoutId: Ref }).parse(raw);
     await setTargets(await scopeFor(clientId, assignmentId), input);
     refresh(clientId, assignmentId);
+  });
+}
+
+/** The coach logger's "Keep for this workout from now on": a superset made (or split) there, kept in the client's plan. */
+export async function coachKeepSuperset(clientId: string, assignmentId: string, raw: { workoutId: string; aweIds: string[] } | { workoutId: string; split: string }) {
+  return run(async () => {
+    const input = z.union([z.object({ workoutId: Ref, aweIds: z.array(Ref).min(2).max(LIMITS.exercisesPerWorkout) }), z.object({ workoutId: Ref, split: Ref })]).parse(raw);
+    const grouping = "aweIds" in input ? { kind: "group" as const, aweIds: input.aweIds } : { kind: "split" as const, aweId: input.split };
+    const result = await keepGrouping(await scopeFor(clientId, assignmentId), { workoutId: input.workoutId, ...grouping });
+    refresh(clientId, assignmentId);
+    return result;
   });
 }
 

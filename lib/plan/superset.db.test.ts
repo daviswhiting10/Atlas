@@ -1,6 +1,7 @@
 /**
  * A superset made mid-session and kept: written to this workout and to its later instances not yet logged, matched by
- * exercise. Logged instances are untouched; someone else's plan and a coach's client's plan are refused.
+ * exercise. Logged instances are untouched; someone else's plan and a coach's client's plan are refused. A coach keeps one
+ * for their own client from the coach logger; a coach from another workspace is refused.
  *   set -a; . ./.env.local; set +a; ATLAS_DB_TEST=1 npx vitest run lib/plan/superset.db.test.ts
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -16,6 +17,9 @@ type Row = { id: string; exerciseId: string; order: number; section: string | nu
 describe.skipIf(!process.env.ATLAS_DB_TEST)("keeping a superset for this workout from now on", () => {
   let prisma: typeof import("@/lib/db/client").prisma;
   let ws = "";
+  let otherWs = "";
+  let coach = "";
+  let otherCoach = "";
   const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const people: Record<"sam" | "kim" | "lee", { user: string; client: string }> = { sam: { user: "", client: "" }, kim: { user: "", client: "" }, lee: { user: "", client: "" } };
   const as = (who: keyof typeof people) => (current.user = { id: people[who].user, role: "CLIENT", workspaceId: ws, clientProfileId: people[who].client });
@@ -44,6 +48,9 @@ describe.skipIf(!process.env.ATLAS_DB_TEST)("keeping a superset for this workout
     const { createPlanForClient } = await import("@/lib/plan/persist");
     const { DEMO_PREFS } = await import("@/lib/guest");
     ws = (await prisma.workspace.create({ data: { name: `superset test ${tag}` }, select: { id: true } })).id;
+    coach = (await prisma.user.create({ data: { email: `${tag}-coach@guest.atlas.app`, name: "Jess", role: "TRAINER", workspaceId: ws }, select: { id: true } })).id;
+    otherWs = (await prisma.workspace.create({ data: { name: `superset test other ${tag}` }, select: { id: true } })).id;
+    otherCoach = (await prisma.user.create({ data: { email: `${tag}-other@guest.atlas.app`, name: "Max", role: "TRAINER", workspaceId: otherWs }, select: { id: true } })).id;
     for (const who of ["sam", "kim", "lee"] as const) {
       people[who].user = (await prisma.user.create({ data: { email: `${tag}-${who}@guest.atlas.app`, name: who, role: "CLIENT", workspaceId: ws }, select: { id: true } })).id;
       people[who].client = (
@@ -82,7 +89,7 @@ describe.skipIf(!process.env.ATLAS_DB_TEST)("keeping a superset for this workout
 
   afterAll(async () => {
     const { deleteGuestWorkspace } = await import("@/lib/guest-cleanup");
-    if (ws) await deleteGuestWorkspace(ws, { ttlMs: 0, includeAthletes: true }).catch((e) => console.error("cleanup failed", e));
+    for (const w of [ws, otherWs]) if (w) await deleteGuestWorkspace(w, { ttlMs: 0, includeAthletes: true }).catch((e) => console.error("cleanup failed", e));
   }, 60_000);
 
   it("week 1's Day 1 grouped and kept: every later unlogged Day 1 has the pair in one block; logged and lacking ones are left", async () => {
@@ -145,4 +152,23 @@ describe.skipIf(!process.env.ATLAS_DB_TEST)("keeping a superset for this workout
     expect(res).toEqual({ ok: false, error: "Your plan is managed by your coach." });
     expect(await rowsOf(w.id)).toEqual(before);
   }, 60_000);
+
+  it("a coach keeps a superset for their client (the coach logger); a coach from another workspace is refused", async () => {
+    const plan = await prisma.programAssignment.findFirstOrThrow({ where: { clientId: people.lee.client, status: "ACTIVE" }, select: { id: true } });
+    const all = await prisma.assignedWorkout.findMany({ where: { programAssignmentId: plan.id }, orderBy: { order: "asc" }, select: { id: true, name: true } });
+    const days = all.filter((w) => w.name === all[0].name).map((w) => w.id);
+    const rows = await rowsOf(days[0]);
+    const ids = [rows[0].id, rows[rows.length - 1].id];
+    const { coachKeepSuperset } = await import("@/lib/actions/coach-plan");
+
+    current.user = { id: otherCoach, role: "TRAINER", workspaceId: otherWs };
+    expect((await coachKeepSuperset(people.lee.client, plan.id, { workoutId: days[0], aweIds: ids })).ok).toBe(false);
+    expect(await rowsOf(days[0])).toEqual(rows);
+
+    current.user = { id: coach, role: "TRAINER", workspaceId: ws };
+    const res = await coachKeepSuperset(people.lee.client, plan.id, { workoutId: days[0], aweIds: ids });
+    expect(res).toEqual({ ok: true, updated: days.length - 1, skipped: 0 });
+    pair = [rows[0].exerciseId, rows[rows.length - 1].exerciseId];
+    for (const id of days) expect(await pairIn(id)).toEqual({ together: true, adjacent: true });
+  }, 120_000);
 });
