@@ -48,6 +48,10 @@ describe("decide: signed in", () => {
   it("lets both roles open goals: Start a goal and a goal's chapter", () => {
     for (const u of [coach, athlete]) for (const p of ["/goals/new", "/goals/clx9abc123", "/goals"]) expect(decide(p, u)).toEqual(next);
   });
+  it("lets both roles open a challenge (the Home chip and You's list link there; a failed one offers Start again)", () => {
+    for (const u of [coach, athlete]) for (const p of ["/challenges/clx9abc123"]) expect(decide(p, u)).toEqual(next);
+    expect(decide("/challengesx", athlete)).toEqual(go("/today"));
+  });
   it("opens goals and nothing else to athletes: look-alikes, the coach side and every API stay closed", () => {
     for (const p of ["/goalsx", "/goals-admin", "/goal", "/clients", "/clients/abc/goals", "/programs", "/log", "/inbox", "/exercises", "/intake", "/settings", "/sessions", "/leads", "/outreach"]) {
       expect(decide(p, athlete)).toEqual(go("/today"));

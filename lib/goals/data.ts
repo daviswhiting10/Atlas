@@ -5,6 +5,9 @@
  *
  * - a goal that has used up its days (and whose last day has closed) becomes
  *   COMPLETED, with endedAt at the end of that last day;
+ * - a `missFails` goal with a missed day becomes ENDED with `rules.failedOn` set to
+ *   that day and endedAt at its end. Only goals whose rules carry `missFails` (written
+ *   at start, from 2026-11-24) can fail: a goal started before never does;
  * - an ended goal's chapter is a draft until 48 hours after it ended, then it
  *   is sealed on the next read. Both writes are conditional, so two readers
  *   arriving together change it once.
@@ -88,6 +91,16 @@ export async function loadGoal(goalId: string, clientId: string, now = new Date(
     result = live();
   }
 
+  // Missed a day under "a miss fails it": the goal ends, failed, as of the end of that day. No more check-ins.
+  if (goal.status === "ACTIVE" && goal.rules.missFails === true && result.failedOn) {
+    const endedAt = endOfDay(result.failedOn, goal.timeZone);
+    const rules = GoalRules.parse({ ...goal.rules, failedOn: result.failedOn });
+    const done = await prisma.goal.updateMany({ where: { id: goal.id, status: "ACTIVE" }, data: { status: "ENDED", endedAt, rules } });
+    if (done.count === 0) return loadGoal(goalId, clientId, now); // someone else closed it first: read what they wrote
+    goal = { ...goal, status: "ENDED", endedAt, rules };
+    result = live();
+  }
+
   let chapter: Chapter | null = null;
   let sealed = false;
   let sealsAt: Date | null = null;
@@ -122,6 +135,17 @@ export async function sealNow(goalId: string, clientId: string, now = new Date()
 export async function activeGoalId(clientId: string): Promise<string | null> {
   const g = await prisma.goal.findFirst({ where: { clientId, status: "ACTIVE" }, orderBy: { createdAt: "desc" }, select: { id: true } });
   return g?.id ?? null;
+}
+
+/** The day a goal failed on, or null (running, completed, ended by hand, or a goal that can't fail). */
+export const failedOn = (g: { status: string; rules: GoalRules }): string | null => (g.status === "ENDED" && g.rules.missFails === true ? (g.rules.failedOn ?? null) : null);
+
+/** With no goal running: the latest goal, if it failed (Today offers to start again). */
+export async function latestFailedGoal(clientId: string): Promise<{ id: string; name: string; failedOn: string } | null> {
+  const g = await prisma.goal.findFirst({ where: { clientId }, orderBy: { createdAt: "desc" }, select: { id: true, name: true, status: true, rules: true } });
+  if (!g) return null;
+  const day = failedOn({ status: g.status, rules: GoalRules.parse(g.rules) });
+  return day ? { id: g.id, name: g.name, failedOn: day } : null;
 }
 
 /** Goals that have ended, newest first, for the chapters list. */

@@ -22,10 +22,12 @@ export const SEVENTY_FIVE_HARD: Template = {
   key: "builtin:75hard",
   name: "75 Hard",
   category: "challenge",
-  blurb: "Every day. A missed day starts over at day 1.",
+  blurb: "Every day. Miss one and the challenge is over.",
   rules: GoalRules.parse({
     length: { days: 75 },
     onMiss: "reset",
+    // A miss fails it; only today can be checked in (lib/goals/rules.ts). Goals started before this kept their rules without it.
+    missFails: true,
     rules: [
       { key: "workouts", label: "Two workouts, 45+ min", kind: "sessions", per: "day", min: 2, where: { minMinutes: 45 } },
       // The outdoor workout is one of the two, not a third.
