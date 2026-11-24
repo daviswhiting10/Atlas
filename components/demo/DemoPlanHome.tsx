@@ -1,8 +1,8 @@
 "use client";
 
-import { PlanUpNext } from "@/components/athlete/PlanUpNext";
+import { PlanWeek } from "@/components/athlete/PlanWeek";
 import { WeekNotesList } from "@/components/plan/WeekNoteCard";
-import { DEMO_PLAN } from "@/lib/demo/sample";
+import { DEMO_PLAN, DEMO_TODAY } from "@/lib/demo/sample";
 import { upNextView } from "@/lib/plan/up-next";
 import { useDemoPlan } from "./useDemoPlan";
 
@@ -16,10 +16,10 @@ export function DemoPlanHome() {
         <p className="eyebrow">{upNext.eyebrow}</p>
         <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
-      <div className="mb-6 max-w-3xl">
+      <PlanWeek plan={plan} today={DEMO_TODAY} totalWeeks={plan.totalWeeks} canEdit={false} base="/demo" />
+      <div className="mt-6 max-w-3xl">
         <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />
       </div>
-      <PlanUpNext view={upNext} totalWeeks={plan.totalWeeks} canEdit={false} base="/demo" />
     </div>
   );
 }

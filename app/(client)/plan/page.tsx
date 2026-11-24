@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, getAthlete, getPlanOverview } from "@/lib/athlete/data";
-import { safeTimeZone } from "@/lib/athlete/sessions";
+import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { listReports } from "@/lib/report/load";
 import { ReportLink } from "@/components/report/ReportLink";
 import {
@@ -20,7 +20,7 @@ import {
 import { isCoached } from "@/lib/athlete/coached";
 import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
-import { PlanUpNext } from "@/components/athlete/PlanUpNext";
+import { PlanWeek } from "@/components/athlete/PlanWeek";
 import { WeekNotesList } from "@/components/plan/WeekNoteCard";
 import { upNextView } from "@/lib/plan/up-next";
 
@@ -104,12 +104,12 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         <p className="eyebrow">{upNext.eyebrow}</p>
         <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
+      <PlanWeek plan={plan} today={localDay(new Date(), safeTimeZone(cookies().get(TZ_COOKIE)?.value))} totalWeeks={plan.totalWeeks} canEdit={!locked} />
       {plan.weekNotes.length > 0 && (
-        <div className="mb-6 max-w-3xl">
+        <div className="mt-6 max-w-3xl">
           <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />
         </div>
       )}
-      <PlanUpNext view={upNext} totalWeeks={plan.totalWeeks} canEdit={!locked} />
       {reportRows}
     </div>
   );
