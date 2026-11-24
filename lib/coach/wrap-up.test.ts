@@ -13,22 +13,39 @@ describe("against last time", () => {
   const cur = [s("a", 100, 10), s("a", 100, 10), s("a", 100, 10)];
   const prev = [s("a", 100, 10), s("a", 100, 10)];
   it("volume change in whole percent, sets now and last", () => {
-    expect(compareWithLast(cur, prev, 3)).toEqual({ volumePct: 50, done: 3, lastDone: 2, skipped: 0 });
+    expect(compareWithLast(cur, prev, 3)).toEqual({ kind: "full", volumePct: 50, done: 3, lastDone: 2, skipped: 0 });
   });
   it("never done before (or nothing logged then): nothing to compare, so no card", () => {
     expect(compareWithLast(cur, null, 3)).toBeNull();
     expect(compareWithLast(cur, [], 3)).toBeNull();
   });
-  it("a plan we can't count leaves skipped out; skipped is never negative", () => {
-    expect(compareWithLast(cur, prev, null)?.skipped).toBeNull();
-    expect(compareWithLast(cur, prev, 2)?.skipped).toBe(0);
-    expect(compareWithLast(cur.slice(0, 1), prev, 3)?.skipped).toBe(2);
+  it("a plan we can't count leaves skipped out", () => {
+    expect(compareWithLast(cur, prev, null)).toMatchObject({ kind: "full", skipped: null });
   });
   it("no weights to compare (bodyweight work): sets only, no percent", () => {
-    expect(compareWithLast([s("a", null, 10)], [s("a", null, 8)], 1)?.volumePct).toBeNull();
+    expect(compareWithLast([s("a", null, 10)], [s("a", null, 8)], 1)).toMatchObject({ volumePct: null });
   });
-  it("a lighter session says so: a negative percent", () => {
-    expect(compareWithLast(prev, cur, 3)?.volumePct).toBe(-33);
+  it("a lighter finished session says so: a negative percent", () => {
+    expect(compareWithLast(prev, cur, 2)).toMatchObject({ volumePct: -33 });
+  });
+});
+
+describe("a partial session is not compared", () => {
+  const sets = (n: number) => Array.from({ length: n }, () => s("a", 100, 10));
+  it("under 70% of the planned sets: 'Partial session · 3 of 22 sets', and no percentage or skipped count", () => {
+    expect(compareWithLast(sets(3), sets(22), 22)).toEqual({ kind: "partial", done: 3, planned: 22 });
+  });
+  it("it says so even with nothing earlier to compare with", () => {
+    expect(compareWithLast(sets(3), null, 22)).toEqual({ kind: "partial", done: 3, planned: 22 });
+  });
+  it("70% exactly is a finished session (compared)", () => {
+    expect(compareWithLast(sets(7), sets(10), 10)).toMatchObject({ kind: "full" });
+  });
+  it("just under 70% is partial", () => {
+    expect(compareWithLast(sets(15), sets(22), 22)).toMatchObject({ kind: "partial" });
+  });
+  it("a plan we can't count can't be judged partial", () => {
+    expect(compareWithLast(sets(3), sets(22), null)).toMatchObject({ kind: "full" });
   });
 });
 

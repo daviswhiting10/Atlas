@@ -12,22 +12,34 @@ export function volumeOf(sets: WrapSet[]): number {
   return sets.reduce((n, s) => n + (s.weight != null && s.weight > 0 && s.reps != null && s.reps > 0 ? s.weight * s.reps : 0), 0);
 }
 
-export type Compare = {
-  /** Change in volume since the last time, whole percent; null when either side has no volume to compare. */
-  volumePct: number | null;
-  /** Sets done this time and last time. */
-  done: number;
-  lastDone: number;
-  /** Planned sets not done (null when the plan's count is unknown). */
-  skipped: number | null;
-};
+/** Under this share of the planned sets, a session is partial: it is not compared with the last one. */
+export const PARTIAL_BELOW = 0.7;
 
-/** `prev` null: this workout hasn't been done before, so there is nothing to compare with. */
+export type Compare =
+  | { kind: "partial"; done: number; planned: number }
+  | {
+      kind: "full";
+      /** Change in volume since the last time, whole percent; null when either side has no volume to compare. */
+      volumePct: number | null;
+      /** Sets done this time and last time. */
+      done: number;
+      lastDone: number;
+      /** Planned sets not done (null when the plan's count is unknown). */
+      skipped: number | null;
+    };
+
+/**
+ * A session that logged fewer than 70% of its planned sets says so ("Partial session · 3 of 22 sets") and is not compared:
+ * a percentage against a full session would only be noise. A finished one is compared with the last time this workout was
+ * done; with no earlier session (or no plan to judge it by) there is nothing to say.
+ */
 export function compareWithLast(cur: WrapSet[], prev: WrapSet[] | null, planned: number | null): Compare | null {
+  if (planned != null && planned > 0 && cur.length < planned * PARTIAL_BELOW) return { kind: "partial", done: cur.length, planned };
   if (prev == null || prev.length === 0) return null;
   const a = volumeOf(cur);
   const b = volumeOf(prev);
   return {
+    kind: "full",
     volumePct: a > 0 && b > 0 ? Math.round(((a - b) / b) * 100) : null,
     done: cur.length,
     lastDone: prev.length,

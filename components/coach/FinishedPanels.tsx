@@ -30,6 +30,15 @@ export function Medals({ medals }: { medals: Medal[] }) {
 /** Against last time. Without an earlier session there is nothing to compare, so no card; the parts that can't be said are left out. */
 export function CompareCard({ compare }: { compare: Compare | null }) {
   if (!compare) return null;
+  if (compare.kind === "partial") {
+    return (
+      <section aria-label="Partial session" className="mt-4 rounded-[20px] border border-line bg-paper px-4 py-3.5 text-left">
+        <p className="text-[15px] font-semibold text-ink">
+          Partial session <span className="font-normal text-ink-mute">· {compare.done} of {compare.planned} sets</span>
+        </p>
+      </section>
+    );
+  }
   const { volumePct, done, lastDone, skipped } = compare;
   return (
     <section aria-label="Against last time" className="mt-4 rounded-[20px] border border-line bg-paper px-4 py-3.5 text-left">
