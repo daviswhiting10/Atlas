@@ -20,9 +20,10 @@ describe("Home opens on your progress", () => {
   it("real Today streams the progress behind the greeting", () => {
     const page = read("app/(client)/today/page.tsx");
     expect(page).toContain("<Suspense fallback={null}><HomeProgress");
+    expect(page).toContain("HomeProgressLoader");
   });
   it("/demo shows the same section from the sample athlete", () => {
-    const demo = read("app/demo/page.tsx");
+    const demo = read("components/demo/DemoToday.tsx");
     expect(demo).toContain("HomeProgressView");
     expect(demo).toContain("DEMO_PROGRESS");
   });

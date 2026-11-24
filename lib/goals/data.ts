@@ -132,3 +132,13 @@ export async function endedGoals(clientId: string) {
     select: { id: true, name: true, status: true, startDay: true, endedAt: true, chapter: true },
   });
 }
+
+/** Every goal the person has had, running first, then newest: for the Challenges list on You. */
+export async function allGoals(clientId: string) {
+  const rows = await prisma.goal.findMany({
+    where: { clientId },
+    orderBy: [{ createdAt: "desc" }],
+    select: { id: true, name: true, status: true, startDay: true, endedAt: true, rules: true, timeZone: true },
+  });
+  return rows.sort((a, b) => Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE"));
+}

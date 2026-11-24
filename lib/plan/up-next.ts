@@ -7,7 +7,7 @@ export type WeekRow = { id: string; name: string; dot: string; meta: string; don
 export type UpNextView = {
   /** "Week 3 of 12 · Build". */
   eyebrow: string;
-  next: { id: string; name: string; meta: string; lighter: boolean; lines: Array<{ name: string; rx: string }>; more: number } | null;
+  next: { id: string; name: string; meta: string; lighter: boolean; lines: Array<{ name: string; rx: string; cue: string | null }>; more: number } | null;
   /** "This week · 1 of 4 done". */
   weekLabel: string;
   /** This week's other workouts, in order. */
@@ -19,6 +19,14 @@ const day = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDa
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const meta = (w: WorkoutSummary) => `${plural(w.exercises.length, "exercise")} · ~${w.estMinutes} min`;
 const rx = (e: WorkoutSummary["exercises"][number]) => `${e.sets} × ${e.reps}${e.weight != null ? ` at ${e.weight}` : ""}`;
+
+/** The coach's note on an exercise, as one short line for the card: the first sentence, trimmed. Nothing when empty. */
+export function cueOf(note: string | null | undefined): string | null {
+  const t = (note ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  const first = t.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? t;
+  return first.length > 90 ? `${first.slice(0, 89).trimEnd()}…` : first;
+}
 
 export function upNextView(plan: PlanOverview): UpNextView {
   const week = plan.currentWeek;
@@ -34,7 +42,7 @@ export function upNextView(plan: PlanOverview): UpNextView {
           name: n.name,
           meta: meta(n),
           lighter: n.deload,
-          lines: n.exercises.slice(0, SHOWN).map((e) => ({ name: e.name, rx: rx(e) })),
+          lines: n.exercises.slice(0, SHOWN).map((e) => ({ name: e.name, rx: rx(e), cue: cueOf(e.note) })),
           more: Math.max(0, n.exercises.length - SHOWN),
         }
       : null,

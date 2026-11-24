@@ -55,6 +55,8 @@ export function TodayScreen({
       {/* Home: your progress first. The greeting is instant; the curve and heatmap stream in under it. */}
       <header className="rise -mb-6">
         <h1 className="text-[52px] font-semibold leading-none tracking-[-0.045em] text-ink [overflow-wrap:anywhere]">{athlete.firstName}</h1>
+        {/* The running challenge: one line, left-aligned (it streams in; nothing when there is none). */}
+        {goal && <div className="mt-3 empty:hidden">{goal}</div>}
       </header>
       {progress}
 
@@ -143,8 +145,6 @@ export function TodayScreen({
 
       {nutrition}
 
-      {/* While a goal is running, its card sits under today's session: the session is the hero. */}
-      {goal}
     </div>
   );
 }
