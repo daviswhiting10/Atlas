@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut, MoreHorizontal, PlayCircle, Scale, Settings, Target } from "lucide-react";
+import { LogOut, MoreHorizontal, Pencil, PlayCircle, Scale, Settings, Target } from "lucide-react";
 import { BodyWeightSheet } from "@/components/athlete/BodyWeightSheet";
 import { DemoChip } from "@/components/DemoChip";
 import { ModeToggle } from "@/components/ModeToggle";
@@ -50,9 +50,14 @@ export function HeaderActions({ side, demo, isCoach, changeGoals = false }: { si
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[200px]">
               {changeGoals && pathname.startsWith("/plan") && (
-                <DropdownMenuItem className="min-h-11" onClick={() => router.push("/you?goals=1")}>
-                  <Target className="mr-2 h-4 w-4" /> Change goals
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem className="min-h-11" onClick={() => router.push("/plan?view=edit")}>
+                    <Pencil className="mr-2 h-4 w-4" /> Edit plan
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="min-h-11" onClick={() => router.push("/you?goals=1")}>
+                    <Target className="mr-2 h-4 w-4" /> Change goals
+                  </DropdownMenuItem>
+                </>
               )}
               <DropdownMenuItem className="min-h-11" onClick={() => setWeighIn(true)}>
                 <Scale className="mr-2 h-4 w-4" /> Add body weight
