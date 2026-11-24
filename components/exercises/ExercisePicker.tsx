@@ -9,6 +9,7 @@ import { createExercise, listExercises, type PickerExercise } from "@/lib/action
 import { findInLibrary } from "@/lib/exercises/custom";
 import { isNetworkError } from "@/lib/sessions/pending";
 import { useEscape } from "@/hooks/use-escape";
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { cn } from "@/lib/utils";
 
 export type { PickerExercise };
@@ -70,6 +71,8 @@ export function ExercisePicker({
   const addingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   useEscape(true, onClose);
+  // The page behind stays put, the bottom nav steps aside, and the sheet stays docked above the keyboard.
+  const vp = useSheetLock();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -162,8 +165,12 @@ export function ExercisePicker({
   const nothing = typing && !found.addName && found.results.length === 0 && found.close.length === 0;
 
   return createPortal(
-    <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()} className="sheet-up flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-bone sm:rounded-2xl">
+    <div
+      className={cn("fade-in fixed inset-x-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center", !vp && "inset-y-0")}
+      style={vp ? { top: vp.top, height: vp.height } : undefined}
+      onClick={onClose}
+    >
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()} className="sheet-up flex max-h-[85%] w-full max-w-md flex-col rounded-t-2xl bg-bone sm:rounded-2xl">
         <div className="flex items-center justify-between gap-3 px-5 pt-5">
           <h2 className="text-xl text-ink">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="press flex h-11 w-11 items-center justify-center rounded-full bg-ink/5 text-ink-soft">
@@ -185,7 +192,7 @@ export function ExercisePicker({
             className="h-11 w-full rounded-xl border border-line-strong bg-dusk-raised pl-10 pr-3 text-[16px] text-ink outline-none placeholder:text-ink-mute focus:border-ink/40"
           />
         </div>
-        <div className="mt-3 flex-1 overflow-y-auto px-5" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
           {found.exact && <ul className="divide-y divide-line">{row(found.exact)}</ul>}
 
           {found.close.length > 0 && (

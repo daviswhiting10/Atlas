@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { canMerge, dropAt, mergeWith, type OrderEntry } from "@/lib/sessions/order";
+import { canMerge, dropAt, dropWithin, groupOf, mergeWith, ungroupAt, type OrderEntry } from "@/lib/sessions/order";
 import { kbKey, type KbResult, type KbState } from "@/lib/sessions/kb-reorder";
 
 /** Holding a card's header this long picks it up. */
@@ -43,6 +43,11 @@ type Drag = {
   hover: string | null;
   /** Hovered long enough: letting go supersets the two. */
   merge: string | null;
+  /** Its superset's members (itself included; empty when it is not in one) and where their outline is on the page. */
+  group: string[];
+  span: Rect | null;
+  /** The finger has left the outline: letting go takes it out of the superset. */
+  outside: boolean;
 };
 
 const buzz = (ms: number) => {
@@ -212,7 +217,8 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
         }, MERGE_MS);
       }
     }
-    setDrag({ ...d, y: pageY, gap, hover, merge });
+    const outside = d.span != null && (pageY < d.span.top || pageY > d.span.bottom);
+    setDrag({ ...d, y: pageY, gap, hover, merge, outside });
   }, []);
 
   // Near an edge, the page scrolls under the lifted card: slowly as the finger enters the edge
@@ -279,7 +285,7 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     setDrag(null);
     if (!commit) return;
     const o = orderRef.current;
-    const next = d.merge ? mergeWith(o, d.id, d.merge) : dropAt(o, d.id, d.gap);
+    const next = d.merge ? mergeWith(o, d.id, d.merge) : d.group.length > 0 ? (d.outside ? ungroupAt(o, d.id, d.gap) : dropWithin(o, d.id, d.gap)) : dropAt(o, d.id, d.gap);
     if (JSON.stringify(next) !== JSON.stringify(o)) onChangeRef.current(next);
   }
   endRef.current = end;
@@ -328,7 +334,10 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     if (swallowTimer.current) clearTimeout(swallowTimer.current);
     swallowClick.current = true;
     buzz(10);
-    setDrag({ id, from, others: ids.filter((x) => x !== id), rects, compact, h: compact + SPACING, startY: y, y, maxScroll, gap: from, hover: null, merge: null });
+    const group = groupOf(orderRef.current, id);
+    const boxes = group.map((x) => rects.get(x)).filter((r): r is Rect => r != null);
+    const span = boxes.length > 1 ? { top: Math.min(...boxes.map((r) => r.top)), bottom: Math.max(...boxes.map((r) => r.bottom)) } : null;
+    setDrag({ id, from, others: ids.filter((x) => x !== id), rects, compact, h: compact + SPACING, startY: y, y, maxScroll, gap: from, hover: null, merge: null, group: span ? group : [], span, outside: false });
   }
 
   function onMove(e: PointerEvent) {
@@ -459,5 +468,26 @@ export function useDragOrder({ order, enabled, onChange }: { order: OrderEntry[]
     lineTop = y - listTop;
   }
 
-  return { listRef, bind, handle, status, styleFor, headingStyle, lineTop, lifted: drag?.id ?? null, mergeTarget: drag?.merge ?? null };
+  /** The lifted exercise's superset outline (relative to the list): whole while it is inside, broken once it is outside. */
+  let groupBox: { top: number; height: number; broken: boolean } | null = null;
+  if (drag?.span && listRef.current && !drag.merge) {
+    const listTop = listRef.current.getBoundingClientRect().top + window.scrollY;
+    // Whole: round the group where it was. Open: round the members still there, where they now show (the lifted one has left).
+    let top = drag.span.top;
+    let bottom = drag.span.bottom;
+    if (drag.outside) {
+      // Measured where the cards are now (they slide into the lifted card's place).
+      const left = drag.group
+        .filter((x) => x !== drag.id)
+        .map((x) => listRef.current?.querySelector<HTMLElement>(`[data-exercise="${x}"]`)?.getBoundingClientRect())
+        .filter((r): r is DOMRect => r != null);
+      if (left.length > 0) {
+        top = Math.min(...left.map((r) => r.top)) + window.scrollY;
+        bottom = Math.max(...left.map((r) => r.bottom)) + window.scrollY;
+      }
+    }
+    groupBox = { top: top - listTop - 6, height: bottom - top + 12, broken: drag.outside };
+  }
+
+  return { listRef, bind, handle, status, styleFor, headingStyle, lineTop, groupBox, lifted: drag?.id ?? null, mergeTarget: drag?.merge ?? null };
 }

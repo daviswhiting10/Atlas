@@ -1,5 +1,7 @@
 "use client";
 
+import { SheetLock } from "@/components/ui/sheet-lock";
+import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ExerciseThumb } from "@/components/ExercisePicture";
@@ -917,6 +919,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
 
         <div ref={drag.listRef} className="relative space-y-4">
           <DragStatus message={drag.status} />
+          <SupersetOutline box={drag.groupBox} />
           {drag.lineTop != null && (
             <div aria-hidden className="pointer-events-none absolute -left-1 -right-1 z-20 flex items-center" style={{ top: drag.lineTop - 1.5 }}>
               <span className="h-2 w-2 shrink-0 rounded-full bg-dusk-teal" />
@@ -1190,6 +1193,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       {/* ── Workout switcher ─────────────────────────────────────────── */}
       {switching && (
         <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={() => setSwitching(false)}>
+          <SheetLock />
           <div className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }} role="dialog" aria-modal="true" aria-label="Switch workout" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
