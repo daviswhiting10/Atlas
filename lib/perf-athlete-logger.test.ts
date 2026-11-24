@@ -18,7 +18,7 @@ describe("athlete logger entry", () => {
     const fn = data.slice(data.indexOf("export async function getLoggerData"), data.indexOf("return {\n    id: workout.id,"));
     expect((fn.match(/await /g) ?? []).length).toBe(3); // getAthlete, round 1, round 2
     expect(fn).toContain("await Promise.all([workoutQuery, historyQuery])");
-    expect(fn).toContain("const [siblings, own, notes] = await Promise.all([");
+    expect(fn).toContain("const [siblings, own, notes, lastAdded] = await Promise.all(["); // "last time you added" rides in round 2
     // The history is scoped to this athlete whatever id is asked for.
     expect(fn).toContain("workoutLog: { clientId: athlete.clientId, NOT: { assignedWorkoutId } }");
   });

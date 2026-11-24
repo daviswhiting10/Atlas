@@ -8,6 +8,7 @@ import WorkoutLogger from "./WorkoutLogger";
 import { PlanNotLive } from "./PlanNotLive";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 import { blobConfigured, mediaPictures } from "@/lib/exercises/media";
+import { addedOffer } from "@/lib/sessions/added-store";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ export default async function LogPage({
   // "Last time", notes and the coach's own pictures for every exercise ride in the same round:
   // one query each, not a few per exercise (lib/sessions/last-time).
   const exerciseIds = assignedWorkout.exercises.map((e) => e.exerciseId);
-  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog, lastSetsById, lastNoteById, own] =
+  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog, lastSetsById, lastNoteById, own, lastAdded] =
     await Promise.all([
       // (a) Source section fallback — only fetch if any section is null
       anyMissingSection && assignedWorkout.sourceWorkoutId
@@ -253,6 +254,9 @@ export default async function LogPage({
 
       // (f) The coach's own photos and clips (they win over the library's).
       mediaPictures(workspaceId, assignedWorkout.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.exercise.name }))),
+
+      // (g) "Last time you added …": what the last session of this workout added and today's doesn't have.
+      addedOffer({ clientId, workout: { ...assignedWorkout, done: assignedWorkout.workoutLog?.completedAt != null, exerciseIds } }),
     ]);
 
   // Build section lookup from source exercises
@@ -331,6 +335,7 @@ export default async function LogPage({
       exercises={exercises}
       existingWorkoutLogId={existingLog?.id ?? null}
       existingSetLogs={(existingLog?.sets ?? []) as ExistingSetLog[]}
+      lastAdded={lastAdded}
       availableWorkouts={availableWorkouts.map((w) => ({
         id: w.id,
         name: w.name,
