@@ -168,7 +168,8 @@ function DayCard({ cell, weeks, reassign, base, today, summary, deleteSession }:
         </ul>
         <Link
           href={`${base}/workouts/${w.id}`}
-          prefetch={cell.upNext}
+          // Only the tapped day's card is on screen, so this is one prefetch per day picked: the logger opens at the tap.
+          prefetch
           className={cn(
             "press flex h-[52px] w-full items-center justify-center rounded-2xl text-[17px] font-semibold",
             // Any day that isn't done can be started: past, today or ahead. Only a finished one is a quiet "View session".
