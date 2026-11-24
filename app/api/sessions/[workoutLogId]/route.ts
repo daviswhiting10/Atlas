@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
+import { deleteSessionRows } from "@/lib/sessions/delete";
 import { requestDay } from "@/lib/sessions/request-day";
 import { planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -148,11 +149,7 @@ export const DELETE = withWorkspace<Ctx>(async (_req, { workspaceId }, { params 
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Delete sets first (no cascade configured), then the log
-  await prisma.$transaction([
-    prisma.setLog.deleteMany({ where: { workoutLogId } }),
-    prisma.workoutLog.delete({ where: { id: workoutLogId } }),
-  ]);
+  await prisma.$transaction((tx) => deleteSessionRows(tx, workoutLogId));
 
   return NextResponse.json({ ok: true });
 });

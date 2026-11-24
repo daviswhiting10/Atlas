@@ -7,6 +7,8 @@ import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import { cueOf } from "@/lib/plan/up-next";
 import { defaultDay, weekGrid, weekRange, type DayCell } from "@/lib/plan/week-grid";
 import { cn } from "@/lib/utils";
+import type { SessionSummary } from "@/lib/actions/athlete";
+import { SessionMini } from "@/components/athlete/SessionMini";
 
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
 const KIND_LABEL = { strength: "strength", cardio: "cardio", mobility: "mobility" } as const;
@@ -27,7 +29,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * The Plan tab's first screen: the week as a Monday-to-Sunday grid (day number, an icon, done days ticked, the next workout
  * outlined, today dotted) above one card for the day you tap. It opens on today. The grid never scrolls.
  */
-export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan: PlanOverview; today: string; totalWeeks: number; canEdit: boolean; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
+export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "", summary, deleteSession }: { plan: PlanOverview; today: string; totalWeeks: number; canEdit: boolean; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
   const [week, setWeek] = useState(plan.currentWeek);
   const grid = weekGrid(plan, week, today);
   const [pick, setPick] = useState<number | null>(null);
@@ -74,7 +76,7 @@ export function PlanWeek({ plan, today, totalWeeks, canEdit, base = "" }: { plan
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
             <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
           </p>
-          <DayCard cell={cell} base={base} />
+          <DayCard cell={cell} base={base} summary={summary} deleteSession={deleteSession} />
         </>
       ) : (
         <p className="rise mt-6 rounded-2xl border border-line bg-paper p-4 text-[15px] text-ink-soft">Nothing planned for week {week}.</p>
@@ -124,7 +126,7 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
   );
 }
 
-function DayCard({ cell, base }: { cell: DayCell; base: string }) {
+function DayCard({ cell, base, summary, deleteSession }: { cell: DayCell; base: string; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
   const w = cell.workout;
   const eyebrow = (s: string) => <p className="eyebrow">{`${longDay(cell.date)} · ${s}`}</p>;
   if (!w) {
@@ -149,31 +151,37 @@ function DayCard({ cell, base }: { cell: DayCell; base: string }) {
         {w.deload && <span className="ml-2 inline-block rounded-full bg-ink px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-[0.06em] text-paper">Lighter week</span>}
       </p>
       <p className="mt-0.5 text-[13px] text-ink-mute">{meta}</p>
+      {done && w.logId && summary ? (
+        <SessionMini logId={w.logId} href={`${base}/workouts/${w.id}`} load={summary} remove={deleteSession} />
+      ) : (
+        <>
       <ul className="mb-3.5 mt-3">
-        {w.exercises.slice(0, SHOWN).map((e, i) => {
-          const cue = cueOf(e.note);
-          return (
-            <li key={`${e.aweId}-${i}`} className="border-t border-line py-2 text-[14px] text-ink-soft first:border-t-0">
-              <div className="flex justify-between gap-3">
-                <span className="min-w-0 truncate">{e.name}</span>
-                <span className="tnum shrink-0">{rx(e)}</span>
-              </div>
-              {cue && <p className="mt-0.5 text-[13px] leading-snug text-ink-mute">{cue}</p>}
-            </li>
-          );
-        })}
-        {w.exercises.length > SHOWN && <li className="border-t border-line py-2 text-[14px] text-ink-soft">+ {w.exercises.length - SHOWN} more</li>}
-      </ul>
-      <Link
-        href={`${base}/workouts/${w.id}`}
-        prefetch={cell.upNext}
-        className={cn(
-          "press flex h-[52px] w-full items-center justify-center rounded-2xl text-[17px] font-semibold",
-          cell.upNext ? "bg-dusk-button text-dusk-button-text hover:brightness-110" : "border border-line-strong text-ink"
-        )}
-      >
-        {done ? "View session" : cell.upNext ? "Start" : "Open workout"}
-      </Link>
+          {w.exercises.slice(0, SHOWN).map((e, i) => {
+            const cue = cueOf(e.note);
+            return (
+              <li key={`${e.aweId}-${i}`} className="border-t border-line py-2 text-[14px] text-ink-soft first:border-t-0">
+                <div className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate">{e.name}</span>
+                  <span className="tnum shrink-0">{rx(e)}</span>
+                </div>
+                {cue && <p className="mt-0.5 text-[13px] leading-snug text-ink-mute">{cue}</p>}
+              </li>
+            );
+          })}
+          {w.exercises.length > SHOWN && <li className="border-t border-line py-2 text-[14px] text-ink-soft">+ {w.exercises.length - SHOWN} more</li>}
+        </ul>
+        <Link
+          href={`${base}/workouts/${w.id}`}
+          prefetch={cell.upNext}
+          className={cn(
+            "press flex h-[52px] w-full items-center justify-center rounded-2xl text-[17px] font-semibold",
+            cell.upNext ? "bg-dusk-button text-dusk-button-text hover:brightness-110" : "border border-line-strong text-ink"
+          )}
+        >
+          {done ? "View session" : cell.upNext ? "Start" : "Open workout"}
+        </Link>
+        </>
+      )}
     </section>
   );
 }

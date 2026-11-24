@@ -2,6 +2,7 @@
 
 import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
+import { deleteSessionRows } from "@/lib/sessions/delete";
 import { MAX_SESSION_NOTE, loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -404,7 +405,7 @@ export async function startMyProgram(raw: { programId: string; startDate: string
 
 /** A finished session's sets for the read-only summary: each exercise with what was done, in the order it was done. */
 /** What a History day shows for a session: each exercise's sets, and the session's notes by author ("Coach", "You"). */
-export type SessionSummary = { lines: Array<{ name: string; sets: string }>; notes?: Array<{ label: string; text: string }> };
+export type SessionSummary = { lines: Array<{ name: string; sets: string }>; notes?: Array<{ label: string; text: string }>; /** Sets logged, and the session's length when it was written down (the mini summary on the Plan calendar). */ setCount?: number; minutes?: number | null; date?: string };
 
 export async function sessionSummary(workoutLogId: string): Promise<SessionSummary | null> {
   const { clientId } = await requireAthlete();
@@ -414,6 +415,8 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
     select: {
       id: true,
       clientNotes: true,
+      durationMin: true,
+      date: true,
       sets: {
         where: { completed: true },
         orderBy: [{ createdAt: "asc" }, { setNumber: "asc" }],
@@ -438,6 +441,24 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
   const notes = (await loadSessionNotes([{ id: log.id, clientNotes: log.clientNotes }])).get(log.id)!;
   return {
     lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })),
+    setCount: log.sets.length,
+    minutes: log.durationMin,
+    date: log.date.toISOString().slice(0, 10),
     notes: [...(notes.coach ? [{ label: "Coach", text: notes.coach }] : []), ...(notes.athlete ? [{ label: "You", text: notes.athlete }] : [])],
   };
+}
+
+/**
+ * Delete one of your own logged sessions (from the Plan calendar's mini summary): the session, its sets, its notes. Only your
+ * own; anything else is "not found". The plan workout goes back to scheduled by itself.
+ */
+export async function deleteMySession(raw: { workoutLogId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = await requireAthlete();
+  const parsed = z.object({ workoutLogId: z.string().min(1).max(64) }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "That session isn't there." };
+  const log = await prisma.workoutLog.findFirst({ where: { id: parsed.data.workoutLogId, clientId }, select: { id: true } });
+  if (!log) return { ok: false, error: "That session isn't there." };
+  await prisma.$transaction((tx) => deleteSessionRows(tx, log.id));
+  refresh();
+  return { ok: true };
 }
