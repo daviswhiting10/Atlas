@@ -38,7 +38,7 @@ export function AssignPanel({
 
   function assign() {
     start(async () => {
-      const res = await guard(() => assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date), invite: notInvited }), () => router.refresh());
+      const res = await guard(() => assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date), invite: notInvited }), router.refresh);
       if (!res.ok) return void toast.error(res.error);
       const inv = res.invite;
       if (!inv) toast.success(`Assigned to ${clientName}`);
@@ -52,7 +52,7 @@ export function AssignPanel({
 
   function discard() {
     start(async () => {
-      const res = await guard(() => discardDraftPlan({ clientId, assignmentId }), () => router.refresh());
+      const res = await guard(() => discardDraftPlan({ clientId, assignmentId }), router.refresh);
       if (!res.ok) return void toast.error(res.error);
       toast.success("Draft discarded");
       router.push(`/clients/${clientId}`);

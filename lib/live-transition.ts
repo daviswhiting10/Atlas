@@ -60,6 +60,8 @@ export function liveTransitionTo(router: Router, href: string, bar?: HTMLElement
   const vt = startVT(
     () =>
       new Promise<void>((resolve) => {
+        // A second tap before the first route arrived: let the first transition finish rather than hang on it.
+        pending?.();
         pending = resolve;
         router.push(href);
         // Never hold the page: if the route does not arrive, let the transition go.

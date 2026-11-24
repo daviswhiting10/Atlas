@@ -582,7 +582,8 @@ export function PlanView({
   const router = useRouter();
   const actions = useMemo(() => {
     const { setSkipped, ...rest } = rawActions;
-    return { ...guardActions(rest, () => router.refresh()), setSkipped } as PlanActions;
+    // router.refresh itself, not a new arrow each time: refreshWhenBack only dedupes the same function.
+    return { ...guardActions(rest, router.refresh), setSkipped } as PlanActions;
   }, [rawActions, router]);
 
   // Centre the current week in the strip without scrolling the page itself.

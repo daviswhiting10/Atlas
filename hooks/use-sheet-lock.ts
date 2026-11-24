@@ -15,22 +15,25 @@ import { useEffect, useState } from "react";
 let holders = 0;
 let restore: (() => void) | null = null;
 
-/** Pin the page while any sheet is open; the last one to close puts it back. (Two sheets can overlap for a moment.) */
-function lockPage(): () => void {
+/**
+ * Pin the page while any sheet is open; the last one to close puts it back. (Two sheets can overlap for a moment.)
+ * Overflow is hidden by CSS on `body[data-sheet-open]` (globals.css), not an inline style: a menu's own scroll lock
+ * (Base UI sets body overflow-x/-y inline) can be on when a sheet opens, and copying it back on close left the page
+ * unscrollable.
+ */
+export function lockPage(): () => void {
   if (holders++ === 0) {
     const body = document.body;
     const y = window.scrollY;
-    const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow };
+    const prev = { position: body.style.position, top: body.style.top, width: body.style.width };
     body.style.position = "fixed";
     body.style.top = `-${y}px`;
     body.style.width = "100%";
-    body.style.overflow = "hidden";
     body.dataset.sheetOpen = "1";
     restore = () => {
       body.style.position = prev.position;
       body.style.top = prev.top;
       body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
       delete body.dataset.sheetOpen;
       window.scrollTo(0, y);
     };

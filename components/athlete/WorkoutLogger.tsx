@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { ExerciseThumb } from "@/components/ExercisePicture";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { pushOrLoad } from "@/lib/nav-watchdog";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronsUpDown, Loader2, MoreHorizontal, Medal, Minus, Plus, Timer, X } from "lucide-react";
 import type { LoggerData, LoggerExercise, LoggerSet } from "@/lib/athlete/data";
@@ -843,7 +844,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 -mx-4 border-b border-line bg-bone/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:-mx-8 sm:px-8 md:top-16">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => router.push(`${base}/today`)} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
+          <button type="button" onClick={() => pushOrLoad((h) => router.push(h), `${base}/today`)} aria-label="Back to Today" className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-ink/5">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <button type="button" onClick={() => setSwitching(true)} className="press flex min-w-0 flex-1 items-center gap-1.5 rounded-xl py-1 text-left">
