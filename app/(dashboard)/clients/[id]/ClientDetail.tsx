@@ -323,6 +323,7 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
       ) : (
         <Link
           href={`/clients/${client.id}/log`}
+          prefetch
           className="press mb-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 sm:max-w-sm"
         >
           Log session
