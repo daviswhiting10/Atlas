@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, ChevronLeft, ChevronRight, Dumbbell, Footprints, PersonStanding } from "lucide-react";
 import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import { cueOf } from "@/lib/plan/up-next";
-import { defaultDay, weekGrid, weekRange, type DayCell } from "@/lib/plan/week-grid";
+import { addDays, defaultDay, openingMonday, planWeekOf, weekBounds, weekGrid, weekRange, type DayCell, type DayItem } from "@/lib/plan/week-grid";
 import { cn } from "@/lib/utils";
 import type { SessionSummary } from "@/lib/actions/athlete";
 import { SessionMini, type SlotWeek } from "@/components/athlete/SessionMini";
@@ -27,39 +27,46 @@ const rx = (e: WorkoutSummary["exercises"][number]) => `${e.sets} × ${e.reps}${
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 /**
- * The Plan tab's first screen: the week as a Monday-to-Sunday grid (day number, an icon, done days ticked, the next workout
- * outlined, today dotted) above one card for the day you tap. It opens on today. The grid never scrolls.
+ * The Plan tab's first screen: the calendar week, Monday to Sunday (day number, an icon, done days ticked, the next workout
+ * outlined, today dotted), above the tapped day's cards. Workouts sit on their dates; a done one on the day it was really
+ * logged. It opens on today's week. The grid never scrolls.
  */
-export function PlanWeek({ plan, today, totalWeeks, base = "", summary, deleteSession, reassign }: { plan: PlanOverview; today: string; totalWeeks: number; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Move a logged session to another day of the plan. */ reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
-  const [week, setWeek] = useState(plan.currentWeek);
-  const grid = weekGrid(plan, week, today);
+export function PlanWeek({ plan, today, timeZone = "UTC", totalWeeks, base = "", summary, deleteSession, reassign }: { plan: PlanOverview; today: string; /** The athlete's timezone: a session is drawn on its day there. */ timeZone?: string; totalWeeks: number; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Move a logged session to another day of the plan. */ reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
+  const [monday, setMonday] = useState(() => openingMonday(plan, today, timeZone));
+  const grid = weekGrid(plan, monday, today, timeZone);
+  const bounds = weekBounds(plan, today, timeZone);
+  // Labelled by the plan week its Monday falls in (a plan that starts on a Saturday has its weeks run Saturday to Friday).
+  const week = planWeekOf(monday, plan.startDate, totalWeeks);
+  const thisWeek = monday <= today && today < addDays(monday, 7);
   const [pick, setPick] = useState<number | null>(null);
   const cells = grid?.cells ?? [];
   const sel = cells.length ? (pick != null && pick < cells.length ? pick : defaultDay(cells)) : 0;
   const cell = cells[sel];
-  const go = (w: number) => {
-    setWeek(w);
+  const go = (k: number) => {
+    setMonday(addDays(monday, 7 * k));
     setPick(null);
   };
 
   return (
     <div className="max-w-xl">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <button type="button" onClick={() => go(week - 1)} disabled={week <= 1} aria-label="Previous week" className="press flex h-11 w-11 items-center justify-center rounded-full border border-line text-ink-soft disabled:opacity-30">
+        <button type="button" onClick={() => go(-1)} disabled={monday <= bounds.first} aria-label="Previous week" className="press flex h-11 w-11 items-center justify-center rounded-full border border-line text-ink-soft disabled:opacity-30">
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <p className="text-[15px] font-semibold text-ink">
-          {grid ? weekRange(grid.monday) : `Week ${week}`}
-          {week === plan.currentWeek && <span className="ml-1.5 font-medium text-ink-mute">· This week</span>}
+        <p className="text-center text-[15px] font-semibold leading-tight text-ink">
+          {weekRange(monday)}
+          {(week != null || thisWeek) && (
+            <span className="block text-[12px] font-medium text-ink-mute">{[week != null && `Week ${week} of ${totalWeeks}`, thisWeek && "This week"].filter(Boolean).join(" · ")}</span>
+          )}
         </p>
-        <button type="button" onClick={() => go(week + 1)} disabled={week >= totalWeeks} aria-label="Next week" className="press flex h-11 w-11 items-center justify-center rounded-full border border-line text-ink-soft disabled:opacity-30">
+        <button type="button" onClick={() => go(1)} disabled={monday >= bounds.last} aria-label="Next week" className="press flex h-11 w-11 items-center justify-center rounded-full border border-line text-ink-soft disabled:opacity-30">
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
       {grid ? (
         <>
-          <div className="grid grid-cols-7 gap-1.5" role="group" aria-label={`Week ${week}`}>
+          <div className="grid grid-cols-7 gap-1.5" role="group" aria-label={`Week of ${weekRange(monday)}`}>
             {DOW.map((d, i) => (
               <span key={i} className="text-center text-[11px] font-bold uppercase tracking-[0.08em] text-ink-mute">
                 {d}
@@ -77,10 +84,16 @@ export function PlanWeek({ plan, today, totalWeeks, base = "", summary, deleteSe
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
             <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
           </p>
-          <DayCard cell={cell} base={base} today={today} summary={summary} deleteSession={deleteSession} reassign={reassign} weeks={slotsByWeek(plan.workouts, cell.workout?.id ?? null)} />
+          {cell.items.length === 0 ? (
+            <RestCard cell={cell} base={base} />
+          ) : (
+            cell.items.map((item, i) => (
+              <DayCard key={item.workout.id} cell={cell} item={item} first={i === 0} base={base} today={today} summary={summary} deleteSession={deleteSession} reassign={reassign} weeks={slotsByWeek(plan.workouts, item.workout.id)} />
+            ))
+          )}
         </>
       ) : (
-        <p className="rise mt-6 rounded-2xl border border-line bg-paper p-4 text-[15px] text-ink-soft">Nothing planned for week {week}.</p>
+        <p className="rise mt-6 rounded-2xl border border-line bg-paper p-4 text-[15px] text-ink-soft">Nothing planned this week.</p>
       )}
 
       <div className="mt-1.5 flex items-center justify-between">
@@ -93,8 +106,9 @@ export function PlanWeek({ plan, today, totalWeeks, base = "", summary, deleteSe
 }
 
 function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onPick: () => void }) {
-  const done = c.workout?.status === "LOGGED";
-  const label = `${longDay(c.date)}${c.workout ? `, ${c.workout.name} (${KIND_LABEL[c.kind ?? "strength"]})${done ? ", done" : c.upNext ? ", up next" : ""}` : ", rest"}${c.today ? ", today" : ""}`;
+  const done = c.done;
+  const what = c.items.map((x) => `${x.workout.name} (${KIND_LABEL[x.kind]})${x.done ? ", done" : x.upNext ? ", up next" : ""}`).join("; ");
+  const label = `${longDay(c.date)}${c.items.length ? `, ${what}` : ", rest"}${c.today ? ", today" : ""}`;
   return (
     <button
       type="button"
@@ -103,8 +117,8 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
       aria-pressed={selected}
       className={cn(
         "press relative flex h-[76px] flex-col items-center justify-between rounded-[14px] border py-2",
-        !c.workout && "border-dashed border-line bg-transparent text-ink-mute",
-        c.workout && !done && "border-line bg-paper text-ink",
+        c.items.length === 0 && "border-dashed border-line bg-transparent text-ink-mute",
+        c.items.length > 0 && !done && "border-line bg-paper text-ink",
         done && "border-signal/35 bg-signal/10 text-ink",
         c.upNext && "border-2 border-signal",
         selected && "ring-2 ring-signal ring-offset-2 ring-offset-bone"
@@ -116,32 +130,38 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
         </span>
       )}
       <span className="tnum text-[15px] font-semibold">{Number(c.date.slice(8))}</span>
-      <DayIcon kind={c.kind} />
+      {/* Two or more on one day: the first one's icon and how many. */}
+      <span className="flex items-center gap-0.5">
+        <DayIcon kind={c.kind} />
+        {c.items.length > 1 && <span className="tnum text-[11px] font-bold leading-none">{c.items.length}</span>}
+      </span>
       {c.today && <span aria-hidden className="absolute -bottom-2.5 h-1.5 w-1.5 rounded-full bg-signal" />}
     </button>
   );
 }
 
-function DayCard({ cell, weeks, reassign, base, today, summary, deleteSession }: { cell: DayCell; base: string; today: string; weeks: SlotWeek[]; reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
-  const w = cell.workout;
+function RestCard({ cell, base }: { cell: DayCell; base: string }) {
+  return (
+    <section aria-label="Day" className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
+      <p className="eyebrow">{`${longDay(cell.date)} · Rest`}</p>
+      <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">Rest day</p>
+      <p className="mt-1 text-[14px] text-ink-mute">Nothing planned.</p>
+      <Link href={`${base}/workouts/new`} className="press mt-3.5 flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
+        Log a workout anyway
+      </Link>
+    </section>
+  );
+}
+
+/** One workout on the tapped day: a done one's mini summary (View session, delete, move), or a planned one's lifts and Start. */
+function DayCard({ cell, item, first, weeks, reassign, base, today, summary, deleteSession }: { cell: DayCell; item: DayItem; first: boolean; base: string; today: string; weeks: SlotWeek[]; reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
+  const w = item.workout;
   const eyebrow = (s: string) => <p className="eyebrow">{`${longDay(cell.date)} · ${s}`}</p>;
-  if (!w) {
-    return (
-      <section aria-label="Day" className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
-        {eyebrow("Rest")}
-        <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">Rest day</p>
-        <p className="mt-1 text-[14px] text-ink-mute">Nothing planned.</p>
-        <Link href={`${base}/workouts/new`} className="press mt-3.5 flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
-          Log a workout anyway
-        </Link>
-      </section>
-    );
-  }
-  const done = w.status === "LOGGED";
+  const done = item.done;
   const meta = `${plural(w.exercises.length, "exercise")} · ~${w.estMinutes} min`;
   return (
-    <section aria-label={cell.upNext ? "Up next" : "Day"} className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
-      {eyebrow(done ? "Done" : cell.upNext ? "Up next" : cell.date < today ? "Not done" : "Planned")}
+    <section aria-label={item.upNext ? "Up next" : "Day"} className={cn("rise rounded-2xl border border-line bg-paper p-4", first ? "mt-6" : "mt-3")}>
+      {eyebrow(done ? "Done" : item.upNext ? "Up next" : cell.date < today ? "Not done" : "Planned")}
       <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">
         {w.name}
         {w.deload && <span className="ml-2 inline-block rounded-full bg-ink px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-[0.06em] text-paper">Lighter week</span>}
