@@ -14,7 +14,7 @@ import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createHandBuiltPlan, createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
-import { MAX_SETS, getProgress } from "@/lib/athlete/data";
+import { MAX_SETS, getLoggerData, getProgress, type LoggerSet } from "@/lib/athlete/data";
 import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
 import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
@@ -469,4 +469,16 @@ export async function deleteMySession(raw: { workoutLogId: string }): Promise<{ 
   await prisma.$transaction((tx) => deleteSessionRows(tx, log.id));
   refresh();
   return { ok: true };
+}
+
+/**
+ * This session's sets as they are now (for the logger to bring itself up to date when it opens: the page it opened from may
+ * be an old copy). Only the signed-in athlete's own workout. Null when there is nothing to read.
+ */
+export async function freshLoggerSets(raw: { assignedWorkoutId: string }): Promise<{ sets: Record<string, LoggerSet[]> } | null> {
+  await requireAthlete();
+  const parsed = z.object({ assignedWorkoutId: z.string().min(1).max(64) }).safeParse(raw);
+  if (!parsed.success) return null;
+  const data = await getLoggerData(parsed.data.assignedWorkoutId);
+  return data ? { sets: Object.fromEntries(data.exercises.map((e) => [e.aweId, e.sets])) } : null;
 }
