@@ -1,7 +1,9 @@
 "use client";
 
 import { FoundInFile, type Found } from "@/components/plan/FoundInFile";
-import { useRef, useState } from "react";
+import { ExerciseMatches } from "@/components/plan/ExerciseMatches";
+import type { ExerciseMatch } from "@/lib/programs/dedupe";
+import { useCallback, useRef, useState } from "react";
 import { DayInput } from "@/components/ui/day-input";
 import { dayFrom } from "@/lib/day-field";
 import { useRouter } from "next/navigation";
@@ -17,7 +19,7 @@ import { answer, planForm } from "@/components/plan/plan-file";
 type Picked = { name: string; form: FormData };
 
 /** What the read step returned: shown to the coach, then sent back to save. */
-type Read = { grid: unknown; context: unknown; summary: ImportSummary; found?: Found; weekOneStart: string | null; targets: boolean };
+type Read = { grid: unknown; context: unknown; summary: ImportSummary; found?: Found; matches?: ExerciseMatch[]; weekOneStart: string | null; targets: boolean };
 
 const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -41,6 +43,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
   const [error, setError] = useState<string | null>(null);
   // After reading: the summary to confirm, and whether to bring in the completed weeks as history.
   const [read_, setRead] = useState<Read | null>(null);
+  const setGrid = useCallback((grid: unknown) => setRead((r) => (r ? { ...r, grid } : r)), []);
   const [history, setHistory] = useState(true);
 
   async function pick(files: File[]) {
@@ -77,11 +80,11 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
         body = JSON.stringify({ step: "read", sheetUrl: link.trim(), ...(weekOne ? { weekOneStart: weekOne } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) });
       }
       const res = await fetch(`/api/clients/${clientId}/plan-from-sheet`, { method: "POST", headers, body });
-      const data = (await answer(res)) as { error?: string; warnings?: string[]; grid?: unknown; context?: unknown; summary?: ImportSummary; found?: Found; targets?: boolean };
+      const data = (await answer(res)) as { error?: string; warnings?: string[]; grid?: unknown; context?: unknown; summary?: ImportSummary; found?: Found; matches?: ExerciseMatch[]; targets?: boolean };
       setBusy(false);
       if (!res.ok) return void setError(data?.error ?? "Couldn't read that plan.");
       for (const w of data.warnings ?? []) toast.warning(w, { duration: 10_000 });
-      setRead({ grid: data.grid, context: data.context, summary: data.summary!, found: data.found, weekOneStart: weekOne || null, targets: data.targets === true });
+      setRead({ grid: data.grid, context: data.context, summary: data.summary!, found: data.found, matches: data.matches ?? [], weekOneStart: weekOne || null, targets: data.targets === true });
       setHistory(true);
     } catch {
       setError("Couldn't reach the server. Please try again.");
@@ -148,6 +151,7 @@ export function SheetPlanUpload({ clientId, firstName }: { clientId: string; fir
             {summary.completedWeeks > 0 ? `Starts at week ${summary.completedWeeks + 1}, as your note says. Earlier weeks aren't imported as sessions.` : "Starts at week 1. Nothing is marked done."}
           </p>
         )}
+        <ExerciseMatches matches={read_.matches ?? []} grid={read_.grid} onGrid={setGrid} />
         <TimesList times={summary.times ?? []} grid={read_.grid} onGrid={(grid) => setRead((r) => (r ? { ...r, grid } : r))} />
         {read_.targets ? null : h.sessions > 0 ? (
           <label className="flex items-start gap-3 rounded-lg border border-line-strong bg-dusk-raised p-3">

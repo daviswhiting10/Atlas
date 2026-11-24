@@ -1,5 +1,6 @@
 "use client";
 
+import { overlayBox, useSheetLock } from "@/hooks/use-sheet-lock";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -8,6 +9,8 @@ import { addBodyWeight } from "@/lib/actions/body-weight";
 
 /** "Add body weight": one number in pounds, saved for today. Opens from the Me ⋯ menu. */
 export function BodyWeightSheet({ onClose }: { onClose: () => void }) {
+  const vp = useSheetLock();
+  const box = overlayBox(vp);
   const [value, setValue] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -21,7 +24,7 @@ export function BodyWeightSheet({ onClose }: { onClose: () => void }) {
       router.refresh();
     });
   return (
-    <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 sm:items-center" onClick={() => !pending && onClose()}>
+    <div className={`fade-in fixed z-50 ${box.className} flex items-end justify-center bg-night/40 sm:items-center`} style={box.style} onClick={() => !pending && onClose()}>
       <form
         className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}

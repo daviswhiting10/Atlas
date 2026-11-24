@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ function Frames({ picture, running, className }: { picture: Picture; running: bo
 
 /** Full-screen view: the movement, large, with the library's name for it. */
 function Viewer({ picture, name, onClose }: { picture: Picture; name: string; onClose: () => void }) {
+  useSheetLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);

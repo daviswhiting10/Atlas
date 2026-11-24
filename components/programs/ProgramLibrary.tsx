@@ -9,6 +9,7 @@ import {
   type FilterState, type LibraryProgram,
 } from "@/lib/programs/filter";
 import { useEscape } from "@/hooks/use-escape";
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { cn } from "@/lib/utils";
 
 type Which = "goals" | "perWeek" | "length";
@@ -134,6 +135,7 @@ export function ProgramLibrary({ programs, user }: { programs: LibraryProgram[];
 
 function FilterSheet({ which, programs, s, onChange, onClose }: { which: Which; programs: LibraryProgram[]; s: FilterState; onChange: (p: Partial<FilterState>) => void; onClose: () => void }) {
   useEscape(true, onClose);
+  useSheetLock();
   const counts = useMemo(() => optionCounts(programs, s, which), [programs, s, which]);
   const options: Array<{ key: string; label: string }> =
     which === "goals" ? [...CATEGORIES.map((c) => ({ key: c.tag as string, label: c.label as string })), { key: UNCATEGORIZED, label: "No category yet" }] : which === "perWeek" ? PER_WEEK : LENGTH;

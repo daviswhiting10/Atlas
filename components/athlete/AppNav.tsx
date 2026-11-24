@@ -69,7 +69,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true, changeGoal
       {!inWorkout && (
         <nav
           aria-label="Main"
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden"
+          data-bottom-nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           <div className="mx-auto flex max-w-md">

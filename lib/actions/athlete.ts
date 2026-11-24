@@ -132,6 +132,26 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
   return { workoutLogId: log.id, setLogId };
 }
 
+/**
+ * The athlete's own note on a session, from Session complete (an ATHLETE SessionNote; the coach's note is separate).
+ * Only their own session; empty text removes it.
+ */
+export async function saveMySessionNote(raw: { assignedWorkoutId: string; text: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const input = z.object({ assignedWorkoutId: z.string().min(1).max(64), text: z.string().max(MAX_SESSION_NOTE * 2) }).safeParse(raw);
+  if (!input.success) return { ok: false, error: "That note is too long." };
+  try {
+    const { clientId } = await requireAthlete();
+    const log = await prisma.workoutLog.findFirst({ where: { assignedWorkoutId: input.data.assignedWorkoutId, clientId }, select: { id: true, date: true } });
+    if (!log) return { ok: false, error: "Log a set first, then add your note." };
+    await saveSessionNote({ workoutLogId: log.id, clientId, date: log.date, role: "ATHLETE", text: input.data.text });
+    refresh();
+    return { ok: true };
+  } catch (err) {
+    console.error("[session note]", err);
+    return { ok: false, error: "Couldn't save your note. Please try again." };
+  }
+}
+
 const QuickCardioInput = z.object({
   activity: z.enum(["RUN", "WALK", "OTHER"]),
   minutes: z.number().int().min(1).max(600),
@@ -177,26 +197,6 @@ export async function exerciseSeries(raw: unknown): Promise<Record<string, Sessi
   const out: Record<string, SessionPoint[]> = {};
   for (const e of progress.exercises) if (wanted.has(e.exerciseId)) out[e.exerciseId] = e.series;
   return out;
-}
-
-/**
- * The athlete's own note on a session, from Session complete (an ATHLETE SessionNote; the coach's note is separate).
- * Only their own session; empty text removes it.
- */
-export async function saveMySessionNote(raw: { assignedWorkoutId: string; text: string }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const input = z.object({ assignedWorkoutId: z.string().min(1).max(64), text: z.string().max(MAX_SESSION_NOTE * 2) }).safeParse(raw);
-  if (!input.success) return { ok: false, error: "That note is too long." };
-  try {
-    const { clientId } = await requireAthlete();
-    const log = await prisma.workoutLog.findFirst({ where: { assignedWorkoutId: input.data.assignedWorkoutId, clientId }, select: { id: true, date: true } });
-    if (!log) return { ok: false, error: "Log a set first, then add your note." };
-    await saveSessionNote({ workoutLogId: log.id, clientId, date: log.date, role: "ATHLETE", text: input.data.text });
-    refresh();
-    return { ok: true };
-  } catch (err) {
-    console.error("[session note]", err);
-    return { ok: false, error: "Couldn't save your note. Please try again." };
-  }
 }
 
 export async function finishWorkout(raw: { assignedWorkoutId: string; durationMin?: number }): Promise<void> {

@@ -12,11 +12,11 @@ describe("screen and tab entrance", () => {
     expect(dur).toBeLessThanOrEqual(300);
     expect(dur + Math.max(...delays)).toBeLessThanOrEqual(300);
   });
-  it("keeps the slow staggered version for the landing page and the Finish screen only", () => {
+  it("keeps the slow staggered version for the landing page only; the Finish screen shows at once", () => {
     expect(num(/\.rise-intro \{ animation: rise (\d+)ms/)).toBe(520);
     const users = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
     expect(users("app/page.tsx")).toContain("rise-intro");
-    expect(users("components/athlete/WorkoutLogger.tsx")).toContain("rise-intro");
+    expect(users("components/athlete/WorkoutLogger.tsx")).not.toContain("rise-intro");
   });
   it("respects prefers-reduced-motion: no duration and no delay (nothing waits hidden)", () => {
     const block = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce) {"));

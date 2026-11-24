@@ -1,5 +1,6 @@
 "use client";
 
+import { overlayBox, useSheetLock } from "@/hooks/use-sheet-lock";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ChevronDown, Search, X } from "lucide-react";
@@ -38,6 +39,8 @@ const THIN = 3;
 
 /** "All lifts ▾": a sheet with a search box and every lift, most-trained first. */
 function LiftSheet({ exercises, value, onChange, onClose }: { exercises: ExerciseProgress[]; value: string | null; onChange: (id: string | null) => void; onClose: () => void }) {
+  const vp = useSheetLock();
+  const box = overlayBox(vp);
   const [query, setQuery] = useState("");
   const ranked = useMemo(() => [...exercises].sort((a, b) => (b.count ?? b.series.length) - (a.count ?? a.series.length)), [exercises]);
   const q = query.trim().toLowerCase();
@@ -48,7 +51,7 @@ function LiftSheet({ exercises, value, onChange, onClose }: { exercises: Exercis
   };
   useEscape(true, onClose);
   return (
-    <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm" onClick={onClose}>
+    <div className={`fade-in fixed z-50 ${box.className} flex items-end bg-night/50 backdrop-blur-sm`} style={box.style} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

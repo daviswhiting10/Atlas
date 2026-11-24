@@ -97,8 +97,9 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
   const notes = parsed.data.notes || undefined;
   let grid;
   let modelContext = NO_CONTEXT;
+  let matches: Awaited<ReturnType<typeof readSheetText>>["matches"] = [];
   try {
-    ({ grid, modelContext } = await readSheetText(csv, { workspaceId, userId, feature: "program-sheet-import", notes }));
+    ({ grid, modelContext, matches } = await readSheetText(csv, { workspaceId, userId, feature: "program-sheet-import", notes }));
   } catch (err) {
     if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
@@ -112,7 +113,7 @@ export const POST = withWorkspace<{ id: string }>(async (req, { workspaceId, use
     context,
     summary,
     readAs: summary.readAs,
-    found: foundInFile(grid),
+    found: foundInFile(grid), matches,
     warnings: contextWarnings(context, { days: summary.daysPerWeek }, "sheet"),
   });
 });
@@ -158,14 +159,14 @@ async function readFiles(req: Request, id: string, who: { workspaceId: string; u
   try {
     const file = planFileFromForm(form);
     if (!perWorkspace(who.workspaceId)) return NextResponse.json({ error: "That's a lot of plans this hour. Try again shortly." }, { status: 429 });
-    const { grid, warnings } = await readPlanFile(file, { ...who, feature: file.csv ? "program-sheet-import" : "program-import", notes });
+    const { grid, warnings, matches } = await readPlanFile(file, { ...who, feature: file.csv ? "program-sheet-import" : "program-import", notes });
     // A spreadsheet keeps the sheet rule (a filled-in load is a week done). A PDF or screenshots show a plan: its loads
     // are each week's targets; it starts at week 1 with nothing marked done, unless the coach's note names a week.
     const pages = !file.csv;
     const noted = notes ? contextFromText(notes) : NO_CONTEXT;
     const context = pages ? pagesContext(noted) : noted;
     const summary = summarizeSheetImport({ grid, context, weekOneStart, today: new Date() });
-    return NextResponse.json({ grid, context, summary, found: foundInFile(grid), targets: pages, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
+    return NextResponse.json({ grid, context, summary, found: foundInFile(grid), matches, targets: pages, readAs: summary.readAs, warnings: [...warnings, ...contextWarnings(context, { days: summary.daysPerWeek }, "sheet")] });
   } catch (err) {
     if (err instanceof PlanFileError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
