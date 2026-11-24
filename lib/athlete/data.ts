@@ -4,6 +4,7 @@
  */
 
 import { cache } from "react";
+import { loadSessionNotes } from "@/lib/sessions/notes";
 import { planWorkoutStatus } from "@/lib/sessions/status";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 import { mediaPictures } from "@/lib/exercises/media";
@@ -347,6 +348,8 @@ export type LoggerData = {
   status: WorkoutSummary["status"];
   note: string | null;
   workoutLogId: string | null;
+  /** The athlete's own note on this session (shown on Session complete), if they wrote one. */
+  myNote?: string | null;
   exercises: LoggerExercise[];
   /** True in one of the plan's lighter weeks: no progression is asked for, and nothing counts as a record. */
   deloadWeek: boolean;
@@ -527,6 +530,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
   // The coach's own photos and clips win over the library's.
   const own = await mediaPictures(athlete.workspaceId, exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name })));
   for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
+  const myNote = workout.workoutLog ? ((await loadSessionNotes([{ id: workout.workoutLog.id }])).get(workout.workoutLog.id)?.athlete ?? null) : null;
 
   return {
     id: workout.id,
@@ -535,6 +539,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
     status: planWorkoutStatus(workout.status, workout.workoutLog),
     note: workout.notes,
     workoutLogId: workout.workoutLog?.id ?? null,
+    myNote,
     deloadWeek,
     exercises,
     coachPlan: !athlete.selfServe,
