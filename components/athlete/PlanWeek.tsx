@@ -74,7 +74,7 @@ export function PlanWeek({ plan, today, totalWeeks, base = "" }: { plan: PlanOve
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
             <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
           </p>
-          <DayCard cell={cell} base={base} />
+          <DayCard cell={cell} base={base} today={today} />
         </>
       ) : (
         <p className="rise mt-6 rounded-2xl border border-line bg-paper p-4 text-[15px] text-ink-soft">Nothing planned for week {week}.</p>
@@ -119,7 +119,7 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
   );
 }
 
-function DayCard({ cell, base }: { cell: DayCell; base: string }) {
+function DayCard({ cell, base, today }: { cell: DayCell; base: string; today: string }) {
   const w = cell.workout;
   const eyebrow = (s: string) => <p className="eyebrow">{`${longDay(cell.date)} · ${s}`}</p>;
   if (!w) {
@@ -138,7 +138,7 @@ function DayCard({ cell, base }: { cell: DayCell; base: string }) {
   const meta = `${plural(w.exercises.length, "exercise")} · ~${w.estMinutes} min`;
   return (
     <section aria-label={cell.upNext ? "Up next" : "Day"} className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
-      {eyebrow(done ? "Done" : cell.upNext ? "Up next" : "Planned")}
+      {eyebrow(done ? "Done" : cell.upNext ? "Up next" : cell.date < today ? "Not done" : "Planned")}
       <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">
         {w.name}
         {w.deload && <span className="ml-2 inline-block rounded-full bg-ink px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-[0.06em] text-paper">Lighter week</span>}
@@ -164,10 +164,11 @@ function DayCard({ cell, base }: { cell: DayCell; base: string }) {
         prefetch={cell.upNext}
         className={cn(
           "press flex h-[52px] w-full items-center justify-center rounded-2xl text-[17px] font-semibold",
-          cell.upNext ? "bg-dusk-button text-dusk-button-text hover:brightness-110" : "border border-line-strong text-ink"
+          // Any day that isn't done can be started: past, today or ahead. Only a finished one is a quiet "View session".
+          done ? "border border-line-strong text-ink" : "bg-dusk-button text-dusk-button-text hover:brightness-110"
         )}
       >
-        {done ? "View session" : cell.upNext ? "Start" : "Open workout"}
+        {done ? "View session" : "Start"}
       </Link>
     </section>
   );
