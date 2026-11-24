@@ -2,10 +2,12 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import type { Athlete, ProgressData } from "@/lib/athlete/data";
 import { ProgressView } from "@/components/athlete/ProgressView";
-import { sessionSummary } from "@/lib/actions/athlete";
+import { exerciseSeries, sessionSummary } from "@/lib/actions/athlete";
+import { liteProgress } from "@/lib/progress/lite";
 import { EmptyStart } from "@/components/athlete/EmptyStart";
 import { HistoryCalendar } from "@/components/athlete/HistoryCalendar";
 import type { HistoryCalendar as Calendar } from "@/lib/history/calendar";
+import { historyView } from "@/lib/history/view";
 import { BodyWeightSection } from "@/components/athlete/BodyWeightSection";
 import type { BodyWeightPoint } from "@/lib/athlete/body-weight";
 
@@ -31,9 +33,11 @@ export function ProgressScreen({
 }) {
   // Never blank: with nothing finished yet there is the one line and the one action.
   if (!athlete.hasHistory && calendar.kind === "empty" && data.totals.sessions === 0 && chapters.length === 0 && bodyWeight.length === 0) return <div className="pt-4"><EmptyStart /></div>;
+  // The browser gets names and counts plus the overall line; a lift's own history is fetched when it is picked.
+  const lite = liteProgress(data);
   return (
     <div className="pt-4">
-      <ProgressView data={data} goalMetric={athlete.metric} history={<HistoryCalendar calendar={calendar} summary={summary} />} />
+      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} quickLog />} />
       <BodyWeightSection points={bodyWeight} />
       {chapters.length > 0 && (
         <section className="mt-14">

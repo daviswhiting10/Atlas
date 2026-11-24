@@ -25,6 +25,8 @@ import { addDays } from "@/lib/goals/days";
 import { datedFinished, isLoggedSet } from "./days";
 import { heatmap, type HeatLevel } from "./heatmap";
 import { prsOverTime } from "./records";
+import { sessionMode, type DayMode } from "./mode";
+import { workOf, type Work } from "./work";
 import type { HistorySession } from "./types";
 
 /** Under this many finished sessions, no grid ("Day one"). */
@@ -37,6 +39,10 @@ export type CalendarSession = {
   /** Logged sets; 0 for a session with only a name and a time. */
   sets: number;
   minutes: number | null;
+  /** The work in it (lib/history/work): strength sets, and minutes of cardio, walking and mobility. */
+  work: Work;
+  /** How it was done (strength, run, walk, or a mix); null when nothing says. */
+  mode: DayMode | null;
   /** Set a heaviest-weight record on some lift. */
   record: boolean;
   /** Where it opens; null when there is no page for it. */
@@ -79,7 +85,12 @@ export type HistoryCalendar =
       summary: string;
       /** What a tap on a day shows: that day's sessions, newest first. */
       byDay: Record<string, CalendarSession[]>;
+      /** The running challenge, with each of its days met or not (the ring on the heatmap); null when none is running. */
+      challenge: Challenge | null;
     };
+
+/** A running challenge's days: met (the day's rules all done) or open (not met, or not over yet). */
+export type Challenge = { name: string; days: Record<string, "met" | "open"> };
 
 export type SessionMeta = { title: string; href: string | null };
 export type ChapterSpan = { name: string; from: string; to: string };
@@ -108,7 +119,7 @@ export function shortDay(day: string): string {
 
 export function historyCalendar(
   sessions: HistorySession[],
-  opts: { timeZone: string; today: string; meta: Record<string, SessionMeta>; chapters?: ChapterSpan[] }
+  opts: { timeZone: string; today: string; meta: Record<string, SessionMeta>; chapters?: ChapterSpan[]; challenge?: Challenge | null }
 ): HistoryCalendar {
   const dated = datedFinished(sessions, opts.timeZone, opts.today);
   if (dated.length === 0) return { kind: "empty" };
@@ -124,6 +135,8 @@ export function historyCalendar(
     title: opts.meta[s.id]?.title ?? "Workout",
     sets: s.sets.filter(isLoggedSet).length,
     minutes: s.durationMin,
+    work: workOf(s),
+    mode: sessionMode(s),
     record: recordSessions.has(s.id),
     href: opts.meta[s.id]?.href ?? null,
   });
@@ -169,6 +182,7 @@ export function historyCalendar(
     rows,
     summary: `${heat.activeWeeks} of the last ${plural(heat.weeksInRange, "week", "weeks")} active, ${plural(dated.length, "session", "sessions")}`,
     byDay,
+    challenge: opts.challenge ?? null,
   };
 }
 

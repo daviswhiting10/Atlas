@@ -5,6 +5,7 @@
  * the app's own pure builders, from the sessions below.
  */
 
+import { exerciseKind } from "@/lib/plan/workout-kind";
 import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import type { ProgressData, LoggerData, ExerciseProgress } from "@/lib/athlete/data";
 import type { HistorySession } from "@/lib/history/types";
@@ -163,8 +164,11 @@ for (let i = 0; i < 81 - plannedSessions.length; i++) {
   const day = i < 6 ? addDays(WEEK1, -7 * (6 - i) + 2) : addDays(WEEK1, 7 * (2 * (i - 5)) + 5);
   if (day >= DEMO_TODAY) break;
   const id = `demo-extra-${i}`;
-  extras.push({ id, date: new Date(`${day}T08:00:00Z`), completedAt: new Date(`${day}T08:40:00Z`), durationMin: 30 + (i % 4) * 10, sets: [] });
-  sessionTitles[id] = i % 2 ? "Mobility" : "Walk";
+  const kind = i % 5 === 3 ? "run" : i % 2 ? "mobility" : "walk";
+  const durationMin = kind === "run" ? 32 + (i % 3) * 6 : 30 + (i % 4) * 10;
+  const mobSets = kind === "mobility" ? Array.from({ length: 6 }, () => ({ exerciseId: "demo-mobility", weight: null, reps: 40, completed: true, mobility: true })) : [];
+  extras.push({ id, date: new Date(`${day}T08:00:00Z`), completedAt: new Date(`${day}T08:40:00Z`), durationMin, activity: kind === "run" ? "RUN" : kind === "walk" ? "WALK" : null, sets: mobSets });
+  sessionTitles[id] = kind === "run" ? "Easy run" : kind === "mobility" ? "Mobility" : "Walk";
 }
 export const DEMO_SESSIONS: HistorySession[] = [...extras, ...plannedSessions].sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -198,6 +202,7 @@ function summary(week: number, wo: (typeof WORKOUTS)[number]): WorkoutSummary {
       aweId: awe(week, wo.key, e.id),
       exerciseId: e.id,
       slug: e.slug,
+      kind: exerciseKind(e.muscles),
       name: e.name,
       sets: deload(week) ? Math.ceil(e.sets / 2) : e.sets,
       reps: repsLabel(e),

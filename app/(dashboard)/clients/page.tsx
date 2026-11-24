@@ -280,6 +280,7 @@ export default function ClientsPage() {
                     <div className="group flex items-center hover:bg-muted/40 transition-colors">
                     <Link
                       href={`/clients/${client.id}`}
+                      draggable={false}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 py-4 px-5 min-h-[60px] active:bg-muted/60"
                     >
                       <div className="flex min-w-0 items-center gap-3">

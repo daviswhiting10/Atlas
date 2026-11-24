@@ -105,7 +105,7 @@ function localDate(dateStr: string): Date {
  */
 type View = "progress" | "sessions" | "plan" | "notes";
 
-export function ClientDetail({ week, progress, history, report, latest, access, initial }: { /** Invited, opened, password set: where the client is with the app. */ access?: LoginStatus | null; /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** The latest finished session, judged against the plan (nothing until she has finished one). */ latest?: React.ReactNode; /** The week so far and the main lifts, shown above the progress charts on the first tab (null: nothing to show yet). */ week?: React.ReactNode; /** null: nothing to chart yet. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
+export function ClientDetail({ week, progress, history, report, latest, access, initial, glance }: { /** The last 30 days and a few numbers, above the fold. */ glance?: React.ReactNode; /** Invited, opened, password set: where the client is with the app. */ access?: LoginStatus | null; /** A row that opens the latest progress report (nothing until a block has finished). */ report?: React.ReactNode; /** The latest finished session, judged against the plan (nothing until she has finished one). */ latest?: React.ReactNode; /** The week so far and the main lifts, shown above the progress charts on the first tab (null: nothing to show yet). */ week?: React.ReactNode; /** null: nothing to chart yet. */ progress: React.ReactNode; /** The History calendar, on top of Sessions. */ history?: React.ReactNode; /** The client, loaded with the page. */ initial?: unknown }) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(() => (initial as Client | undefined) ?? null);
@@ -253,8 +253,8 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
   return (
     <div className={cn("pb-12", phase === "fading" && "animate-in fade-in-0 duration-200 ease-out")}>
       {/* ── Header: the name, and ⋯ for everything that isn't logging ──────── */}
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="min-w-0 text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-ink [overflow-wrap:anywhere]">{client.fullName}</h1>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="min-w-0 text-[26px] font-semibold leading-[1.1] tracking-[-0.025em] text-ink [overflow-wrap:anywhere]">{client.fullName}</h1>
         <DropdownMenu>
           <DropdownMenuTrigger aria-label={`More for ${client.fullName}`} className="press inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink-soft hover:text-ink">
             <MoreHorizontal className="h-5 w-5" />
@@ -321,6 +321,7 @@ export function ClientDetail({ week, progress, history, report, latest, access, 
         </Link>
       )}
       {report && <div className="-mt-3 mb-8">{report}</div>}
+      {glance}
       {latest}
       <div className="mb-12">
         <div role="tablist" className="flex w-full max-w-md gap-1 overflow-x-auto rounded-2xl bg-ink/5 p-1">

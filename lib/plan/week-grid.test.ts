@@ -47,3 +47,12 @@ describe("the Plan week grid", () => {
     expect(weekRange("2026-11-30")).toBe("Nov 30 – Dec 6");
   });
 });
+
+describe("each cell's kind drives its icon", () => {
+  const withKinds = (id: string, week: number, date: string, kinds: Array<"strength" | "cardio" | "mobility">): WorkoutSummary =>
+    ({ ...wo(id, week, "PLANNED", date), exercises: kinds.map((kind, i) => ({ aweId: `${id}${i}`, kind, section: "block:1" })) }) as unknown as WorkoutSummary;
+  it("strength, cardio and mobility days; rest has none", () => {
+    const g = weekGrid(plan([withKinds("a", 20, "2026-11-23", ["strength", "strength"]), withKinds("b", 20, "2026-11-25", ["cardio"]), withKinds("c", 20, "2026-11-27", ["mobility", "mobility"])]), 20, "2026-11-25")!;
+    expect(g.cells.map((c) => c.kind)).toEqual(["strength", null, "cardio", null, "mobility", null, null]);
+  });
+});

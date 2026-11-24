@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, X } from "lucide-react";
+import { liveTransitionTo } from "@/lib/live-transition";
 import { LIVE_EVENT, LIVE_KEY, clearLive, formatElapsed, liveIsFresh, readLiveFor, type LiveSession } from "@/lib/sessions/live";
 
 function storage(): Storage | null {
@@ -26,6 +27,7 @@ export function LiveSessionBar({ owner }: { /** The signed-in coach: only their 
   const router = useRouter();
   const [live, setLive] = useState<LiveSession | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const bar = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const load = () => setLive(readLiveFor(storage(), owner));
@@ -50,6 +52,12 @@ export function LiveSessionBar({ owner }: { /** The signed-in coach: only their 
     return () => clearInterval(id);
   }, [visible]);
 
+  // The logger's shell is ready before the tap: the bar can grow into it at once.
+  const href = live?.href;
+  useEffect(() => {
+    if (visible && href) router.prefetch(href);
+  }, [visible, href, router]);
+
   if (!visible || !live) return null;
 
   return (
@@ -61,10 +69,10 @@ export function LiveSessionBar({ owner }: { /** The signed-in coach: only their 
       role="region"
       aria-label="Currently logging"
     >
-      <div className="mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-line-strong bg-dusk-raised p-1.5 shadow-lg md:max-w-xl">
+      <div ref={bar} data-live-bar className="mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-line-strong bg-dusk-raised p-1.5 shadow-lg md:max-w-xl">
         <button
           type="button"
-          onClick={() => router.push(live.href)}
+          onClick={() => liveTransitionTo(router, live.href, bar.current)}
           className="press flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-2.5 text-left"
         >
           <ClipboardList className="h-4 w-4 shrink-0 text-signal" />

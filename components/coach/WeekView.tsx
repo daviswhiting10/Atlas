@@ -29,12 +29,8 @@ export function WeekView({ week, lifts }: { week: WeekData | null; lifts: MainLi
     <div className="space-y-8">
       {week && (
         <section aria-label="This week">
-          <p className="tnum flex items-baseline gap-2">
-            <span className="text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{week.done}</span>
-            <span className="text-[24px] font-medium text-ink-mute">/{week.planned}</span>
-            <span className="ml-1 text-[15px] text-ink-mute">this week{week.lighter ? " · lighter" : ""}</span>
-          </p>
-          <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <p className={label}>This week{week.lighter ? " · lighter" : ""}</p>
+          <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {week.chips.map((c, i) => (
               <li
                 key={`${c.date}-${i}`}
