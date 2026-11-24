@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
@@ -103,6 +104,7 @@ function SummaryView({ s, load, onBack, onClose }: { s: CalendarSession; load: (
 
 /** A day's sessions in a bottom sheet: the day, then each session; with `summary`, tapping one shows what was done. */
 function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: CalendarSession[]; summary?: (id: string) => Promise<SessionSummary | null>; onClose: () => void }) {
+  useSheetLock();
   const [view, setView] = useState<CalendarSession | null>(sessions.length === 1 && summary ? sessions[0] : null);
   useEscape(true, onClose);
   return (

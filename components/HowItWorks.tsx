@@ -1,5 +1,6 @@
 "use client";
 
+import { SheetLock } from "@/components/ui/sheet-lock";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRight } from "lucide-react";
@@ -32,6 +33,7 @@ export function HowItWorks({ className }: { className?: string }) {
       {open &&
         createPortal(
           <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/50 backdrop-blur-sm sm:items-center" onClick={close}>
+          <SheetLock />
             <div
               role="dialog"
               aria-modal="true"

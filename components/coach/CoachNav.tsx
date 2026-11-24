@@ -1,5 +1,6 @@
 "use client";
 
+import { SheetLock } from "@/components/ui/sheet-lock";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -68,7 +69,7 @@ export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn 
         </div>
       </header>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <nav data-bottom-nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 backdrop-blur-xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="mx-auto flex max-w-md">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = chosen(href);
@@ -100,6 +101,7 @@ export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn 
 
       {more && (
         <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/40 backdrop-blur-sm md:hidden" onClick={() => setMore(false)}>
+          <SheetLock />
           <div
             role="dialog"
             aria-modal="true"

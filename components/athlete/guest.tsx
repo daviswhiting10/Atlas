@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ export function useGuestSignIn() {
 
 /** "The demo is busy": never a raw error. A retry button, and a way out. */
 export function DemoBusy({ input, onRetry, onClose }: { input: GuestInput | null; onRetry: (input: GuestInput) => void; onClose: () => void }) {
+  useSheetLock();
   useEscape(input != null, onClose);
   if (!input) return null;
   return createPortal(
