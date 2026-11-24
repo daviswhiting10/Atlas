@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   e1RM,
   bestE1RM,
-  sessionVolume,
   weightTrendEMA,
   strengthComposite,
   weekStart,
@@ -62,33 +61,6 @@ describe("bestE1RM", () => {
       { weight: 50,  reps: 8, completed: true },
     ];
     expect(bestE1RM(sets)).toBeCloseTo(e1RM(50, 8), 5);
-  });
-});
-
-// ── sessionVolume ─────────────────────────────────────────────────────────────
-
-describe("sessionVolume", () => {
-  it("returns 0 for empty sets", () => {
-    expect(sessionVolume([])).toBe(0);
-  });
-
-  it("skips bodyweight sets", () => {
-    const sets: SetRecord[] = [{ weight: null, reps: 10, completed: true }];
-    expect(sessionVolume(sets)).toBe(0);
-  });
-
-  it("skips incomplete sets", () => {
-    const sets: SetRecord[] = [{ weight: 100, reps: 10, completed: false }];
-    expect(sessionVolume(sets)).toBe(0);
-  });
-
-  it("sums weight × reps for all completed weighted sets", () => {
-    const sets: SetRecord[] = [
-      { weight: 100, reps: 10, completed: true },  // 1000
-      { weight: 120, reps: 8,  completed: true },  // 960
-      { weight: null, reps: 10, completed: true }, // 0 (BW)
-    ];
-    expect(sessionVolume(sets)).toBe(1960);
   });
 });
 

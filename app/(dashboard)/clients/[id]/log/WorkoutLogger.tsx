@@ -5,6 +5,7 @@
 import { SheetLock } from "@/components/ui/sheet-lock";
 import { liveTransitionTo } from "@/lib/live-transition";
 import { summaryView } from "@/lib/sessions/summary-copy";
+import { setVolume, timedRx } from "@/lib/sessions/volume";
 import { AthleteNote, CompareCard, Medals, NextFor } from "@/components/coach/FinishedPanels";
 import type { WrapUp } from "@/lib/coach/wrap-up";
 import { reconcile } from "@/lib/sessions/reconcile";
@@ -1474,12 +1475,13 @@ export default function WorkoutLogger({
     let doneSetsAll = 0;
     let totalVolumeAll = 0;
     for (const ex of exercises) {
+      // A timed or cardio exercise's reps are seconds: it adds no weight lifted.
+      const timed = timedRx(ex.prescribedSets);
       for (const entry of stateFor(ex).sets) {
         if (entry.completed) {
           doneSetsAll++;
           const w = entry.isBodyweight || entry.isBand ? 0 : parseFloat(entry.weight) || 0;
-          const r = parseInt(entry.reps, 10) || 0;
-          totalVolumeAll += w * r;
+          totalVolumeAll += setVolume({ weight: w, reps: parseInt(entry.reps, 10) || 0, timed });
         }
       }
     }

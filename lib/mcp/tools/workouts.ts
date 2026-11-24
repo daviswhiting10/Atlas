@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import { displayName } from "@/lib/plan/catalog";
+import { isTimedSet, setVolume, TIMED_SELECT } from "@/lib/sessions/volume";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
 import { invalid, notFound } from "../context";
@@ -60,6 +61,7 @@ export const getWorkoutHistory = clientTool({
             rpe: true,
             completed: true,
             exercise: { select: { name: true, slug: true } },
+            ...TIMED_SELECT,
           },
         },
       },
@@ -92,7 +94,7 @@ export const getWorkoutHistory = clientTool({
             rpe: s.rpe,
             completed: s.completed,
           });
-          if (s.completed && s.weight && s.reps) volumeLb += s.weight * s.reps;
+          volumeLb += setVolume({ weight: s.weight, reps: s.reps, completed: s.completed, timed: isTimedSet(s, s.exercise.slug) });
         }
         return {
           workoutLogId: log.id,

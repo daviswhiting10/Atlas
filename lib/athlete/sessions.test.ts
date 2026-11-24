@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, localDay, mondayOf, referenceSession, safeTimeZone, weekOf } from "./sessions";
+import { DAY_MS, localDay, mondayOf, referenceSession, safeTimeZone, sessionBefore, weekOf } from "./sessions";
 
 const set = (weight: number | null, reps: number, completed = true) => ({ weight, reps, completed });
 
@@ -69,5 +69,23 @@ describe("referenceSession", () => {
   it("returns null with no usable history", () => {
     expect(referenceSession([])).toBeNull();
     expect(referenceSession([untouched])).toBeNull();
+  });
+});
+
+describe("sessionBefore", () => {
+  const a = { deload: false, sets: [set(225, 10)] };
+  const b = { deload: false, sets: [set(225, 10)] };
+  const lighter = { deload: true, sets: [set(225, 7)] };
+  const untouched = { deload: false, sets: [set(225, 8, false)] };
+
+  it("is the counted session before the reference, skipping lighter weeks and empty sessions", () => {
+    const sessions = [a, lighter, untouched, b];
+    expect(sessionBefore(sessions, referenceSession(sessions))).toBe(a);
+  });
+
+  it("is null with nothing earlier, or when the reference is a lighter-week fallback", () => {
+    expect(sessionBefore([a], a)).toBeNull();
+    expect(sessionBefore([lighter], lighter)).toBeNull();
+    expect(sessionBefore([], null)).toBeNull();
   });
 });

@@ -27,14 +27,7 @@ export function bestE1RM(sets: SetRecord[]): number | null {
   return best;
 }
 
-// ── Volume (tonnage) ──────────────────────────────────────────────────────────
-// Sum of weight × reps for all completed weighted sets.
-export function sessionVolume(sets: SetRecord[]): number {
-  return sets.reduce((sum, s) => {
-    if (!s.completed || s.weight == null || s.reps == null) return sum;
-    return sum + s.weight * s.reps;
-  }, 0);
-}
+// Volume (weight × reps) is lib/sessions/volume.ts: it leaves out timed and cardio sets.
 
 // ── Weight trend EMA ─────────────────────────────────────────────────────────
 // Exponential moving average over body weight readings. Default period = 7.

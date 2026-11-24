@@ -38,6 +38,7 @@ import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish } from "@/lib/sessions/finish";
 import { FinishSheet } from "@/components/logger/FinishSheet";
 import { summaryView } from "@/lib/sessions/summary-copy";
+import { loggedVolume } from "@/lib/sessions/volume";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -773,7 +774,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const all = data.exercises.flatMap((e) => listOf(e));
   const doneCount = all.filter((s) => s.done).length;
   const totalCount = all.length;
-  const volume = Math.round(all.reduce((sum, s) => (s.done && s.reps ? sum + (s.weight ?? 0) * s.reps : sum), 0));
+  // A timed or cardio exercise's reps are seconds: it adds no weight lifted.
+  const volume = Math.round(loggedVolume(data.exercises.map((e) => ({ unit: e.unit, sets: listOf(e) }))));
   /** The workout's parts in the order they're done, each exercise with its badge ("1A", "2", "W", "C"). */
   const blocks = useMemo(
     () =>
@@ -983,8 +985,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                           <p className="mt-0.5 text-[12px] leading-tight text-ink-mute">
                             {list.length} × {timed ? durationRange(ex.repMin, ex.repMax) : `${ex.repMin === ex.repMax ? ex.repMax : `${ex.repMin}–${ex.repMax}`} ${unit}`}
                           </p>
-                          {/* Only a first time (nothing to go on) gets a word of guidance; a hold is timed, so it never asks for "N reps". */}
-                          {ex.target.kind === "first" && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
+                          {/* Only a first time (nothing to go on) and "at the top once, one more to go up" get a word of guidance; a hold is timed, so it never asks for "N reps". */}
+                          {(ex.target.kind === "first" || ex.target.oneMore) && <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">{ex.target.reason}</p>}
                           {/* The coach's note on the exercise, as written. */}
                           {ex.note && <p className="mt-1 text-[13px] leading-snug text-ink-soft">{ex.note}</p>}
                         </div>

@@ -22,7 +22,7 @@ import { addWork } from "./work";
 export type GridLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
 /** What the grid needs to know about a day: no ids, no links, no record flags. This is what a browser is sent. */
-export type DayInfo = { minutes: number; units: number; sets: number; runMin: number; walkMin: number; mobMin: number; titles: string[]; mode: DayMode | null };
+export type DayInfo = { minutes: number; units: number; sets: number; runMin: number; walkMin: number; mobMin: number; holdMin: number; titles: string[]; mode: DayMode | null };
 export type HeatDays = Record<string, DayInfo>;
 
 /** The bands' lower edges in work units (rounded to whole units), for levels 1 to 5. */
@@ -57,6 +57,7 @@ export function heatDays(byDay: Record<string, CalendarSession[]>): HeatDays {
       runMin: w.runMin,
       walkMin: w.walkMin,
       mobMin: w.mobMin,
+      holdMin: w.holdMin,
       titles: list.map((s) => s.title),
       mode: dayMode(list),
     };
@@ -74,6 +75,7 @@ export type GridCell = {
   runMin: number;
   walkMin: number;
   mobMin: number;
+  holdMin: number;
   titles: string[];
   mode: DayMode | null;
 };
@@ -126,6 +128,7 @@ export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number;
         runMin: info?.runMin ?? 0,
         walkMin: info?.walkMin ?? 0,
         mobMin: info?.mobMin ?? 0,
+        holdMin: info?.holdMin ?? 0,
         titles: info?.titles ?? [],
         mode: future ? null : (info?.mode ?? null),
       };
@@ -137,12 +140,13 @@ export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number;
 }
 
 /** The day's raw numbers, not the units: "22 sets · 45 min run · 20 min walk"; just the minutes for a session with no sets. */
-export function rawStats(c: Pick<GridCell, "sets" | "runMin" | "walkMin" | "mobMin" | "minutes">): string | null {
+export function rawStats(c: Pick<GridCell, "sets" | "runMin" | "walkMin" | "mobMin" | "minutes"> & { holdMin?: number }): string | null {
   const parts = [
     c.sets > 0 ? `${c.sets} set${c.sets === 1 ? "" : "s"}` : null,
     c.runMin > 0 ? `${c.runMin} min run` : null,
     c.walkMin > 0 ? `${c.walkMin} min walk` : null,
     c.mobMin > 0 ? `${c.mobMin} min mobility` : null,
+    c.holdMin ? `${c.holdMin} min timed` : null,
   ].filter(Boolean);
   if (parts.length > 0) return parts.join(" · ");
   return c.minutes > 0 ? `${c.minutes} min` : null;

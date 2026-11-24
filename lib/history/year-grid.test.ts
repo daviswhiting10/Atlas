@@ -10,7 +10,7 @@ const s = (title: string, minutes: number | null, mode: DayMode | null = "S", se
   const strength = mode === "S" || mode === "M" ? sets : 0;
   const runMin = mode === "R" || mode === "M" ? (minutes ?? 0) : 0;
   const walkMin = mode === "W" ? (minutes ?? 0) : 0;
-  return { id: title + minutes, title, sets: strength, minutes, mode, record: false, href: null, work: { sets: strength, runMin, walkMin, mobMin: 0, units: strength + runMin / 3 + walkMin / 10 } };
+  return { id: title + minutes, title, sets: strength, minutes, mode, record: false, href: null, work: { sets: strength, runMin, walkMin, mobMin: 0, holdMin: 0, units: strength + runMin / 3 + walkMin / 10 } };
 };
 // 2026-11-23 is a Monday (so 2026-11-11 is a Wednesday).
 const TODAY = "2026-11-23";
@@ -103,6 +103,9 @@ describe("raw stats in the readout, not the units", () => {
   });
   it("a walk and mobility say their minutes", () => {
     expect(rawStats({ sets: 0, runMin: 0, walkMin: 30, mobMin: 15, minutes: 45 })).toBe("30 min walk · 15 min mobility");
+  });
+  it("timed holds and carries say their minutes", () => {
+    expect(rawStats({ sets: 12, runMin: 0, walkMin: 0, mobMin: 0, holdMin: 3, minutes: 50 })).toBe("12 sets · 3 min timed");
   });
   it("a session with only a time keeps showing it", () => {
     expect(rawStats({ sets: 0, runMin: 0, walkMin: 0, mobMin: 0, minutes: 40 })).toBe("40 min");

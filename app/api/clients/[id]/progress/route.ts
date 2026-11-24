@@ -1,6 +1,7 @@
 import { withWorkspace } from "@/lib/api/middleware";
 import { prisma } from "@/lib/db/client";
-import { bestE1RM, weightTrendEMA, sessionVolume, weekStart, type SetRecord } from "@/lib/progress/math";
+import { bestE1RM, weightTrendEMA, weekStart, type SetRecord } from "@/lib/progress/math";
+import { isTimedSet, setVolume, TIMED_SELECT } from "@/lib/sessions/volume";
 import { NextResponse } from "next/server";
 
 // GET /api/clients/[id]/progress
@@ -39,7 +40,8 @@ export const GET = withWorkspace<{ id: string }>(async (_req, { workspaceId }, c
     where: { workoutLog: { clientId } },
     include: {
       workoutLog: { select: { date: true } },
-      exercise: { select: { id: true, name: true } },
+      exercise: { select: { id: true, name: true, slug: true } },
+      ...TIMED_SELECT,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -108,7 +110,8 @@ export const GET = withWorkspace<{ id: string }>(async (_req, { workspaceId }, c
     if (!s.completed) continue;
     const ws = weekStart(s.workoutLog.date).toISOString().slice(0, 10);
     const entry = volumeByWeek.get(ws) ?? { totalKg: 0, sessionCount: 0 };
-    entry.totalKg += sessionVolume([{ weight: s.weight, reps: s.reps, completed: s.completed }]);
+    // A timed or cardio set's reps are seconds: it adds no weight lifted.
+    entry.totalKg += setVolume({ weight: s.weight, reps: s.reps, timed: isTimedSet(s, s.exercise?.slug) });
     const sessionKey = `${s.workoutLogId}__${ws}`;
     if (!sessionDates.has(sessionKey)) {
       sessionDates.add(sessionKey);

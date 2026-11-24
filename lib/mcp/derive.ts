@@ -4,7 +4,8 @@
  * they are unit-tested against fixtures.
  */
 
-import { bestE1RM, e1RM, sessionVolume } from "@/lib/progress/math";
+import { bestE1RM, e1RM } from "@/lib/progress/math";
+import { setVolume, volumeOf } from "@/lib/sessions/volume";
 import { suggestNext, type LoadType, type ProgressionSuggestion } from "@/lib/progression";
 import { detectPlateau, holdStreak, type PlateauResult } from "@/lib/progress/plateau";
 import { localDay, mondayOf } from "@/lib/athlete/sessions";
@@ -24,6 +25,8 @@ export type DerivedSet = {
   workoutLogId: string;
   date: Date;
   deload: boolean;
+  /** The reps are seconds (a hold, a carry, cardio): no tonnage. */
+  timed?: boolean;
 };
 
 export type ExerciseSession = {
@@ -84,7 +87,7 @@ export function summarizeSession(session: ExerciseSession) {
         : null,
     bestE1RM: best == null ? null : round1(best),
     bestReps: done.length > 0 ? Math.max(...done.map((s) => s.reps as number)) : null,
-    volumeLb: Math.round(sessionVolume(done)),
+    volumeLb: Math.round(volumeOf(done)),
   };
 }
 
@@ -136,7 +139,7 @@ export type VolumeWeek = {
   week: string;
   tonnageLb: number;
   sets: number;
-  /** Bodyweight and band sets: they count as work but add no tonnage. */
+  /** Bodyweight, band and timed sets: they count as work but add no tonnage. */
   unloadedSets: number;
   byMuscle: Record<string, { tonnageLb: number; sets: number }>;
 };
@@ -153,7 +156,7 @@ export function volumeByWeek(rows: DerivedSet[], timeZone: string): VolumeWeek[]
       w = { week: key, tonnageLb: 0, sets: 0, unloadedSets: 0, byMuscle: {} };
       weeks.set(key, w);
     }
-    const tonnage = r.weight != null && r.weight > 0 ? r.weight * r.reps : 0;
+    const tonnage = setVolume(r);
     w.sets += 1;
     w.tonnageLb += tonnage;
     if (tonnage === 0) w.unloadedSets += 1;
