@@ -5,6 +5,7 @@ import { saveSessionNote } from "@/lib/sessions/notes";
 import { requestDay } from "@/lib/sessions/request-day";
 import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
+import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
 import {
   checkStrengthMilestones,
   checkSessionMilestones,
@@ -57,7 +58,9 @@ export async function logSet(input: {
   completed: boolean;
   /** The day the session was done, when creating it (YYYY-MM-DD). Defaults to today, never the scheduled day. */
   date?: string;
-}): Promise<{ workoutLogId: string; setLogId: string }> {
+  /** Only on a save replayed after being offline: whether this device last knew the set as ticked on the server. */
+  expectDone?: boolean;
+}): Promise<{ workoutLogId: string; setLogId: string; conflict?: ServerSetState }> {
   const { workspaceId } = await requireWorkspace();
 
   // ── Verify the AssignedWorkout belongs to this workspace ───────────────────
@@ -129,9 +132,13 @@ export async function logSet(input: {
     // Update existing set (trainer edited weight/reps after initial save)
     const ownedSet = await prisma.setLog.findFirst({
       where: { id: known, workoutLogId },
-      select: { id: true },
+      select: { id: true, completed: true, weight: true, reps: true },
     });
     if (!ownedSet) throw new Error("Set not found");
+    // A save replayed after being offline: if another device changed this set meanwhile, keep theirs and say so.
+    if (input.expectDone !== undefined && replayConflict(input.expectDone, ownedSet)) {
+      return { workoutLogId, setLogId: ownedSet.id, conflict: { done: ownedSet.completed, weight: ownedSet.weight == null ? null : Number(ownedSet.weight), reps: ownedSet.reps } };
+    }
     await prisma.setLog.update({
       where: { id: known },
       data: {

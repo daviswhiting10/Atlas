@@ -22,7 +22,10 @@ export default withPWA({
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: false,
   aggressiveFrontEndNavCaching: false,
-  reloadOnOnline: true,
+  // Off: the page used to reload itself when the connection came back, which threw away anything half-typed (a new
+  // client's form, a note) and every open sheet. The logger resends its own ticks; saves that fail say so and the page
+  // re-reads itself (lib/net/guard).
+  reloadOnOnline: false,
   // Don't precache the coach's certificate PDFs (4 MB every visitor would
   // download), and don't keep API responses — they hold signed-in data that
   // would outlive a sign-out.
