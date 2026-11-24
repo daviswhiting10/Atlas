@@ -2,6 +2,7 @@
 
 /// <reference types="@types/dom-speech-recognition" />
 
+import { SheetLock } from "@/components/ui/sheet-lock";
 import { SupersetOutline } from "@/components/logger/SupersetOutline";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { COOLDOWN, WARMUP, parts, structure } from "@/lib/workouts/structure";
@@ -1735,6 +1736,7 @@ export default function WorkoutLogger({
       {/* ── Date, week and day: one sheet ───────────────────────────── */}
       {whenOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={() => setWhenOpen(false)}>
+          <SheetLock />
           <div
             role="dialog"
             aria-modal="true"

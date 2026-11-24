@@ -25,3 +25,26 @@ describe("a bottom sheet locks the page and stays docked", () => {
     expect(p).toContain("min-h-0 flex-1");
   });
 });
+
+import { readdirSync, statSync } from "node:fs";
+
+describe("every modal sheet in the app locks the page", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(new URL(`../${dir}`, import.meta.url)).flatMap((n) => {
+      const rel = `${dir}/${n}`;
+      return statSync(new URL(`../${rel}`, import.meta.url)).isDirectory() ? walk(rel) : rel.endsWith(".tsx") ? [rel] : [];
+    });
+  // Files with their own sheets drawn as a fixed full-window overlay (not the base-ui Dialog, which locks scroll itself,
+  // and not the mode-switch shell or the "building" status overlay, which are not sheets).
+  const sheets = [...walk("components"), ...walk("app")].filter((f) => {
+    if (/components\/ui\/dialog\.tsx|ModeSwitchProvider/.test(f)) return false;
+    const src = read(f);
+    return /role="dialog"/.test(src) && /fixed (inset-0|z-50)/.test(src);
+  });
+  it("finds the sheets (so this test can't pass by finding none)", () => {
+    expect(sheets.length).toBeGreaterThanOrEqual(12);
+  });
+  it.each(sheets)("%s", (f) => {
+    expect(read(f)).toMatch(/useSheetLock\(|<SheetLock \/>/);
+  });
+});

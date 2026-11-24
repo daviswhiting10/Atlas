@@ -12,11 +12,12 @@ import { useEffect, useState } from "react";
  *   bottom stays docked on top of it instead of floating mid-page. Returns where the overlay should sit (null: use the
  *   whole window, as before the keyboard or where there is no visual viewport).
  */
-export function useSheetLock(open = true): { top: number; height: number } | null {
-  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
+let holders = 0;
+let restore: (() => void) | null = null;
 
-  useEffect(() => {
-    if (!open) return;
+/** Pin the page while any sheet is open; the last one to close puts it back. (Two sheets can overlap for a moment.) */
+function lockPage(): () => void {
+  if (holders++ === 0) {
     const body = document.body;
     const y = window.scrollY;
     const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow };
@@ -25,7 +26,7 @@ export function useSheetLock(open = true): { top: number; height: number } | nul
     body.style.width = "100%";
     body.style.overflow = "hidden";
     body.dataset.sheetOpen = "1";
-    return () => {
+    restore = () => {
       body.style.position = prev.position;
       body.style.top = prev.top;
       body.style.width = prev.width;
@@ -33,6 +34,21 @@ export function useSheetLock(open = true): { top: number; height: number } | nul
       delete body.dataset.sheetOpen;
       window.scrollTo(0, y);
     };
+  }
+  return () => {
+    if (--holders === 0) {
+      restore?.();
+      restore = null;
+    }
+  };
+}
+
+export function useSheetLock(open = true): { top: number; height: number } | null {
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    return lockPage();
   }, [open]);
 
   useEffect(() => {
@@ -51,4 +67,9 @@ export function useSheetLock(open = true): { top: number; height: number } | nul
   }, [open]);
 
   return box;
+}
+
+/** Where a sheet's overlay sits: the whole window, or (keyboard up) the part you can see. Spread onto the overlay. */
+export function overlayBox(vp: { top: number; height: number } | null) {
+  return { className: vp ? "inset-x-0" : "inset-0", style: vp ? { top: vp.top, height: vp.height } : undefined } as const;
 }

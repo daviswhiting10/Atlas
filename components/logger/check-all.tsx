@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { useRef } from "react";
 import type { BulkMode } from "@/lib/sessions/check-all";
 import { bulkConfirmText } from "@/lib/sessions/check-all";
@@ -23,6 +24,7 @@ export function CheckAllButton({ mode, onClick, name }: { mode: BulkMode; onClic
 
 /** "Check all 14 sets?" (or "Uncheck all 14 sets?") with Cancel and Check all. Opens like the other sheets, from the bottom. */
 export function CheckAllSheet({ mode = "check", count, onCancel, onConfirm }: { mode?: BulkMode; count: number; onCancel: () => void; onConfirm: () => void }) {
+  useSheetLock();
   // A tap on Check all in the first 400 ms after the sheet opens is a stray (the tap that opened it, a double tap): ignored.
   const openedAt = useRef(typeof performance === "undefined" ? 0 : performance.now());
   const ready = () => typeof performance === "undefined" || performance.now() - openedAt.current > 400;

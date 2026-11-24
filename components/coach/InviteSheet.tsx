@@ -1,5 +1,6 @@
 "use client";
 
+import { useSheetLock } from "@/hooks/use-sheet-lock";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Copy, Share, X } from "lucide-react";
@@ -16,6 +17,7 @@ export type InviteResult = { email: string; emailed: boolean; link: string; expi
  * when it couldn't (no email set up yet), the sheet is "Share this link".
  */
 export function InviteSheet({ name, invite, onClose }: { name: string; invite: InviteResult; onClose: () => void }) {
+  useSheetLock();
   const [copied, setCopied] = useState(false);
   // The share sheet exists on phones and some desktop browsers; checked after the page is up, so it never flickers.
   const [canShare, setCanShare] = useState(false);

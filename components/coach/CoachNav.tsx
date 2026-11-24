@@ -1,5 +1,6 @@
 "use client";
 
+import { SheetLock } from "@/components/ui/sheet-lock";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -100,6 +101,7 @@ export function CoachNav({ demo = false, preview }: { demo?: boolean; /** Drawn 
 
       {more && (
         <div className="fade-in fixed inset-0 z-50 flex items-end bg-night/40 backdrop-blur-sm md:hidden" onClick={() => setMore(false)}>
+          <SheetLock />
           <div
             role="dialog"
             aria-modal="true"
