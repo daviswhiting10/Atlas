@@ -18,13 +18,13 @@ export type SummaryView =
 const n = (v: number) => v.toLocaleString("en-US");
 const long = (minutes: number) => (minutes >= 60 ? `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60} min` : ""}` : `${minutes} min`);
 
-export function summaryView({ sets, volume, minutes }: { sets: number; volume: number; minutes: number }): SummaryView {
+export function summaryView({ sets, volume, minutes, who = "You" }: { sets: number; volume: number; minutes: number; /** Who did it: "You" on the athlete's screen, the athlete's first name on the coach's. */ who?: string }): SummaryView {
   const lifted = volume > 0;
   if (minutes < SHORT_SESSION_MIN) {
     return { kind: "tiles", tiles: [{ value: n(sets), label: sets === 1 ? "Set" : "Sets" }, ...(lifted ? [{ value: n(Math.round(volume)), unit: "lb", label: "Weight lifted" }] : [])] };
   }
   const parts: Part[] = [
-    { text: "You did " },
+    { text: `${who} did ` },
     { text: `${n(sets)} ${sets === 1 ? "set" : "sets"}`, strong: true },
     ...(lifted ? [{ text: " and lifted " }, { text: `${n(Math.round(volume))} lb`, strong: true }] : []),
     { text: " in " },

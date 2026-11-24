@@ -7,7 +7,8 @@
 import { prisma } from "@/lib/db/client";
 import type { NoteAuthor } from "@/app/generated/prisma/client";
 
-export type SessionNotes = { coach: string | null; athlete: string | null };
+import type { SessionNotes } from "./note-order";
+export { labelledNotes, type SessionNotes, type Viewer } from "./note-order";
 
 export const MAX_SESSION_NOTE = 2000;
 
@@ -55,12 +56,4 @@ export async function saveSessionNote(
     });
   }
   if (input.role === "COACH") await db.workoutLog.update({ where: { id: input.workoutLogId }, data: { clientNotes: text || null } });
-}
-
-/** "Coach" / "<first name>" labels for the two notes, in the order they are shown (coach first). */
-export function labelledNotes(notes: SessionNotes, names: { coach?: string | null; athlete?: string | null } = {}) {
-  return [
-    ...(notes.coach ? [{ role: "COACH" as const, label: names.coach ? `Coach ${names.coach}` : "Coach", text: notes.coach }] : []),
-    ...(notes.athlete ? [{ role: "ATHLETE" as const, label: names.athlete ?? "Athlete", text: notes.athlete }] : []),
-  ];
 }

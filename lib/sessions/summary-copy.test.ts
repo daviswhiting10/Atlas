@@ -34,6 +34,12 @@ describe("the finish screen's framing", () => {
   });
 });
 
+describe("the coach's screen names the athlete", () => {
+  it("'Alex did 20 sets and lifted 8,810 lb in 42 min.'", () => {
+    expect(summaryView({ sets: 20, volume: 8810, minutes: 42, who: "Alex" })).toMatchObject({ text: "Alex did 20 sets and lifted 8,810 lb in 42 min." });
+  });
+});
+
 describe("the athlete's finish screen uses it, and keeps the medals", () => {
   const src = readFileSync(new URL("../../components/athlete/WorkoutLogger.tsx", import.meta.url), "utf8");
   it("framed by summaryView; the three raw tiles are gone", () => {

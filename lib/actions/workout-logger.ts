@@ -1,9 +1,10 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { saveSessionNote } from "@/lib/sessions/notes";
+import { loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
+import { compareWithLast, medalsOf, type WrapSet, type WrapUp } from "@/lib/coach/wrap-up";
 import { requestDay } from "@/lib/sessions/request-day";
-import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
+import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import {
   checkStrengthMilestones,
@@ -183,6 +184,73 @@ export async function logSet(input: {
   }
 
   return { workoutLogId, setLogId };
+}
+
+// ── Session complete: how it compared, new bests, what is next ───────────────────
+
+const sameName = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * What the coach's Session complete screen shows beyond the totals: against the last time this workout was done, any lift
+ * that set a new best, the athlete's note, and the next workout in the plan. Read-only, the caller's workspace only. Each
+ * part that can't be worked out comes back empty (nothing to compare with, no plan), and the screen leaves it out.
+ */
+export async function sessionWrapUp(input: { workoutLogId: string }): Promise<WrapUp> {
+  const { workspaceId } = await requireWorkspace();
+  const log = await prisma.workoutLog.findFirst({
+    where: { id: input.workoutLogId, client: { workspaceId } },
+    select: {
+      id: true,
+      clientId: true,
+      date: true,
+      title: true,
+      assignedWorkoutId: true,
+      assignedWorkout: { select: { name: true, exercises: { select: { prescribedSets: true } } } },
+      sets: { where: { completed: true }, select: { exerciseId: true, weight: true, reps: true, exercise: { select: { name: true } } } },
+    },
+  });
+  if (!log) return { compare: null, medals: [], next: null, athleteNote: null };
+  const rows = (sets: Array<{ exerciseId: string | null; weight: number | null; reps: number | null; exercise: { name: string } | null }>): WrapSet[] =>
+    sets.filter((x) => x.exerciseId).map((x) => ({ exerciseId: x.exerciseId!, name: x.exercise?.name ?? "Exercise", weight: x.weight, reps: x.reps }));
+  const cur = rows(log.sets);
+  const name = log.assignedWorkout?.name ?? log.title;
+  const planned = log.assignedWorkout ? log.assignedWorkout.exercises.reduce((n, e) => n + (Array.isArray(e.prescribedSets) ? e.prescribedSets.length : 0), 0) || null : null;
+
+  // The last time this workout was done: the same name, finished, before this one.
+  const earlier = await prisma.workoutLog.findMany({
+    where: { clientId: log.clientId, completedAt: { not: null }, date: { lt: log.date }, id: { not: log.id } },
+    orderBy: { date: "desc" },
+    take: 30,
+    select: { title: true, assignedWorkout: { select: { name: true } }, sets: { where: { completed: true }, select: { exerciseId: true, weight: true, reps: true, exercise: { select: { name: true } } } } },
+  });
+  const last = earlier.find((e) => sameName(e.assignedWorkout?.name ?? e.title, name));
+
+  // Each lift's heaviest weight before this session.
+  const ids = Array.from(new Set(cur.map((c) => c.exerciseId)));
+  const heaviest = ids.length
+    ? await prisma.setLog.groupBy({
+        by: ["exerciseId"],
+        where: { exerciseId: { in: ids }, completed: true, weight: { gt: 0 }, workoutLog: { clientId: log.clientId, completedAt: { not: null }, date: { lt: log.date }, id: { not: log.id } } },
+        _max: { weight: true },
+      })
+    : [];
+  const before = new Map<string, number>();
+  for (const h of heaviest) if (h.exerciseId && h._max.weight != null) before.set(h.exerciseId, h._max.weight);
+
+  // Next in the plan: the earliest workout still to do (not this one).
+  const next = await prisma.assignedWorkout.findFirst({
+    where: { programAssignment: { clientId: log.clientId, workspaceId, status: "ACTIVE" }, status: "PLANNED", NOT: [DONE, { id: log.assignedWorkoutId ?? "-" }] },
+    orderBy: { scheduledDate: "asc" },
+    select: { name: true, scheduledDate: true },
+  });
+
+  const notes = (await loadSessionNotes([{ id: log.id, clientNotes: null }])).get(log.id);
+  return {
+    compare: compareWithLast(cur, last ? rows(last.sets) : null, planned),
+    medals: medalsOf(cur, before),
+    next: next ? { name: next.name, day: next.scheduledDate.toISOString().slice(0, 10) } : null,
+    athleteNote: notes?.athlete ?? null,
+  };
 }
 
 // ── completeSession ────────────────────────────────────────────────────────────

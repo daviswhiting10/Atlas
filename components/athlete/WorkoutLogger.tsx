@@ -860,6 +860,13 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           </ul>
         )}
 
+        {/* The coach's note first (what the athlete wants to read), their own under it. */}
+        {data.coachNote && (
+          <section aria-label="Coach's note" className="mt-8 rounded-2xl border border-signal/30 bg-signal/10 px-4 py-3 text-left">
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.08em] text-signal">Coach&apos;s note</h2>
+            <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-ink">{data.coachNote}</p>
+          </section>
+        )}
         {actions.saveNote && <MySessionNote assignedWorkoutId={data.id} initial={data.myNote} save={actions.saveNote} />}
 
         <div className="mt-auto pt-10">
