@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CalendarSession } from "./calendar";
 import type { DayMode } from "./mode";
-import { BAND_LABELS, BANDS, DESKTOP_WEEKS, PHONE_WEEKS, bandOf, gridDay, heatDays, latestTrained, rawStats, readout, yearGrid } from "./year-grid";
+import { BAND_LABELS, BANDS, PHONE_WEEKS, YEAR_WEEKS, bandOf, gridDay, hasEarlier, heatDays, latestTrained, rangeLabel, rawStats, readout, yearGrid } from "./year-grid";
 
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
 // A session: strength sets for "S" (and mixed), minutes of run or walk for "R" and "W", as the work units are made.
@@ -81,15 +81,15 @@ describe("the ring: the running challenge", () => {
 
 describe("the window: weeks as columns, seven rows, Monday first", () => {
   const g = yearGrid({}, { today: TODAY });
-  it("26 columns on a desktop, ending on the week of today; 13 on a phone, right-aligned to the same week", () => {
-    expect(DESKTOP_WEEKS).toBe(26);
+  it("53 columns (a year) on a desktop, ending on the week of today; 13 on a phone, right-aligned to the same week", () => {
+    expect(YEAR_WEEKS).toBe(53);
     expect(PHONE_WEEKS).toBe(13);
-    expect(g.columns).toHaveLength(26);
+    expect(g.columns).toHaveLength(53);
     expect(g.columns.every((c) => c.cells.length === 7)).toBe(true);
     expect(g.columns.at(-1)!.monday).toBe("2026-11-23");
     const phone = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS });
     expect(phone.columns).toHaveLength(13);
-    expect(phone.columns[0].monday).toBe(g.columns[26 - 13].monday);
+    expect(phone.columns[0].monday).toBe(g.columns[YEAR_WEEKS - PHONE_WEEKS].monday);
   });
   it("names a month above the column that holds its 1st", () => {
     expect(g.columns.filter((c) => c.month).map((c) => c.month).slice(-3)).toEqual(["Sep", "Oct", "Nov"]);
@@ -136,19 +136,19 @@ describe("the one-line readout", () => {
 
 describe("the heatmap component", () => {
   const c = read("components/athlete/YearHeatmap.tsx");
-  it("cells are display-only: no buttons, no 44 px targets, nothing floats", () => {
-    expect(c).not.toContain("<button");
-    expect(c).not.toMatch(/h-11|min-h-11|w-11/);
-    expect(c).not.toMatch(/popover|Popover|Tooltip/);
+  it("cells are display-only (the arrows are the only buttons); a tap opens a small tooltip, not a line of text under the grid", () => {
+    expect(c.match(/<button/g)?.length).toBe(2);
+    expect(c).toContain('role="tooltip"');
+    expect(c).not.toMatch(/tnum mt-3 min-h-\[22px\]/);
   });
   it("one accent (not the purple of the reference); the ring is a closed circle or one with a gap", () => {
     expect(c).toContain("var(--dusk-teal)");
     expect(c).not.toMatch(/purple|violet/i);
     expect(c).toContain("strokeDasharray");
   });
-  it("shows 13 weeks on a phone and 26 from md up, with no sideways scroll", () => {
+  it("shows the last 13 weeks on a phone and the year from md up, with no sideways scroll", () => {
     expect(c).toContain("max-md:hidden");
-    expect(c).toContain("DESKTOP_WEEKS - PHONE_WEEKS");
+    expect(c).toContain("YEAR_WEEKS - PHONE_WEEKS");
     expect(c).not.toMatch(/overflow-x-(auto|scroll)/);
   });
   it("a short fade-in and nothing else moves", () => {
@@ -159,5 +159,24 @@ describe("the heatmap component", () => {
     expect(c).toContain("function Legend");
     expect(c).toContain("BAND_LABELS");
     expect(c).toContain("MODE_LABEL");
+  });
+});
+
+describe("moving the window back", () => {
+  it("back N weeks ends N weeks earlier, with no future days", () => {
+    const now = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS });
+    const earlier = yearGrid({}, { today: TODAY, weeks: PHONE_WEEKS, back: PHONE_WEEKS });
+    expect(earlier.columns.at(-1)!.monday).toBe(now.columns[0].monday.replace(now.columns[0].monday, new Date(Date.parse(`${now.columns[0].monday}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10)));
+    expect(earlier.columns.flatMap((c) => c.cells).some((c) => c.future)).toBe(false);
+  });
+  it("the back arrow has somewhere to go only while there is training before the window", () => {
+    const byDay = heatDays({ "2026-03-02": [s("Upper", null)] });
+    expect(hasEarlier(byDay, "2026-08-24")).toBe(true);
+    expect(hasEarlier(byDay, "2026-03-02")).toBe(false);
+    expect(hasEarlier({}, "2026-08-24")).toBe(false);
+  });
+  it("the period reads as months, with the year only when it crosses one", () => {
+    expect(rangeLabel("2026-08-24", "2026-11-16")).toBe("Aug – Nov 2026");
+    expect(rangeLabel("2025-12-01", "2026-11-23")).toBe("Dec 2025 – Nov 2026");
   });
 });

@@ -9,8 +9,8 @@
  * 2. **Corner icon: how you trained** (lib/history/mode): strength, run, walk, or a mix.
  * 3. **Ring: the running challenge.** Closed when the day's rules were met, open (a gap) when not.
  *
- * The window ends on the week of today: 13 weeks on a phone, 26 on a desktop. A month is named above the column that
- * holds its 1st.
+ * The window ends on the week of today, or `back` weeks before it (the arrows above the grid): the last 13 weeks (three
+ * months) on a phone, a year (53 columns) on a desktop. A month is named above the column that holds its 1st.
  */
 
 import { mondayOf } from "@/lib/athlete/sessions";
@@ -89,10 +89,14 @@ export type GridColumn = { monday: string; month: string | null; cells: GridCell
 
 export type YearGrid = { columns: GridColumn[] };
 
-/** Columns on a desktop. */
-export const DESKTOP_WEEKS = 26;
+/** Columns on a desktop (a year of weeks, plus the partial one). */
+export const YEAR_WEEKS = 53;
+export const DESKTOP_WEEKS = YEAR_WEEKS;
 /** Columns on a phone: the last 13 weeks, so each cell is wide enough (about 24 px) for its icon and ring. */
 export const PHONE_WEEKS = 13;
+/** How far the arrows move the window: a phone's whole window, a desktop's year. */
+export const PHONE_STEP = PHONE_WEEKS;
+export const DESKTOP_STEP = 52;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -108,9 +112,9 @@ export function gridDay(day: string): string {
   return `${WEEKDAYS[p.wd]} ${MONTHS[p.m]} ${p.d}`;
 }
 
-export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number }): YearGrid {
-  const weeks = opts.weeks ?? DESKTOP_WEEKS;
-  const lastMonday = mondayOf(opts.today);
+export function yearGrid(byDay: HeatDays, opts: { today: string; weeks?: number; /** Weeks the window is moved back from today's. */ back?: number }): YearGrid {
+  const weeks = opts.weeks ?? YEAR_WEEKS;
+  const lastMonday = addDays(mondayOf(opts.today), -7 * Math.max(0, opts.back ?? 0));
   const columns: GridColumn[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const monday = addDays(lastMonday, -7 * i);
@@ -171,4 +175,19 @@ export function latestTrained(g: YearGrid): GridCell | null {
     }
   }
   return null;
+}
+
+/** Is there any training before this Monday (so the back arrow has somewhere to go)? */
+export function hasEarlier(byDay: HeatDays, monday: string): boolean {
+  return Object.keys(byDay).some((day) => day < monday);
+}
+
+/** What period the columns cover: "Aug – Nov 2026", or "Dec 2025 – Nov 2026" across a year. */
+export function rangeLabel(firstMonday: string, lastMonday: string): string {
+  const a = parts(firstMonday);
+  const lastDay = addDays(lastMonday, 6);
+  const b = parts(lastDay);
+  const ya = Number(firstMonday.slice(0, 4));
+  const yb = Number(lastDay.slice(0, 4));
+  return ya === yb ? `${MONTHS[a.m]} – ${MONTHS[b.m]} ${yb}` : `${MONTHS[a.m]} ${ya} – ${MONTHS[b.m]} ${yb}`;
 }
