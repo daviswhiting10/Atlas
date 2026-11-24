@@ -3,13 +3,12 @@ import { describe, expect, it } from "vitest";
 
 const s = readFileSync(new URL("../components/athlete/WorkoutLogger.tsx", import.meta.url), "utf8");
 
-describe("Athlete logger: Add a set is in the card's ⋯", () => {
-  it("the menu offers Add a set (first), then Swap", () => {
-    const menu = s.indexOf("Add a set</DropdownMenuItem>");
-    expect(menu).toBeGreaterThan(0);
-    expect(menu).toBeLessThan(s.indexOf(">Swap</DropdownMenuItem>"));
+describe("Athlete logger: Add set is a row under the sets, not in the ⋯", () => {
+  it("the menu no longer has Add a set; Swap is first", () => {
+    expect(s).not.toContain("Add a set</DropdownMenuItem>");
+    expect(s).toContain(">Swap</DropdownMenuItem>");
   });
-  it("there is no Add set button under the sets any more", () => {
-    expect(s).not.toContain("<Plus className=\"h-3.5 w-3.5\" /> Add set");
+  it("a tappable Add set row sits below each exercise's sets", () => {
+    expect(s.indexOf("</ul>\n                      <button type=\"button\" onClick={() => addSet(ex)}")).toBeGreaterThan(0);
   });
 });

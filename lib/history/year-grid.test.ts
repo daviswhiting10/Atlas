@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CalendarSession } from "./calendar";
 import type { DayMode } from "./mode";
-import { BAND_LABELS, BANDS, PHONE_WEEKS, YEAR_WEEKS, bandOf, gridDay, hasEarlier, heatDays, latestTrained, rangeLabel, rawStats, readout, yearGrid } from "./year-grid";
+import { BAND_LABELS, BANDS, PHONE_WEEKS, YEAR_WEEKS, bandOf, gridDay, hasEarlier, heatDays, latestTrained, rangeLabel, rawStats, readTitles, readout, yearGrid } from "./year-grid";
 
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
 // A session: strength sets for "S" (and mixed), minutes of run or walk for "R" and "W", as the work units are made.
@@ -99,7 +99,7 @@ describe("raw stats in the readout, not the units", () => {
     const d = heatDays({ "2026-11-17": [s("Upper", 50, "S", 22), s("Run", 45, "R")] });
     const g = yearGrid(d, { today: TODAY, weeks: 2 });
     expect(rawStats(cell(g, "2026-11-17"))).toBe("22 sets · 45 min run");
-    expect(readout(cell(g, "2026-11-17"))).toBe("Tue Nov 17 · Upper, Run · 22 sets · 45 min run");
+    expect(readout(cell(g, "2026-11-17"))).toBe("Nov 17 · Upper, Run · 22 sets · 45 min run");
   });
   it("a walk and mobility say their minutes", () => {
     expect(rawStats({ sets: 0, runMin: 0, walkMin: 30, mobMin: 15, minutes: 45 })).toBe("30 min walk · 15 min mobility");
@@ -114,15 +114,15 @@ describe("the one-line readout", () => {
   const d = heatDays({ "2026-11-14": [s("Long run", 52, "R")], "2026-11-11": [s("Lower A", 64)], "2026-11-12": [s("Imported", null, null, 0)] });
   const g = yearGrid(d, { today: TODAY });
   it("day, workout and raw stats (never the units)", () => {
-    expect(readout(cell(g, "2026-11-14"))).toBe("Sat Nov 14 · Long run · 52 min run");
-    expect(readout(cell(g, "2026-11-11"))).toBe("Wed Nov 11 · Lower A · 10 sets");
+    expect(readout(cell(g, "2026-11-14"))).toBe("Nov 14 · Long run · 52 min run");
+    expect(readout(cell(g, "2026-11-11"))).toBe("Nov 11 · Lower A · 10 sets");
   });
   it("a day with nothing says so; with no minutes, nothing is invented", () => {
-    expect(readout(cell(g, "2026-11-23"))).toBe("Mon Nov 23 · no session");
-    expect(readout(cell(g, "2026-11-12"))).toBe("Thu Nov 12 · Imported");
+    expect(readout(cell(g, "2026-11-23"))).toBe("Nov 23 · no session");
+    expect(readout(cell(g, "2026-11-12"))).toBe("Nov 12 · Imported");
   });
   it("a day to come, and before anything is touched the latest training day", () => {
-    expect(readout(cell(g, "2026-11-24"))).toBe("Tue Nov 24 · not yet");
+    expect(readout(cell(g, "2026-11-24"))).toBe("Nov 24 · not yet");
     expect(latestTrained(g)?.day).toBe("2026-11-14");
   });
 });
@@ -170,5 +170,15 @@ describe("moving the window back", () => {
   it("the period reads as months, with the year only when it crosses one", () => {
     expect(rangeLabel("2026-08-24", "2026-11-16")).toBe("Aug – Nov 2026");
     expect(rangeLabel("2025-12-01", "2026-11-23")).toBe("Dec 2025 – Nov 2026");
+  });
+});
+
+describe("the tooltip's names", () => {
+  it("drops 'Day 1 —', the colon, repeats and a bare Workout", () => {
+    expect(readTitles(["Day 1 — Upper: Push + Arms", "Workout", "Workout"])).toBe("Upper Push + Arms");
+  });
+  it("keeps a lone Workout, and two real sessions", () => {
+    expect(readTitles(["Workout", "Workout"])).toBe("Workout");
+    expect(readTitles(["Lower A", "Run"])).toBe("Lower A, Run");
   });
 });

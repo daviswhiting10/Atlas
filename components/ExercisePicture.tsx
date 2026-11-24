@@ -71,14 +71,14 @@ export function ExerciseThumb({ picture, name, className }: { picture: Picture |
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`See ${name}`}
-        className={cn("press relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-line bg-ink/5", className)}
+        className={cn("press relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-ink/5", className)}
       >
         {picture.video ? (
           // The clip's first frame; it plays in the large view.
-          <video src={`${picture.video}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+          <video src={`${picture.video}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-contain" />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={picture.frames[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+          <img src={picture.frames[0]} alt="" loading="lazy" className="h-full w-full object-contain" />
         )}
       </button>
       {open && <Viewer picture={picture} name={name} onClose={() => setOpen(false)} />}
