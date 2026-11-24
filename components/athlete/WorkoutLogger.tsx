@@ -25,7 +25,7 @@ import { useDragOrder } from "@/app/(dashboard)/clients/[id]/log/useDragOrder";
 import { DragHandle, DragStatus } from "@/components/logger/DragHandle";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/use-long-press";
-import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
+import { allDone, nextOpen } from "@/lib/sessions/flow";
 import { bulkIndices, exerciseBulk, queueBulk, workoutBulk, type BulkMode } from "@/lib/sessions/check-all";
 import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
 import { DurationStepper } from "@/components/athlete/DurationStepper";
@@ -402,7 +402,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           });
           if (!back) {
             setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
-            cancelFinish();
           }
           markUnsaved(key, true);
         }
@@ -489,7 +488,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     queueBulk(store(), data.id, order.map((o) => ({ ...o, done })));
     for (const o of order) persist(o.aweId, o.setNumber);
     if (!done) {
-      cancelFinish();
       setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !gone.includes(k))));
       return;
     }
@@ -544,7 +542,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     const key = `${ex.aweId}:${s.setNumber}`;
     if (!done) {
       // A set un-ticked: the workout isn't over after all.
-      cancelFinish();
       setRecords((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
       return;
     }
@@ -563,7 +560,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     const lists = data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done));
     if (allDone(lists)) {
       setRest(null);
-      scheduleFinish();
       return;
     }
     restFor.current = ex.aweId;
@@ -594,7 +590,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       action: {
         label: "Undo",
         onClick: () => {
-          cancelFinish();
           const cur = setsRef.current[ex.aweId] ?? ex.sets;
           apply({ ...setsRef.current, [ex.aweId]: renumber([...cur.slice(0, i), s, ...cur.slice(i)]) });
         },
@@ -603,35 +598,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     afterChange(ex);
   }
 
-  // ── Finishing: by itself, FINISH_DELAY_MS after the last set, unless Undo is tapped ─────
-  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The countdown bar at the bottom (not a toast: a toast sits over the title and the back arrow).
-  const [countdown, setCountdown] = useState<{ message: string; key: number } | null>(null);
   const finishRef = useRef<() => void>(() => {});
-  function cancelFinish() {
-    if (!finishTimer.current) return;
-    clearTimeout(finishTimer.current);
-    finishTimer.current = null;
-    setCountdown(null);
-  }
-  function scheduleFinish(message = "All sets logged · finishing") {
-    cancelFinish();
-    setCountdown({ message, key: Date.now() });
-    finishTimer.current = setTimeout(() => {
-      finishTimer.current = null;
-      finishRef.current();
-    }, FINISH_DELAY_MS);
-  }
-  // Leaving the screen inside those seconds still finishes the workout.
-  useEffect(
-    () => () => {
-      if (finishTimer.current) {
-        clearTimeout(finishTimer.current);
-        finishRef.current();
-      }
-    },
-    []
-  );
   // Ticks the server hasn't confirmed (the page reloaded or the app closed mid-save, or the
   // connection dropped): on the screen as tapped, with the values they were ticked with, and sent
   // again. On opening (before the finish check below) and whenever the connection comes back.
@@ -663,10 +630,9 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   onOnline.current = () => {
     setNoSignal(false);
     resendPending();
-    // A finish tapped while offline goes through now; otherwise, everything logged while offline finishes if it was all of it.
+    // A finish tapped while offline goes through now.
     queue.current.then(() => {
       if (!summaryRef.current && queuedFinish(store(), data.id)) return void finishRef.current();
-      if (!summaryRef.current && data.status !== "LOGGED" && !finishTimer.current && allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) scheduleFinish();
     });
   };
   useEffect(() => {
@@ -684,19 +650,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     // Once, on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Coming back to a workout whose sets are all logged but that never finished (the app was
-  // closed mid-countdown): the countdown starts again, with its Undo. (A tick later, so React's
-  // development double-mount doesn't read it as leaving.)
-  useEffect(() => {
-    if (data.status === "LOGGED") return;
-    const t = setTimeout(() => {
-      if (allDone(data.exercises.map((e) => (setsRef.current[e.aweId] ?? e.sets).map((x) => x.done)))) scheduleFinish();
-    }, 0);
-    return () => clearTimeout(t);
-    // Once, on opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   function addSet(ex: LoggerExercise) {
     const list = setsRef.current[ex.aweId] ?? ex.sets;
     const last = list[list.length - 1];
@@ -707,7 +660,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   }
 
   function finish() {
-    setCountdown(null);
     const loggedNow = () => data.exercises.some((e) => (setsRef.current[e.aweId] ?? e.sets).some((x) => x.done));
     // The finished screen shows at once, from what is on the phone; the saves and the finish go on behind it. If the
     // finish doesn't go through, it goes back to the logger with a message. (Waiting for them first took up to 2 s.)
@@ -753,7 +705,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   function tapFinish() {
     const act = finishAction(data.exercises.map((e) => listOf(e).map((x) => x.done)));
     if (act.kind === "none") return;
-    cancelFinish();
     setRest(null);
     if (act.kind === "confirm") return void setConfirmFinish(act.unlogged);
     finish();
@@ -765,7 +716,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       .map((ex) => ({ ex, idx: bulkIndices((setsRef.current[ex.aweId] ?? ex.sets).map((x) => x.done), "check") }))
       .filter((g) => g.idx.length > 0);
     if (groups.length) applyBulk(groups, "check");
-    cancelFinish(); // the bulk check starts the automatic finish; this one is already on its way
     setRest(null);
     finish();
   }
@@ -823,7 +773,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       [String(summary.minutes), "min"],
     ];
     return (
-      <div className="rise-intro mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
+      <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
         <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
@@ -898,8 +848,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[180px]">
                 <DropdownMenuItem className="min-h-11" onClick={() => {
-                    // Asking to uncheck during the finishing countdown stops it: the sheet must not race the auto-finish.
-                    cancelFinish();
                     setConfirmAll({ mode: wb.mode, count: wb.count });
                   }}>
                   {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
@@ -1109,19 +1057,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           <Plus className="h-4 w-4" /> Add an exercise
         </button>
       </div>
-
-      {/* ── Finishing countdown: the bar empties over FINISH_DELAY_MS; Undo cancels it ── */}
-      {countdown && (
-        <div className="sheet-up fixed inset-x-0 bottom-0 z-40 flex justify-center px-4" style={{ paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${rest ? 84 : 16}px)` }}>
-          <div className="relative flex w-full max-w-sm items-center gap-3 overflow-hidden rounded-full border border-line-strong bg-dusk-raised py-2 pl-5 pr-2 shadow-[0_20px_40px_-16px_rgba(0,0,0,0.7)]">
-            <div key={countdown.key} className="finish-bar absolute inset-y-0 left-0 bg-signal/35" style={{ animationDuration: `${FINISH_DELAY_MS}ms` }} />
-            <p className="relative flex-1 text-sm font-medium text-ink">{countdown.message}</p>
-            <button type="button" onClick={cancelFinish} className="press relative h-11 rounded-full bg-dusk-button px-5 text-sm font-semibold text-dusk-button-text">
-              Undo
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Rest timer ───────────────────────────────────────────────── */}
       {rest && (

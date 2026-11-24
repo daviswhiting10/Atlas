@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FINISH_DELAY_MS, allDone, nextOpen } from "./flow";
+import { allDone, nextOpen } from "./flow";
 
 describe("logger flow", () => {
   it("is done only when every set of every exercise is logged", () => {
@@ -77,8 +77,4 @@ describe("logger flow: edges", () => {
     expect(lists).toEqual([[true], [false]]);
   });
 
-  it("gives the Undo toast a few seconds, not an instant and not a minute", () => {
-    expect(FINISH_DELAY_MS).toBeGreaterThanOrEqual(3000);
-    expect(FINISH_DELAY_MS).toBeLessThanOrEqual(10_000);
-  });
 });

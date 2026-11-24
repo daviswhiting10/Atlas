@@ -57,7 +57,7 @@ import type { LoggerExercise, PrescribedSet, ExistingSetLog } from "./page";
 import { ExerciseName } from "@/components/ExerciseName";
 import { DayInput } from "@/components/ui/day-input";
 import { SetNote } from "@/components/logger/SetNote";
-import { FINISH_DELAY_MS, allDone, nextOpen } from "@/lib/sessions/flow";
+import { allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
@@ -705,8 +705,6 @@ export default function WorkoutLogger({
     const entry = exStateRef.current[aweId]?.sets[idx];
     if (!entry) return;
     const nowDone = !entry.completed;
-    // A set un-ticked: the session isn't over after all.
-    if (!nowDone) cancelFinish();
     noteServer(entry);
     clearStuck(entry.uid);
     // Only this set's tick changes (nothing carried forward), and the ref changes with it, so a
@@ -720,10 +718,6 @@ export default function WorkoutLogger({
     setLastSetAt(Date.now());
     setRestSecs(0);
     const lists = doneLists();
-    if (allDone(lists)) {
-      scheduleFinish();
-      return;
-    }
     afterExerciseChange(aweId, lists);
   }
 
@@ -797,7 +791,6 @@ export default function WorkoutLogger({
         if (left > 0) return;
         clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
         setSet(aweId, uid, { completed: server.completed });
-        if (!server.completed) cancelFinish();
         markUnsaved(uid, true);
       }
     });
@@ -829,12 +822,11 @@ export default function WorkoutLogger({
     setExState((prev) => mark(prev));
     queueBulk(store(), assignedWorkoutId, calls.map((c) => ({ aweId: c.aweId, setNumber: c.idx + 1, done })));
     for (const c of calls) saveSet(c.aweId, c.exerciseId, c.entry.uid, { ...c.entry, completed: done }, c.idx);
-    if (!done) return void cancelFinish();
+    if (!done) return;
     lastAwe.current = calls[calls.length - 1].aweId;
     setLastSetAt(Date.now());
     setRestSecs(0);
     const lists = doneLists();
-    if (allDone(lists)) return void scheduleFinish();
     afterExerciseChange(calls[calls.length - 1].aweId, lists);
   }
   function bulkOne(ex: LoggerExercise, mode: BulkMode) {
@@ -854,7 +846,6 @@ export default function WorkoutLogger({
   function tapFinish() {
     const act = finishAction(exercises.map((e) => (exStateRef.current[e.aweId] ?? freshState(e)).sets.map((x) => x.completed)));
     if (act.kind === "none") return;
-    cancelFinish();
     if (act.kind === "confirm") return void setConfirmFinish(act.unlogged);
     void handleCompleteSession(true);
   }
@@ -864,7 +855,6 @@ export default function WorkoutLogger({
       .map((ex) => ({ ex, idx: bulkIndices((exStateRef.current[ex.aweId]?.sets ?? []).map((x) => x.completed), "check") }))
       .filter((g) => g.idx.length > 0);
     if (groups.length) applyBulk(groups, "check");
-    cancelFinish(); // the bulk check starts the automatic finish; this one is already on its way
     void handleCompleteSession(true);
   }
   const anyLogged = exercises.some((e) => (exState[e.aweId] ?? freshState(e)).sets.some((x) => x.completed));
@@ -881,8 +871,6 @@ export default function WorkoutLogger({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
         <DropdownMenuItem className="min-h-11" onClick={() => {
-                    // Asking to uncheck during the finishing countdown stops it: the sheet must not race the auto-finish.
-                    cancelFinish();
                     setConfirmAll({ mode: wb.mode, count: wb.count });
                   }}>
           {wb.mode === "check" ? "Check all sets" : "Uncheck all"}
@@ -949,7 +937,6 @@ export default function WorkoutLogger({
       action: {
         label: "Undo",
         onClick: () => {
-          cancelFinish();
           setExState((prev) => {
             const next = [...prev[aweId].sets];
             next.splice(idx, 0, entry);
@@ -959,41 +946,9 @@ export default function WorkoutLogger({
       },
     });
     // The sets left were all logged: that was the exercise's (or the session's) last one.
-    if (allDone(lists)) scheduleFinish();
-    else afterExerciseChange(aweId, lists);
+    afterExerciseChange(aweId, lists);
   }
 
-  // ── Finishing: by itself, FINISH_DELAY_MS after the last set, unless Undo is tapped ─────
-  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const completeRef = useRef<() => void>(() => {});
-  function cancelFinish() {
-    if (!finishTimer.current) return;
-    clearTimeout(finishTimer.current);
-    finishTimer.current = null;
-    toast.dismiss("finish");
-  }
-  function scheduleFinish() {
-    cancelFinish();
-    toast.success("Every set logged. Finishing…", {
-      id: "finish",
-      duration: FINISH_DELAY_MS,
-      action: { label: "Undo", onClick: () => cancelFinish() },
-    });
-    finishTimer.current = setTimeout(() => {
-      finishTimer.current = null;
-      completeRef.current();
-    }, FINISH_DELAY_MS);
-  }
-  // Leaving the screen inside those seconds still finishes the session.
-  useEffect(
-    () => () => {
-      if (finishTimer.current) {
-        clearTimeout(finishTimer.current);
-        completeRef.current();
-      }
-    },
-    []
-  );
   // Ticks the server hasn't confirmed (the page reloaded or the app closed mid-save, or the
   // connection dropped): on the screen as tapped, and sent again. On opening (before the finish
   // check below, so a restored last tick counts) and whenever the connection comes back.
@@ -1020,10 +975,6 @@ export default function WorkoutLogger({
   const onOnline = useRef(() => {});
   onOnline.current = () => {
     resendPending();
-    // Everything logged while offline: finish now that it can.
-    saveChain.current.then(() => {
-      if (!finishedRef.current && !finishTimer.current && allDone(doneLists())) scheduleFinish();
-    });
   };
   useEffect(() => {
     const t = setTimeout(resendPending, 0);
@@ -1036,19 +987,6 @@ export default function WorkoutLogger({
     // Once, on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Coming back to a session whose sets are all logged but that never finished (the app was
-  // closed mid-countdown): the countdown starts again, with its Undo. (A tick later, so React's
-  // development double-mount doesn't read it as leaving.)
-  useEffect(() => {
-    if (completed) return;
-    const t = setTimeout(() => {
-      if (allDone(doneLists())) scheduleFinish();
-    }, 0);
-    return () => clearTimeout(t);
-    // Once, on opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── An edit to a logged set (a field left): saved behind the screen, like a tick ──
   function handleUpdateCompletedSet(aweId: string, exerciseId: string, idx: number) {
     const entry = exStateRef.current[aweId]?.sets[idx];
@@ -1252,7 +1190,6 @@ export default function WorkoutLogger({
     });
   }
 
-  completeRef.current = () => void handleCompleteSession();
 
   // ── Phone: folding and jumping ───────────────────────────────────────────
   const isDone = (ex: LoggerExercise) => {
