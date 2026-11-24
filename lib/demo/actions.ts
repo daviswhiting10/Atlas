@@ -27,4 +27,8 @@ export const demoActions: LoggerActions = {
   async planSwapExercise() {
     return NOT_IN_DEMO;
   },
+  async saveNote() {
+    // The demo keeps nothing: the note is accepted for this screen only.
+    return { ok: true as const };
+  },
 } as LoggerActions;

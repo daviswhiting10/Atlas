@@ -7,6 +7,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { athleteIdentity } from "@/lib/athlete/identity";
@@ -152,7 +153,9 @@ export async function loadQuickSession(raw: { clientId?: string | null; sessionI
     if (!e) exercises.push((e = { exerciseId: set.exerciseId, name: displayName(set.exercise.slug, set.exercise.name), isNew: isTypedNew(set.exercise), sets: [] }));
     e.sets.push({ weight: set.weight, reps: set.reps, band: (set.bandColor as QuickSet["band"]) ?? null });
   }
-  return { id: s.id, date: s.date.toISOString(), title: s.title, notes: s.clientNotes, durationMin: s.durationMin, exercises };
+  // The note of whoever is editing: a coach sees the coach's note, an athlete their own.
+  const notes = (await loadSessionNotes([s])).get(s.id)!;
+  return { id: s.id, date: s.date.toISOString(), title: s.title, notes: scope.by === "coach" ? notes.coach : notes.athlete, durationMin: s.durationMin, exercises };
 }
 
 /** A typed name: the exercise it means (exact, a saved alternate name, or the same name written differently), else a new private one. */
@@ -189,7 +192,8 @@ export async function saveQuickSession(raw: unknown): Promise<QuickSaveResult> {
   const sessionId = await prisma.$transaction(
     async (tx) => {
       let id = input.sessionId ?? null;
-      const fields = { date, title: clean.title, clientNotes: clean.notes, durationMin: clean.durationMin };
+      // clientNotes is the coach's note (kept for one release); an athlete's note goes only to their SessionNote.
+      const fields = { date, title: clean.title, ...(scope.by === "coach" ? { clientNotes: clean.notes } : {}), durationMin: clean.durationMin };
       if (id) {
         const existing = await tx.workoutLog.findFirst({ where: { id, clientId: scope.clientId, source: "OFF_PLAN" }, select: { id: true } });
         if (!existing) throw new Error("not_found");
@@ -209,6 +213,7 @@ export async function saveQuickSession(raw: unknown): Promise<QuickSaveResult> {
         });
         id = created.id;
       }
+      await saveSessionNote({ workoutLogId: id!, clientId: scope.clientId, date, role: scope.by === "coach" ? "COACH" : "ATHLETE", text: clean.notes ?? "" }, tx);
       const at = Date.now();
       const rows: Prisma.SetLogCreateManyInput[] = [];
       for (let i = 0; i < clean.exercises.length; i++) {

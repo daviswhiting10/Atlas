@@ -87,12 +87,20 @@ function SummaryView({ s, load, onBack, onClose }: { s: CalendarSession; load: (
         {summary === "loading" ? (
           <div className="h-24" aria-busy />
         ) : (
-          summary?.lines.map((l) => (
-            <div key={l.name} className="flex items-baseline justify-between gap-4 border-t border-line py-3">
-              <span className="min-w-0 text-[16px] font-semibold text-ink">{l.name}</span>
-              <span className="tnum shrink-0 text-right text-[15px] text-ink-soft">{l.sets}</span>
-            </div>
-          ))
+          <>
+            {summary?.lines.map((l) => (
+              <div key={l.name} className="flex items-baseline justify-between gap-4 border-t border-line py-3">
+                <span className="min-w-0 text-[16px] font-semibold text-ink">{l.name}</span>
+                <span className="tnum shrink-0 text-right text-[15px] text-ink-soft">{l.sets}</span>
+              </div>
+            ))}
+            {summary?.notes?.map((n) => (
+              <p key={n.label} className="border-t border-line py-3 text-[15px] leading-relaxed text-ink-soft">
+                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">{n.label}</span>
+                {n.text}
+              </p>
+            ))}
+          </>
         )}
       </div>
     </>

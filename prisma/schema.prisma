@@ -485,6 +485,7 @@ model WorkoutLog {
   clientNotes       String?          @db.Text
   trainerSeen       Boolean          @default(false)
   sets              SetLog[]
+  notes             SessionNote[]
   createdAt         DateTime         @default(now())
 
   @@index([clientId, date])
@@ -514,6 +515,14 @@ model SetLog {
 // SESSION NOTES
 // ─────────────────────────────────────────────
 
+/// Who wrote a session note.
+enum NoteAuthor {
+  COACH
+  ATHLETE
+}
+
+/// A note on a session: the coach's and the athlete's, one each (workoutLogId + authorRole). Older rows with no
+/// workoutLogId are the coach's structured (SOAP) notes per client.
 model SessionNote {
   id             String        @id @default(cuid())
   clientId       String
@@ -522,7 +531,12 @@ model SessionNote {
   rawInput       String        @db.Text
   structuredNote Json
   rpeAvg         Float?
+  workoutLogId   String?
+  workoutLog     WorkoutLog?   @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  authorRole     NoteAuthor    @default(COACH)
   createdAt      DateTime      @default(now())
+
+  @@unique([workoutLogId, authorRole])
 }
 
 // ─────────────────────────────────────────────
