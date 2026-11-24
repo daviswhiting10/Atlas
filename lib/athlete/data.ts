@@ -4,6 +4,9 @@
  */
 
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import { progressVersion } from "@/lib/progress/version";
+import { progressKey, type ProgressKey } from "@/lib/progress/cache-key";
 import { loadSessionNotes } from "@/lib/sessions/notes";
 import { planWorkoutStatus } from "@/lib/sessions/status";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
@@ -161,12 +164,32 @@ export const getHistory = cache(async (): Promise<HistoryCalendar> => {
   return loadCalendar({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, timeZone: getTimeZone(), viewer: { kind: "athlete" } });
 });
 
-/** The signed-in athlete's progress. The read model itself is shared with the coach side. */
+/**
+ * The signed-in athlete's progress. The read model itself is shared with the coach side.
+ *
+ * No plan: next-session targets are the coach's (the athlete's screens send the lite data, which has none), so the
+ * plan, a slower read than the sets, isn't waited for.
+ *
+ * Cached, because it reads every set the athlete has ever logged. The key (lib/progress/cache-key) is whose it is
+ * (client and workspace: one athlete's is never served to another), the timezone, today, and a fingerprint of the
+ * sessions and sets (lib/progress/version), so a set logged anywhere is in the very next read and no write path has
+ * to clear anything. Exercise renames and lighter-week settings aren't in the key; they show within 10 minutes.
+ */
 export const getProgress = cache(async (): Promise<ProgressData> => {
   const athlete = await getAthlete();
-  // The plan loads alongside the sets, not before them.
-  return loadProgress({ clientId: athlete.clientId, workspaceId: athlete.workspaceId, plan: getPlanOverview(), selfServe: athlete.selfServe, timeZone: getTimeZone() });
+  const timeZone = getTimeZone();
+  const version = await progressVersion(athlete.clientId);
+  return cachedProgress()(...progressKey(athlete, { timeZone, now: new Date(), version }));
 });
+
+/** Made per call, not at import: modules that mock next/cache in tests never reach it. */
+const cachedProgress = () =>
+  unstable_cache(
+    // Today and the fingerprint are only part of the key.
+    (...[clientId, workspaceId, selfServe, timeZone]: ProgressKey) => loadProgress({ clientId, workspaceId, plan: null, selfServe, timeZone }),
+    ["athlete-progress", process.env.VERCEL_DEPLOYMENT_ID ?? "local"],
+    { revalidate: 600 }
+  );
 
 /**
  * Progress for one client: per-exercise series, weekly totals, records.
