@@ -201,7 +201,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
         overall.change != null &&
         overall.since && (
           <Section title="Strength" control={chooser}>
-            <Big value={`${overall.change > 0 ? "+" : ""}${overall.change}%`} label={`since ${day(overall.since)}`} accent={overall.change > 0} />
+            <Big value={`${overall.change > 0 ? "+" : ""}${overall.change}%`} label={`since the week of ${day(overall.since)}`} accent={overall.change > 0} />
             {sessions >= THIN && (
               <div className="mt-5">
                 {OverallC ? <OverallC points={overall.points} height={compact ? 130 : 200} /> : <ChartSpace />}
