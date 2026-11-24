@@ -9,14 +9,26 @@ import { cn } from "@/lib/utils";
 
 type Program = { id: string; name: string; weeks: number; category: string; tag: string | null };
 
-const PLACEHOLDER = `A few sentences in your own words. Worth covering:
-· What they want, and why now
-· Training history: what they've done, what's worked
-· Injuries, pain or anything to work around
-· How many days a week, and what equipment they have
-· Sleep, stress, work: anything that affects recovery`;
+const PLACEHOLDER = "In your own words: what they want, and why now.";
+const COVER = "Worth covering: training history · injuries or anything to work around · days a week and equipment · sleep, stress and work.";
 
 const field = "w-full rounded-xl border border-line-strong bg-dusk-raised px-3.5 text-[15px] text-ink outline-none focus:border-ink/40";
+
+/** A numbered step heading: the form reads as four short steps, not one long page. */
+function Step({ n, title, children, hint }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section aria-label={title}>
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden className="tnum flex h-6 w-6 items-center justify-center rounded-full bg-signal/15 text-[12px] font-bold text-signal">{n}</span>
+        <h2 className="text-[17px] font-semibold text-ink">
+          {title}
+          {hint && <span className="ml-1.5 text-[14px] font-normal text-ink-mute">{hint}</span>}
+        </h2>
+      </div>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
 
 /** The four goals most intakes are about; the others are behind "More goals" (a goal already picked always shows). */
 const COMMON_GOALS = ["Weight Loss", "Hypertrophy", "Strength", "General Fitness"];
@@ -68,29 +80,40 @@ export function IntakeForm({
 
   return (
     <form onSubmit={submit} className="rise rise-1 space-y-7">
-      <section>
-        <label className="text-sm font-semibold text-ink" htmlFor="intake-client">
-          Client
-        </label>
-        <select id="intake-client" value={clientId} onChange={(e) => setClientId(e.target.value)} className={cn(field, "mt-2 h-12")}>
-          <option value="" disabled>
-            Choose a client
-          </option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.fullName}
+      <Step n={1} title="Who is it for?">
+        {clients.length <= 12 ? (
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Client">
+            {[...clients.map((c) => ({ id: c.id, label: c.fullName })), { id: "new", label: "+ New client" }].map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={clientId === c.id}
+                onClick={() => setClientId(c.id)}
+                className={cn("press min-h-11 rounded-full border px-4 text-[15px] font-medium", clientId === c.id ? "border-ink bg-dusk-selected text-dusk-selected-text" : "border-line bg-paper text-ink-soft hover:border-ink/25 hover:text-ink")}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <select id="intake-client" aria-label="Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className={cn(field, "h-12")}>
+            <option value="" disabled>
+              Choose a client
             </option>
-          ))}
-          <option value="new">+ New client</option>
-        </select>
-        {clientId === "new" && (
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Their full name" maxLength={120} autoFocus className={cn(field, "mt-2 h-12")} />
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.fullName}
+              </option>
+            ))}
+            <option value="new">+ New client</option>
+          </select>
         )}
-      </section>
+        {clientId === "new" && <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Their full name" maxLength={120} autoFocus className={cn(field, "mt-3 h-12")} />}
+      </Step>
 
-      <section>
-        <p className="text-sm font-semibold text-ink">Goal</p>
-        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Goal">
+      <Step n={2} title="What is the goal?">
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Goal">
           {categories.filter((c) => moreGoals || COMMON_GOALS.includes(c.tag) || c.tag === tag).map((c) => (
             <button
               key={c.tag}
@@ -112,28 +135,26 @@ export function IntakeForm({
             </button>
           )}
         </div>
-      </section>
+      </Step>
 
-      <section>
-        <label className="text-sm font-semibold text-ink" htmlFor="intake-notes">
+      <Step n={3} title="What did you learn?" hint="(optional)">
+        <label className="sr-only" htmlFor="intake-notes">
           Notes
         </label>
         <textarea
           id="intake-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={8}
+          rows={4}
           maxLength={8000}
           placeholder={PLACEHOLDER}
-          className={cn(field, "mt-2 resize-y py-3 leading-relaxed placeholder:text-ink-mute")}
+          className={cn(field, "resize-y py-3 leading-relaxed placeholder:text-ink-mute")}
         />
-      </section>
+        <p className="mt-2 text-[13px] leading-snug text-ink-mute">{COVER}</p>
+      </Step>
 
-      <section>
-        <label className="text-sm font-semibold text-ink" htmlFor="intake-program">
-          Program <span className="font-normal text-ink-mute">(optional)</span>
-        </label>
-        <select id="intake-program" value={programId} onChange={(e) => setProgramId(e.target.value)} className={cn(field, "mt-2 h-12")}>
+      <Step n={4} title="Give them a program" hint="(optional)">
+        <select id="intake-program" aria-label="Program" value={programId} onChange={(e) => setProgramId(e.target.value)} className={cn(field, "h-12")}>
           <option value="">No program yet</option>
           {groups.map((g) => (
             <optgroup key={g} label={g}>
@@ -156,10 +177,10 @@ export function IntakeForm({
             <p className="mt-1.5 text-xs text-ink-mute">It becomes their live plan. Any plan they&apos;re on now is finished; their logged history stays.</p>
           </>
         )}
-      </section>
+      </Step>
 
       <button type="submit" disabled={!ready || saving} className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-dusk-button text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-40">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save intake"}
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : ready ? "Save intake" : !clientId ? "Choose who it is for" : clientId === "new" && !newName.trim() ? "Add their name" : "Choose a goal"}
       </button>
     </form>
   );
