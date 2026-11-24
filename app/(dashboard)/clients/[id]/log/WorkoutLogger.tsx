@@ -51,7 +51,9 @@ import {
   addExerciseNote,
   updateSessionDate,
 } from "@/lib/actions/workout-logger";
-import { coachAddExercise, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
+import { coachAddExercise, coachKeepSuperset, coachRemoveExercise, coachSetTargets, coachSwapExercise } from "@/lib/actions/coach-plan";
+import { keptMessage, supersetChange } from "@/lib/plan/superset";
+import { KeepSupersetSheet } from "@/components/logger/KeepSupersetSheet";
 import { ExercisePicker, type PickerExercise } from "@/components/exercises/ExercisePicker";
 import { PendingExercises, usePendingExercises } from "@/components/exercises/pending";
 import { FOLD_DELAY_MS, STUCK_MS, UnsavedDot } from "@/components/logger/set-marks";
@@ -366,10 +368,28 @@ export default function WorkoutLogger({
       return ex ? [{ ...ex, section: o.section }] : [];
     });
   }, [planExercises, order]);
+  // A superset made here (or one the plan has, split) can be kept in the client's plan for this workout from now on: asked once.
+  const [keepAsk, setKeepAsk] = useState<null | { kind: "group"; aweIds: string[] } | { kind: "split"; aweId: string }>(null);
+  const moveTo = (o: OrderEntry[]) => {
+    const asked = completed ? null : supersetChange(order, o, sessionOrder(planExercises.map((e) => ({ aweId: e.aweId, section: e.section })), null));
+    if (asked) setKeepAsk(asked);
+    setSavedOrder(o);
+  };
+  const keepSuperset = async (k: NonNullable<typeof keepAsk>) => {
+    setKeepAsk(null);
+    try {
+      const res = await coachKeepSuperset(clientId, assignmentId, k.kind === "group" ? { workoutId: assignedWorkoutId, aweIds: k.aweIds } : { workoutId: assignedWorkoutId, split: k.aweId });
+      if (!res.ok) return void toast.error(res.error);
+      toast.success(keptMessage(res.updated, res.skipped));
+      router.refresh();
+    } catch {
+      toast.error("Couldn't save that change. Please try again.");
+    }
+  };
   // Hold a card's header to pick it up; drop between cards to reorder, hold over one to superset.
-  const drag = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  const drag = useDragOrder({ order, enabled: !completed, onChange: moveTo });
   // The same on a desktop: its own list, so its own lift (the phone's list is not on screen there).
-  const dragD = useDragOrder({ order, enabled: !completed, onChange: setSavedOrder });
+  const dragD = useDragOrder({ order, enabled: !completed, onChange: moveTo });
   // Back to the client: the logger shrinks into the live-session bar (when the session is still open) instead of a page swap.
   const leaveToClient = (e: React.MouseEvent) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -381,9 +401,9 @@ export default function WorkoutLogger({
     const i = order.findIndex((o) => o.aweId === aweId);
     const above = order[i - 1]?.aweId;
     return {
-      up: () => setSavedOrder(stepOrder(order, aweId, -1)),
-      down: () => setSavedOrder(stepOrder(order, aweId, 1)),
-      merge: above && canMerge(order, aweId, above) && order[i - 1].section !== order[i].section ? () => setSavedOrder(mergeWith(order, aweId, above)) : undefined,
+      up: () => moveTo(stepOrder(order, aweId, -1)),
+      down: () => moveTo(stepOrder(order, aweId, 1)),
+      merge: above && canMerge(order, aweId, above) && order[i - 1].section !== order[i].section ? () => moveTo(mergeWith(order, aweId, above)) : undefined,
     };
   };
   const [whenOpen, setWhenOpen] = useState(false);
@@ -2002,6 +2022,8 @@ export default function WorkoutLogger({
           }}
         />
       )}
+
+      {keepAsk != null && <KeepSupersetSheet split={keepAsk.kind === "split"} onToday={() => setKeepAsk(null)} onKeep={() => keepSuperset(keepAsk)} />}
 
       {confirmAll != null && (
         <CheckAllSheet

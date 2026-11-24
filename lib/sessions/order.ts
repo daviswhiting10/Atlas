@@ -32,7 +32,7 @@ export type PlanEntry = { aweId: string; section: string | null };
  * entries in the order they're shown (warm-up, blocks, cool-down), so a position in this list
  * is a position on the screen.
  */
-function normalise(entries: OrderEntry[]): OrderEntry[] {
+export function normalise(entries: OrderEntry[]): OrderEntry[] {
   const sections = canonicalSections(entries, (e) => e.section);
   const rank = (s: string) => (s === WARMUP ? 0 : s === COOLDOWN ? 2 : 1);
   return entries
