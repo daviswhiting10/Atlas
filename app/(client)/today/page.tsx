@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getAthlete, getPlanOverview } from "@/lib/athlete/data";
+import { HomeProgress } from "@/components/athlete/HomeProgress";
 import { TodayScreen } from "@/components/athlete/TodayScreen";
 import { GoalToday } from "@/components/goals/GoalToday";
 import { TodayReport } from "@/components/report/TodayReport";
@@ -18,7 +19,7 @@ export default async function TodayPage() {
   preloadTodayGoal(athlete.clientId);
   const plan = await planP;
   return (
-    <TodayScreen athlete={athlete} plan={plan} nutrition={nutritionEnabled() ? <Suspense fallback={null}><TodayNutrition clientId={athlete.clientId} /></Suspense> : undefined} goal={<GoalToday clientId={athlete.clientId} />}
+    <TodayScreen athlete={athlete} plan={plan} progress={<Suspense fallback={null}><HomeProgress athlete={athlete} /></Suspense>} nutrition={nutritionEnabled() ? <Suspense fallback={null}><TodayNutrition clientId={athlete.clientId} /></Suspense> : undefined} goal={<GoalToday clientId={athlete.clientId} />}
       report={
         <Suspense fallback={null}>
           <TodayReport clientId={athlete.clientId} workspaceId={athlete.workspaceId} />
