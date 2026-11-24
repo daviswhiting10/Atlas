@@ -55,7 +55,7 @@ const STEPS = [
   "coach roster row: Logged today, 3/4, Logs own",
   "coach Log session tab: the row is one target and opens the logger",
   "coach client page: the latest-session card",
-  "coach client page: the Week tab",
+  "coach client page: 3/4 this week, and the Week tab",
   "late plan: a second client signs in with no plan, the coach assigns one, it appears",
   "cleanup: throwaway workspace deleted",
 ] as const;
@@ -490,9 +490,13 @@ async function main() {
     await must(STEPS[15], async () => {
       const first = await coach.ev<string>(`(document.querySelector('[role=tablist] [role=tab],[role=tablist] button')||{}).innerText||''`);
       if (!/Week/.test(first)) throw new Error(`first tab is "${first}"`);
+      // parity-client-page: "3/4 this week" is in the page's stats row now; the Week tab lists the week's workouts.
+      const page = await coach.ev<string>(`document.body.innerText.replace(/\\n+/g,' ')`);
+      if (!/3\s*\/\s*4\s*this week/i.test(page)) throw new Error(`no "3/4 this week" on the page`);
       const week = await coach.ev<string>(`(()=>{const s=document.querySelector('section[aria-label="This week"]');return s?s.innerText.replace(/\\n+/g,' '):''})()`);
-      if (!/3\s*\/\s*4/.test(week)) throw new Error(`Week reads "${week.slice(0, 100)}"`);
-      return week.slice(0, 100);
+      const miss = ["Upper A", "Lower A", "Upper B", "Lower B"].filter((n) => !week.includes(n));
+      if (miss.length) throw new Error(`Week tab is missing ${miss.join(", ")}: "${week.slice(0, 100)}"`);
+      return `3/4 this week · ${week.slice(0, 80)}`;
     }, () => coach.shot("client-week-tab"));
 
     // The late plan: she is signed in before any plan exists.
