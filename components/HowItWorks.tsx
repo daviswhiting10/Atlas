@@ -3,6 +3,7 @@
 import { SheetLock } from "@/components/ui/sheet-lock";
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HOW_IT_WORKS } from "@/lib/how-it-works";
@@ -13,7 +14,7 @@ import { useEscape } from "@/hooks/use-escape";
  * A "How it works" row that opens the three steps in a sheet. It starts at step 1 every time,
  * with Back, Next and Skip. It only shows: nothing is read or written.
  */
-export function HowItWorks({ className }: { className?: string }) {
+export function HowItWorks({ className, aiDemo = false }: { className?: string; /** The demo: the last step also links to the AI-assistant walkthrough (it used to be its own row on You). */ aiDemo?: boolean }) {
   const [step, setStep] = useState<number | null>(null);
   const open = step != null;
   const close = () => setStep(null);
@@ -52,6 +53,11 @@ export function HowItWorks({ className }: { className?: string }) {
               </div>
               <h2 className="mt-4 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">{HOW_IT_WORKS[step][0]}</h2>
               <p className="mt-2 min-h-[72px] text-[16px] leading-relaxed text-ink-soft">{HOW_IT_WORKS[step][1]}</p>
+              {aiDemo && step === last && (
+                <Link href="/agents#demo" className="press -mt-2 mb-1 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-ink">
+                  Watch an AI assistant use this data <ArrowRight className="h-4 w-4 text-ink-soft" />
+                </Link>
+              )}
               <div className="mt-6 flex gap-3">
                 {step > 0 && (
                   <button type="button" onClick={() => setStep(step - 1)} className="press h-14 flex-1 rounded-2xl border border-line-strong text-[17px] font-semibold text-ink">

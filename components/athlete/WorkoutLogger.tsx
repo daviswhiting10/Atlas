@@ -31,6 +31,7 @@ import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
 import { DurationStepper } from "@/components/athlete/DurationStepper";
 import { durationRange, formatClock } from "@/lib/sessions/duration";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+import { conflictMessage } from "@/lib/sessions/replay";
 import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish } from "@/lib/sessions/finish";
 import { FinishSheet } from "@/components/logger/FinishSheet";
@@ -353,6 +354,9 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const [noSignal, setNoSignal] = useState(false);
   const [finishQueued, setFinishQueued] = useState(() => false);
   const pending = useRef(new Map<string, number>());
+  // Sets whose save is being sent again after a dropped connection (or a reload): they say what the server had, so a
+  // change made meanwhile on another device isn't overwritten (lib/sessions/replay).
+  const replay = useRef(new Set<string>());
   const persist = useCallback(
     (aweId: string, setNumber: number) => {
       const key = `${aweId}:${setNumber}`;
@@ -371,9 +375,24 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
             reps: s.reps,
             done: s.done,
             setLogId: s.setLogId,
+            expectDone: replay.current.has(key) ? (serverDone.current.get(key) ?? false) : undefined,
           });
           // A failed answer can come back as nothing rather than an error: that's a refusal too.
           if (!res?.setLogId) throw new Error("The set wasn't saved");
+          replay.current.delete(key);
+          // Changed on another device while this phone was offline: theirs stands, and this screen shows it.
+          if (res.conflict) {
+            const c = res.conflict;
+            serverDone.current.set(key, c.done);
+            clearStuck(key);
+            clearPending(store(), data.id, key);
+            apply({
+              ...setsRef.current,
+              [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, done: c.done, weight: c.weight ?? x.weight, reps: c.reps ?? x.reps, setLogId: res.setLogId } : x)),
+            });
+            toast(conflictMessage(setNumber));
+            return;
+          }
           serverDone.current.set(key, s.done);
           clearStuck(key);
           // Confirmed while the page is closing: the next page may have read the server before this
@@ -389,6 +408,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           // No connection: the tick stays and is sent when the connection is back. Only a refusal
           // from the server puts the set back.
           if (isNetworkError(e)) {
+            replay.current.add(key);
             setNoSignal(true);
             if (!stuckTimers.current.has(key)) stuckTimers.current.set(key, setTimeout(() => markUnsaved(key, true), STUCK_MS));
             return;
@@ -622,6 +642,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           [aweId]: list.map((x) => (x.setNumber === setNumber ? { ...x, done: tick.done, weight: tick.weight !== undefined ? tick.weight : x.weight, reps: tick.reps !== undefined ? tick.reps : x.reps } : x)),
         });
       }
+      replay.current.add(key); // sent again after a reload or a dropped connection
       persist(aweId, setNumber);
     }
   }
@@ -947,6 +968,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[180px]">
+                            <DropdownMenuItem className="min-h-11" onClick={() => addSet(ex)}>Add a set</DropdownMenuItem>
                             <DropdownMenuItem className="min-h-11" onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
                             {/* A coach's plan stays the coach's: swap, but no retargeting or removing. */}
                             {!data.coachPlan && <DropdownMenuItem className="min-h-11" onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
@@ -1042,9 +1064,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                         })}
                       </ul>
                       <div className="mt-2 flex items-center gap-1">
-                        <button type="button" onClick={() => addSet(ex)} className="press logger-quiet inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-medium text-ink-soft hover:text-ink">
-                          <Plus className="h-3.5 w-3.5" /> Add set
-                        </button>
                         {data.status !== "LOGGED" && exerciseBulk(list.map((x) => x.done)) && (
                           <CheckAllButton mode={exerciseBulk(list.map((x) => x.done))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(list.map((x) => x.done))!)} />
                         )}

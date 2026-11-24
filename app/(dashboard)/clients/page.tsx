@@ -1,7 +1,7 @@
 "use client";
 
 import { emailTypo } from "@/lib/email-typos";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useContentFade } from "@/hooks/use-content-fade";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { NO_CONNECTION, createdSince } from "@/lib/net/guard";
 import { MoreHorizontal, Plus, Search, Upload, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,9 @@ const GOAL_LABELS: Record<string, string> = {
 
 const sel = (setter: (v: string) => void) => (v: string | null) => { if (v) setter(v); };
 
+/** Search appears with more clients than this (fewer fit on one screen). */
+const SEARCH_FROM = 8;
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
@@ -85,8 +89,10 @@ export default function ClientsPage() {
 
   // Search only: with a roster this size a status filter is one more control than it's worth.
   // Deleting a client lives in the client page's ⋯ menu, not on every row.
+  // With the box hidden (a short list) nothing is filtered, whatever was typed before the list shrank.
+  const searching = clients.length > SEARCH_FROM;
   const filtered = clients.filter(
-    (c) => c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
+    (c) => !searching || c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   async function askDelete(id: string) {
@@ -114,16 +120,34 @@ export default function ClientsPage() {
     setOpenRow(null);
   }
 
+  // When the first try of "Add" left the phone and no answer came back, the client may exist already: before trying
+  // again, look for her (same name and email, made since that try) instead of adding a second copy.
+  const firstTry = useRef<number | null>(null);
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(`Failed to create client (${res.status}): ${err?.error ?? "unknown"}`); return; }
-    const newClient = await res.json();
-    setClients((prev) => [newClient, ...prev]);
+    let newClient;
+    try {
+      if (firstTry.current != null) {
+        const list = (await (await fetch("/api/clients")).json()) as Array<{ id: string; fullName: string; email?: string | null; createdAt: string }>;
+        newClient = createdSince(list, form, firstTry.current) ?? undefined;
+      }
+      if (!newClient) {
+        firstTry.current ??= Date.now();
+        const res = await fetch("/api/clients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) { firstTry.current = null; const err = await res.json().catch(() => ({})); toast.error(`Failed to create client (${res.status}): ${err?.error ?? "unknown"}`); return; }
+        newClient = await res.json();
+      }
+    } catch {
+      // No connection (or no answer). What she typed stays in the form.
+      toast.error(NO_CONNECTION);
+      return;
+    }
+    firstTry.current = null;
+    setClients((prev) => (prev.some((c) => c.id === newClient.id) ? prev : [newClient, ...prev]));
     setDialogOpen(false);
     setForm({ fullName: "", email: "", phone: "", primaryGoal: "", status: "PROSPECT" });
     toast.success(`${newClient.fullName} added`);
@@ -141,11 +165,7 @@ export default function ClientsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-        <Link href="/clients/import" className={buttonVariants({ variant: "outline" })}>
-          <Upload className="w-4 h-4 mr-1.5" />
-          Import
-        </Link>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) firstTry.current = null; }}>
           <DialogTrigger>
             <span className={buttonVariants()}>
               <Plus className="w-4 h-4 mr-1.5" />
@@ -218,9 +238,15 @@ export default function ClientsPage() {
                   </Select>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Add Client</Button>
+              <div className="flex items-center justify-between gap-2 pt-2">
+                {/* Import is a second way to add clients: it lives here, not as its own button above the list. */}
+                <Link href="/clients/import" className="press inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink">
+                  <Upload className="w-4 h-4" /> Import a spreadsheet
+                </Link>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit">Add Client</Button>
+                </div>
               </div>
             </form>
           </DialogContent>
@@ -228,8 +254,8 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 mb-6">
+      {/* Filters: a search box earns its place once the list is longer than a screen. */}
+      {searching && <div className="flex gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -239,7 +265,7 @@ export default function ClientsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-      </div>
+      </div>}
 
       <div className="relative">
         {phase !== "done" && (

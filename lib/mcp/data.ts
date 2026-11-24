@@ -142,6 +142,7 @@ export async function loadActiveAssignment(client: ScopedClient) {
           id: true,
           name: true,
           scheduledDate: true,
+          order: true,
           status: true,
           workoutLog: { select: { completedAt: true } },
           notes: true,

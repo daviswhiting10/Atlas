@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { weekOf } from "@/lib/athlete/sessions";
+import { inPlanOrder } from "@/lib/plan/plan-order";
 import { prisma } from "@/lib/db/client";
 import { strengthComposite, weightTrendEMA } from "@/lib/progress/math";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
@@ -27,7 +29,10 @@ export function keyLifts(client: ScopedClient, histories: ExerciseHistory[], max
 export async function plannedRepsByExercise(client: ScopedClient): Promise<Record<string, number | null>> {
   const assignment = await loadActiveAssignment(client);
   const planned: Record<string, number | null> = {};
-  for (const w of assignment?.assignedWorkouts ?? []) {
+  // In plan order, so "next" matches Today, Plan and get_current_program.
+  const start = assignment?.startDate.getTime() ?? 0;
+  const ordered = inPlanOrder((assignment?.assignedWorkouts ?? []).map((w) => ({ ...w, week: weekOf(w.scheduledDate.getTime(), start) })));
+  for (const w of ordered) {
     if (w.status !== "PLANNED") continue;
     for (const e of w.exercises) {
       if (!(e.exerciseId in planned)) planned[e.exerciseId] = describePrescription(e.prescribedSets).repMin;

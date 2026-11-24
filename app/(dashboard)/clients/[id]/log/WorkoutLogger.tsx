@@ -63,6 +63,7 @@ import { DayInput } from "@/components/ui/day-input";
 import { SetNote } from "@/components/logger/SetNote";
 import { allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+import { conflictMessage } from "@/lib/sessions/replay";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -743,6 +744,8 @@ export default function WorkoutLogger({
   const serverSets = useRef(new Map<string, { setLogId: string | null; completed: boolean }>());
   /** Saves still to run for each set: a failed one only rolls back when nothing newer is coming. */
   const pendingSaves = useRef(new Map<string, number>());
+  /** Sets whose save is being sent again after a dropped connection (or a reload): they say what the server had, so a change made meanwhile on another device isn't overwritten. */
+  const replay = useRef(new Set<string>());
   /** Remember a set's server state before the screen first changes it. */
   function noteServer(entry: SetEntry) {
     if (!serverSets.current.has(entry.uid)) serverSets.current.set(entry.uid, { setLogId: entry.setLogId, completed: entry.setLogId ? entry.completed : false });
@@ -771,9 +774,22 @@ export default function WorkoutLogger({
           note: want.note.trim() || null,
           completed: want.completed,
           date: logIdRef.current ? undefined : logDate, // only when this save creates the session
+          expectDone: replay.current.has(uid) ? server.completed : undefined,
         });
         // A failed answer can come back as nothing rather than an error: that's a refusal too.
         if (!result?.setLogId || !result.workoutLogId) throw new Error("The set wasn't saved");
+        replay.current.delete(uid);
+        // Changed on another device while this one was offline: theirs stands, and this screen shows it.
+        if (result.conflict) {
+          const c = result.conflict;
+          logIdRef.current = result.workoutLogId;
+          serverSets.current.set(uid, { setLogId: result.setLogId, completed: c.done });
+          clearStuck(uid);
+          clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
+          setSet(aweId, uid, { completed: c.done, setLogId: result.setLogId, ...(c.weight != null && !want.isBodyweight && !want.isBand ? { weight: String(c.weight) } : {}), ...(c.reps != null ? { reps: String(c.reps) } : {}) });
+          toast(conflictMessage(idx + 1));
+          return;
+        }
         logIdRef.current = result.workoutLogId;
         serverSets.current.set(uid, { setLogId: result.setLogId, completed: want.completed });
         clearStuck(uid);
@@ -788,6 +804,7 @@ export default function WorkoutLogger({
         // No connection: the tick stays (it's the truth on this phone) and is sent when the
         // connection is back. Only a refusal from the server puts the set back.
         if (isNetworkError(e)) {
+          replay.current.add(uid);
           if (!stuckTimers.current.has(uid)) stuckTimers.current.set(uid, setTimeout(() => markUnsaved(uid, true), STUCK_MS));
           return;
         }
@@ -971,6 +988,7 @@ export default function WorkoutLogger({
       }
       noteServer(entry);
       if (entry.completed !== tick.done) setSet(aweId, entry.uid, { completed: tick.done });
+      replay.current.add(entry.uid); // sent again after a reload or a dropped connection
       saveSet(aweId, ex.exerciseId, entry.uid, { ...entry, completed: tick.done }, idx);
     }
   }
@@ -1192,8 +1210,9 @@ export default function WorkoutLogger({
         toast.dismiss("finish");
         // Never in the way: if it can't be worked out, the screen is just the totals and the notes.
         void sessionWrapUp({ workoutLogId }).then(setWrap).catch(() => {});
-      } catch {
-        back("Failed to complete session");
+      } catch (e) {
+        // No connection: the sets are kept on the phone (they're sent when it's back); only the finish needs a second tap.
+        back(isNetworkError(e) ? "No connection. Your sets are saved on this phone. Tap Finish when you're back." : "Failed to complete session");
       }
     });
   }
@@ -2244,6 +2263,7 @@ function SetTable({
           const extra = Boolean(entry.note.trim() || entry.rpe);
           const persist = () => entry.completed && onBlurPersist(idx);
           const open = detail === idx;
+          const showDetails = open || extra || entry.completed || entry.isBand || entry.isBodyweight || idx === sets.findIndex((x) => !x.completed);
           return (
             <div key={idx} role="group" aria-label={`Set ${idx + 1}`}>
               <HoldRow
@@ -2253,17 +2273,21 @@ function SetTable({
                 }}
                 className={cn(SET_GRID, "rounded-lg px-0.5", entry.completed && "bg-[var(--success)]/[0.07]")}
               >
-                <button
-                  type="button"
-                 
-                  onClick={() => setDetail(open ? null : idx)}
-                  aria-expanded={open}
-                  aria-label={`Set ${idx + 1}: load type, RPE and note`}
-                  className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
-                >
-                  {idx + 1}
-                  {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
-                </button>
+                {showDetails ? (
+                  <button
+                    type="button"
+                    onClick={() => setDetail(open ? null : idx)}
+                    aria-expanded={open}
+                    aria-label={`Set ${idx + 1}: load type, RPE and note`}
+                    className="logger-cell relative flex h-10 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums text-ink-soft"
+                  >
+                    {idx + 1}
+                    {extra && <span className="absolute right-0.5 top-2 h-1.5 w-1.5 rounded-full bg-[var(--success)]" />}
+                  </button>
+                ) : (
+                  // A set still to do, and not the next one: just its number. (The button is on the next set, on logged sets and on any with a note.)
+                  <span className="flex h-10 items-center justify-center text-[13px] font-semibold tabular-nums text-ink-mute">{idx + 1}</span>
+                )}
                 <span className="text-[12px] leading-tight tabular-nums text-ink-mute">{prevLabel}</span>
                 <span className="min-w-0">
                   {entry.isBand || entry.isBodyweight ? (
