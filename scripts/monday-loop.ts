@@ -1,5 +1,6 @@
 /**
- * Smoke test of Monday's loop, on a production build, against dev-sessions, with throwaway users that are deleted afterwards.
+ * Smoke test of Monday's loop, on a production build, against the local Postgres (or dev-sessions with --db neon), with
+ * throwaway users that are deleted afterwards.
  *
  *   coach creates a client with a plan (one exercise has no weight) -> invites her -> she sets a password (a simple one,
  *   through "Use it anyway") -> signs out -> signs in with email and password -> the plan is there -> she logs sets against
@@ -12,6 +13,7 @@
  *   npx tsx scripts/monday-loop.ts                # dry run
  *   npx tsx scripts/monday-loop.ts --run          # the real run (screenshots and report in ~/Documents/atlas-screenshots/monday-loop/<time>/)
  *   options: --base http://localhost:3900   --keep (leave the throwaway data in place)
+ *            --db local|neon (default local when DATABASE_URL_LOCAL is set; start the server with scripts/local-server.sh)
  *
  * Database: the connection string is read from .env.local by this script and is never printed. The script refuses the
  * production database. Everything it creates sits in one workspace. The logins are @example.test addresses while it runs (a
@@ -26,10 +28,15 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir, homedir } from "os";
 import { join } from "path";
 import { config } from "dotenv";
+import { pickDatabase } from "../lib/db/local";
 
 config({ path: ".env.local", quiet: true });
 
 const args = process.argv.slice(2);
+// The local Postgres by default (docs/local-postgres.md), so the loop never touches Neon; --db neon for dev-sessions.
+// The server under test must be started on the same database (scripts/local-server.sh does that for local).
+const DB = pickDatabase(args, process.env);
+process.env.DATABASE_URL = DB.url;
 const RUN = args.includes("--run");
 const KEEP = args.includes("--keep");
 const BASE = (args.includes("--base") ? args[args.indexOf("--base") + 1] : "http://localhost:3900").replace(/\/$/, "");
@@ -168,7 +175,7 @@ async function main() {
   if (isProductionDatabase(process.env.DATABASE_URL)) throw new Error("Refusing to run: this is the production database.");
 
   const up = await fetch(BASE + "/login", { redirect: "manual" }).then((r) => r.status < 500, () => false);
-  console.log(`Monday loop · ${RUN ? "RUN" : "DRY RUN"} · server ${BASE} ${up ? "answers" : "is NOT answering"} · database is not production`);
+  console.log(`Monday loop · ${RUN ? "RUN" : "DRY RUN"} · server ${BASE} ${up ? "answers" : "is NOT answering"} · database: ${DB.which === "local" ? "local Postgres" : "Neon (dev-sessions)"}, not production`);
   if (!RUN) {
     STEPS.forEach((s, i) => console.log(`  ${String(i + 1).padStart(2)}. ${s}`));
     console.log("\nDry run: nothing was created. Add --run to do it for real.");

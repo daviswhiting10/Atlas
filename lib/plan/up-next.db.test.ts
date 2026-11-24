@@ -16,7 +16,7 @@ describe.skipIf(!process.env.ATLAS_DB_TEST)("up next after finishing a workout",
   let prisma: typeof import("@/lib/db/client").prisma;
   let ws = "";
   let clientId = "";
-  const tag = Date.now().toString(36);
+  const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
   beforeAll(async () => {
     ({ prisma } = await import("@/lib/db/client"));
