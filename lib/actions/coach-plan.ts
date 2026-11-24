@@ -22,6 +22,7 @@ import {
   LIMITS,
   PlanEditError,
   addExercise,
+  addLastTime,
   addWorkout,
   keepGrouping,
   removeExercise,
@@ -35,6 +36,8 @@ import {
 } from "@/lib/plan/edit";
 import { MAX_WEEK_NOTE, readWeekNotes, setWeekNote } from "@/lib/plan/week-notes";
 import { inviteClient, notInvited } from "@/lib/clients/invite";
+import { forgetAdded, recordAdded } from "@/lib/sessions/added-store";
+import { requestDay } from "@/lib/sessions/request-day";
 
 export type CoachResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -106,23 +109,47 @@ export async function coachRemoveWorkout(clientId: string, assignmentId: string,
   });
 }
 
-export async function coachAddExercise(clientId: string, assignmentId: string, raw: { workoutId: string; slug?: string; exerciseId?: string } & z.input<typeof Targets>) {
+/**
+ * Add an exercise to one workout. From the session logger (`session`), it also goes on that session's list of exercises
+ * added, starting the session if need be on the logger's day (`date`, YYYY-MM-DD; today otherwise).
+ */
+export async function coachAddExercise(
+  clientId: string,
+  assignmentId: string,
+  raw: { workoutId: string; slug?: string; exerciseId?: string; session?: boolean; date?: string } & z.input<typeof Targets>
+): Promise<CoachResult<{ aweId: string; workoutLogId?: string }>> {
   return run(async () => {
     // A catalog slug (plan editor) or any exercise id this workspace can see (the session logger's picker).
-    const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() })
+    const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional(), session: z.boolean().optional(), date: IsoDay.optional() })
       .refine((v) => v.slug || v.exerciseId)
       .parse(raw);
-    const result = await addExercise(await scopeFor(clientId, assignmentId), input);
+    const scope = await scopeFor(clientId, assignmentId);
+    const { aweId } = await addExercise(scope, input);
+    const log = input.session
+      ? await prisma.$transaction((tx) => recordAdded({ clientId: scope.clientId, assignedWorkoutId: input.workoutId, aweId, date: input.date ? requestDay(input.date) : undefined }, tx))
+      : null;
     refresh(clientId, assignmentId);
-    return result;
+    return { aweId, ...(log ? { workoutLogId: log.workoutLogId } : {}) };
   });
 }
 
 export async function coachRemoveExercise(clientId: string, assignmentId: string, raw: { aweId: string; workoutId: string }) {
   return run(async () => {
     const input = z.object({ aweId: Ref, workoutId: Ref }).parse(raw);
-    await removeExercise(await scopeFor(clientId, assignmentId), input.aweId);
+    const scope = await scopeFor(clientId, assignmentId);
+    await removeExercise(scope, input.aweId);
+    await forgetAdded({ clientId: scope.clientId, assignedWorkoutId: input.workoutId, aweId: input.aweId });
     refresh(clientId, assignmentId);
+  });
+}
+
+/** The "Last time you added …" card in the session logger: this workout only, or it and every later unfinished one of the same workout. */
+export async function coachAddLastTime(clientId: string, assignmentId: string, raw: { workoutId: string; fromNowOn: boolean; exerciseIds?: string[]; date?: string }) {
+  return run(async () => {
+    const input = z.object({ workoutId: Ref, fromNowOn: z.boolean(), exerciseIds: z.array(Ref).max(LIMITS.exercisesPerWorkout).optional(), date: IsoDay.optional() }).parse(raw);
+    const result = await addLastTime(await scopeFor(clientId, assignmentId), { ...input, date: input.date ? requestDay(input.date) : undefined });
+    refresh(clientId, assignmentId);
+    return result;
   });
 }
 
@@ -132,7 +159,9 @@ export async function coachSwapExercise(clientId: string, assignmentId: string, 
       .object({ aweId: Ref, workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() })
       .refine((v) => v.slug || v.exerciseId)
       .parse(raw);
-    await swapExercise(await scopeFor(clientId, assignmentId), input);
+    const scope = await scopeFor(clientId, assignmentId);
+    await swapExercise(scope, input);
+    await forgetAdded({ clientId: scope.clientId, assignedWorkoutId: input.workoutId, aweId: input.aweId, swapped: true });
     refresh(clientId, assignmentId);
   });
 }

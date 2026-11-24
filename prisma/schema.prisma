@@ -505,6 +505,8 @@ model WorkoutLog {
   rpeAvg            Float?
   clientNotes       String?          @db.Text
   trainerSeen       Boolean          @default(false)
+  /// Exercises added during this session, [{ exerciseId, name, aweId, prescribedSets? }] (lib/sessions/added.ts). Null when none.
+  addedExercises    Json?
   sets              SetLog[]
   notes             SessionNote[]
   createdAt         DateTime         @default(now())

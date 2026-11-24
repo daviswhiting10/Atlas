@@ -22,10 +22,12 @@ import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
 import { displayName } from "@/lib/plan/catalog";
 import { resetPlanRows, sessionsOnPlan } from "@/lib/plan/reset-progress";
 import { isGuestEmail } from "@/lib/guest-rules";
+import { forgetAdded, recordAdded } from "@/lib/sessions/added-store";
 import {
   LIMITS,
   PlanEditError,
   addExercise,
+  addLastTime,
   addWorkout,
   keepGrouping,
   removeExercise,
@@ -404,19 +406,39 @@ export async function planRemoveWorkout(workoutId: string) {
   return edit((scope) => removeWorkout(scope, Ref.parse(workoutId)), undefined, true);
 }
 
-export async function planAddExercise(raw: { workoutId: string; slug?: string; exerciseId?: string } & z.input<typeof Targets>) {
-  const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional() }).refine((v) => v.slug || v.exerciseId).parse(raw);
-  return edit((scope) => addExercise(scope, input), input.workoutId, true);
+/** Add an exercise to a workout. From the logger (`session`), it also goes on that session's list of exercises added. */
+export async function planAddExercise(raw: { workoutId: string; slug?: string; exerciseId?: string; session?: boolean } & z.input<typeof Targets>) {
+  const input = Targets.extend({ workoutId: Ref, slug: Ref.optional(), exerciseId: Ref.optional(), session: z.boolean().optional() }).refine((v) => v.slug || v.exerciseId).parse(raw);
+  return edit(async (scope) => {
+    const { aweId } = await addExercise(scope, input);
+    if (input.session) await prisma.$transaction((tx) => recordAdded({ clientId: scope.clientId, assignedWorkoutId: input.workoutId, aweId }, tx));
+    return { aweId };
+  }, input.workoutId, true);
 }
 
 export async function planRemoveExercise(raw: { aweId: string; workoutId: string }) {
   const input = z.object({ aweId: Ref, workoutId: Ref }).parse(raw);
-  return edit((scope) => removeExercise(scope, input.aweId), input.workoutId, true);
+  return edit(async (scope) => {
+    await removeExercise(scope, input.aweId);
+    await forgetAdded({ clientId: scope.clientId, assignedWorkoutId: input.workoutId, aweId: input.aweId });
+  }, input.workoutId, true);
 }
 
 export async function planSwapExercise(raw: { aweId: string; slug?: string; exerciseId?: string; workoutId: string }) {
   const input = z.object({ aweId: Ref, slug: Ref.optional(), exerciseId: Ref.optional(), workoutId: Ref }).refine((v) => v.slug || v.exerciseId).parse(raw);
-  return edit((scope) => swapExercise(scope, input), input.workoutId);
+  return edit(async (scope) => {
+    await swapExercise(scope, input);
+    await forgetAdded({ clientId: scope.clientId, assignedWorkoutId: input.workoutId, aweId: input.aweId, swapped: true });
+  }, input.workoutId);
+}
+
+/**
+ * The "Last time you added …" card: add them to this workout only, or to it and every later unfinished one of the same
+ * workout. Only someone who makes their own plan (the same rule as adding an exercise).
+ */
+export async function planAddLastTime(raw: { workoutId: string; fromNowOn: boolean; exerciseIds?: string[] }) {
+  const input = z.object({ workoutId: Ref, fromNowOn: z.boolean(), exerciseIds: z.array(Ref).max(LIMITS.exercisesPerWorkout).optional() }).parse(raw);
+  return edit((scope) => addLastTime(scope, input), input.workoutId, true);
 }
 
 export async function planSetTargets(raw: { aweId: string; workoutId: string } & z.input<typeof Targets>) {
