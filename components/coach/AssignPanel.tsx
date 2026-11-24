@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Send, Trash2 } from "lucide-react";
 import { assignDraftPlan, discardDraftPlan } from "@/lib/actions/coach-plan";
+import { guard } from "@/lib/net/guard";
 import { InviteSheet, type InviteResult } from "@/components/coach/InviteSheet";
 
 /**
@@ -37,7 +38,7 @@ export function AssignPanel({
 
   function assign() {
     start(async () => {
-      const res = await assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date), invite: notInvited });
+      const res = await guard(() => assignDraftPlan({ clientId, assignmentId, startDate: dayFrom(dateRef, date), invite: notInvited }), () => router.refresh());
       if (!res.ok) return void toast.error(res.error);
       const inv = res.invite;
       if (!inv) toast.success(`Assigned to ${clientName}`);
@@ -51,7 +52,7 @@ export function AssignPanel({
 
   function discard() {
     start(async () => {
-      const res = await discardDraftPlan({ clientId, assignmentId });
+      const res = await guard(() => discardDraftPlan({ clientId, assignmentId }), () => router.refresh());
       if (!res.ok) return void toast.error(res.error);
       toast.success("Draft discarded");
       router.push(`/clients/${clientId}`);

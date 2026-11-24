@@ -1,7 +1,7 @@
 "use client";
 
 import { emailTypo } from "@/lib/email-typos";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useContentFade } from "@/hooks/use-content-fade";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { NO_CONNECTION, createdSince } from "@/lib/net/guard";
 import { MoreHorizontal, Plus, Search, Upload, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -114,16 +115,34 @@ export default function ClientsPage() {
     setOpenRow(null);
   }
 
+  // When the first try of "Add" left the phone and no answer came back, the client may exist already: before trying
+  // again, look for her (same name and email, made since that try) instead of adding a second copy.
+  const firstTry = useRef<number | null>(null);
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error(`Failed to create client (${res.status}): ${err?.error ?? "unknown"}`); return; }
-    const newClient = await res.json();
-    setClients((prev) => [newClient, ...prev]);
+    let newClient;
+    try {
+      if (firstTry.current != null) {
+        const list = (await (await fetch("/api/clients")).json()) as Array<{ id: string; fullName: string; email?: string | null; createdAt: string }>;
+        newClient = createdSince(list, form, firstTry.current) ?? undefined;
+      }
+      if (!newClient) {
+        firstTry.current ??= Date.now();
+        const res = await fetch("/api/clients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) { firstTry.current = null; const err = await res.json().catch(() => ({})); toast.error(`Failed to create client (${res.status}): ${err?.error ?? "unknown"}`); return; }
+        newClient = await res.json();
+      }
+    } catch {
+      // No connection (or no answer). What she typed stays in the form.
+      toast.error(NO_CONNECTION);
+      return;
+    }
+    firstTry.current = null;
+    setClients((prev) => (prev.some((c) => c.id === newClient.id) ? prev : [newClient, ...prev]));
     setDialogOpen(false);
     setForm({ fullName: "", email: "", phone: "", primaryGoal: "", status: "PROSPECT" });
     toast.success(`${newClient.fullName} added`);
@@ -145,7 +164,7 @@ export default function ClientsPage() {
           <Upload className="w-4 h-4 mr-1.5" />
           Import
         </Link>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) firstTry.current = null; }}>
           <DialogTrigger>
             <span className={buttonVariants()}>
               <Plus className="w-4 h-4 mr-1.5" />
