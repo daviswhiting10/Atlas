@@ -64,6 +64,14 @@ export const GoalRules = z
     carriedThrough: Day.optional(),
     rules: z.array(Rule).min(1).max(20),
     onMiss: z.literal("reset"),
+    /**
+     * A missed day ends the goal (failed) instead of starting it over, and only today can be checked in.
+     * Written into the rules when a goal starts (75 Hard from 2026-11-24 on), so a goal started before keeps
+     * the old rules: "reset" on a miss, and yesterday open until the end of today. Goals without it never fail.
+     */
+    missFails: z.literal(true).optional(),
+    /** The missed day that failed the goal. Written once, with status ENDED, by lib/goals/data.ts. */
+    failedOn: Day.optional(),
   })
   .superRefine((g, ctx) => {
     const keys = g.rules.map((r) => r.key);

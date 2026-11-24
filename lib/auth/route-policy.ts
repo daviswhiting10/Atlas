@@ -11,7 +11,7 @@ export const PUBLIC_PATHS = ["/", "/start", "/login", "/error", "/agents", "/for
 /** (/demo: fixed sample data, no account, nothing stored; open to anyone, and a signed-in session is left alone.) */
 export const SHARED_PATHS = ["/agents", "/error", "/forgot-password", "/reset-password", "/invite", "/api/invite", "/demo"];
 /** The athlete app. Coaches use it too, for their own training ("My training"). */
-export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals", "/report"];
+export const ATHLETE_PATHS = ["/today", "/plan", "/workouts", "/progress", "/you", "/goals", "/challenges", "/report"];
 /** The set-password step: signed in, any role. */
 /** The athlete's own plan import (reads a PDF, photos or a sheet). Its handler checks who may use it. */
 export const ATHLETE_IMPORT_PATH = "/api/athlete/plan-import";

@@ -8,7 +8,11 @@ import { SEVENTY_FIVE_HARD } from "./templates";
 const TZ = "America/New_York";
 const D1 = "2026-01-01";
 const noon = (day: string, tz = TZ) => dayToDate(day, tz);
-const hard = { startDay: D1, timeZone: TZ, rules: SEVENTY_FIVE_HARD.rules };
+/** 75 Hard as goals started before 2026-11-24 hold it: no missFails, so a miss resets and yesterday stays open. */
+const OLD_HARD = GoalRules.parse({ ...SEVENTY_FIVE_HARD.rules, missFails: undefined });
+const hard = { startDay: D1, timeZone: TZ, rules: OLD_HARD };
+/** 75 Hard as started from 2026-11-24: a miss fails it. */
+const hardNew = { startDay: D1, timeZone: TZ, rules: SEVENTY_FIVE_HARD.rules };
 const oneWorkout = (days = 5) => GoalRules.parse({ length: { days }, onMiss: "reset", rules: [{ key: "w", label: "Workout", kind: "sessions", per: "day", min: 1 }] });
 const small = (days = 5) => ({ startDay: D1, timeZone: TZ, rules: oneWorkout(days) });
 const session = (day: string, durationMin: number | null = 50, n = 1, tz = TZ): SessionInput => ({ id: `s-${day}-${n}`, date: noon(day, tz), durationMin });
@@ -281,5 +285,94 @@ describe("days carried in from before Atlas", () => {
     const r = evaluateGoal(carried(75, "2026-01-09"), sessions, checkIns, noon(addDays(last, 2)));
     expect(r).toMatchObject({ suggestion: "complete", completedOn: last, misses: 0 });
     expect(last).toBe("2026-03-16");
+  });
+});
+
+describe("a miss fails it (missFails, 75 Hard from 2026-11-24)", () => {
+  it("the template carries the flag; a goal started before (no flag) doesn't", () => {
+    expect(SEVENTY_FIVE_HARD.rules.missFails).toBe(true);
+    expect(OLD_HARD.missFails).toBeUndefined();
+  });
+
+  it("a day closes at its own end: yesterday is no longer open", () => {
+    expect(evaluateGoal(hardNew, [], [], noon(D1)).periods[0].state).toBe("pending");
+    const next = evaluateGoal(hardNew, [], [], noon("2026-01-02"));
+    expect(next.periods.map((p) => p.state)).toEqual(["missed"]);
+    expect(next.failedOn).toBe(D1);
+  });
+
+  it("the first missed day fails it: no reset, nothing after is judged, nothing asked today", () => {
+    const { sessions, checkIns } = days(["2026-01-01", "2026-01-02", "2026-01-04", "2026-01-05"]);
+    const r = evaluateGoal(hardNew, sessions, checkIns, noon("2026-01-05"));
+    expect(r.failedOn).toBe("2026-01-03");
+    expect(r.periods.map((p) => p.day)).toEqual(["2026-01-01", "2026-01-02", "2026-01-03"]);
+    expect(r.attempts).toEqual([{ fromDay: D1, toDay: "2026-01-02", days: 2, current: false }]);
+    expect(r.today).toEqual([]);
+    expect(r.dayOfGoal).toBe(0);
+    expect(r.streak).toEqual({ current: 0, best: 2 });
+    expect(r.completedOn).toBeNull();
+  });
+
+  it("the same days on a goal started before don't fail it: it resets, as it always did", () => {
+    const { sessions, checkIns } = days(["2026-01-01", "2026-01-02", "2026-01-04", "2026-01-05"]);
+    const r = evaluateGoal(hard, sessions, checkIns, noon("2026-01-05"));
+    expect(r.failedOn).toBeNull();
+    expect(r.misses).toBe(1);
+    expect(r.attempts.map((a) => a.current)).toEqual([false, true]);
+    expect(r.dayOfGoal).toBe(2);
+  });
+
+  it("an old goal never fails, however many misses (the yesterday-grace stays too)", () => {
+    const r = evaluateGoal(hard, [], [], noon("2026-01-20"));
+    expect(r.failedOn).toBeNull();
+    expect(r.misses).toBeGreaterThan(5);
+    expect(evaluateGoal(hard, [], [], noon("2026-01-02")).periods[0].state).toBe("pending");
+  });
+
+  it("a full day yesterday and today still open: running, today's rules asked", () => {
+    const { sessions, checkIns } = fullDay(D1);
+    const r = evaluateGoal(hardNew, sessions, checkIns, noon("2026-01-02"));
+    expect(r.failedOn).toBeNull();
+    expect(r.dayOfGoal).toBe(2);
+    expect(r.today.map((t) => t.ruleKey)).toEqual(["workouts", "outdoors", "water", "reading", "diet", "photo"]);
+  });
+
+  it("a session with no duration yesterday doesn't save the day: it closed at midnight", () => {
+    const r = evaluateGoal({ ...small(), rules: GoalRules.parse({ ...oneWorkout(), missFails: true, rules: [{ key: "w", label: "Workout", kind: "sessions", per: "day", min: 1, where: { minMinutes: 45 } }] }) }, [session(D1, null)], [], noon("2026-01-02"));
+    expect(r.failedOn).toBe(D1);
+  });
+
+  it("days carried in from before Atlas don't fail it; today is judged for real", () => {
+    const rules = GoalRules.parse({ ...SEVENTY_FIVE_HARD.rules, carriedThrough: "2026-01-04" });
+    const r = evaluateGoal({ ...hardNew, rules }, [], [], noon("2026-01-05"));
+    expect(r.failedOn).toBeNull();
+    expect(r.dayOfGoal).toBe(5);
+  });
+
+  it("an ended goal judged up to its last day (the chapter) fails there and no later", () => {
+    const r = evaluateGoal(hardNew, [], [], noon("2026-01-10"), { lastDay: D1, closeAll: true });
+    expect(r.failedOn).toBe(D1);
+    expect(r.periods).toHaveLength(1);
+  });
+
+  describe("the goal's timezone decides where today ends", () => {
+    it("11:30pm in Kiritimati (UTC+14) is still today there; just after midnight there, it has failed", () => {
+      const tz = "Pacific/Kiritimati";
+      const g = { startDay: D1, timeZone: tz, rules: SEVENTY_FIVE_HARD.rules };
+      // 2026-01-01 23:30 local = 2026-01-01 09:30Z.
+      expect(evaluateGoal(g, [], [], new Date("2026-01-01T09:30:00Z")).failedOn).toBeNull();
+      // 2026-01-02 00:05 local = 2026-01-01 10:05Z, still Jan 1 in UTC.
+      expect(evaluateGoal(g, [], [], new Date("2026-01-01T10:05:00Z")).failedOn).toBe(D1);
+    });
+
+    it("in Honolulu (UTC-10) the day runs past UTC midnight", () => {
+      const tz = "Pacific/Honolulu";
+      const g = { startDay: D1, timeZone: tz, rules: SEVENTY_FIVE_HARD.rules };
+      // 2026-01-01 23:00 local = 2026-01-02 09:00Z: UTC says Jan 2, Honolulu still Jan 1.
+      const late = evaluateGoal(g, [], [], new Date("2026-01-02T09:00:00Z"));
+      expect(late.failedOn).toBeNull();
+      expect(late.today.length).toBe(6);
+      expect(evaluateGoal(g, [], [], new Date("2026-01-02T10:30:00Z")).failedOn).toBe(D1);
+    });
   });
 });

@@ -70,25 +70,28 @@ describe("todayView: the workout slots", () => {
   });
 });
 
-describe("todayView: yesterday's workouts (the 'Yesterday is still open' rows)", () => {
+/** 75 Hard as a goal started before 2026-11-24 holds it: without missFails, so yesterday stays open. */
+const OLD_HARD = GoalRules.parse({ ...SEVENTY_FIVE_HARD.rules, missFails: undefined });
+
+describe("todayView: yesterday's workouts (the 'Yesterday is still open' rows, goals started before missFails)", () => {
   const tagged = (session: string, day: string): CheckInInput => ({ ruleKey: "outdoors", day, workoutLogId: session, excuse: false });
 
   it("lists yesterday's finished workouts, with their tags, for yesterday's rows; today's workouts aren't in it", () => {
-    const v = todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-13", [workout("y1", "2026-11-14", 45), workout("t1", "2026-11-15", 50)], [tagged("y1", "2026-11-14")]), NOW);
+    const v = todayView(loaded(OLD_HARD, "2026-11-13", [workout("y1", "2026-11-14", 45), workout("t1", "2026-11-15", 50)], [tagged("y1", "2026-11-14")]), NOW);
     expect(v.behind?.day).toBe("2026-11-14");
     expect(v.behind?.workout?.sessions).toEqual([{ id: "y1", title: "Workout", minutes: 45, tags: ["outdoors"], sets: 0 }]);
     expect(v.sessions.map((s) => s.id)).toEqual(["t1"]);
   });
 
   it("what is still open is still listed: one of two workouts leaves 'workouts' open and 'outdoors' met", () => {
-    const v = todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-13", [workout("y1", "2026-11-14", 45)], [tagged("y1", "2026-11-14")]), NOW);
+    const v = todayView(loaded(OLD_HARD, "2026-11-13", [workout("y1", "2026-11-14", 45)], [tagged("y1", "2026-11-14")]), NOW);
     const keys = v.behind?.items.map((i) => i.key) ?? [];
     expect(keys).toContain("workouts");
     expect(keys).not.toContain("outdoors");
   });
 
   it("yesterday with no workouts has empty workout rows, not none", () => {
-    expect(todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-13"), NOW).behind?.workout).toEqual({ sessions: [] });
+    expect(todayView(loaded(OLD_HARD, "2026-11-13"), NOW).behind?.workout).toEqual({ sessions: [] });
   });
 
   it("a goal with no workout slots has no workout rows for yesterday", () => {
@@ -100,5 +103,21 @@ describe("todayView: yesterday's workouts (the 'Yesterday is still open' rows)",
 
   it("nothing is open for yesterday on a goal that started today", () => {
     expect(todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW).behind).toBeNull();
+  });
+});
+
+describe("todayView: a goal a miss fails asks about today only", () => {
+  it("never offers yesterday: a yesterday left unfinished has failed the goal, and nothing is asked", () => {
+    const failed = loaded(SEVENTY_FIVE_HARD.rules, "2026-11-14", [workout("y1", "2026-11-14", 45)]);
+    expect(failed.result.failedOn).toBe("2026-11-14");
+    const v = todayView(failed, NOW);
+    expect(v.behind).toBeNull();
+    expect(v.rules).toEqual([]);
+  });
+
+  it("a goal started today asks for today's rules, and nothing for yesterday", () => {
+    const v = todayView(loaded(SEVENTY_FIVE_HARD.rules, "2026-11-15"), NOW);
+    expect(v.behind).toBeNull();
+    expect(v.rules.map((r) => r.key)).toEqual(["workouts", "outdoors", "water", "reading", "diet", "photo"]);
   });
 });

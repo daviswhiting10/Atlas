@@ -22,7 +22,7 @@ import { prisma } from "@/lib/db/client";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { dayToDate } from "@/lib/sessions/day";
 import { addDays } from "@/lib/goals/days";
-import { sealNow } from "@/lib/goals/data";
+import { loadGoal, sealNow } from "@/lib/goals/data";
 import { confirmStart } from "@/lib/goals/preview";
 import { WorkoutMinutes } from "@/lib/goals/rows";
 import { DAY, GoalRules, ruleActiveOn } from "@/lib/goals/rules";
@@ -44,13 +44,23 @@ async function me() {
 async function ownActiveGoal(goalId: string, clientId: string) {
   const g = await prisma.goal.findFirst({ where: { id: Id.parse(goalId), clientId, status: "ACTIVE" } });
   if (!g) throw new Error("That goal isn't running.");
-  return { goal: g, rules: GoalRules.parse(g.rules), today: localDay(new Date(), g.timeZone) };
+  const rules = GoalRules.parse(g.rules);
+  // A goal a miss fails may have failed since anyone last looked: judge it (that writes the failure) before taking a check-in.
+  if (rules.missFails === true) {
+    const loaded = await loadGoal(g.id, clientId);
+    if (!loaded || loaded.goal.status !== "ACTIVE") throw new Error("That goal isn't running.");
+  }
+  return { goal: g, rules, today: localDay(new Date(), g.timeZone) };
 }
 
-/** Can a tick or tag still be changed on this day? Real days only, until the day after it closes. */
-function editable(day: string, today: string, startDay: string, carriedThrough?: string): string | null {
+/**
+ * Can a tick or tag still be changed on this day? Real days only. A goal a miss fails takes today only (in its
+ * own timezone); one started before that rule keeps the old window, until the day after the day closes.
+ */
+function editable(day: string, today: string, startDay: string, rules: GoalRules): string | null {
   if (day < startDay || day > today) return "That day is outside the goal.";
-  if (carriedThrough && day <= carriedThrough) return "That day is from before Atlas.";
+  if (rules.carriedThrough && day <= rules.carriedThrough) return "That day is from before Atlas.";
+  if (rules.missFails === true) return day === today ? null : "Only today can be checked in.";
   if (today >= addDays(day, 2)) return "That day has closed.";
   return null;
 }
@@ -113,7 +123,7 @@ export async function tickRule(raw: unknown): Promise<Result> {
   const { goal, rules, today } = await ownActiveGoal(input.goalId, clientId);
   const rule = rules.rules.find((r) => r.key === input.ruleKey);
   if (!rule || rule.kind !== "check_in" || !ruleActiveOn(rule, input.day)) return { ok: false, error: "That isn't something to tick." };
-  const blocked = editable(input.day, today, goal.startDay, rules.carriedThrough);
+  const blocked = editable(input.day, today, goal.startDay, rules);
   if (blocked) return { ok: false, error: blocked };
 
   if (input.on) {
@@ -141,7 +151,7 @@ export async function tagSession(raw: unknown): Promise<Result> {
   const session = await prisma.workoutLog.findFirst({ where: { id: input.sessionId, clientId, completedAt: { not: null } }, select: { id: true, date: true } });
   if (!session) return { ok: false, error: "That workout isn't there." };
   const day = localDay(session.date, goal.timeZone);
-  const blocked = editable(day, today, goal.startDay, rules.carriedThrough);
+  const blocked = editable(day, today, goal.startDay, rules);
   if (blocked) return { ok: false, error: blocked };
 
   if (input.on) {
@@ -168,7 +178,7 @@ export async function logWorkout(raw: unknown): Promise<Result<{ sessionId: stri
   const input = LogWorkoutInput.parse(raw);
   const { goal, rules, today } = await ownActiveGoal(input.goalId, clientId);
   const day = input.day ?? today;
-  const blocked = editable(day, today, goal.startDay, rules.carriedThrough);
+  const blocked = editable(day, today, goal.startDay, rules);
   if (blocked) return { ok: false, error: blocked };
   const mark = input.outdoors ? rules.rules.flatMap((r) => (r.kind === "sessions" && r.where.mark ? [r.where.mark] : []))[0] : undefined;
   if (input.outdoors && !mark) return { ok: false, error: "This goal doesn't use that tag." };
@@ -189,7 +199,7 @@ async function changeableWorkout(goalId: string, sessionId: string, clientId: st
   const { goal, rules, today } = await ownActiveGoal(goalId, clientId);
   const s = await prisma.workoutLog.findFirst({ where: { id: Id.parse(sessionId), clientId, completedAt: { not: null }, ...extra }, select: { id: true, date: true } });
   if (!s) return { ok: false as const, error: "That workout isn't there." };
-  const blocked = editable(localDay(s.date, goal.timeZone), today, goal.startDay, rules.carriedThrough);
+  const blocked = editable(localDay(s.date, goal.timeZone), today, goal.startDay, rules);
   return blocked ? { ok: false as const, error: blocked } : { ok: true as const, goal, session: s };
 }
 

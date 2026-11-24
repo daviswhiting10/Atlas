@@ -12,6 +12,9 @@
  *   while the day is open the rule reads "needs duration"; once the day
  *   closes, it doesn't count.
  * - The first missed day ends the attempt; the next calendar day is day 1.
+ * - Unless the goal's rules say `missFails` (75 Hard started from 2026-11-24): then a
+ *   day closes at its own end (only today can be checked in), and the first missed
+ *   day fails the goal: `failedOn` is that day and nothing after it is judged.
  * - Days "carried in" (from before Atlas) count as met with nothing to check.
  * - Rules have a span: a rule added later only judges days from its `fromDay`,
  *   so days already judged keep their result.
@@ -62,6 +65,8 @@ export type GoalResult = {
   suggestion: "keep_going" | "complete";
   /** The last day of an attempt that met every rule for the whole length (once that day has closed). */
   completedOn: string | null;
+  /** The first missed day of a `missFails` goal: the goal failed on it. Always null for other goals. */
+  failedOn: string | null;
 };
 
 export type EvaluateOptions = {
@@ -76,7 +81,7 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
   const today = localDay(now, tz);
   const length = goal.rules.length.days;
   const through = opts.lastDay && opts.lastDay < today ? opts.lastDay : today;
-  const empty: GoalResult = { started: false, periods: [], attempts: [], attemptNumber: 0, dayOfGoal: 0, length, streak: { current: 0, best: 0 }, misses: 0, needsDuration: [], today: [], suggestion: "keep_going", completedOn: null };
+  const empty: GoalResult = { started: false, periods: [], attempts: [], attemptNumber: 0, dayOfGoal: 0, length, streak: { current: 0, best: 0 }, misses: 0, needsDuration: [], today: [], suggestion: "keep_going", completedOn: null, failedOn: null };
   if (through < goal.startDay) return empty;
 
   // Index what we were given.
@@ -96,7 +101,9 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
     else ticks.add(`${c.ruleKey}|${c.day}`);
   }
 
-  const closed = (day: string) => opts.closeAll === true || today >= addDays(day, 2);
+  const fails = goal.rules.missFails === true;
+  // A missFails goal can only be checked in today, so its day closes when the day ends; others keep the next day too.
+  const closed = (day: string) => opts.closeAll === true || today >= addDays(day, fails ? 1 : 2);
   // Carried-in days end at the latest the day before today: today is always real.
   const yesterday = addDays(today, -1);
   const carriedTo = goal.rules.carriedThrough ? (goal.rules.carriedThrough < yesterday ? goal.rules.carriedThrough : yesterday) : null;
@@ -132,6 +139,7 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
   let completedOn: string | null = null;
   let reachedLength = false;
   let misses = 0;
+  let failedOn: string | null = null;
 
   for (let day = goal.startDay; day <= through; day = addDays(day, 1)) {
     const active = goal.rules.rules.filter((r) => ruleActiveOn(r, day));
@@ -152,6 +160,10 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
     if (state === "missed") {
       attempts.push({ fromDay: from, toDay: lastMet, days: metRun, current: false });
       misses++;
+      if (fails) {
+        failedOn = day;
+        break; // the goal is over: nothing after the missed day is judged
+      }
       from = addDays(day, 1);
       metRun = 0;
       lastMet = null;
@@ -168,9 +180,11 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
 
   const lastEvaluated = periods.length ? periods[periods.length - 1].day : goal.startDay;
   if (completedOn) attempts.push({ fromDay: from, toDay: completedOn, days: length, current: false });
-  else if (from <= lastEvaluated) attempts.push({ fromDay: from, toDay: lastMet, days: metRun, current: true });
+  else if (failedOn) {
+    // No current attempt: the failed one is the last.
+  } else if (from <= lastEvaluated) attempts.push({ fromDay: from, toDay: lastMet, days: metRun, current: true });
 
-  const inCurrent = completedOn || reachedLength ? length : from <= lastEvaluated ? Math.min(length, daysBetween(from, lastEvaluated) + 1) : 0;
+  const inCurrent = completedOn || reachedLength ? length : failedOn ? 0 : from <= lastEvaluated ? Math.min(length, daysBetween(from, lastEvaluated) + 1) : 0;
   const best = attempts.reduce((m, a) => Math.max(m, a.days), 0);
 
   return {
@@ -180,11 +194,12 @@ export function evaluateGoal(goal: GoalInput, sessions: SessionInput[], checkIns
     attemptNumber: attempts.length,
     dayOfGoal: inCurrent,
     length,
-    streak: { current: completedOn ? length : from <= lastEvaluated ? metRun : 0, best },
+    streak: { current: completedOn ? length : !failedOn && from <= lastEvaluated ? metRun : 0, best },
     misses,
     needsDuration: Array.from(needsDuration),
-    today: lastEvaluated === today ? todayRules : [],
+    today: lastEvaluated === today && !failedOn ? todayRules : [],
     suggestion: completedOn ? "complete" : "keep_going",
     completedOn,
+    failedOn,
   };
 }
