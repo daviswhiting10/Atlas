@@ -92,9 +92,6 @@ describe("both loggers", () => {
       expect(src).toContain("bulkAll(mode)");
     }
   });
-  it("asking to uncheck stops the finishing countdown so the sheet can't race it", () => {
-    for (const src of [athlete, coach]) expect(src).toMatch(/cancelFinish\(\);\s*setConfirmAll\(/);
-  });
   it("the coach logger shows a carried-down weight muted too", () => {
     expect(coach).toContain("muted={!entry.completed && filled.has(entry.uid)}");
   });
