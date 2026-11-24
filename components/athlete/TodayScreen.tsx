@@ -25,7 +25,7 @@ export function TodayScreen({
   goal,
   report,
   nutrition,
-  progress,
+  log,
   base = "",
 }: {
   athlete: Pick<Athlete, "firstName" | "isDemo" | "isGuest" | "isCoach" | "selfServe" | "prefs">;
@@ -36,8 +36,8 @@ export function TodayScreen({
   report?: ReactNode;
   /** The Nutrition row (only passed while the NUTRITION flag is on). */
   nutrition?: ReactNode;
-  /** Home's top section (strength curve and heatmap), under the greeting. */
-  progress?: ReactNode;
+  /** The + Log pill (a sheet of what can be logged). Not shown in the demo. */
+  log?: ReactNode;
   /** Prefix for this screen's links ("/demo" keeps the demo inside /demo). */
   base?: string;
 }) {
@@ -52,13 +52,21 @@ export function TodayScreen({
 
   return (
     <div className="space-y-14 pt-4">
-      {/* Home: your progress first. The greeting is instant; the curve and heatmap stream in under it. */}
-      <header className="rise -mb-6">
-        <h1 className="text-[52px] font-semibold leading-none tracking-[-0.045em] text-ink [overflow-wrap:anywhere]">{athlete.firstName}</h1>
+      {/* Today is the day: the name and Log, the running challenge, one line of where the plan stands, then the workout. */}
+      <header className="rise -mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="min-w-0 truncate text-[34px] font-semibold leading-none tracking-[-0.035em] text-ink">{athlete.firstName}</h1>
+          {log}
+        </div>
         {/* The running challenge: one line, left-aligned (it streams in; nothing when there is none). */}
         {goal && <div className="mt-3 empty:hidden">{goal}</div>}
+        {plan && next && (
+          <p className="tnum mt-2 text-[14px] text-ink-mute" data-testid="plan-line">
+            Week {plan.currentWeek} of {plan.totalWeeks}
+            {week.length > 0 ? ` · ${done}/${week.length} this week` : ""}
+          </p>
+        )}
       </header>
-      {progress}
 
       {!plan && athlete.selfServe && <PendingPlan />}
 
@@ -125,21 +133,6 @@ export function TodayScreen({
           <Link href={`${base}/you?goals=1`} className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
             Choose a plan
           </Link>
-        </section>
-      )}
-
-      {done > 0 && (
-        <section>
-          <p className={label}>This week</p>
-          <p className="mt-3 flex items-baseline gap-2">
-            <span className="text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{done}</span>
-            <span className="text-[15px] font-medium text-ink-mute">of {week.length}</span>
-          </p>
-          <div className="mt-5 flex gap-2" role="img" aria-label={`${done} of ${week.length} workouts done this week`}>
-            {week.map((w) => (
-              <span key={w.id} className={w.status === "LOGGED" ? "h-2.5 flex-1 rounded-full bg-signal" : "h-2.5 flex-1 rounded-full bg-ink/15"} />
-            ))}
-          </div>
         </section>
       )}
 

@@ -9,7 +9,7 @@ describe("challenges: a chip on Home, a home for managing them on You", () => {
     expect(read("components/goals/GoalToday.tsx")).not.toContain("<GoalCard");
     const today = read("components/athlete/TodayScreen.tsx");
     expect(today.indexOf("{athlete.firstName}")).toBeLessThan(today.indexOf("{goal}"));
-    expect(today.indexOf("{goal}")).toBeLessThan(today.indexOf("{progress}"));
+    expect(today.indexOf("{goal}")).toBeLessThan(today.indexOf("Week {next.week}"));
   });
   it("the chip says the day, the length and the name, and opens the challenge", () => {
     const chip = read("components/goals/GoalChip.tsx");
