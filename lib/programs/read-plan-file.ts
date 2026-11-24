@@ -12,6 +12,7 @@ import { PHOTO_TYPES } from "./screenshot-program";
 import { plannedCount, type SheetGrid } from "./sheet-plan";
 import { extractionToGrid, numberSheetText, parseExtraction } from "./extract";
 import { NO_CONTEXT, modelContextFromReply, type PlanContext } from "./plan-context";
+import type { ExerciseMatch } from "./dedupe";
 
 export class PlanFileError extends Error {
   constructor(message: string, readonly status: number) {
@@ -41,7 +42,14 @@ export const NO_WORKOUTS = "Couldn't find any workouts in that file, so nothing 
 type Who = { workspaceId: string; userId: string; feature: string; notes?: string };
 
 /** A spreadsheet's text (one tab, or every tab headed "Tab: <name>"), read into the plan grid. */
-export type ReadPlan = { grid: SheetGrid; warnings: string[]; /** What the coach's note says, as the model read it. */ modelContext: PlanContext };
+export type ReadPlan = {
+  grid: SheetGrid;
+  warnings: string[];
+  /** What the coach's note says, as the model read it. */
+  modelContext: PlanContext;
+  /** Names that are a library exercise with a cue in them, for the coach to confirm (lib/programs/dedupe). */
+  matches: ExerciseMatch[];
+};
 
 export async function readSheetText(csv: string, opts: Who): Promise<ReadPlan> {
   // Numbered before anything is dropped, so row numbers match the sheet the coach sees.
@@ -49,7 +57,8 @@ export async function readSheetText(csv: string, opts: Who): Promise<ReadPlan> {
   if (numbered.length < 10) throw new PlanFileError("That sheet looks empty.", 400);
   const { system, user } = buildProgramSheetPrompt(numbered, opts.notes);
   const reply = await ask(() => callAI({ system, user, model: MODELS.sonnet, maxTokens: 16000, feature: opts.feature, workspaceId: opts.workspaceId, userId: opts.userId }));
-  return { grid: toGrid(reply), warnings: [], modelContext: opts.notes ? modelContextFromReply(reply) : NO_CONTEXT };
+  const grid = toGrid(reply);
+  return { grid, warnings: [], modelContext: opts.notes ? modelContextFromReply(reply) : NO_CONTEXT, matches: await matchesFor(grid, opts.workspaceId) };
 }
 
 export async function readPlanFile({ csv, files }: PlanFile, opts: Who): Promise<ReadPlan> {
@@ -83,7 +92,8 @@ export async function readPlanFile({ csv, files }: PlanFile, opts: Who): Promise
   }
   const { system, user } = buildProgramPagesPrompt(images.length, opts.notes, texts);
   const reply = await ask(() => callAIVision({ system, user, images, model: MODELS.sonnet, maxTokens: 16000, feature: opts.feature, workspaceId: opts.workspaceId, userId: opts.userId }));
-  return { grid: toGrid(reply), warnings, modelContext: opts.notes ? modelContextFromReply(reply) : NO_CONTEXT };
+  const grid = toGrid(reply);
+  return { grid, warnings, modelContext: opts.notes ? modelContextFromReply(reply) : NO_CONTEXT, matches: await matchesFor(grid, opts.workspaceId) };
 }
 
 async function ask(call: () => Promise<{ content: string }>): Promise<string> {
@@ -102,4 +112,16 @@ function toGrid(reply: string): SheetGrid {
   const grid = extractionToGrid(extracted);
   if (plannedCount(grid) === 0) throw new PlanFileError(NO_WORKOUTS, 422);
   return grid;
+}
+
+/** Suggestions are a help, never a reason the read fails. */
+async function matchesFor(grid: SheetGrid, workspaceId: string): Promise<ExerciseMatch[]> {
+  try {
+    // Loaded here, not at the top: the library read is the only part of the reader that needs the database.
+    const { exerciseMatches } = await import("./dedupe-server");
+    return await exerciseMatches(grid, workspaceId);
+  } catch (err) {
+    console.error("[read-plan-file] exercise matches failed:", err);
+    return [];
+  }
 }

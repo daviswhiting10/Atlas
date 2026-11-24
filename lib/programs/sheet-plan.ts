@@ -27,6 +27,8 @@ export type GridExercise = {
   label?: string;
   /** Rest between sets, in seconds, when the file says. */
   rest?: number | null;
+  /** The name as imported, when the coach chose an existing exercise for it (lib/programs/dedupe). */
+  matchedFrom?: string;
   weeks: GridWeek[];
 };
 export type GridDay = { name: string; exercises: GridExercise[] };
