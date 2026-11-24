@@ -35,6 +35,7 @@ import { conflictMessage } from "@/lib/sessions/replay";
 import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish } from "@/lib/sessions/finish";
 import { FinishSheet } from "@/components/logger/FinishSheet";
+import { summaryView } from "@/lib/sessions/summary-copy";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -788,11 +789,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   // ── Done ──────────────────────────────────────────────────────────────────
   if (summary) {
     const recordList = Object.entries(records);
-    const tiles = [
-      [String(doneCount), "sets"],
-      ...(volume > 0 ? [[volume >= 10000 ? `${(volume / 1000).toFixed(1)}k` : volume.toLocaleString(), "lb"]] : []),
-      [String(summary.minutes), "min"],
-    ];
+    const view = summaryView({ sets: doneCount, volume, minutes: summary.minutes });
     return (
       <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
         <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
@@ -800,14 +797,23 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
         </span>
         <h1 className="mt-6 font-display text-4xl leading-tight text-ink sm:text-5xl">{data.name}, done.</h1>
 
-        <div className="mt-10 flex justify-center gap-12">
-          {tiles.map(([value, label]) => (
-            <div key={label}>
-              <p className="tnum text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{value}</p>
-              <p className="mt-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{label}</p>
-            </div>
-          ))}
-        </div>
+        {view.kind === "sentence" ? (
+          <p className="mx-auto mt-8 max-w-sm text-[22px] leading-snug text-ink-soft">
+            {view.parts.map((p, i) => (p.strong ? <strong key={i} className="tnum font-semibold text-ink">{p.text}</strong> : <span key={i}>{p.text}</span>))}
+          </p>
+        ) : (
+          <div className="mt-10 flex justify-center gap-12">
+            {view.tiles.map((t) => (
+              <div key={t.label}>
+                <p className="tnum text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">
+                  {t.value}
+                  {t.unit && <span className="ml-1.5 text-[20px] font-medium tracking-normal text-ink-mute">{t.unit}</span>}
+                </p>
+                <p className="mt-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{t.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {recordList.length > 0 && (
           <ul className="mt-10 divide-y divide-line border-y border-line text-left">
@@ -826,6 +832,13 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           </ul>
         )}
 
+        {/* The coach's note first (what the athlete wants to read), their own under it. */}
+        {data.coachNote && (
+          <section aria-label="Coach's note" className="mt-8 rounded-2xl border border-signal/30 bg-signal/10 px-4 py-3 text-left">
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.08em] text-signal">Coach&apos;s note</h2>
+            <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-ink">{data.coachNote}</p>
+          </section>
+        )}
         {actions.saveNote && <MySessionNote assignedWorkoutId={data.id} initial={data.myNote} save={actions.saveNote} />}
 
         <div className="mt-auto pt-10">

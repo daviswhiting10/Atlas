@@ -74,16 +74,16 @@ export function LatestSession({ clientId, session: s, prs }: { clientId: string;
 
       {(s.note || s.athleteNote) && (
         <div className="mt-3 space-y-1.5 rounded-xl border border-line px-3 py-2 text-[14px] leading-snug text-ink-soft">
-          {s.note && (
-            <p>
-              <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink">Coach</span>
-              {s.note}
-            </p>
-          )}
           {s.athleteNote && (
             <p>
               <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink">Client</span>
               {s.athleteNote}
+            </p>
+          )}
+          {s.note && (
+            <p>
+              <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink">Coach</span>
+              {s.note}
             </p>
           )}
         </div>
