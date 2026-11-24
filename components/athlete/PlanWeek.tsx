@@ -161,7 +161,8 @@ function DayCard({ cell, base }: { cell: DayCell; base: string }) {
       </ul>
       <Link
         href={`${base}/workouts/${w.id}`}
-        prefetch={cell.upNext}
+        // Only the tapped day's card is on screen, so this is one prefetch per day picked: the logger opens at the tap.
+        prefetch
         className={cn(
           "press flex h-[52px] w-full items-center justify-center rounded-2xl text-[17px] font-semibold",
           cell.upNext ? "bg-dusk-button text-dusk-button-text hover:brightness-110" : "border border-line-strong text-ink"
