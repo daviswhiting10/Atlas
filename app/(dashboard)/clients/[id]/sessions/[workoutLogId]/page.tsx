@@ -514,16 +514,16 @@ export default function SessionDetailPage() {
 
         {(session.notes?.coach || session.notes?.athlete || session.clientNotes) && (
           <div className="space-y-2 border-t pt-3">
-            {(session.notes?.coach ?? session.clientNotes) && (
-              <p className="text-sm text-muted-foreground">
-                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground">Coach</span>
-                {session.notes?.coach ?? session.clientNotes}
-              </p>
-            )}
             {session.notes?.athlete && (
               <p className="text-sm text-muted-foreground">
                 <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground">{session.client.fullName.split(" ")[0]}</span>
                 {session.notes.athlete}
+              </p>
+            )}
+            {(session.notes?.coach ?? session.clientNotes) && (
+              <p className="text-sm text-muted-foreground">
+                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground">Coach</span>
+                {session.notes?.coach ?? session.clientNotes}
               </p>
             )}
           </div>

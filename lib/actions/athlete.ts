@@ -2,6 +2,7 @@
 
 import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
+import { deleteSessionRows } from "@/lib/sessions/delete";
 import { MAX_SESSION_NOTE, loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -16,6 +17,7 @@ import { checkSessionMilestones } from "@/lib/progress/milestones";
 import { MAX_SETS, getProgress } from "@/lib/athlete/data";
 import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
+import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
 import { displayName } from "@/lib/plan/catalog";
 import {
   LIMITS,
@@ -54,6 +56,8 @@ const SaveSetInput = z.object({
   reps: z.number().nullable(),
   done: z.boolean(),
   setLogId: z.string().max(64).nullish(),
+  /** Only on a save replayed after being offline: whether the phone last knew this set as ticked on the server. */
+  expectDone: z.boolean().optional(),
 });
 const WorkoutRef = z.object({ assignedWorkoutId: z.string().min(1).max(64) });
 
@@ -66,7 +70,7 @@ function refresh() {
 }
 
 /** Save (or update) one set. Creates today's workout log on the first set. */
-export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ workoutLogId: string; setLogId: string }> {
+export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ workoutLogId: string; setLogId: string; conflict?: ServerSetState }> {
   const { clientId } = await requireAthlete();
   const input = SaveSetInput.parse(raw);
 
@@ -108,11 +112,16 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
   };
 
   const existing = input.setLogId
-    ? await prisma.setLog.findFirst({ where: { id: input.setLogId, workoutLogId: log.id }, select: { id: true } })
+    ? await prisma.setLog.findFirst({ where: { id: input.setLogId, workoutLogId: log.id }, select: { id: true, completed: true, weight: true, reps: true } })
     : await prisma.setLog.findFirst({
         where: { workoutLogId: log.id, assignedWorkoutExerciseId: input.aweId, setNumber: input.setNumber },
-        select: { id: true },
+        select: { id: true, completed: true, weight: true, reps: true },
       });
+
+  // A save replayed after being offline: if another device changed this set meanwhile, keep theirs and say so.
+  if (input.expectDone !== undefined && existing && replayConflict(input.expectDone, existing)) {
+    return { workoutLogId: log.id, setLogId: existing.id, conflict: { done: existing.completed, weight: existing.weight == null ? null : Number(existing.weight), reps: existing.reps } };
+  }
 
   const setLogId = existing
     ? (await prisma.setLog.update({ where: { id: existing.id }, data, select: { id: true } })).id
@@ -404,7 +413,7 @@ export async function startMyProgram(raw: { programId: string; startDate: string
 
 /** A finished session's sets for the read-only summary: each exercise with what was done, in the order it was done. */
 /** What a History day shows for a session: each exercise's sets, and the session's notes by author ("Coach", "You"). */
-export type SessionSummary = { lines: Array<{ name: string; sets: string }>; notes?: Array<{ label: string; text: string }> };
+export type SessionSummary = { lines: Array<{ name: string; sets: string }>; notes?: Array<{ label: string; text: string }>; /** Sets logged, and the session's length when it was written down (the mini summary on the Plan calendar). */ setCount?: number; minutes?: number | null; date?: string };
 
 export async function sessionSummary(workoutLogId: string): Promise<SessionSummary | null> {
   const { clientId } = await requireAthlete();
@@ -414,6 +423,8 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
     select: {
       id: true,
       clientNotes: true,
+      durationMin: true,
+      date: true,
       sets: {
         where: { completed: true },
         orderBy: [{ createdAt: "asc" }, { setNumber: "asc" }],
@@ -438,6 +449,24 @@ export async function sessionSummary(workoutLogId: string): Promise<SessionSumma
   const notes = (await loadSessionNotes([{ id: log.id, clientNotes: log.clientNotes }])).get(log.id)!;
   return {
     lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })),
+    setCount: log.sets.length,
+    minutes: log.durationMin,
+    date: log.date.toISOString().slice(0, 10),
     notes: [...(notes.coach ? [{ label: "Coach", text: notes.coach }] : []), ...(notes.athlete ? [{ label: "You", text: notes.athlete }] : [])],
   };
+}
+
+/**
+ * Delete one of your own logged sessions (from the Plan calendar's mini summary): the session, its sets, its notes. Only your
+ * own; anything else is "not found". The plan workout goes back to scheduled by itself.
+ */
+export async function deleteMySession(raw: { workoutLogId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = await requireAthlete();
+  const parsed = z.object({ workoutLogId: z.string().min(1).max(64) }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "That session isn't there." };
+  const log = await prisma.workoutLog.findFirst({ where: { id: parsed.data.workoutLogId, clientId }, select: { id: true } });
+  if (!log) return { ok: false, error: "That session isn't there." };
+  await prisma.$transaction((tx) => deleteSessionRows(tx, log.id));
+  refresh();
+  return { ok: true };
 }

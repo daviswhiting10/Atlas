@@ -45,7 +45,7 @@ export function YouScreen({
       )}
 
       {/* How it works and Start a goal describe the self-serve flow: a coached client's plan comes from her coach. */}
-      {!isCoached(athlete) && <HowItWorks className="mt-8" />}
+      {!isCoached(athlete) && <HowItWorks className="mt-8" aiDemo={athlete.isDemo} />}
 
       {canStartGoal && (
         <Link href="/goals/new" className="press flex min-h-[56px] items-center justify-between gap-3 border-y border-line text-[17px] font-semibold text-ink hover:text-ink-soft">
@@ -55,16 +55,7 @@ export function YouScreen({
 
       {challenges}
 
-      {/* A demo account is sample data; a guest's own plan is worth keeping. */}
-      {athlete.isDemo && (
-        <Link href="/agents#demo" className="press mt-6 flex items-center justify-between gap-3 rounded-2xl border border-line bg-paper p-4 hover:border-ink/20">
-          <span className="min-w-0">
-            <span className="block text-[15px] font-semibold text-ink">Watch an AI assistant use this data</span>
-            <span className="block text-[13px] text-ink-mute">How Claude reads Alex&apos;s plan, spots stalls and logs a workout, safely.</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-ink-soft" />
-        </Link>
-      )}
+      {/* A guest's own plan is worth keeping. (The demo's link to the AI walkthrough is in the last step of How it works.) */}
       {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-6" />}
       {account && !athlete.isCoach && <PasswordPanel className="mt-6" email={account.email ?? ""} hasPassword={account.passwordHash != null} />}
 

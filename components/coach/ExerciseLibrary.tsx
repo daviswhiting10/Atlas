@@ -13,10 +13,15 @@ export type LibraryRow = { id: string; name: string; picture: Picture | null; in
 type Filter = "plans" | "all";
 
 /** The coach's exercises, each with its picture. */
+/** Rows shown before "Show all N". */
+const FIRST_ROWS = 5;
+
 export function ExerciseLibrary({ rows }: { rows: LibraryRow[] }) {
   const [filter, setFilter] = useState<Filter>("plans");
   const [query, setQuery] = useState("");
 
+  // The first rows, then "Show all": the list grows with the library, and a search looks through everything.
+  const [showAll, setShowAll] = useState(false);
   const counts = useMemo(
     () => ({ plans: rows.filter((r) => r.inPlans).length, all: rows.length }),
     [rows]
@@ -38,6 +43,7 @@ export function ExerciseLibrary({ rows }: { rows: LibraryRow[] }) {
   function pick(id: Filter) {
     setFilter(id);
     setQuery("");
+    setShowAll(false);
   }
 
   return (
@@ -68,7 +74,7 @@ export function ExerciseLibrary({ rows }: { rows: LibraryRow[] }) {
         <p className="rule pt-4 text-[15px] text-ink-soft">{query ? `No exercise called “${query}”.` : "Nothing here yet."}</p>
       ) : (
         <ul className="divide-y divide-line rounded-2xl border border-line bg-paper">
-          {shown.map((r) => (
+          {(showAll || query ? shown : shown.slice(0, FIRST_ROWS)).map((r) => (
             <li key={r.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 {r.picture ? (
@@ -86,6 +92,11 @@ export function ExerciseLibrary({ rows }: { rows: LibraryRow[] }) {
             </li>
           ))}
         </ul>
+      )}
+      {!query && !showAll && shown.length > FIRST_ROWS && (
+        <button type="button" onClick={() => setShowAll(true)} className="press flex min-h-11 w-full items-center justify-center rounded-xl border border-line text-[15px] font-medium text-ink-soft hover:text-ink">
+          Show all {shown.length}
+        </button>
       )}
     </div>
   );

@@ -31,9 +31,11 @@ import { CheckAllButton, CheckAllSheet } from "@/components/logger/check-all";
 import { DurationStepper } from "@/components/athlete/DurationStepper";
 import { durationRange, formatClock } from "@/lib/sessions/duration";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
+import { conflictMessage } from "@/lib/sessions/replay";
 import { queuedFinish } from "@/lib/sessions/pending-finish";
 import { finishAction, sendFinish } from "@/lib/sessions/finish";
 import { FinishSheet } from "@/components/logger/FinishSheet";
+import { summaryView } from "@/lib/sessions/summary-copy";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -352,6 +354,9 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   const [noSignal, setNoSignal] = useState(false);
   const [finishQueued, setFinishQueued] = useState(() => false);
   const pending = useRef(new Map<string, number>());
+  // Sets whose save is being sent again after a dropped connection (or a reload): they say what the server had, so a
+  // change made meanwhile on another device isn't overwritten (lib/sessions/replay).
+  const replay = useRef(new Set<string>());
   const persist = useCallback(
     (aweId: string, setNumber: number) => {
       const key = `${aweId}:${setNumber}`;
@@ -370,9 +375,24 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
             reps: s.reps,
             done: s.done,
             setLogId: s.setLogId,
+            expectDone: replay.current.has(key) ? (serverDone.current.get(key) ?? false) : undefined,
           });
           // A failed answer can come back as nothing rather than an error: that's a refusal too.
           if (!res?.setLogId) throw new Error("The set wasn't saved");
+          replay.current.delete(key);
+          // Changed on another device while this phone was offline: theirs stands, and this screen shows it.
+          if (res.conflict) {
+            const c = res.conflict;
+            serverDone.current.set(key, c.done);
+            clearStuck(key);
+            clearPending(store(), data.id, key);
+            apply({
+              ...setsRef.current,
+              [aweId]: (setsRef.current[aweId] ?? []).map((x) => (x.setNumber === setNumber ? { ...x, done: c.done, weight: c.weight ?? x.weight, reps: c.reps ?? x.reps, setLogId: res.setLogId } : x)),
+            });
+            toast(conflictMessage(setNumber));
+            return;
+          }
           serverDone.current.set(key, s.done);
           clearStuck(key);
           // Confirmed while the page is closing: the next page may have read the server before this
@@ -388,6 +408,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           // No connection: the tick stays and is sent when the connection is back. Only a refusal
           // from the server puts the set back.
           if (isNetworkError(e)) {
+            replay.current.add(key);
             setNoSignal(true);
             if (!stuckTimers.current.has(key)) stuckTimers.current.set(key, setTimeout(() => markUnsaved(key, true), STUCK_MS));
             return;
@@ -621,6 +642,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           [aweId]: list.map((x) => (x.setNumber === setNumber ? { ...x, done: tick.done, weight: tick.weight !== undefined ? tick.weight : x.weight, reps: tick.reps !== undefined ? tick.reps : x.reps } : x)),
         });
       }
+      replay.current.add(key); // sent again after a reload or a dropped connection
       persist(aweId, setNumber);
     }
   }
@@ -767,11 +789,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
   // ── Done ──────────────────────────────────────────────────────────────────
   if (summary) {
     const recordList = Object.entries(records);
-    const tiles = [
-      [String(doneCount), "sets"],
-      ...(volume > 0 ? [[volume >= 10000 ? `${(volume / 1000).toFixed(1)}k` : volume.toLocaleString(), "lb"]] : []),
-      [String(summary.minutes), "min"],
-    ];
+    const view = summaryView({ sets: doneCount, volume, minutes: summary.minutes });
     return (
       <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-xl flex-col pt-6 text-center md:pt-12">
         <span className="pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-signal text-bone">
@@ -779,14 +797,23 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
         </span>
         <h1 className="mt-6 font-display text-4xl leading-tight text-ink sm:text-5xl">{data.name}, done.</h1>
 
-        <div className="mt-10 flex justify-center gap-12">
-          {tiles.map(([value, label]) => (
-            <div key={label}>
-              <p className="tnum text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">{value}</p>
-              <p className="mt-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{label}</p>
-            </div>
-          ))}
-        </div>
+        {view.kind === "sentence" ? (
+          <p className="mx-auto mt-8 max-w-sm text-[22px] leading-snug text-ink-soft">
+            {view.parts.map((p, i) => (p.strong ? <strong key={i} className="tnum font-semibold text-ink">{p.text}</strong> : <span key={i}>{p.text}</span>))}
+          </p>
+        ) : (
+          <div className="mt-10 flex justify-center gap-12">
+            {view.tiles.map((t) => (
+              <div key={t.label}>
+                <p className="tnum text-[56px] font-semibold leading-none tracking-[-0.04em] text-ink">
+                  {t.value}
+                  {t.unit && <span className="ml-1.5 text-[20px] font-medium tracking-normal text-ink-mute">{t.unit}</span>}
+                </p>
+                <p className="mt-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{t.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {recordList.length > 0 && (
           <ul className="mt-10 divide-y divide-line border-y border-line text-left">
@@ -805,6 +832,13 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           </ul>
         )}
 
+        {/* The coach's note first (what the athlete wants to read), their own under it. */}
+        {data.coachNote && (
+          <section aria-label="Coach's note" className="mt-8 rounded-2xl border border-signal/30 bg-signal/10 px-4 py-3 text-left">
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.08em] text-signal">Coach&apos;s note</h2>
+            <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-ink">{data.coachNote}</p>
+          </section>
+        )}
         {actions.saveNote && <MySessionNote assignedWorkoutId={data.id} initial={data.myNote} save={actions.saveNote} />}
 
         <div className="mt-auto pt-10">
@@ -934,6 +968,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[180px]">
+                            <DropdownMenuItem className="min-h-11" onClick={() => addSet(ex)}>Add a set</DropdownMenuItem>
                             <DropdownMenuItem className="min-h-11" onClick={() => setPicker({ mode: "swap", aweId: ex.aweId })}>Swap</DropdownMenuItem>
                             {/* A coach's plan stays the coach's: swap, but no retargeting or removing. */}
                             {!data.coachPlan && <DropdownMenuItem className="min-h-11" onClick={() => setEditingTarget(ex.aweId)}>Change target</DropdownMenuItem>}
@@ -1029,9 +1064,6 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                         })}
                       </ul>
                       <div className="mt-2 flex items-center gap-1">
-                        <button type="button" onClick={() => addSet(ex)} className="press logger-quiet inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-medium text-ink-soft hover:text-ink">
-                          <Plus className="h-3.5 w-3.5" /> Add set
-                        </button>
                         {data.status !== "LOGGED" && exerciseBulk(list.map((x) => x.done)) && (
                           <CheckAllButton mode={exerciseBulk(list.map((x) => x.done))!} name={ex.name} onClick={() => bulkOne(ex, exerciseBulk(list.map((x) => x.done))!)} />
                         )}

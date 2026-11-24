@@ -7,6 +7,7 @@
  */
 
 import { prescriptionLabels, type PrescribedSet } from "./prescription";
+import { nextInPlan } from "./plan-order";
 import { readWeekNotes, type WeekNote } from "./week-notes";
 import { prisma } from "@/lib/db/client";
 import { planWorkoutStatus } from "@/lib/sessions/status";
@@ -28,6 +29,8 @@ export type WorkoutStatus = "PLANNED" | "LOGGED" | "SKIPPED" | "RESCHEDULED";
 
 export type WorkoutSummary = {
   id: string;
+  /** The finished session, when there is one (what a delete removes). */
+  logId?: string | null;
   name: string;
   week: number;
   date: string;
@@ -154,8 +157,9 @@ export async function loadPlanOverview({
           id: true,
           name: true,
           scheduledDate: true,
+          order: true,
           status: true,
-          workoutLog: { select: { completedAt: true, date: true, clientNotes: true } },
+          workoutLog: { select: { id: true, completedAt: true, date: true, clientNotes: true } },
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
@@ -179,6 +183,7 @@ export async function loadPlanOverview({
 
   const workouts: WorkoutSummary[] = assignment.assignedWorkouts.map((w) => ({
     id: w.id,
+    logId: w.workoutLog?.completedAt ? w.workoutLog.id : null,
     name: w.name,
     week: weekOf(w.scheduledDate.getTime(), start),
     date: iso(w.scheduledDate),
@@ -238,7 +243,10 @@ export async function loadPlanOverview({
     }
   }
 
-  const nextUp = workouts.find((w) => w.status === "PLANNED") ?? null;
+  // Up next is in plan order, not by date: an unlogged workout from last week (or one whose session was deleted) comes first.
+  const orderOf = new Map(assignment.assignedWorkouts.map((w) => [w.id, w.order]));
+  const nextUp = nextInPlan(workouts.map((w) => ({ ...w, order: orderOf.get(w.id)! })));
+  const nextUpSummary = nextUp ? workouts.find((w) => w.id === nextUp.id)! : null;
   const totalWeeks = workouts.reduce((m, w) => Math.max(m, w.week), 1);
 
   return {
@@ -247,7 +255,7 @@ export async function loadPlanOverview({
     status: assignment.status,
     startDate: iso(assignment.startDate),
     totalWeeks,
-    currentWeek: nextUp?.week ?? totalWeeks,
+    currentWeek: nextUpSummary?.week ?? totalWeeks,
     generated,
     lighterWeeks,
     prefs,
@@ -257,7 +265,7 @@ export async function loadPlanOverview({
     blocks: plan?.blocks ?? [],
     rationale: plan?.rationale ?? [],
     workouts,
-    nextUp,
+    nextUp: nextUpSummary,
     done: workouts.filter((w) => w.status === "LOGGED").length,
     rx,
   };

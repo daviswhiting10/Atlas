@@ -77,6 +77,9 @@ function dateLabel(day: string): string {
  * from last time, one save. Kept on this device as you go, so closing the
  * tab doesn't lose it.
  */
+/** The recent exercises offered as one-tap chips. The rest are a search away (Add exercise). */
+export const RECENT_SHOWN = 4;
+
 export function QuickLog({
   clientId,
   heading,
@@ -547,6 +550,7 @@ export function QuickLog({
             <div className="mt-2 flex flex-wrap gap-2">
               {recent
                 .filter((r) => !added.has(r.id))
+                .slice(0, RECENT_SHOWN)
                 .map((r) => (
                   <button key={r.id} type="button" onClick={() => add(r)} className="press min-h-11 rounded-full border border-line-strong bg-paper px-3.5 py-2 text-[14px] font-medium text-ink hover:border-ink/25">
                     {r.name}
