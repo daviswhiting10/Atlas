@@ -4,7 +4,7 @@ import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCw } from "lucide-react";
 import { healChunkError } from "@/lib/net/skew-heal";
-import { retryPlan } from "@/lib/plan/retry";
+import { retryScreen } from "@/lib/net/retry";
 
 /**
  * The Plan tab couldn't be drawn: usually the database connection dropped for a moment.
@@ -25,7 +25,7 @@ export default function PlanError({ error, reset }: { error: Error & { digest?: 
       <button
         type="button"
         disabled={pending}
-        onClick={() => start(() => retryPlan(router, reset))}
+        onClick={() => start(() => retryScreen(router, reset))}
         className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85 disabled:opacity-60"
       >
         <RotateCw className={pending ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Try again

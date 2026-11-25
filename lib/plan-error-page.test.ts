@@ -51,11 +51,4 @@ describe("the Plan tab when the database connection drops", () => {
     expect(html).not.toContain("That didn");
     expect(html).not.toContain("500");
   });
-
-  it("Try again asks the server for the page again, then redraws", async () => {
-    const { retryPlan } = await import("@/lib/plan/retry");
-    const calls: string[] = [];
-    retryPlan({ refresh: () => calls.push("refresh") }, () => calls.push("reset"));
-    expect(calls).toEqual(["refresh", "reset"]);
-  });
 });
