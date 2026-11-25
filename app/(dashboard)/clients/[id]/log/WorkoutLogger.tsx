@@ -72,6 +72,7 @@ import { SetNote } from "@/components/logger/SetNote";
 import { allDone, nextOpen } from "@/lib/sessions/flow";
 import { addPending, clearPending, isNetworkError, pendingKey, readPending } from "@/lib/sessions/pending";
 import { conflictMessage } from "@/lib/sessions/replay";
+import { rxAt, setCount, setValues } from "@/lib/sessions/coach-sets";
 
 /** Set while the page is going away: a save cut off by a reload or close isn't a failed save. */
 let leaving = false;
@@ -198,9 +199,12 @@ function buildInitialState(
     const exLogs = existingSetLogs.filter(
       (s) => s.assignedWorkoutExerciseId === ex.aweId || s.exerciseId === ex.exerciseId
     );
-    const sets = ex.prescribedSets.map((ps) => {
-      const existing = exLogs.find((s) => s.setNumber === ps.setNumber);
-      return initSetEntry(ps, ex.suggestion, existing);
+    // As in the athlete's logger (lib/athlete/data.ts): sets logged past the plan's count are shown too,
+    // after the prescribed ones, so a coach sees (and can edit) every set the session holds.
+    const sets = Array.from({ length: setCount(ex.prescribedSets.length, exLogs) }, (_, i) => {
+      const rx = rxAt(ex.prescribedSets, i, { weight: null, repMin: 0, repMax: 0, rpe: null, restSeconds: null, notes: "" });
+      const existing = exLogs.find((s) => s.setNumber === rx.setNumber);
+      return initSetEntry(rx, ex.suggestion, existing);
     });
     state[ex.aweId] = { sets, noteInput: "", noteSaving: false, noteAdded: false };
   }
@@ -433,6 +437,8 @@ export default function WorkoutLogger({
       .then((log) => {
         if (!live || !log) return;
         const fresh = buildInitialState(exercises, log.sets as ExistingSetLog[]);
+        // Fresh rows are what the server holds: leaving one of their fields unchanged sends nothing.
+        for (const ex of Object.values(fresh)) for (const x of ex.sets) if (x.setLogId) savedValues.current?.set(x.uid, setValues(x));
         // (each entry's uid is made fresh every time, so it is left out of the comparison)
         const mine = (s: ExerciseState) => JSON.stringify(s.sets.map((x) => ({ ...x, uid: 0 })));
         setExState((cur) => reconcile(cur, openedState.current, fresh, (a, b) => mine(a) === mine(b)));
@@ -801,12 +807,21 @@ export default function WorkoutLogger({
   const pendingSaves = useRef(new Map<string, number>());
   /** Sets whose save is being sent again after a dropped connection (or a reload): they say what the server had, so a change made meanwhile on another device isn't overwritten. */
   const replay = useRef(new Set<string>());
+  /** The values last saved for each set (by uid), so leaving a field without changing anything sends nothing. */
+  const savedValues = useRef<Map<string, string> | null>(null);
+  if (savedValues.current === null) {
+    savedValues.current = new Map();
+    for (const ex of Object.values(exState)) for (const x of ex.sets) if (x.setLogId) savedValues.current.set(x.uid, setValues(x));
+  }
+  /** The values of the save queued last for each set, while one is still on its way. */
+  const queuedValues = useRef(new Map<string, string>());
   /** Remember a set's server state before the screen first changes it. */
   function noteServer(entry: SetEntry) {
     if (!serverSets.current.has(entry.uid)) serverSets.current.set(entry.uid, { setLogId: entry.setLogId, completed: entry.setLogId ? entry.completed : false });
   }
   function saveSet(aweId: string, exerciseId: string, uid: string, want: SetEntry, idx: number) {
     pendingSaves.current.set(uid, (pendingSaves.current.get(uid) ?? 0) + 1);
+    queuedValues.current.set(uid, setValues(want));
     saveChain.current = saveChain.current.then(async () => {
       const left = (pendingSaves.current.get(uid) ?? 1) - 1;
       pendingSaves.current.set(uid, left);
@@ -839,6 +854,7 @@ export default function WorkoutLogger({
           const c = result.conflict;
           logIdRef.current = result.workoutLogId;
           serverSets.current.set(uid, { setLogId: result.setLogId, completed: c.done });
+          savedValues.current?.delete(uid);
           clearStuck(uid);
           clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
           setSet(aweId, uid, { completed: c.done, setLogId: result.setLogId, ...(c.weight != null && !want.isBodyweight && !want.isBand ? { weight: String(c.weight) } : {}), ...(c.reps != null ? { reps: String(c.reps) } : {}) });
@@ -847,6 +863,7 @@ export default function WorkoutLogger({
         }
         logIdRef.current = result.workoutLogId;
         serverSets.current.set(uid, { setLogId: result.setLogId, completed: want.completed });
+        savedValues.current?.set(uid, setValues(want));
         clearStuck(uid);
         // Confirmed while the page is closing: the next page may have read the server before this
         // landed, so it stays pending there (that page clears it, or resends it harmlessly).
@@ -867,6 +884,7 @@ export default function WorkoutLogger({
         if (left > 0) return;
         clearPending(store(), assignedWorkoutId, pendingKey(aweId, idx + 1));
         setSet(aweId, uid, { completed: server.completed });
+        savedValues.current?.delete(uid);
         markUnsaved(uid, true);
       }
     });
@@ -1068,6 +1086,9 @@ export default function WorkoutLogger({
   function handleUpdateCompletedSet(aweId: string, exerciseId: string, idx: number) {
     const entry = exStateRef.current[aweId]?.sets[idx];
     if (!entry || !entry.completed) return;
+    // Only a real change is saved: compared with the save still on its way, or else the last one the server confirmed.
+    const against = (pendingSaves.current.get(entry.uid) ?? 0) > 0 ? queuedValues.current.get(entry.uid) : savedValues.current?.get(entry.uid);
+    if (against === setValues(entry)) return;
     noteServer(entry);
     saveSet(aweId, exerciseId, entry.uid, entry, idx);
   }
