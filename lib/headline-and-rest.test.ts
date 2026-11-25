@@ -17,3 +17,11 @@ describe("an unscheduled day is open, not a rest day", () => {
     expect(s).toContain("Log a workout\n");
   });
 });
+describe("the calendar key matches the day card", () => {
+  const s = readFileSync(new URL("../components/athlete/PlanWeek.tsx", import.meta.url), "utf8");
+  it("an empty day is Open in the key and to a screen reader", () => {
+    expect(s).toContain('<DayIcon kind={null} className="h-3.5 w-3.5" /> Open</span>');
+    expect(s).not.toContain('/> Rest</span>');
+    expect(s).toContain(': ", open"}');
+  });
+});

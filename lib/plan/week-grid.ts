@@ -26,9 +26,9 @@ export type DayCell = {
   date: string;
   /** 0 = Monday. */
   index: number;
-  /** What is on this day, in plan order: none for a rest day. */
+  /** What is on this day, in plan order: none for an open day. */
   items: DayItem[];
-  /** The first item's icon; null on a rest day. */
+  /** The first item's icon; null on an open day. */
   kind: ExerciseKind | null;
   /** Every item on the day is done (and there is one). */
   done: boolean;

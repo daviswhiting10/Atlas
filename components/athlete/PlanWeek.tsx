@@ -14,7 +14,7 @@ import { slotsByWeek } from "@/lib/sessions/reassign";
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
 const KIND_LABEL = { strength: "strength", cardio: "cardio", mobility: "mobility" } as const;
 
-/** The day's icon: a dumbbell, a shoe, a stretch, or (rest) a dot. */
+/** The day's icon: a dumbbell, a shoe, a stretch, or (an open day) a dot. */
 function DayIcon({ kind, className }: { kind: DayCell["kind"]; className?: string }) {
   if (kind === "cardio") return <Footprints className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
   if (kind === "mobility") return <PersonStanding className={cn("h-5 w-5 text-signal", className)} aria-hidden />;
@@ -80,12 +80,12 @@ export function PlanWeek({ plan, today, timeZone = "UTC", totalWeeks, base = "",
             <span className="inline-flex items-center gap-1"><DayIcon kind="strength" className="h-3.5 w-3.5" /> Strength</span>
             <span className="inline-flex items-center gap-1"><DayIcon kind="cardio" className="h-3.5 w-3.5" /> Cardio</span>
             <span className="inline-flex items-center gap-1"><DayIcon kind="mobility" className="h-3.5 w-3.5" /> Mobility</span>
-            <span className="inline-flex items-center gap-1"><DayIcon kind={null} className="h-3.5 w-3.5" /> Rest</span>
+            <span className="inline-flex items-center gap-1"><DayIcon kind={null} className="h-3.5 w-3.5" /> Open</span>
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded border-2 border-signal" /> Up next</span>
             <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 text-signal" /> Done</span>
           </p>
           {cell.items.length === 0 ? (
-            <RestCard cell={cell} base={base} />
+            <OpenCard cell={cell} base={base} />
           ) : (
             cell.items.map((item, i) => (
               <DayCard key={item.workout.id} cell={cell} item={item} first={i === 0} base={base} today={today} summary={summary} deleteSession={deleteSession} reassign={reassign} weeks={slotsByWeek(plan.workouts, item.workout.id)} />
@@ -108,7 +108,7 @@ export function PlanWeek({ plan, today, timeZone = "UTC", totalWeeks, base = "",
 function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onPick: () => void }) {
   const done = c.done;
   const what = c.items.map((x) => `${x.workout.name} (${KIND_LABEL[x.kind]})${x.done ? ", done" : x.upNext ? ", up next" : ""}`).join("; ");
-  const label = `${longDay(c.date)}${c.items.length ? `, ${what}` : ", rest"}${c.today ? ", today" : ""}`;
+  const label = `${longDay(c.date)}${c.items.length ? `, ${what}` : ", open"}${c.today ? ", today" : ""}`;
   return (
     <button
       type="button"
@@ -140,7 +140,7 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
   );
 }
 
-function RestCard({ cell, base }: { cell: DayCell; base: string }) {
+function OpenCard({ cell, base }: { cell: DayCell; base: string }) {
   return (
     <section aria-label="Day" className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
       {/* Not on the plan isn't a rest day: the plan only says which days have a workout. */}
