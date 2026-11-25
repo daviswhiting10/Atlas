@@ -111,7 +111,7 @@ export const GET = withWorkspace<{ id: string }>(async (_req, { workspaceId }, c
     const ws = weekStart(s.workoutLog.date).toISOString().slice(0, 10);
     const entry = volumeByWeek.get(ws) ?? { totalKg: 0, sessionCount: 0 };
     // A timed or cardio set's reps are seconds: it adds no weight lifted.
-    entry.totalKg += setVolume({ weight: s.weight, reps: s.reps, timed: isTimedSet(s, s.exercise?.slug) });
+    entry.totalKg += setVolume({ weight: s.weight, reps: s.reps, timed: isTimedSet(s, s.exercise?.slug), implements: s.implements });
     const sessionKey = `${s.workoutLogId}__${ws}`;
     if (!sessionDates.has(sessionKey)) {
       sessionDates.add(sessionKey);

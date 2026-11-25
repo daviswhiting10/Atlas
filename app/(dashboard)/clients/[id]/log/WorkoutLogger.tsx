@@ -110,6 +110,8 @@ type SetEntry = {
   reps: string;       // stores seconds when isSeconds === true
   rpe: string;
   completed: boolean;
+  /** A dumbbell or kettlebell set: 2 = per hand, 1 = one bell (lib/exercises/implements.ts). Null for other equipment. */
+  implements: number | null;
   /** Stable for the life of the screen: saves find their set by it, whatever moved or was deleted meanwhile. */
   uid: string;
 };
@@ -151,6 +153,7 @@ function formatRest(secs: number): string {
 function initSetEntry(
   ps: PrescribedSet,
   suggestion: LoggerExercise["suggestion"],
+  bells: LoggerExercise["implements"],
   existing?: ExistingSetLog
 ): SetEntry {
   const isSeconds = ps.unit === "secs";
@@ -166,6 +169,7 @@ function initSetEntry(
       reps: existing.reps != null ? String(existing.reps) : "",
       rpe: existing.rpe != null ? String(existing.rpe) : "",
       completed: existing.completed,
+      implements: bells == null ? null : existing.implements,
       uid: newUid(),
     };
   }
@@ -186,6 +190,7 @@ function initSetEntry(
     reps: suggestedReps != null ? String(suggestedReps) : "",
     rpe: "",
     completed: false,
+    implements: bells,
     uid: newUid(),
   };
 }
@@ -204,7 +209,7 @@ function buildInitialState(
     const sets = Array.from({ length: setCount(ex.prescribedSets.length, exLogs) }, (_, i) => {
       const rx = rxAt(ex.prescribedSets, i, { weight: null, repMin: 0, repMax: 0, rpe: null, restSeconds: null, notes: "" });
       const existing = exLogs.find((s) => s.setNumber === rx.setNumber);
-      return initSetEntry(rx, ex.suggestion, existing);
+      return initSetEntry(rx, ex.suggestion, ex.implements, existing);
     });
     state[ex.aweId] = { sets, noteInput: "", noteSaving: false, noteAdded: false };
   }
@@ -275,7 +280,7 @@ function LastWeek({ ex }: { ex: LoggerExercise }) {
 
 /** Set rows straight from the prescription, nothing logged yet. */
 function freshState(ex: LoggerExercise): ExerciseState {
-  return { sets: ex.prescribedSets.map((ps) => initSetEntry(ps, ex.suggestion)), noteInput: "", noteSaving: false, noteAdded: false };
+  return { sets: ex.prescribedSets.map((ps) => initSetEntry(ps, ex.suggestion, ex.implements)), noteInput: "", noteSaving: false, noteAdded: false };
 }
 
 // ── Block helpers ───────────────────────────────────────────────────────────────
@@ -694,7 +699,7 @@ export default function WorkoutLogger({
 
   // ── Set field helpers ──────────────────────────────────────────────────────
   // Load-related keys that auto-carry forward to uncompleted subsequent sets
-  const CARRY_KEYS: (keyof SetEntry)[] = ["weight", "isBodyweight", "isBand", "bandColor", "reps", "isSeconds"];
+  const CARRY_KEYS: (keyof SetEntry)[] = ["weight", "isBodyweight", "isBand", "bandColor", "reps", "isSeconds", "implements"];
 
   // Weights carried down into sets that had none (muted until ticked or edited). Still editable; logged only when ticked.
   const [filled, setFilled] = useState<Set<string>>(() => new Set());
@@ -748,6 +753,7 @@ export default function WorkoutLogger({
         reps: last?.reps ?? "",
         rpe: "",
         completed: false,
+        implements: last?.implements ?? exercises.find((e) => e.aweId === aweId)?.implements ?? null,
         uid: newUid(),
       };
       return { ...prev, [aweId]: { ...prev[aweId], sets: [...sets, newSet] } };
@@ -843,6 +849,7 @@ export default function WorkoutLogger({
           rpe: want.rpe ? parseFloat(want.rpe) : null,
           note: want.note.trim() || null,
           completed: want.completed,
+          implements: want.implements,
           date: logIdRef.current ? undefined : logDate, // only when this save creates the session
           expectDone: replay.current.has(uid) ? server.completed : undefined,
         });
@@ -1092,6 +1099,16 @@ export default function WorkoutLogger({
     noteServer(entry);
     saveSet(aweId, exerciseId, entry.uid, entry, idx);
   }
+  /** Per hand on or off (a dumbbell or kettlebell): the sets still to do follow; a logged set saves like any edit. */
+  function togglePerHand(aweId: string, exerciseId: string, idx: number) {
+    const entry = exStateRef.current[aweId]?.sets[idx];
+    if (!entry || !settled()) return;
+    const bells = entry.implements === 2 ? 1 : 2;
+    updateSet(aweId, idx, { implements: bells });
+    if (!entry.completed) return;
+    noteServer(entry);
+    saveSet(aweId, exerciseId, entry.uid, { ...entry, implements: bells }, idx);
+  }
 
   // ── Save coach note ───────────────────────────────────────────────────────
   async function saveNote(aweId: string, exerciseId: string) {
@@ -1154,7 +1171,7 @@ export default function WorkoutLogger({
           for (let i = sets.length - 1; i >= 0 && sets.length > t.sets; i--) if (!sets[i].completed) sets = sets.filter((_, j) => j !== i);
           const last = sets[sets.length - 1];
           while (sets.length < t.sets) {
-            sets = [...sets, { ...(last ?? initSetEntry(ex.prescribedSets[0], ex.suggestion)), setLogId: null, reps: String(t.repMax), rpe: "", note: "", completed: false, uid: newUid() }];
+            sets = [...sets, { ...(last ?? initSetEntry(ex.prescribedSets[0], ex.suggestion, ex.implements)), setLogId: null, reps: String(t.repMax), rpe: "", note: "", completed: false, uid: newUid() }];
           }
           return { ...prev, [ex.aweId]: { ...cur, sets } };
         })
@@ -1566,7 +1583,7 @@ export default function WorkoutLogger({
         if (entry.completed) {
           doneSetsAll++;
           const w = entry.isBodyweight || entry.isBand ? 0 : parseFloat(entry.weight) || 0;
-          totalVolumeAll += setVolume({ weight: w, reps: parseInt(entry.reps, 10) || 0, timed });
+          totalVolumeAll += setVolume({ weight: w, reps: parseInt(entry.reps, 10) || 0, timed, implements: entry.implements });
         }
       }
     }
@@ -1739,6 +1756,7 @@ export default function WorkoutLogger({
                       onComplete={(idx) => settled() && handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onBlurPersist={(idx) => handleUpdateCompletedSet(ex.aweId, ex.exerciseId, idx)}
                       onRemove={(idx) => deleteSet(ex.aweId, idx)}
+                      onPerHand={ex.implements == null ? undefined : (idx) => togglePerHand(ex.aweId, ex.exerciseId, idx)}
                     />
 
                     <div className="flex items-center justify-between gap-2">
@@ -1999,6 +2017,7 @@ export default function WorkoutLogger({
                       bare={timedKind(ex.name, ex.notes ?? "") === "steady" ? "min" : "sec"}
                       onComplete={() => handleComplete(ex.aweId, ex.exerciseId, idx)}
                       onRemove={state.sets.length > 1 && !entry.completed ? () => removeSet(ex.aweId, idx) : undefined}
+                      onPerHand={ex.implements == null ? undefined : () => togglePerHand(ex.aweId, ex.exerciseId, idx)}
                     />
                   );
                 })}
@@ -2331,6 +2350,21 @@ function TimeField({ value, onChange, onBlur, label, bare }: { value: string; on
   );
 }
 
+/** A dumbbell or kettlebell set: ×2 when per hand (the weight is one bell, two were held), ×1 for one bell. Tap to switch. */
+function PerHand({ idx, on, onToggle, className }: { idx: number; on: boolean; onToggle: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      aria-label={on ? `Set ${idx + 1}: per hand, two bells (tap for one)` : `Set ${idx + 1}: one bell (tap for per hand)`}
+      className={cn("logger-cell rounded-md px-1 py-0.5 text-[11px] font-semibold tabular-nums", on ? "bg-signal/20 text-signal" : "text-ink-mute", className)}
+    >
+      {on ? "×2" : "×1"}
+    </button>
+  );
+}
+
 const SET_GRID = "grid grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] items-center gap-1.5";
 
 function SetTable({
@@ -2345,6 +2379,7 @@ function SetTable({
   onComplete,
   onBlurPersist,
   onRemove,
+  onPerHand,
 }: {
   secs: boolean;
   bare: BareUnit;
@@ -2358,6 +2393,8 @@ function SetTable({
   onComplete: (idx: number) => void;
   onBlurPersist: (idx: number) => void;
   onRemove: (idx: number) => void;
+  /** A dumbbell or kettlebell: the ×2 / ×1 switch in the weight cell (per hand, or one bell). */
+  onPerHand?: (idx: number) => void;
 }) {
   const [detail, setDetail] = useState<number | null>(null);
   return (
@@ -2429,15 +2466,18 @@ function SetTable({
                       )}
                     </button>
                   ) : (
-                    <NumField
-                      value={entry.weight}
-                      onChange={(v) => onChange(idx, { weight: v })}
-                      onBlur={persist}
-                      label={`Set ${idx + 1} weight in pounds`}
-                      decimal
-                      muted={!entry.completed && filled.has(entry.uid)}
-                      placeholder={prescribed[idx]?.weight != null ? String(prescribed[idx].weight) : "lb"}
-                    />
+                    <span className="relative block">
+                      <NumField
+                        value={entry.weight}
+                        onChange={(v) => onChange(idx, { weight: v })}
+                        onBlur={persist}
+                        label={`Set ${idx + 1} weight in pounds`}
+                        decimal
+                        muted={!entry.completed && filled.has(entry.uid)}
+                        placeholder={prescribed[idx]?.weight != null ? String(prescribed[idx].weight) : "lb"}
+                      />
+                      {onPerHand && <PerHand idx={idx} on={entry.implements === 2} onToggle={() => onPerHand(idx)} className="absolute right-0.5 top-1/2 -translate-y-1/2" />}
+                    </span>
                   )}
                 </span>
                 <span className="min-w-0">
@@ -2707,10 +2747,13 @@ function DesktopSetRow({
   onChange,
   onComplete,
   onRemove,
+  onPerHand,
   bare = "sec",
 }: {
   unsaved: boolean;
   onRemove?: () => void;
+  /** A dumbbell or kettlebell: the ×2 / ×1 switch (per hand, or one bell). */
+  onPerHand?: () => void;
   bare?: BareUnit;
   idx: number;
   entry: SetEntry;
@@ -2758,6 +2801,7 @@ function DesktopSetRow({
             step="2.5"
           />
         )}
+        {onPerHand && !entry.isBand && !entry.isBodyweight && <PerHand idx={idx} on={entry.implements === 2} onToggle={onPerHand} className="shrink-0" />}
 
         {/* Load mode toggle: BW / Band / N/A */}
         <button

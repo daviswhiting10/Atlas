@@ -49,6 +49,8 @@ export type SetRow = {
   deload: boolean;
   /** The reps are seconds (a hold, a carry, cardio): no tonnage. See lib/sessions/volume.ts. */
   timed: boolean;
+  /** Bells held (2 = per hand); null = not recorded, one. Tonnage only (lib/exercises/implements.ts). */
+  implements: number | null;
 };
 
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -77,6 +79,7 @@ export async function loadSetRows(
       rpe: true,
       completed: true,
       workoutLogId: true,
+      implements: true,
       ...TIMED_SELECT,
       exercise: { select: { name: true, slug: true, movementPattern: true, primaryMuscles: true, secondaryMuscles: true } },
       workoutLog: {
@@ -108,6 +111,7 @@ export async function loadSetRows(
         workoutLogId: r.workoutLogId,
         date: r.workoutLog.date,
         deload,
+        implements: r.implements,
         timed: isTimedSet(r, r.exercise.slug),
       },
     ];

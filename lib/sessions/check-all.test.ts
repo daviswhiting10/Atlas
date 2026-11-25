@@ -57,6 +57,10 @@ describe("offline: the bulk tick is kept on the phone in set order, and Uncheck 
     queueBulk(st, "w1", sets.map((x) => ({ ...x, done: false })), 3_000);
     const q = readPending(st, "w1", 4_000);
     expect(Object.values(q).every((t) => t.done === false)).toBe(true);
+  });  it("keeps per hand with the tick, so a reload sends it again", () => {
+    const st = mem();
+    queueBulk(st, "w1", [{ aweId: "a1", setNumber: 1, done: true, weight: 15, reps: 12, implements: 2 }], 1_000);
+    expect(readPending(st, "w1", 2_000)[pendingKey("a1", 1)].implements).toBe(2);
   });
 });
 

@@ -19,6 +19,7 @@ import { MAX_SETS, getLoggerData, getProgress, type LoggerSet } from "@/lib/athl
 import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
 import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
+import { implementsToStore } from "@/lib/exercises/implements";
 import { displayName } from "@/lib/plan/catalog";
 import { resetPlanRows, sessionsOnPlan } from "@/lib/plan/reset-progress";
 import { isGuestEmail } from "@/lib/guest-rules";
@@ -61,6 +62,8 @@ const SaveSetInput = z.object({
   weight: z.number().nullable(),
   reps: z.number().nullable(),
   done: z.boolean(),
+  /** Dumbbells and kettlebells: 2 = per hand, 1 = one bell. Ignored for other equipment (lib/exercises/implements.ts). */
+  implements: z.number().int().min(1).max(2).nullish(),
   setLogId: z.string().max(64).nullish(),
   /** Only on a save replayed after being offline: whether the phone last knew this set as ticked on the server. */
   expectDone: z.boolean().optional(),
@@ -86,7 +89,7 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
       assignedWorkoutId: input.assignedWorkoutId,
       assignedWorkout: { programAssignment: { clientId } },
     },
-    select: { exerciseId: true, assignedWorkout: { select: PLAN_SOURCE_SELECT } },
+    select: { exerciseId: true, exercise: { select: { name: true, equipment: true } }, assignedWorkout: { select: PLAN_SOURCE_SELECT } },
   });
   if (!awe) throw new Error("Workout not found");
 
@@ -130,11 +133,12 @@ export async function saveSet(raw: z.input<typeof SaveSetInput>): Promise<{ work
   }
 
   const setLogId = existing
-    ? (await prisma.setLog.update({ where: { id: existing.id }, data, select: { id: true } })).id
+    ? (await prisma.setLog.update({ where: { id: existing.id }, data: { ...data, implements: implementsToStore(awe.exercise, input.implements, false) }, select: { id: true } })).id
     : (
         await prisma.setLog.create({
           data: {
             ...data,
+            implements: implementsToStore(awe.exercise, input.implements, true),
             workoutLogId: log.id,
             exerciseId: awe.exerciseId,
             assignedWorkoutExerciseId: input.aweId,

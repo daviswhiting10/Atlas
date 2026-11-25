@@ -3,6 +3,7 @@ import { PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import { displayName } from "@/lib/plan/catalog";
 import { isTimedSet, setVolume, TIMED_SELECT } from "@/lib/sessions/volume";
+import { implementsToStore } from "@/lib/exercises/implements";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
 import { invalid, notFound } from "../context";
@@ -60,6 +61,7 @@ export const getWorkoutHistory = clientTool({
             reps: true,
             rpe: true,
             completed: true,
+            implements: true,
             exercise: { select: { name: true, slug: true } },
             ...TIMED_SELECT,
           },
@@ -94,7 +96,7 @@ export const getWorkoutHistory = clientTool({
             rpe: s.rpe,
             completed: s.completed,
           });
-          volumeLb += setVolume({ weight: s.weight, reps: s.reps, completed: s.completed, timed: isTimedSet(s, s.exercise.slug) });
+          volumeLb += setVolume({ weight: s.weight, reps: s.reps, completed: s.completed, timed: isTimedSet(s, s.exercise.slug), implements: s.implements });
         }
         return {
           workoutLogId: log.id,
@@ -199,7 +201,7 @@ export const logWorkout = clientTool({
       select: {
         id: true,
         name: true,
-        exercises: { select: { id: true, exerciseId: true } },
+        exercises: { select: { id: true, exerciseId: true, exercise: { select: { name: true, equipment: true } } } },
         ...PLAN_SOURCE_SELECT,
       },
     });
@@ -208,6 +210,7 @@ export const logWorkout = clientTool({
     const aweByExercise = new Map(
       workout.exercises.map((e) => [e.exerciseId, e.id]),
     );
+    const exerciseById = new Map(workout.exercises.map((e) => [e.exerciseId, e.exercise]));
     for (const s of args.sets) {
       if (!aweByExercise.has(s.exerciseId))
         throw invalid(`Exercise ${s.exerciseId} is not part of this workout.`);
@@ -259,6 +262,8 @@ export const logWorkout = clientTool({
                 exerciseId: s.exerciseId,
                 assignedWorkoutExerciseId: aweId,
                 setNumber: s.setNumber,
+                // A dumbbell or kettlebell set: the catalog's per hand default (the weight is one bell).
+                implements: implementsToStore(exerciseById.get(s.exerciseId)!, undefined, true),
               },
             });
         }

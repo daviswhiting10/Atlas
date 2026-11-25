@@ -14,7 +14,8 @@ export const PENDING_KEY = "atlas.pendingSets.v1";
 /** Older than this, a pending tick is forgotten (an abandoned session). */
 export const PENDING_MAX_MS = 12 * 60 * 60_000;
 
-export type PendingTick = { done: boolean; at: number; weight?: number | null; reps?: number | null };
+/** `implements`: a dumbbell or kettlebell set's bells (2 = per hand), sent again with the tick. */
+export type PendingTick = { done: boolean; at: number; weight?: number | null; reps?: number | null; implements?: number | null };
 type All = Record<string, Record<string, PendingTick>>;
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 

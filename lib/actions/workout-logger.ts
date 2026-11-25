@@ -8,6 +8,7 @@ import { requestDay } from "@/lib/sessions/request-day";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { prisma } from "@/lib/db/client";
 import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
+import { implementsToStore } from "@/lib/exercises/implements";
 import {
   checkStrengthMilestones,
   checkSessionMilestones,
@@ -58,6 +59,8 @@ export async function logSet(input: {
   rpe: number | null;
   note: string | null;
   completed: boolean;
+  /** Dumbbells and kettlebells: 2 = per hand, 1 = one bell (lib/exercises/implements.ts). Ignored for other equipment. */
+  implements?: number | null;
   /** The day the session was done, when creating it (YYYY-MM-DD). Defaults to today, never the scheduled day. */
   date?: string;
   /** Only on a save replayed after being offline: whether this device last knew the set as ticked on the server. */
@@ -66,13 +69,17 @@ export async function logSet(input: {
   const { workspaceId } = await requireWorkspace();
 
   // ── Verify the AssignedWorkout belongs to this workspace ───────────────────
-  const assignedWorkout = await prisma.assignedWorkout.findFirst({
-    where: {
-      id: input.assignedWorkoutId,
-      programAssignment: { workspaceId, clientId: input.clientId },
-    },
-    select: { id: true, ...PLAN_SOURCE_SELECT },
-  });
+  // The exercise rides along: whether it is a dumbbell or kettlebell decides `implements`, and its name the milestones.
+  const [assignedWorkout, exercise] = await Promise.all([
+    prisma.assignedWorkout.findFirst({
+      where: {
+        id: input.assignedWorkoutId,
+        programAssignment: { workspaceId, clientId: input.clientId },
+      },
+      select: { id: true, ...PLAN_SOURCE_SELECT },
+    }),
+    prisma.exercise.findUnique({ where: { id: input.exerciseId }, select: { name: true, equipment: true } }),
+  ]);
   if (!assignedWorkout) throw new Error("Workout not found");
 
   // ── Find or create WorkoutLog ──────────────────────────────────────────────
@@ -150,6 +157,7 @@ export async function logSet(input: {
         rpe: input.rpe,
         note: input.note,
         completed: input.completed,
+        implements: exercise ? implementsToStore(exercise, input.implements, false) : undefined,
       },
     });
     setLogId = known;
@@ -167,6 +175,7 @@ export async function logSet(input: {
         rpe: input.rpe,
         note: input.note,
         completed: input.completed,
+        implements: exercise ? implementsToStore(exercise, input.implements, true) : undefined,
       },
       select: { id: true },
     });
@@ -174,10 +183,6 @@ export async function logSet(input: {
 
     // Fire-and-forget: check strength milestones on completed sets
     if (input.completed && input.exerciseId) {
-      const exercise = await prisma.exercise.findUnique({
-        where: { id: input.exerciseId },
-        select: { name: true },
-      });
       if (exercise) {
         checkStrengthMilestones(
           workspaceId,
@@ -197,7 +202,7 @@ export async function logSet(input: {
 // ── Session complete: how it compared, new bests, what is next ───────────────────
 
 /** A wrap-up set: its numbers, its exercise, and whether its reps are seconds (lib/sessions/volume.ts). */
-const SET_SELECT = { exerciseId: true, weight: true, reps: true, exercise: { select: { name: true, slug: true } }, ...TIMED_SELECT } as const;
+const SET_SELECT = { exerciseId: true, weight: true, reps: true, implements: true, exercise: { select: { name: true, slug: true } }, ...TIMED_SELECT } as const;
 
 const sameName = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -221,9 +226,9 @@ export async function sessionWrapUp(input: { workoutLogId: string }): Promise<Wr
     },
   });
   if (!log) return { compare: null, medals: [], next: null, athleteNote: null };
-  type Row = { exerciseId: string | null; weight: number | null; reps: number | null; exercise: { name: string; slug: string } | null } & Parameters<typeof isTimedSet>[0];
+  type Row = { exerciseId: string | null; weight: number | null; reps: number | null; implements: number | null; exercise: { name: string; slug: string } | null } & Parameters<typeof isTimedSet>[0];
   const rows = (sets: Row[]): WrapSet[] =>
-    sets.filter((x) => x.exerciseId).map((x) => ({ exerciseId: x.exerciseId!, name: x.exercise?.name ?? "Exercise", weight: x.weight, reps: x.reps, timed: isTimedSet(x, x.exercise?.slug) }));
+    sets.filter((x) => x.exerciseId).map((x) => ({ exerciseId: x.exerciseId!, name: x.exercise?.name ?? "Exercise", weight: x.weight, reps: x.reps, timed: isTimedSet(x, x.exercise?.slug), implements: x.implements }));
   const cur = rows(log.sets);
   const name = log.assignedWorkout?.name ?? log.title;
   const planned = log.assignedWorkout ? log.assignedWorkout.exercises.reduce((n, e) => n + (Array.isArray(e.prescribedSets) ? e.prescribedSets.length : 0), 0) || null : null;

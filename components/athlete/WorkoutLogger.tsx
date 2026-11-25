@@ -91,6 +91,7 @@ function Stepper({
   showButtons,
   onArm,
   bodyweight,
+  perHand,
 }: {
   value: number | null;
   step: number;
@@ -108,6 +109,8 @@ function Stepper({
   onArm: () => void;
   /** The unit under the number is the switch: lb, or BW (bodyweight: no weight to enter). */
   bodyweight?: { on: boolean; toggle: () => void };
+  /** A dumbbell or kettlebell: beside the unit, ×2 (a bell in each hand, the weight is one) or ×1. */
+  perHand?: { on: boolean; toggle: () => void };
 }) {
   const bump = (dir: 1 | -1) => {
     if (!settled()) return;
@@ -137,9 +140,16 @@ function Stepper({
           className={cn("tnum w-full bg-transparent text-center text-[17px] leading-none outline-none [appearance:textfield] placeholder:text-ink-mute [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", muted ? "font-normal text-ink-mute" : "font-semibold text-ink")}
         />
         {bodyweight ? (
-          <button type="button" onClick={bodyweight.toggle} aria-pressed={bodyweight.on} aria-label={bodyweight.on ? `${label}: bodyweight (tap to use a weight)` : `${label}: lb (tap for bodyweight)`} className={cn("press relative -mb-1 mt-0.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide before:absolute before:-inset-x-2 before:-inset-y-2", bodyweight.on ? "bg-signal/20 text-signal" : "text-ink-mute")}>
-            {bodyweight.on ? "BW" : unit}
-          </button>
+          <span className="flex items-center">
+            <button type="button" onClick={bodyweight.toggle} aria-pressed={bodyweight.on} aria-label={bodyweight.on ? `${label}: bodyweight (tap to use a weight)` : `${label}: lb (tap for bodyweight)`} className={cn("press relative -mb-1 mt-0.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide before:absolute before:-inset-x-2 before:-inset-y-2", bodyweight.on ? "bg-signal/20 text-signal" : "text-ink-mute")}>
+              {bodyweight.on ? "BW" : unit}
+            </button>
+            {perHand && !bodyweight.on && (
+              <button type="button" onClick={perHand.toggle} aria-pressed={perHand.on} aria-label={perHand.on ? `${label}: per hand, two bells (tap for one)` : `${label}: one bell (tap for per hand)`} className={cn("press relative -mb-1 mt-0.5 rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide before:absolute before:-inset-x-1 before:-inset-y-2", perHand.on ? "bg-signal/20 text-signal" : "text-ink-mute")}>
+                {perHand.on ? "×2" : "×1"}
+              </button>
+            )}
+          </span>
         ) : (
           <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-mute">{unit}</span>
         )}
@@ -438,6 +448,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
             weight: s.weight,
             reps: s.reps,
             done: s.done,
+            implements: s.implements,
             setLogId: s.setLogId,
             expectDone: replay.current.has(key) ? (serverDone.current.get(key) ?? false) : undefined,
           });
@@ -499,7 +510,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
 
   // Weights carried down from set 1 into sets that had none (muted until ticked or edited). Still editable; logged only when ticked.
   const [filled, setFilled] = useState<Set<string>>(() => new Set());
-  function edit(ex: LoggerExercise, i: number, patch: Partial<Pick<LoggerSet, "weight" | "reps">>) {
+  function edit(ex: LoggerExercise, i: number, patch: Partial<Pick<LoggerSet, "weight" | "reps" | "implements">>) {
     const list = setsRef.current[ex.aweId] ?? ex.sets;
     const before = list[i];
     if (patch.weight !== undefined) {
@@ -516,6 +527,8 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       if (j > i && !s.done && patch.weight !== undefined && s.weight === before.weight) return { ...s, weight: patch.weight };
       // The same for reps: type them once and the sets still to do follow.
       if (j > i && !s.done && patch.reps !== undefined && s.reps === before.reps) return { ...s, reps: patch.reps };
+      // And per hand.
+      if (j > i && !s.done && patch.implements !== undefined && s.implements === before.implements) return { ...s, implements: patch.implements };
       return s;
     });
     apply({ ...setsRef.current, [ex.aweId]: next });
@@ -553,7 +566,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     const nextSets = { ...setsRef.current };
     const recs: Record<string, string> = {};
     const gone: string[] = [];
-    const order: Array<{ aweId: string; setNumber: number; weight: number | null; reps: number | null }> = [];
+    const order: Array<{ aweId: string; setNumber: number; weight: number | null; reps: number | null; implements: number | null }> = [];
     for (const { ex, idx } of groups) {
       const running = (setsRef.current[ex.aweId] ?? ex.sets).map((x) => ({ ...x }));
       for (const i of idx) {
@@ -566,7 +579,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
           if (label) recs[key] = label;
         } else gone.push(key);
         running[i] = { ...s, done };
-        order.push({ aweId: ex.aweId, setNumber: s.setNumber, weight: s.weight, reps: s.reps });
+        order.push({ aweId: ex.aweId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, implements: s.implements });
       }
       nextSets[ex.aweId] = running;
     }
@@ -623,7 +636,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     const next = list.map((x, j) => (j === i ? { ...x, done } : x));
     apply({ ...setsRef.current, [ex.aweId]: next });
     // Kept on the phone until the server confirms it: a reload mid-save puts it back and resends it.
-    addPending(store(), data.id, pendingKey(ex.aweId, s.setNumber), { done, weight: s.weight, reps: s.reps });
+    addPending(store(), data.id, pendingKey(ex.aweId, s.setNumber), { done, weight: s.weight, reps: s.reps, implements: s.implements });
     persist(ex.aweId, s.setNumber);
 
     const key = `${ex.aweId}:${s.setNumber}`;
@@ -713,7 +726,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
       if (s.done !== tick.done) {
         apply({
           ...setsRef.current,
-          [aweId]: list.map((x) => (x.setNumber === setNumber ? { ...x, done: tick.done, weight: tick.weight !== undefined ? tick.weight : x.weight, reps: tick.reps !== undefined ? tick.reps : x.reps } : x)),
+          [aweId]: list.map((x) => (x.setNumber === setNumber ? { ...x, done: tick.done, weight: tick.weight !== undefined ? tick.weight : x.weight, reps: tick.reps !== undefined ? tick.reps : x.reps, implements: tick.implements !== undefined ? tick.implements : x.implements } : x)),
         });
       }
       replay.current.add(key); // sent again after a reload or a dropped connection
@@ -751,7 +764,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
     const last = list[list.length - 1];
     apply({
       ...setsRef.current,
-      [ex.aweId]: [...list, { setNumber: list.length + 1, weight: last?.weight ?? null, reps: last?.reps ?? ex.repMin, done: false, setLogId: null }],
+      [ex.aweId]: [...list, { setNumber: list.length + 1, weight: last?.weight ?? null, reps: last?.reps ?? ex.repMin, done: false, setLogId: null, implements: last ? last.implements : ex.implements }],
     });
   }
 
@@ -1121,7 +1134,7 @@ export function WorkoutLogger({ data, actions = REAL_ACTIONS, base = "" }: { dat
                             <li key={s.setNumber}>
                               <HoldRow onHold={() => deleteSet(ex, i)} className="flex items-center gap-1.5">
                                 <span className={cn("tnum w-4 shrink-0 text-center text-sm font-semibold", s.done ? "text-signal" : "text-ink-mute")}>{s.setNumber}</span>
-                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { weight: v })} bodyweight={{ on: s.weight === 0, toggle: () => edit(ex, i, { weight: s.weight === 0 ? (list.find((x) => (x.weight ?? 0) > 0)?.weight ?? null) : 0 }) }} />}
+                                {ex.loaded && <Stepper value={s.weight} step={ex.increment || 5} unit="lb" label={`Set ${s.setNumber} weight`} dim={s.done} muted={!s.done && filled.has(`${ex.aweId}:${s.setNumber}`)} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { weight: v })} bodyweight={{ on: s.weight === 0, toggle: () => edit(ex, i, { weight: s.weight === 0 ? (list.find((x) => (x.weight ?? 0) > 0)?.weight ?? null) : 0 }) }} perHand={ex.implements == null ? undefined : { on: s.implements === 2, toggle: () => settled() && edit(ex, i, { implements: s.implements === 2 ? 1 : 2 }) }} />}
                                 {timed ? (
                                   <DurationStepper value={s.reps} bare={ex.timedKind === "steady" ? "min" : "sec"} label={`Set ${s.setNumber} time`} dim={s.done} settled={settled} showButtons={showButtons} onArm={() => setArmed(key)} onChange={(v) => edit(ex, i, { reps: v == null ? null : Math.round(v) })} />
                                 ) : (

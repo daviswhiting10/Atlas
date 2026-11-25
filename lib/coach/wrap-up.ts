@@ -7,8 +7,8 @@
 
 import { volumeOf } from "@/lib/sessions/volume";
 
-/** `timed`: the reps are seconds (a hold, a carry, cardio), so the set adds no volume. */
-export type WrapSet = { exerciseId: string; name: string; weight: number | null; reps: number | null; timed?: boolean };
+/** `timed`: the reps are seconds (a hold, a carry, cardio), so the set adds no volume. `implements`: bells held (volume only). */
+export type WrapSet = { exerciseId: string; name: string; weight: number | null; reps: number | null; timed?: boolean; implements?: number | null };
 
 /** Under this share of the planned sets, a session is partial: it is not compared with the last one. */
 export const PARTIAL_BELOW = 0.7;
