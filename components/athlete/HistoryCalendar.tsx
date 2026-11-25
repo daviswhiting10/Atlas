@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { SessionSummary } from "@/lib/actions/athlete";
+import { toast } from "sonner";
 import { shortDay, type CalendarSession } from "@/lib/history/calendar";
 import type { HistoryView } from "@/lib/history/view";
 import { useEscape } from "@/hooks/use-escape";
@@ -157,8 +158,15 @@ function DaySheet({ day, sessions, summary, onClose, actions }: { day: string; s
  * History: the session count and the year of training as a heatmap (YearHeatmap, from lib/history/calendar).
  * Under three sessions: "Day one" and the first session.
  */
-export function HistoryCalendar({ calendar, summary, compact = false, deleteSession, reassign, loadWeeks }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** The athlete's own History (not the demo, not the coach's view): Delete on a session, and Reassign on one that is on the plan. */ deleteSession?: Remove; reassign?: Move; loadWeeks?: (logId: string) => Promise<SlotWeek[]>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ }) {
+export function HistoryCalendar({ calendar, summary, compact = false, deleteSession, reassign, loadWeeks, loadDay }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** The athlete's own History (not the demo, not the coach's view): Delete on a session, and Reassign on one that is on the plan. */ deleteSession?: Remove; reassign?: Move; loadWeeks?: (logId: string) => Promise<SlotWeek[]>; /** A tap on a heatmap day (the second, once its tooltip is up) opens that day's sessions. Fetched then: the page carries no session ids. */ loadDay?: (day: string) => Promise<CalendarSession[]>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [dayOpen, setDayOpen] = useState<{ day: string; sessions: CalendarSession[] } | null>(null);
+  const openDay = (day: string) => {
+    loadDay?.(day).then(
+      (sessions) => sessions.length > 0 && setDayOpen({ day, sessions }),
+      () => toast.error("Couldn't open that day.")
+    );
+  };
   if (calendar.kind === "empty") return null;
 
   return (
@@ -185,7 +193,8 @@ export function HistoryCalendar({ calendar, summary, compact = false, deleteSess
           )}
           <p className="sr-only">{calendar.summary}</p>
           <div className={compact ? "mt-1" : "mt-6"}>
-            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} />
+            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} onOpenDay={loadDay && summary ? openDay : undefined} />
+            {dayOpen && summary && <DaySheet day={dayOpen.day} sessions={dayOpen.sessions} summary={summary} onClose={() => setDayOpen(null)} actions={{ deleteSession, reassign, loadWeeks }} />}
           </div>
         </>
       )}

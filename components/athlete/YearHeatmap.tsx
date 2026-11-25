@@ -31,11 +31,12 @@ const iconColor = (l: GridLevel) => (l >= 4 ? "#0f2a27" : "#ece8e1");
  * Colour is the answer: there is no line of text under the grid. Touching or hovering a day opens a small tooltip over it
  * with that day's detail (the same words, "Tue Nov 11 · Lower A · 14 sets").
  */
-export function YearHeatmap({ byDay, today, summary }: { byDay: HeatDays; today: string; summary: string }) {
+export function YearHeatmap({ byDay, today, summary, onOpenDay }: { byDay: HeatDays; today: string; summary: string; /** A tap (or click) on a day that already shows its tooltip opens that day's sessions. */ onOpenDay?: (day: string) => void }) {
   const [back, setBack] = useState(0);
   const grid = useMemo(() => yearGrid(byDay, { today, weeks: YEAR_WEEKS, back }), [byDay, today, back]);
   const cells = useMemo(() => new Map(grid.columns.flatMap((c) => c.cells).map((c) => [c.day, c] as const)), [grid]);
   const [tip, setTip] = useState<{ day: string; x: number; y: number; w: number } | null>(null);
+  const [touch, setTouch] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const hidden = YEAR_WEEKS - PHONE_WEEKS;
   const cols = grid.columns;
@@ -56,9 +57,17 @@ export function YearHeatmap({ byDay, today, summary }: { byDay: HeatDays; today:
     const el = (e.target as HTMLElement).closest<HTMLElement>("[data-day]");
     const wrap = box.current;
     if (!el || !wrap) return;
+    const day = el.dataset.day!;
+    setTouch(e.pointerType !== "mouse");
+    // The tooltip first (a mouse has it from hovering, a finger from the first tap); the same day again opens its sessions.
+    const c = cells.get(day);
+    if (onOpenDay && tip?.day === day && c && !c.future && c.titles.length > 0) {
+      setTip(null);
+      return void onOpenDay(day);
+    }
     const r = el.getBoundingClientRect();
     const w = wrap.getBoundingClientRect();
-    setTip({ day: el.dataset.day!, x: r.left - w.left + r.width / 2, y: r.top - w.top, w: w.width });
+    setTip({ day, x: r.left - w.left + r.width / 2, y: r.top - w.top, w: w.width });
   };
 
   const go = (dir: 1 | -1) => {
@@ -121,6 +130,7 @@ export function YearHeatmap({ byDay, today, summary }: { byDay: HeatDays; today:
             style={{ left: tip.x, top: tip.y, transform: `translate(-${(tip.x / tip.w) * 100}%, -100%)` }}
           >
             {readout(shown)}
+            {onOpenDay && !shown.future && shown.titles.length > 0 && <span className="ml-2 text-ink-mute">{touch ? "Tap again to open" : "Click to open"}</span>}
           </div>
         )}
       </div>

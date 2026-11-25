@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { deleteSessionRows } from "@/lib/sessions/delete";
 import { remapSets, slotsByWeek, type Slot } from "@/lib/sessions/reassign";
 import { buildSessionSummary } from "@/lib/sessions/summary";
+import type { CalendarSession } from "@/lib/history/calendar";
 import { MAX_SESSION_NOTE, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
@@ -574,6 +575,15 @@ export async function reassignMySession(raw: { workoutLogId: string; toAssignedW
   });
   refresh();
   return { ok: true };
+}
+
+/** What a tap on a heatmap day opens: that day's finished sessions, newest first. Own data only; days are read in the athlete's zone. */
+export async function historyDaySessions(day: string): Promise<CalendarSession[]> {
+  await requireAthlete();
+  const d = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(day);
+  const { getHistory } = await import("@/lib/athlete/data");
+  const cal = await getHistory();
+  return cal.kind === "grid" ? (cal.byDay[d] ?? []) : [];
 }
 
 /** The plan's days for "Reassign to…" when it is opened from History (which doesn't carry the plan): by week, with this session's own day and the logged ones marked. */

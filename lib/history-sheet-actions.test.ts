@@ -27,3 +27,19 @@ describe("History day sheet: Reassign + Delete", () => {
     expect(r("./history/load.ts")).toContain("planned: r.assignedWorkoutId != null");
   });
 });
+
+describe("a tap on a heatmap day opens its sessions", () => {
+  const y = r("../components/athlete/YearHeatmap.tsx");
+  it("the tooltip comes first; the same day again (a mouse has hovered it already) opens it", () => {
+    expect(y).toContain("tip?.day === day && c && !c.future && c.titles.length > 0");
+    expect(y).toContain("onOpenDay(day)");
+    expect(y).toContain("Tap again to open");
+  });
+  it("the sessions are fetched when asked (the page carries no ids), own data only", () => {
+    expect(r("../app/(client)/progress/page.tsx")).toContain("loadDay={historyDaySessions}");
+    expect(r("./actions/athlete.ts")).toContain("export async function historyDaySessions");
+  });
+  it("the demo opens its own sample day, read-only", () => {
+    expect(r("../app/demo/progress/page.tsx")).toContain("loadDay={demoHistoryDay}");
+  });
+});
