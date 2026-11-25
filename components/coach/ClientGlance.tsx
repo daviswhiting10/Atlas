@@ -14,6 +14,12 @@ export function ClientGlance({ days, stats }: { days: DayBar[]; stats: Stat[] })
   const total = days.reduce((n, d) => n + d.sets, 0);
   const [tip, setTip] = useState<number | null>(null);
   const [open, setOpen] = useState<DayBar | null>(null);
+  /** The index of the day under a pointer, or null when that day has no session. */
+  const dayAt = (e: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>): number | null => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const i = Math.min(days.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * days.length)));
+    return days[i].sessions.length > 0 ? i : null;
+  };
   return (
     <section aria-label="Last 30 days" className="mb-5 sm:max-w-md">
       <div className="flex items-baseline justify-between gap-3">
@@ -27,23 +33,16 @@ export function ClientGlance({ days, stats }: { days: DayBar[]; stats: Stat[] })
             return <rect key={d.day} x={i * 10 + 1.5} y={46 - h} width={7} height={h} rx={2} fill="currentColor" opacity={d.sets === 0 ? 0.18 : 1} />;
           })}
         </svg>
-        {/* One full-height strip per day, over the chart: hover shows the tip, a tap opens the session. Days with a session only. */}
-        <div className="absolute inset-0 flex">
-          {days.map((d, i) =>
-            d.sessions.length > 0 ? (
-              <button
-                key={d.day}
-                type="button"
-                aria-label={barTip(d)}
-                onPointerEnter={(e) => e.pointerType === "mouse" && setTip(i)}
-                onClick={() => setOpen(d)}
-                className="h-full flex-1 cursor-pointer"
-              />
-            ) : (
-              <span key={d.day} className="h-full flex-1" onPointerEnter={(e) => e.pointerType === "mouse" && setTip(null)} />
-            )
-          )}
-        </div>
+        {/* One touch surface over the chart. The day under the pointer is worked out from its position, so a tap beside a bar
+            never lands on a neighbour (a row of small buttons gets "helped" onto the nearest one by touch screens). */}
+        <div
+          className={tip != null ? "absolute inset-0 cursor-pointer" : "absolute inset-0"}
+          onPointerMove={(e) => e.pointerType === "mouse" && setTip(dayAt(e))}
+          onClick={(e) => {
+            const i = dayAt(e);
+            if (i != null) setOpen(days[i]);
+          }}
+        />
         {tip != null && (
           <div
             role="tooltip"
@@ -62,6 +61,14 @@ export function ClientGlance({ days, stats }: { days: DayBar[]; stats: Stat[] })
           </span>
         ))}
       </p>
+      {/* For a keyboard or a screen reader: the same days, as buttons. */}
+      <div className="sr-only">
+        {days.filter((d) => d.sessions.length > 0).map((d) => (
+          <button key={d.day} type="button" onClick={() => setOpen(d)}>
+            {barTip(d)}
+          </button>
+        ))}
+      </div>
       {open && (
         <SessionSheet
           eyebrow={new Date(`${open.day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}
