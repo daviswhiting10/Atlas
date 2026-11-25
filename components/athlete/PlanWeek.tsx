@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Dumbbell, Footprints, PersonStanding } from "lucide-react";
+import { Check, Plus, ChevronLeft, ChevronRight, Dumbbell, Footprints, PersonStanding } from "lucide-react";
 import type { PlanOverview, WorkoutSummary } from "@/lib/plan/overview";
 import { cueOf } from "@/lib/plan/up-next";
 import { addDays, defaultDay, openingMonday, planWeekOf, weekBounds, weekGrid, weekRange, type DayCell, type DayItem } from "@/lib/plan/week-grid";
@@ -143,11 +143,10 @@ function DayButton({ c, selected, onPick }: { c: DayCell; selected: boolean; onP
 function RestCard({ cell, base }: { cell: DayCell; base: string }) {
   return (
     <section aria-label="Day" className="rise mt-6 rounded-2xl border border-line bg-paper p-4">
-      <p className="eyebrow">{`${longDay(cell.date)} · Rest`}</p>
-      <p className="mt-1 text-[22px] font-semibold leading-tight text-ink">Rest day</p>
-      <p className="mt-1 text-[14px] text-ink-mute">Nothing planned.</p>
-      <Link href={`${base}/workouts/new`} className="press mt-3.5 flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
-        Log a workout anyway
+      {/* Not on the plan isn't a rest day: the plan only says which days have a workout. */}
+      <p className="eyebrow">{`${longDay(cell.date)} · Open`}</p>
+      <Link href={`${base}/workouts/new`} className="press mt-2 flex h-[52px] w-full items-center justify-center gap-1.5 rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
+        <Plus className="h-4 w-4" /> Log a workout
       </Link>
     </section>
   );
