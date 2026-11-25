@@ -16,7 +16,17 @@ describe("per hand: the default per equipment", () => {
   });
   it("none for anything else", () => {
     for (const equipment of ["barbell", "cable", "body only", "other", "machine", "", null, undefined])
-      expect(defaultImplements({ name: "Dumbbell Bench Press", equipment })).toBeNull();
+      expect(defaultImplements({ name: "Bench Press", equipment })).toBeNull();
+  });
+  it("by name too, when the equipment says other (imported library names)", () => {
+    for (const name of ["1A Dumbbell Bench Press", "3A Dumbbell Bicep Curl", "Incline Dumbbells Press", "Kettlebell Deadlift", "2B. kettlebells row"]) {
+      expect(isBellExercise({ name, equipment: "other" })).toBe(true);
+      expect(defaultImplements({ name, equipment: "other" })).toBe(2);
+    }
+    expect(defaultImplements({ name: "3A Dumbbell Pullover", equipment: "other" })).toBe(1);
+    expect(defaultImplements({ name: "Kettlebell Swing", equipment: null })).toBe(1);
+    expect(implementsToStore({ name: "1A Dumbbell Bench Press", equipment: "other" }, undefined, true)).toBe(2);
+    for (const name of ["Bench Press", "Barbell Row", "Hammer Curl", "DB-free stretch"]) expect(isBellExercise({ name, equipment: "other" })).toBe(false);
   });
   it("off for single-bell lifts", () => {
     for (const name of ["Goblet Squat", "Kettlebell Swing", "One-Arm Kettlebell Swings", "One-Arm Dumbbell Row", "Single Arm Dumbbell Press", "Single-arm row", "1-Arm DB Row", "Turkish Get-Up", "Turkish getup", "Dumbbell Pullover"])

@@ -10,9 +10,12 @@
 export type Bells = 1 | 2;
 type Ex = { name: string; equipment?: string | null };
 
-/** Dumbbell or kettlebell equipment, however it was written ("Dumbbell", "db", "kettlebells", "kb"). */
-export function isBellExercise(ex: { equipment?: string | null }): boolean {
-  return /^(dumbbells?|db|kettlebells?|kb)$/i.test((ex.equipment ?? "").trim());
+/**
+ * A dumbbell or kettlebell exercise: by its equipment, however it was written ("Dumbbell", "db", "kettlebells", "kb"), or by
+ * its name, for exercises whose equipment says "other" (imported library names such as "1A Dumbbell Bench Press").
+ */
+export function isBellExercise(ex: { name?: string | null; equipment?: string | null }): boolean {
+  return /^(dumbbells?|db|kettlebells?|kb)$/i.test((ex.equipment ?? "").trim()) || /\b(dumbbells?|kettlebells?)\b/i.test(ex.name ?? "");
 }
 
 /** Lifts done with one bell, by name: per hand starts off for them. The catalog's list, not data. */
