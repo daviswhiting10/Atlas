@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
+import { buildSessionSummary } from "@/lib/sessions/summary";
 import { compareWithLast, medalsOf, type WrapSet, type WrapUp } from "@/lib/coach/wrap-up";
 import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
 import { requestDay } from "@/lib/sessions/request-day";
@@ -534,4 +535,11 @@ export async function getLastExerciseNote(
     select: { note: true },
   });
   return note?.note ?? null;
+}
+
+/** A client's finished session, read-only (the coach's Last 30 days chart): the sets by exercise, the notes. Their workspace only. */
+export async function clientSessionSummary(workoutLogId: string): Promise<import("@/lib/actions/athlete").SessionSummary | null> {
+  const { workspaceId } = await requireWorkspace();
+  if (typeof workoutLogId !== "string" || workoutLogId.length < 1 || workoutLogId.length > 64) return null;
+  return buildSessionSummary({ id: workoutLogId, client: { workspaceId } }, "Client");
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { format, parseISO } from "date-fns";
 import type { FocusMetric } from "@/lib/plan/generator";
@@ -17,8 +17,18 @@ type Row = {
   best: boolean;
   deload: boolean;
   ghost: boolean;
+  /** The session behind the point: its name, sets, and the id a tap opens. */
+  title?: string;
+  sets?: number;
+  logId?: string;
+  workoutId?: string | null;
 };
 
+/** The plot's left and right edges inside the chart box: the y axis (48) less the chart's left margin (-8), and the right margin. */
+const PLOT_LEFT = 40;
+const PLOT_RIGHT = 12;
+/** A line chart's x axis is padded this much at each end (see its XAxis). */
+const LINE_PAD = 14;
 const INK_MUTE = "var(--ink-mute)";
 const GRID = "color-mix(in srgb, var(--ink) 7%, transparent)";
 const DELOAD = "color-mix(in srgb, var(--ink) 22%, transparent)";
@@ -43,6 +53,12 @@ function ChartTooltip({
   return (
     <div className="rounded-lg border border-line bg-paper px-3 py-2 shadow-md">
       <p className="text-[11px] text-ink-mute">{row.ghost ? "Next target" : row.date ? format(parseISO(row.date), "EEE, MMM d") : ""}</p>
+      {!row.ghost && row.title && (
+        <p className="text-[12px] text-ink-soft">
+          {row.title}
+          {row.sets ? ` · ${row.sets} ${row.sets === 1 ? "set" : "sets"}` : ""}
+        </p>
+      )}
       <p className="text-sm font-semibold text-ink">
         {timed && metric === "reps" ? (
           durationLabel(v)
@@ -63,7 +79,7 @@ function ChartTooltip({
 function Dot(props: { cx?: number; cy?: number; payload?: Row }) {
   const { cx, cy, payload } = props;
   if (cx == null || cy == null || !payload || payload.value == null) return null;
-  if (payload.record) return <circle cx={cx} cy={cy} r={4} fill="var(--gold)" stroke="var(--bone)" strokeWidth={1.5} />;
+  if (payload.record) return <circle data-hit cx={cx} cy={cy} r={4} fill="var(--gold)" stroke="var(--bone)" strokeWidth={1.5} />;
   if (payload.best) return <circle cx={cx} cy={cy} r={3.5} fill="var(--bone)" stroke="var(--signal)" strokeWidth={2} />;
   if (payload.deload) {
     return (
@@ -137,6 +153,7 @@ export const ProgressChart = memo(function ProgressChart({
   chartKey,
   legend = true,
   timed = false,
+  onPick,
 }: {
   series: SessionPoint[];
   metric: FocusMetric;
@@ -148,7 +165,10 @@ export const ProgressChart = memo(function ProgressChart({
   legend?: boolean;
   /** The exercise is measured in seconds rather than reps. */
   timed?: boolean;
+  /** A tap on a point (or a bar) opens its session. */
+  onPick?: (p: { logId: string; workoutId: string | null }) => void;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const unit = unitFor(metric, loaded, timed);
   const bars = chartKind(metric) === "bars";
 
@@ -163,6 +183,10 @@ export const ProgressChart = memo(function ProgressChart({
       best: p.best,
       deload: p.deload,
       ghost: false,
+      title: p.title,
+      sets: p.sets,
+      logId: p.logId,
+      workoutId: p.workoutId,
     }));
     const lastReal = rows.length - 1;
     // A projected next point only makes sense on a trend line.
@@ -192,9 +216,29 @@ export const ProgressChart = memo(function ProgressChart({
 
   return (
     <div>
-      <div style={{ height }} className="w-full">
+      <div ref={wrapRef} style={{ height, cursor: onPick ? "pointer" : undefined }} className="w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart key={chartKey} data={rows} margin={{ top: 18, right: 12, left: -8, bottom: 0 }} barCategoryGap="28%">
+          <ComposedChart
+            key={chartKey}
+            data={rows}
+            margin={{ top: 18, right: 12, left: -8, bottom: 0 }}
+            barCategoryGap="28%"
+            // A tap on the plot opens the session nearest the tap (every session has a point, but most have no dot to aim at).
+            // The axis gutters don't count, so a tap beside the chart does nothing.
+            onClick={(_: unknown, ev: unknown) => {
+              const box = wrapRef.current?.getBoundingClientRect();
+              const x = (ev as { clientX?: number } | null)?.clientX;
+              if (!onPick || !box || x == null) return;
+              const plotW = box.width - PLOT_LEFT - PLOT_RIGHT;
+              const rel = x - box.left - PLOT_LEFT;
+              if (rel < 0 || rel > plotW) return;
+              // Worked out from where the tap landed, not from the chart's hover state (on a phone that is one tap behind).
+              const n = rows.length;
+              const at = bars ? Math.floor((rel / plotW) * n) : Math.round(((rel - LINE_PAD) / Math.max(1, plotW - 2 * LINE_PAD)) * (n - 1));
+              const r = rows[Math.min(n - 1, Math.max(0, at))];
+              if (r?.logId && !r.ghost) onPick({ logId: r.logId, workoutId: r.workoutId ?? null });
+            }}
+          >
             <CartesianGrid vertical={false} stroke={GRID} />
             <XAxis
               dataKey="key"

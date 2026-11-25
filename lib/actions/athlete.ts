@@ -4,7 +4,8 @@ import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
 import { deleteSessionRows } from "@/lib/sessions/delete";
 import { remapSets } from "@/lib/sessions/reassign";
-import { MAX_SESSION_NOTE, loadSessionNotes, saveSessionNote } from "@/lib/sessions/notes";
+import { buildSessionSummary } from "@/lib/sessions/summary";
+import { MAX_SESSION_NOTE, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
 import { z } from "zod";
 import { TARGET_LIMIT_MESSAGE } from "@/lib/sessions/duration";
@@ -19,7 +20,6 @@ import { MAX_SETS, getLoggerData, getProgress, type LoggerSet } from "@/lib/athl
 import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
 import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
-import { displayName } from "@/lib/plan/catalog";
 import { resetPlanRows, sessionsOnPlan } from "@/lib/plan/reset-progress";
 import { isGuestEmail } from "@/lib/guest-rules";
 import { forgetAdded, recordAdded } from "@/lib/sessions/added-store";
@@ -505,42 +505,7 @@ export type SessionSummary = { lines: Array<{ name: string; sets: string }>; not
 export async function sessionSummary(workoutLogId: string): Promise<SessionSummary | null> {
   const { clientId } = await requireAthlete();
   const id = z.string().min(1).max(64).parse(workoutLogId);
-  const log = await prisma.workoutLog.findFirst({
-    where: { id, clientId },
-    select: {
-      id: true,
-      clientNotes: true,
-      durationMin: true,
-      date: true,
-      sets: {
-        where: { completed: true },
-        orderBy: [{ createdAt: "asc" }, { setNumber: "asc" }],
-        select: {
-          weight: true,
-          reps: true,
-          exercise: { select: { name: true, slug: true } },
-          assignedWorkoutExercise: { select: { prescribedSets: true } },
-        },
-      },
-    },
-  });
-  if (!log) return null;
-  const byName = new Map<string, string[]>();
-  for (const s of log.sets) {
-    if (!s.exercise || s.reps == null) continue;
-    const name = displayName(s.exercise.slug, s.exercise.name);
-    const timed = ((s.assignedWorkoutExercise?.prescribedSets as Array<{ unit?: string }> | null) ?? [])[0]?.unit === "secs";
-    const text = timed ? `${s.reps} sec` : s.weight != null && s.weight > 0 ? `${s.weight}×${s.reps}` : `${s.reps}`;
-    byName.set(name, [...(byName.get(name) ?? []), text]);
-  }
-  const notes = (await loadSessionNotes([{ id: log.id, clientNotes: log.clientNotes }])).get(log.id)!;
-  return {
-    lines: Array.from(byName, ([name, sets]) => ({ name, sets: sets.join(", ") })),
-    setCount: log.sets.length,
-    minutes: log.durationMin,
-    date: log.date.toISOString().slice(0, 10),
-    notes: [...(notes.coach ? [{ label: "Coach", text: notes.coach }] : []), ...(notes.athlete ? [{ label: "You", text: notes.athlete }] : [])],
-  };
+  return buildSessionSummary({ id, clientId }, "You");
 }
 
 /**
