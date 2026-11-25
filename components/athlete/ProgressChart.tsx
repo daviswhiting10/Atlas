@@ -17,6 +17,11 @@ type Row = {
   best: boolean;
   deload: boolean;
   ghost: boolean;
+  /** The session behind the point: its name, sets, and the id a tap opens. */
+  title?: string;
+  sets?: number;
+  logId?: string;
+  workoutId?: string | null;
 };
 
 const INK_MUTE = "var(--ink-mute)";
@@ -43,6 +48,12 @@ function ChartTooltip({
   return (
     <div className="rounded-lg border border-line bg-paper px-3 py-2 shadow-md">
       <p className="text-[11px] text-ink-mute">{row.ghost ? "Next target" : row.date ? format(parseISO(row.date), "EEE, MMM d") : ""}</p>
+      {!row.ghost && row.title && (
+        <p className="text-[12px] text-ink-soft">
+          {row.title}
+          {row.sets ? ` · ${row.sets} ${row.sets === 1 ? "set" : "sets"}` : ""}
+        </p>
+      )}
       <p className="text-sm font-semibold text-ink">
         {timed && metric === "reps" ? (
           durationLabel(v)
@@ -137,6 +148,7 @@ export const ProgressChart = memo(function ProgressChart({
   chartKey,
   legend = true,
   timed = false,
+  onPick,
 }: {
   series: SessionPoint[];
   metric: FocusMetric;
@@ -148,6 +160,8 @@ export const ProgressChart = memo(function ProgressChart({
   legend?: boolean;
   /** The exercise is measured in seconds rather than reps. */
   timed?: boolean;
+  /** A tap on a point (or a bar) opens its session. */
+  onPick?: (p: { logId: string; workoutId: string | null }) => void;
 }) {
   const unit = unitFor(metric, loaded, timed);
   const bars = chartKind(metric) === "bars";
@@ -163,6 +177,10 @@ export const ProgressChart = memo(function ProgressChart({
       best: p.best,
       deload: p.deload,
       ghost: false,
+      title: p.title,
+      sets: p.sets,
+      logId: p.logId,
+      workoutId: p.workoutId,
     }));
     const lastReal = rows.length - 1;
     // A projected next point only makes sense on a trend line.
@@ -221,7 +239,17 @@ export const ProgressChart = memo(function ProgressChart({
               cursor={bars ? { fill: "color-mix(in srgb, var(--ink) 4%, transparent)" } : { stroke: "color-mix(in srgb, var(--ink) 20%, transparent)", strokeDasharray: "3 3" }}
             />
             {bars ? (
-              <Bar dataKey="value" radius={[2, 2, 0, 0]} maxBarSize={30} animationDuration={700}>
+              <Bar
+                dataKey="value"
+                radius={[2, 2, 0, 0]}
+                maxBarSize={30}
+                animationDuration={700}
+                cursor={onPick ? "pointer" : undefined}
+                onClick={(d: unknown) => {
+                  const r = (d as { payload?: Row }).payload;
+                  if (onPick && r?.logId) onPick({ logId: r.logId, workoutId: r.workoutId ?? null });
+                }}
+              >
                 {rows.map((r) => (
                   <Cell key={r.key} fill={r.record ? "var(--gold)" : r.deload ? DELOAD : "var(--signal)"} />
                 ))}

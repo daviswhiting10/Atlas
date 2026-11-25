@@ -48,12 +48,12 @@ export { safeTimeZone };
 const getTimeZone = () => safeTimeZone(cookies().get(TZ_COOKIE)?.value);
 
 type Session =
- { date: Date; deload: boolean; sets: LoggedSet[]; range: { repMin: number; repMax: number } | null };
+ { date: Date; deload: boolean; sets: LoggedSet[]; range: { repMin: number; repMax: number } | null; /** For a tap on the chart: which session it was, its name, and the plan workout it was (the athlete's page for it). */ logId?: string; title?: string; workoutId?: string | null };
 
 
 /** Select shape that lets a logged set be traced back to its plan week. */
 const WEEK_SOURCE = {
-  select: { date: true, assignedWorkout: { select: { scheduledDate: true, programAssignment: { select: LIGHTER_SELECT } } } },
+  select: { date: true, title: true, assignedWorkoutId: true, assignedWorkout: { select: { name: true, scheduledDate: true, programAssignment: { select: LIGHTER_SELECT } } } },
 } as const;
 
 type WeekSource = { assignedWorkout: { scheduledDate: Date; programAssignment: LighterSource } | null };
@@ -260,7 +260,7 @@ export async function loadProgress({
     }
     let session = entry.sessions.get(s.workoutLogId);
     if (!session) {
-      session = { date, deload: isDeloadSession(s.workoutLog, selfServe), sets: [], range: prescribedRange(s.assignedWorkoutExercise?.prescribedSets) };
+      session = { date, deload: isDeloadSession(s.workoutLog, selfServe), sets: [], range: prescribedRange(s.assignedWorkoutExercise?.prescribedSets), logId: s.workoutLogId, title: s.workoutLog.title ?? s.workoutLog.assignedWorkout?.name ?? undefined, workoutId: s.workoutLog.assignedWorkoutId };
       entry.sessions.set(s.workoutLogId, session);
     }
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
@@ -278,7 +278,10 @@ export async function loadProgress({
   for (const [exerciseId, entry] of Array.from(byExercise.entries())) {
     const sessions = Array.from(entry.sessions.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
     const points = sessions
-      .map((s) => sessionPoint(localDay(s.date, tz), s.sets, s.deload, entry.timed))
+      .map((s) => {
+        const p = sessionPoint(localDay(s.date, tz), s.sets, s.deload, entry.timed);
+        return p ? { ...p, logId: s.logId, title: s.title, workoutId: s.workoutId } : null;
+      })
       .filter((p): p is NonNullable<typeof p> => p != null);
     if (points.length === 0) continue;
     const series = buildSeries(points);

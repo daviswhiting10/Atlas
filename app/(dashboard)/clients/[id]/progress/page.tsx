@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadClientProgress } from "@/lib/coach/progress";
+import { clientSessionSummary } from "@/lib/actions/workout-logger";
 import { ProgressView } from "@/components/athlete/ProgressView";
 import { prisma } from "@/lib/db/client";
 import { MilestoneCard } from "./_components/MilestoneCard";
@@ -50,7 +51,7 @@ export default async function ClientProgressPage({ params }: { params: { id: str
           </p>
         </div>
       </div>
-      <ProgressView data={data} goalMetric={metric} />
+      <ProgressView data={data} goalMetric={metric} session={{ load: clientSessionSummary, hrefPrefix: `/clients/${params.id}/sessions/`, by: "logId" }} />
       {milestones.length > 0 && (
         <section className="mt-10">
           <p className="eyebrow mb-3">Milestones</p>

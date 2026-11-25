@@ -202,6 +202,10 @@ export type SessionPoint = {
   e1rm: number | null;
   volume: number;
   sets: number;
+  /** Which session this point is (a tap on the chart opens it), its name, and the plan workout it was. Absent on sample data. */
+  logId?: string;
+  title?: string;
+  workoutId?: string | null;
   /** Logged in a lighter (deload) week: expected to dip, and never a record. */
   deload: boolean;
   /** This session set a personal record. See `buildSeries` for the rule. */

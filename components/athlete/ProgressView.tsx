@@ -12,6 +12,8 @@ import type { SessionPoint } from "@/lib/plan/overload";
 import { defaultLift } from "@/lib/progress/default-lift";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
+import { SessionSheet } from "@/components/athlete/SessionSheet";
+import type { SessionSummary } from "@/lib/actions/athlete";
 import { useEscape } from "@/hooks/use-escape";
 // The charts (recharts, the heaviest code on this screen) load after the page, not with it. A plain effect and state, not
 // Suspense: React holds back a Suspense reveal for 300 ms even when the code is already there, and a pick should not wait.
@@ -127,10 +129,11 @@ function Big({ value, label, accent = false }: { value: string; label?: string; 
  * latest record. A section with nothing to show renders nothing, heading included (no
  * overall line yet means no Strength section): never a chart of two points or a row of zeros.
  */
-export function ProgressView({ data, goalMetric, history, overall: given, loadSeries, records = true, compact = false }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode; /** Home: tighter, so the heatmap fits the first screen. */ compact?: boolean; /** False on Home: the latest record stays on Progress. */ records?: boolean; /** The overall line, when the server worked it out (then `data.exercises` need not carry their series). */ overall?: Overall; /** Fetches one lift's history when it is picked, for exercises sent without it. */ loadSeries?: (input: { exerciseIds: string[] }) => Promise<Record<string, SessionPoint[]>> }) {
+export function ProgressView({ data, goalMetric, history, overall: given, loadSeries, records = true, compact = false, session }: { data: ProgressData; goalMetric: FocusMetric; history?: React.ReactNode; /** Home: tighter, so the heatmap fits the first screen. */ compact?: boolean; /** False on Home: the latest record stays on Progress. */ records?: boolean; /** The overall line, when the server worked it out (then `data.exercises` need not carry their series). */ overall?: Overall; /** Fetches one lift's history when it is picked, for exercises sent without it. */ loadSeries?: (input: { exerciseIds: string[] }) => Promise<Record<string, SessionPoint[]>>; /** A tap on a bar opens that session: how to read it, and where "View session" goes. */ session?: { load: (id: string) => Promise<SessionSummary | null>; /** "View session" goes to this plus the plan workout's id (the athlete) or the log's id (the coach). */ hrefPrefix: string; by: "workoutId" | "logId" } }) {
   // Opens on the lift done most (its curve and its lighter weeks); "All lifts" is in the chooser.
   const [exerciseId, setExerciseId] = useState<string | null>(() => defaultLift(data.exercises, THIN));
   const [sheet, setSheet] = useState(false);
+  const [tapped, setTapped] = useState<{ logId: string; workoutId: string | null; title: string } | null>(null);
   const overall = useMemo(() => given ?? overallProgress(data.exercises), [given, data.exercises]);
   const picked = data.exercises.find((e) => e.exerciseId === exerciseId) ?? null;
   // A lift sent without its history gets it from the server: all of them when the chooser opens (so a pick is usually
@@ -186,6 +189,14 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
 
   return (
     <div className={compact ? "space-y-5" : "space-y-14"}>
+      {tapped && session && (
+        <SessionSheet
+          eyebrow={exercise?.series.find((x) => x.logId === tapped.logId)?.date ? format(parseISO(exercise.series.find((x) => x.logId === tapped.logId)!.date), "EEEE, MMM d") : "Session"}
+          sessions={[{ id: tapped.logId, title: tapped.title, href: ((id) => (id ? `${session.hrefPrefix}${id}` : null))(tapped[session.by]) }]}
+          load={session.load}
+          onClose={() => setTapped(null)}
+        />
+      )}
       {exercise ? (
         <Section title="Strength" control={chooser}>
           {loading && <div className="h-[56px]" aria-busy />}
@@ -199,7 +210,7 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
           {loading && <div className="mt-5 h-[200px]" aria-busy />}
           {exercise.series.length >= THIN && (
             <div className="mt-5">
-              {ProgressC ? <ProgressC series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={compact ? 130 : 200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} /> : <ChartSpace />}
+              {ProgressC ? <ProgressC series={exercise.series} metric={metric} loaded={exercise.loaded} timed={exercise.timed} height={compact ? 130 : 200} legend={false} chartKey={`${exercise.exerciseId}-${metric}`} onPick={session ? (p) => setTapped({ ...p, title: exercise.series.find((x) => x.logId === p.logId)?.title ?? exercise.name }) : undefined} /> : <ChartSpace />}
             </div>
           )}
         </Section>
