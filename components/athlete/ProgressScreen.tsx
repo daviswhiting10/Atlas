@@ -21,6 +21,9 @@ export function ProgressScreen({
   chapters,
   bodyWeight = [],
   summary = sessionSummary,
+  deleteSession,
+  reassign,
+  loadWeeks,
 }: {
   athlete: Pick<Athlete, "metric" | "hasHistory">;
   data: ProgressData;
@@ -30,6 +33,10 @@ export function ProgressScreen({
   bodyWeight?: BodyWeightPoint[];
   /** What a tapped day in History shows (the demo passes its own: it never calls the server). */
   summary?: typeof sessionSummary;
+  /** A tapped session in History can be deleted, and moved to another day of the plan (not in the demo). */
+  deleteSession?: React.ComponentProps<typeof HistoryCalendar>["deleteSession"];
+  reassign?: React.ComponentProps<typeof HistoryCalendar>["reassign"];
+  loadWeeks?: React.ComponentProps<typeof HistoryCalendar>["loadWeeks"];
 }) {
   // Never blank: with nothing finished yet there is the one line and the one action.
   if (!athlete.hasHistory && calendar.kind === "empty" && data.totals.sessions === 0 && chapters.length === 0 && bodyWeight.length === 0) return <div className="pt-4"><EmptyStart /></div>;
@@ -37,7 +44,7 @@ export function ProgressScreen({
   const lite = liteProgress(data);
   return (
     <div className="pt-4">
-      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} session={{ load: summary, hrefPrefix: "/workouts/", by: "workoutId" }} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} />} />
+      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} session={{ load: summary, hrefPrefix: "/workouts/", by: "workoutId" }} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} deleteSession={deleteSession} reassign={reassign} loadWeeks={loadWeeks} />} />
       <BodyWeightSection points={bodyWeight} />
       {chapters.length > 0 && (
         <section className="mt-14">

@@ -75,7 +75,7 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
       timed: isTimedSet({ assignedWorkoutExercise: awe }, exercise?.slug),
     })),
   }));
-  const meta = Object.fromEntries(rows.map((r) => [r.id, { title: r.title ?? r.assignedWorkout?.name ?? "Workout", href: sessionHref(viewer, r) }]));
+  const meta = Object.fromEntries(rows.map((r) => [r.id, { title: r.title ?? r.assignedWorkout?.name ?? "Workout", href: sessionHref(viewer, r), planned: r.assignedWorkoutId != null }]));
   const today = localDay(new Date(), timeZone);
   return historyCalendar(sessions, { timeZone, today, meta, chapters: goals.map((g) => chapterSpan(g, timeZone, today)) });
 }

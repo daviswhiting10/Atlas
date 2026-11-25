@@ -3,7 +3,7 @@
 import { CardioTarget } from "@/lib/plan/cardio-target";
 import { revalidatePath } from "next/cache";
 import { deleteSessionRows } from "@/lib/sessions/delete";
-import { remapSets } from "@/lib/sessions/reassign";
+import { remapSets, slotsByWeek, type Slot } from "@/lib/sessions/reassign";
 import { buildSessionSummary } from "@/lib/sessions/summary";
 import { MAX_SESSION_NOTE, saveSessionNote } from "@/lib/sessions/notes";
 import { DONE, PLAN_SOURCE_SELECT, planSessionSource } from "@/lib/sessions/status";
@@ -574,6 +574,17 @@ export async function reassignMySession(raw: { workoutLogId: string; toAssignedW
   });
   refresh();
   return { ok: true };
+}
+
+/** The plan's days for "Reassign to…" when it is opened from History (which doesn't carry the plan): by week, with this session's own day and the logged ones marked. */
+export async function reassignSlots(workoutLogId: string): Promise<Array<{ week: number; slots: Slot[] }>> {
+  const { clientId } = await requireAthlete();
+  const id = z.string().min(1).max(64).parse(workoutLogId);
+  const log = await prisma.workoutLog.findFirst({ where: { id, clientId }, select: { assignedWorkoutId: true } });
+  if (!log?.assignedWorkoutId) return [];
+  const { getPlanOverview } = await import("@/lib/athlete/data");
+  const plan = await getPlanOverview();
+  return plan ? slotsByWeek(plan.workouts, log.assignedWorkoutId) : [];
 }
 
 /**
