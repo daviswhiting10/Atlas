@@ -21,7 +21,7 @@ function Glimpse({ cells }: { cells: number[] }) {
 function Card({ r }: { r: DashRow }) {
   const week = r.thisWeek ? `${r.thisWeek.done} of ${r.thisWeek.planned} workouts this week` : "No plan this week";
   return (
-    <Link href={`/clients/${r.id}`} className={cn("press block rounded-[20px] border bg-paper p-4", r.standing === "overdue" ? "border-warn/50" : "border-line")} aria-label={`${r.name}, ${r.standing === "overdue" ? "overdue" : r.standing === "no-plan" ? "no plan" : "on track"}, ${week}, last session ${r.lastLabel}`}>
+    <Link href={`/clients/${r.id}`} className={cn("press block rounded-[20px] border bg-paper p-4", "border-line")} aria-label={`${r.name}, ${r.standing === "overdue" ? "overdue" : r.standing === "no-plan" ? "no plan" : "on track"}, ${week}, last session ${r.lastLabel}`}>
       <div className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 items-center gap-3">
           <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-signal/15 font-semibold text-signal">{r.name.charAt(0)}</span>
@@ -30,9 +30,8 @@ function Card({ r }: { r: DashRow }) {
             <span className="block truncate text-[13px] text-ink-mute">{[`Last: ${r.lastLabel}`, r.lastWorkout].filter(Boolean).join(" · ")}</span>
           </span>
         </span>
-        {r.standing === "overdue" ? (
-          <span className="shrink-0 rounded-full border border-warn/50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-warn">Overdue</span>
-        ) : r.standing === "on-track" ? (
+        {/* Overdue is a filter the coach chooses, not a tag on every card. */}
+        {r.standing === "on-track" ? (
           <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.05em] text-signal">On track</span>
         ) : (
           <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.05em] text-ink-mute">No plan</span>
