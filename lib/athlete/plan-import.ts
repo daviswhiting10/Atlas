@@ -2,6 +2,7 @@
 import type { PlanContext } from "@/lib/programs/plan-context";
 import { formatTime, timedRows, type SheetGrid, type TimedRow } from "@/lib/programs/sheet-plan";
 import { shapeSheet } from "@/lib/programs/sheet-summary";
+import { savedRange } from "@/lib/programs/plan-rules";
 
 export type ImportPreview = {
   title: string;
@@ -39,7 +40,9 @@ export function previewFromGrid(grid: SheetGrid, context: PlanContext): ImportPr
             exercise: changing.name,
             weeks: weeks.map((w) => {
               const e = changing.at(w);
-              return `Week ${w.week}: ${e ? `${e.rx.sets} × ${reps(e.rx.repMin, e.rx.repMax, e.rx.unit)}${e.load?.weight != null ? ` at ${e.load.weight}` : ""}` : "not in this week"}`;
+              // The range it is saved at: a lone number widened down (lib/programs/plan-rules).
+              const r = e && savedRange(e.rx, e.exercise);
+              return `Week ${w.week}: ${e && r ? `${e.rx.sets} × ${reps(r.repMin, r.repMax, e.rx.unit)}${e.load?.weight != null ? ` at ${e.load.weight}` : ""}` : "not in this week"}`;
             }),
           }
         : null,

@@ -2,6 +2,7 @@ import type { ImportPreview as Preview } from "@/lib/athlete/plan-import";
 import { TimesList } from "./TimesList";
 import { FoundInFile, type Found } from "./FoundInFile";
 import { ExerciseMatches } from "./ExerciseMatches";
+import { CoreCheck } from "./CoreCheck";
 import type { ExerciseMatch } from "@/lib/programs/dedupe";
 
 /** A plan read from a file, for a quick check before it is saved: its shape, each day, and one lift week by week. */
@@ -32,6 +33,7 @@ export function ImportPreview({ preview, found, matches = [], warnings = [], gri
         </div>
       )}
       {preview.times?.length > 0 && <TimesList times={preview.times} grid={grid} onGrid={onGrid ?? (() => {})} />}
+      {grid != null && onGrid && <CoreCheck grid={grid} onGrid={onGrid} />}
       {preview.sameEveryWeek && <p className="text-[13px] text-ink-mute">Every week is the same in this plan.</p>}
       {warnings.map((w) => (
         <p key={w} className="text-[13px] text-warn">

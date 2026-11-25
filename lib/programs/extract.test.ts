@@ -109,7 +109,7 @@ describe("the extraction is checked", () => {
         },
       ],
     });
-    expect(foundInFile(grid)).toEqual({ workouts: [{ name: "Workout 1", exercises: 2 }], uncertain: ["Workout 1 · Plank: rest"] });
+    expect(foundInFile(grid)).toEqual({ workouts: [{ name: "Workout 1", exercises: 2 }], uncertain: ["Workout 1 · Plank: rest", "Workout 1 · Goblet squat: range added, 10 → 8–10", "Workout 1 · Plank: range added, 30 s → 15–30 s"] });
     expect(shapeSheet(grid).weeks[0].days[0].entries[1].rx).toMatchObject({ repMin: 30, unit: "secs" });
   });
 

@@ -10,6 +10,7 @@
 
 import Papa from "papaparse";
 import type { SheetGrid } from "./sheet-plan";
+import { rangeAddedLines } from "./plan-rules";
 
 export const MAX_NOTE_CHARS = 2000;
 
@@ -197,7 +198,7 @@ export function extractionToGrid(ex: Extracted): SheetGrid {
   };
 }
 
-/** What the coach checks before saving: how many workouts, how many exercises in each, and what the model guessed. */
+/** What the coach checks before saving: how many workouts, how many exercises in each, what the model guessed, and each range added to a lone number. */
 export function foundInFile(grid: SheetGrid): { workouts: Array<{ name: string; exercises: number }>; uncertain: string[] } {
-  return { workouts: grid.days.map((d) => ({ name: d.name, exercises: d.exercises.length })), uncertain: grid.uncertain ?? [] };
+  return { workouts: grid.days.map((d) => ({ name: d.name, exercises: d.exercises.length })), uncertain: [...(grid.uncertain ?? []), ...rangeAddedLines(grid)] };
 }
