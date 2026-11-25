@@ -49,6 +49,7 @@ export async function loadCalendar({ clientId, workspaceId, timeZone, viewer }: 
             rpe: true,
             bandColor: true,
             completed: true,
+            implements: true,
             exercise: { select: { primaryMuscles: true, slug: true } },
             assignedWorkoutExercise: { select: { mode: true, activity: true, prescribedSets: true } },
           },

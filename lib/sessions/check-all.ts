@@ -43,10 +43,10 @@ export const bulkConfirmText = (mode: BulkMode, n: number) => (mode === "check" 
 export function queueBulk(
   storage: Parameters<typeof addPending>[0],
   workoutId: string,
-  entries: Array<{ aweId: string; setNumber: number; done: boolean; weight?: number | null; reps?: number | null }>,
+  entries: Array<{ aweId: string; setNumber: number; done: boolean; weight?: number | null; reps?: number | null; implements?: number | null }>,
   now = Date.now()
 ) {
   entries.forEach((e, n) =>
-    addPending(storage, workoutId, pendingKey(e.aweId, e.setNumber), { done: e.done, weight: e.weight, reps: e.reps }, now + n)
+    addPending(storage, workoutId, pendingKey(e.aweId, e.setNumber), { done: e.done, weight: e.weight, reps: e.reps, implements: e.implements }, now + n)
   );
 }

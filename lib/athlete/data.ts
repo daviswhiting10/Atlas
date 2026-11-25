@@ -33,6 +33,7 @@ import { loadCalendar } from "@/lib/history/load";
 import type { HistoryCalendar } from "@/lib/history/calendar";
 import { timedHasLoad, timedKind, type TimedKind } from "@/lib/plan/timed";
 import { isTimedSet, setVolume } from "@/lib/sessions/volume";
+import { lastImplements, startImplements, type Bells } from "@/lib/exercises/implements";
 
 /** Upper bound on sets per exercise in one workout. */
 export const MAX_SETS = 20;
@@ -223,6 +224,7 @@ export async function loadProgress({
       weight: true,
       reps: true,
       completed: true,
+      implements: true,
       workoutLogId: true,
       workoutLog: WEEK_SOURCE,
       // The prescription the set was logged against: its range tells "the range moved up" from a hard day (see nextTarget),
@@ -266,7 +268,7 @@ export async function loadProgress({
     session.sets.push({ weight: s.weight, reps: s.reps, completed: s.completed });
 
     if (s.completed && s.reps) {
-      totalVolume += setVolume({ weight: s.weight, reps: s.reps, timed });
+      totalVolume += setVolume({ weight: s.weight, reps: s.reps, timed, implements: s.implements });
       totalSets += 1;
     }
   }
@@ -343,6 +345,8 @@ export type LoggerSet = {
   reps: number | null;
   done: boolean;
   setLogId: string | null;
+  /** A dumbbell or kettlebell set: 2 = per hand, 1 = one bell (lib/exercises/implements.ts). Null for other equipment. */
+  implements: number | null;
   /** What the coach wrote for this set beyond weight and reps: the target RPE, the rest after it, a note. */
   plan?: { rpe: number | null; rest: number | null; note: string | null } | null;
 };
@@ -372,6 +376,8 @@ export type LoggerExercise = {
   sets: LoggerSet[];
   /** What the movement looks like, when the library has it. */
   picture: Picture | null;
+  /** A dumbbell or kettlebell: what a new set starts at (2 = per hand), from the last choice or the catalog. Null otherwise. */
+  implements: Bells | null;
 };
 
 export type LoggerData = {
@@ -415,6 +421,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
       weight: true,
       reps: true,
       completed: true,
+      implements: true,
       workoutLogId: true,
       workoutLog: WEEK_SOURCE,
       // The range the set was prescribed at: tells "the range moved up" from a hard day (see nextTarget).
@@ -450,7 +457,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
           completedAt: true,
           sets: {
             orderBy: { setNumber: "asc" },
-            select: { id: true, assignedWorkoutExerciseId: true, exerciseId: true, setNumber: true, weight: true, reps: true, completed: true },
+            select: { id: true, assignedWorkoutExerciseId: true, exerciseId: true, setNumber: true, weight: true, reps: true, completed: true, implements: true },
           },
         },
       },
@@ -481,8 +488,13 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
   ]);
 
   const sessionsByExercise = new Map<string, Map<string, Session>>();
+  // Each exercise's sets, oldest first, for its last "per hand" choice.
+  const bellsByExercise = new Map<string, Array<{ implements: number | null }>>();
   for (const s of history) {
     if (!s.exerciseId) continue;
+    const bells = bellsByExercise.get(s.exerciseId) ?? [];
+    bells.push(s);
+    bellsByExercise.set(s.exerciseId, bells);
     let sessions = sessionsByExercise.get(s.exerciseId);
     if (!sessions) {
       sessions = new Map();
@@ -548,18 +560,19 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
             reason: `The target set for this session.${computed.weight != null && computed.kind !== "first" ? ` From your last session Atlas would suggest ${computed.weight} lb × ${computed.reps}.` : ""}`,
           };
 
+    const bells = startImplements(e.exercise, lastImplements(bellsByExercise.get(e.exerciseId) ?? []));
     const mine = logged.filter((s) => s.assignedWorkoutExerciseId === e.id || (!s.assignedWorkoutExerciseId && s.exerciseId === e.exerciseId));
     const count = Math.min(MAX_SETS, Math.max(prescribed.length, mine.reduce((m, s) => Math.max(m, s.setNumber), 0)));
     const sets: LoggerSet[] = Array.from({ length: count }, (_, i) => {
       const saved = mine.find((s) => s.setNumber === i + 1);
       if (saved) {
-        return { setNumber: i + 1, weight: saved.weight, reps: saved.reps, done: saved.completed, setLogId: saved.id };
+        return { setNumber: i + 1, weight: saved.weight, reps: saved.reps, done: saved.completed, setLogId: saved.id, implements: bells == null ? null : saved.implements };
       }
       // Each set starts at its own prescription: the weight the coach wrote for it, and its reps when they differ across the sets.
       const ps = prescribed[i];
       const own = ps && typeof ps.weight === "number" && ps.weight > 0 && !bodyweight ? ps.weight : target.weight;
       const perSetReps = prescribed.some((p) => p.repMin !== first.repMin);
-      return { setNumber: i + 1, weight: own, reps: perSetReps && ps?.repMin ? ps.repMin : target.reps, done: false, setLogId: null, plan: setPlan(ps) };
+      return { setNumber: i + 1, weight: own, reps: perSetReps && ps?.repMin ? ps.repMin : target.reps, done: false, setLogId: null, implements: bells, plan: setPlan(ps) };
     });
 
     return {
@@ -587,6 +600,7 @@ export async function getLoggerData(assignedWorkoutId: string): Promise<LoggerDa
         : null,
       history: series,
       sets,
+      implements: bells,
     };
   });
   for (const e of exercises) e.picture = own.get(e.exerciseId) ?? e.picture;
