@@ -31,8 +31,13 @@ describe("coach logger: leaving a field saves only a real change", () => {
   });
   it("any field that's sent differs", () => {
     const base = setValues(set());
-    for (const o of [{ weight: "140" }, { reps: "9" }, { rpe: "8" }, { note: "grip" }, { completed: false }, { isBodyweight: true }, { isBand: true }])
+    for (const o of [{ weight: "140" }, { reps: "9" }, { rpe: "8" }, { note: "grip" }, { completed: false }, { isBodyweight: true }, { isBand: true }, { implements: 2 }, { implements: 1 }])
       expect(setValues(set(o))).not.toBe(base);
+  });
+  it("per hand is a change: on, off, and off against not recorded", () => {
+    expect(setValues(set({ implements: 2 }))).not.toBe(setValues(set({ implements: 1 })));
+    expect(setValues(set({ implements: 1 }))).not.toBe(setValues(set({ implements: null })));
+    expect(setValues(set({ implements: null }))).toBe(setValues(set()));
   });
   it("a hidden weight or band colour doesn't count", () => {
     expect(setValues(set({ isBodyweight: true, weight: "135" }))).toBe(setValues(set({ isBodyweight: true, weight: "" })));

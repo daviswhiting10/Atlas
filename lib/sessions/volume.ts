@@ -9,21 +9,26 @@
  * to the library's unit for the exercise.
  */
 import { CATALOG_BY_SLUG } from "@/lib/plan/catalog";
+import { bellCount } from "@/lib/exercises/implements";
 
-export type VolumeSet = { weight: number | null; reps: number | null; completed?: boolean; timed?: boolean };
+/** `implements`: bells held (2 = a dumbbell in each hand); null or missing counts as one (lib/exercises/implements.ts). */
+export type VolumeSet = { weight: number | null; reps: number | null; completed?: boolean; timed?: boolean; implements?: number | null };
 
-/** Weight × reps of one completed, loaded, rep-based set; 0 for anything else (a timed or cardio set, bodyweight, unticked). */
+/**
+ * Weight × reps (× bells held) of one completed, loaded, rep-based set; 0 for anything else (a timed or cardio set,
+ * bodyweight, unticked). Load moved only: records, e1RM and charts stay per bell.
+ */
 export function setVolume(s: VolumeSet): number {
   if (s.timed || s.completed === false || s.weight == null || s.weight <= 0 || s.reps == null || s.reps <= 0) return 0;
-  return s.weight * s.reps;
+  return s.weight * s.reps * bellCount(s.implements);
 }
 
 /** The weight lifted over a list of sets (see `setVolume`). */
 export const volumeOf = (sets: VolumeSet[]): number => sets.reduce((n, s) => n + setVolume(s), 0);
 
 /** The athlete done screen's "Weight lifted": each exercise's ticked sets, a timed one (unit "secs", cardio too) left out. */
-export const loggedVolume = (exercises: Array<{ unit: "reps" | "secs"; sets: Array<{ weight: number | null; reps: number | null; done: boolean }> }>): number =>
-  exercises.reduce((sum, e) => sum + volumeOf(e.sets.map((s) => ({ weight: s.weight, reps: s.reps, completed: s.done, timed: e.unit === "secs" }))), 0);
+export const loggedVolume = (exercises: Array<{ unit: "reps" | "secs"; sets: Array<{ weight: number | null; reps: number | null; done: boolean; implements?: number | null }> }>): number =>
+  exercises.reduce((sum, e) => sum + volumeOf(e.sets.map((s) => ({ weight: s.weight, reps: s.reps, completed: s.done, timed: e.unit === "secs", implements: s.implements }))), 0);
 
 /** A prescription whose reps are seconds: its first set's unit is "secs", or it is logged as cardio. */
 export function timedRx(prescribedSets: unknown, mode?: string | null): boolean {

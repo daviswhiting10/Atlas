@@ -531,6 +531,9 @@ model SetLog {
   /// Cardio exercises (mode CARDIO): metres covered, and the seconds each split took, in order. `reps` holds the seconds.
   distanceM                 Float?
   splits                    Json?
+  /// Bells held for a dumbbell or kettlebell set: 2 = per hand (the weight is one bell), 1 = one bell. null = not
+  /// recorded (older sets, other equipment): counted as one. Only load-moved totals use it; records stay per bell.
+  implements                Int?
   completed                 Boolean                  @default(true)
   createdAt                 DateTime                 @default(now())
 

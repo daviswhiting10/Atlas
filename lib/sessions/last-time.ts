@@ -7,6 +7,9 @@
  * days) the client did the exercise, never the session being logged, and
  * the coach's newest note on it.
  *
+ * The same read gives each exercise's last "per hand" choice (lib/exercises/implements.ts): the newest set in the window
+ * with `implements` recorded, older sets (null) skipped.
+ *
  * Callers check the client belongs to the workspace first.
  */
 
@@ -47,18 +50,20 @@ export async function lastPerformanceFor(input: {
   /** The plan workout being logged: its own session is never "last time". */
   excludeAssignedWorkoutId?: string | null;
   now?: Date;
-}): Promise<Map<string, LastSet[]>> {
+}): Promise<{ sets: Map<string, LastSet[]>; implements: Map<string, number> }> {
   const ids = Array.from(new Set(input.exerciseIds));
-  if (ids.length === 0) return new Map();
+  if (ids.length === 0) return { sets: new Map(), implements: new Map() };
   const cutoff = new Date(input.now ?? Date.now());
   cutoff.setDate(cutoff.getDate() - 90);
   const exclude = input.excludeAssignedWorkoutId ?? null;
   // At most 20 rows per exercise (getLastPerformance's cap), newest session first: never every set.
-  // Off-plan sessions have no plan workout, so NULL is kept explicitly.
-  const rows = await prisma.$queryRaw<Array<{ exerciseId: string; weight: number | null; reps: number | null; rpe: number | null; completed: boolean; date: Date }>>(Prisma.sql`
-    SELECT "exerciseId", weight, reps, rpe, completed, date FROM (
+  // Off-plan sessions have no plan workout, so NULL is kept explicitly. "lastImplements": the newest recorded choice in the
+  // whole window (not only the 20 rows), nulls ordered last.
+  const rows = await prisma.$queryRaw<Array<{ exerciseId: string; weight: number | null; reps: number | null; rpe: number | null; completed: boolean; date: Date; lastImplements: number | null }>>(Prisma.sql`
+    SELECT "exerciseId", weight, reps, rpe, completed, date, "lastImplements" FROM (
       SELECT s."exerciseId", s.weight, s.reps, s.rpe, s.completed, w.date, s."createdAt",
-             ROW_NUMBER() OVER (PARTITION BY s."exerciseId" ORDER BY w.date DESC, s."createdAt" ASC) AS rn
+             ROW_NUMBER() OVER (PARTITION BY s."exerciseId" ORDER BY w.date DESC, s."createdAt" ASC) AS rn,
+             FIRST_VALUE(s.implements) OVER (PARTITION BY s."exerciseId" ORDER BY s.implements IS NULL, w.date DESC, s."createdAt" DESC) AS "lastImplements"
       FROM "SetLog" s
       JOIN "WorkoutLog" w ON w.id = s."workoutLogId"
       WHERE w."clientId" = ${input.clientId}
@@ -68,7 +73,12 @@ export async function lastPerformanceFor(input: {
     ) ranked
     WHERE rn <= 20
     ORDER BY "exerciseId", date DESC, "createdAt" ASC`);
-  return lastSetsByExercise(rows.map(({ date, ...r }) => ({ ...r, day: new Date(date).toISOString().slice(0, 10) })));
+  const bells = new Map<string, number>();
+  for (const r of rows) if (r.lastImplements != null) bells.set(r.exerciseId, Number(r.lastImplements));
+  return {
+    sets: lastSetsByExercise(rows.map(({ exerciseId, weight, reps, rpe, completed, date }) => ({ exerciseId, weight, reps, rpe, completed, day: new Date(date).toISOString().slice(0, 10) }))),
+    implements: bells,
+  };
 }
 
 /** The coach's newest note on each exercise for this client. */

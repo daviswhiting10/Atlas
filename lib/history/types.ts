@@ -20,6 +20,8 @@ export type HistorySet = {
   mobility?: boolean;
   /** The reps are seconds (a plank, a carry, a hold): counted by its time, not as a set, and never as weight × seconds. */
   timed?: boolean;
+  /** Bells held (2 = per hand): tonnage only. Null or missing = one. */
+  implements?: number | null;
   completed: boolean;
 };
 

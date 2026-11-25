@@ -27,6 +27,8 @@ export type DerivedSet = {
   deload: boolean;
   /** The reps are seconds (a hold, a carry, cardio): no tonnage. */
   timed?: boolean;
+  /** Bells held (2 = per hand): tonnage counts both; records stay per bell. Null or missing = one. */
+  implements?: number | null;
 };
 
 export type ExerciseSession = {

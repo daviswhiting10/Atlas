@@ -9,6 +9,7 @@ import { PlanNotLive } from "./PlanNotLive";
 import { pictureFor, type Picture } from "@/lib/exercises/pictures";
 import { blobConfigured, mediaPictures } from "@/lib/exercises/media";
 import { addedOffer } from "@/lib/sessions/added-store";
+import { startImplements, type Bells } from "@/lib/exercises/implements";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ export type LoggerExercise = {
   prevWorkoutSets: PrevSet[];
   lastNote: string | null;
   suggestion: ProgressionSuggestion;
+  /** A dumbbell or kettlebell: what a new set starts at (2 = per hand), from the client's last choice or the catalog. Null otherwise. */
+  implements: Bells | null;
   /** What the movement looks like, when the library has it. */
   picture: Picture | null;
 };
@@ -65,6 +68,7 @@ export type ExistingSetLog = {
   rpe: number | null;
   note: string | null;
   completed: boolean;
+  implements: number | null;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -170,7 +174,7 @@ export default async function LogPage({
   // "Last time", notes and the coach's own pictures for every exercise ride in the same round:
   // one query each, not a few per exercise (lib/sessions/last-time).
   const exerciseIds = assignedWorkout.exercises.map((e) => e.exerciseId);
-  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog, lastSetsById, lastNoteById, own, lastAdded] =
+  const [sourceExercisesRaw, prevWorkout, availableWorkouts, existingLog, lastTime, lastNoteById, own, lastAdded] =
     await Promise.all([
       // (a) Source section fallback — only fetch if any section is null
       anyMissingSection && assignedWorkout.sourceWorkoutId
@@ -243,6 +247,7 @@ export default async function LogPage({
               rpe: true,
               note: true,
               completed: true,
+              implements: true,
             },
           },
         },
@@ -282,7 +287,7 @@ export default async function LogPage({
   const goal = client.primaryGoal ?? "general";
 
   const exercises: LoggerExercise[] = assignedWorkout.exercises.map((awe) => {
-      const lastSets = lastSetsById.get(awe.exerciseId) ?? [];
+      const lastSets = lastTime.sets.get(awe.exerciseId) ?? [];
       const lastNote = lastNoteById.get(awe.exerciseId) ?? null;
 
       const prescribedSets = awe.prescribedSets as PrescribedSet[];
@@ -313,6 +318,7 @@ export default async function LogPage({
         prevWorkoutSets: prevWorkoutSetsByExercise[awe.exerciseId] ?? [],
         lastNote,
         suggestion,
+        implements: startImplements(awe.exercise, lastTime.implements.get(awe.exerciseId)),
         picture: own.get(awe.exerciseId) ?? pictureFor({ name: awe.exercise.name, gifUrl: awe.exercise.gifUrl }),
       };
     });

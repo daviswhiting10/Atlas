@@ -12,7 +12,7 @@ export function rxAt<T extends { setNumber: number }>(prescribed: T[], i: number
 }
 
 /** What a save of a set sends, as one comparable string (the fields logSet gets), so a field left unchanged sends nothing. */
-export function setValues(x: { weight: string; isBodyweight: boolean; isBand: boolean; bandColor: string; reps: string; rpe: string; note: string; completed: boolean }): string {
+export function setValues(x: { weight: string; isBodyweight: boolean; isBand: boolean; bandColor: string; reps: string; rpe: string; note: string; completed: boolean; implements?: number | null }): string {
   const weight = x.isBodyweight || x.isBand ? null : x.weight ? parseFloat(x.weight) : null;
-  return JSON.stringify([weight, x.isBand ? x.bandColor : null, x.reps ? parseInt(x.reps, 10) : null, x.rpe ? parseFloat(x.rpe) : null, x.note.trim() || null, x.completed]);
+  return JSON.stringify([weight, x.isBand ? x.bandColor : null, x.reps ? parseInt(x.reps, 10) : null, x.rpe ? parseFloat(x.rpe) : null, x.note.trim() || null, x.completed, x.implements ?? null]);
 }
