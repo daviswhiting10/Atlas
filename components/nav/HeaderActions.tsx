@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut, MoreHorizontal, PlayCircle, RotateCcw, Scale, Settings } from "lucide-react";
+import { KeyRound, LogOut, MoreHorizontal, PlayCircle, RotateCcw, Scale, Settings } from "lucide-react";
+import { LeaveSheet } from "@/components/athlete/LeaveSheet";
+import { PasswordSheet } from "@/components/athlete/PasswordSheet";
 import { BodyWeightSheet } from "@/components/athlete/BodyWeightSheet";
 import { RestartPlanSheet } from "@/components/athlete/RestartPlanSheet";
 import { DemoChip } from "@/components/DemoChip";
@@ -20,11 +22,13 @@ const ICON = "press flex h-11 w-11 items-center justify-center rounded-full text
  * The header's right side, for both sides of the app (one component, not a copy in each header).
  * What shows where is decided by lib/header-actions.
  */
-export function HeaderActions({ side, demo, isCoach, restartPlan = false }: { side: Side; demo: boolean; isCoach: boolean; /** ...and Restart plan (not a guest or a demo account). */ restartPlan?: boolean }) {
+export function HeaderActions({ side, demo, isCoach, restartPlan = false, canPassword = false, guest = false }: { side: Side; demo: boolean; isCoach: boolean; /** ...and Restart plan (not a guest or a demo account). */ restartPlan?: boolean; /** A real account (not a guest, a demo, or a coach: theirs is in Settings): Password. */ canPassword?: boolean; /** A guest: signing out asks first. */ guest?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [weighIn, setWeighIn] = useState(false);
   const [restart, setRestart] = useState(false);
+  const [password, setPassword] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const render = (a: HeaderAction) => {
     switch (a) {
@@ -59,9 +63,26 @@ export function HeaderActions({ side, demo, isCoach, restartPlan = false }: { si
               <DropdownMenuItem className="min-h-11" onClick={() => setWeighIn(true)}>
                 <Scale className="mr-2 h-4 w-4" /> Add body weight
               </DropdownMenuItem>
+              {canPassword && !isCoach && (
+                <DropdownMenuItem className="min-h-11" onClick={() => setPassword(true)}>
+                  <KeyRound className="mr-2 h-4 w-4" /> Password
+                </DropdownMenuItem>
+              )}
               {!demo && (
                 <DropdownMenuItem className="min-h-11" onClick={() => router.push(`/demo?from=${encodeURIComponent(pathname)}`)}>
                   <PlayCircle className="mr-2 h-4 w-4" /> Demo
+                </DropdownMenuItem>
+              )}
+              {/* An athlete's Sign out lives here only (a guest is asked first). */}
+              {!isCoach && (
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onClick={() => {
+                    if (guest) return void setLeaving(true);
+                    void import("@/lib/sign-out").then((m) => m.signOutAndForget(`${window.location.origin}/`));
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" /> Sign out
                 </DropdownMenuItem>
               )}
               {/* A coach's phone has no More on the Me side: Settings and Sign out live here (desktop has the icons). */}
@@ -92,6 +113,8 @@ export function HeaderActions({ side, demo, isCoach, restartPlan = false }: { si
       ))}
       {weighIn && <BodyWeightSheet onClose={() => setWeighIn(false)} />}
       {restart && <RestartPlanSheet onClose={() => setRestart(false)} />}
+      {password && <PasswordSheet onClose={() => setPassword(false)} />}
+      {leaving && <LeaveSheet onClose={() => setLeaving(false)} />}
     </div>
   );
 }

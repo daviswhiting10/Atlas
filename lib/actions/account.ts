@@ -297,3 +297,12 @@ export async function resetPassword(raw: { token: string; password: string; allo
   ]).catch((err) => console.error("[reset: clear limits]", err));
   return { ok: true, email: user.email };
 }
+
+/** Whether the signed-in account has a password yet, and its email: what the header's Password sheet shows. Own account only. */
+export async function passwordStatus(): Promise<{ email: string; hasPassword: boolean } | null> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return null;
+  const user = await prisma.user.findUnique({ where: { id }, select: { email: true, passwordHash: true } });
+  return user ? { email: user.email ?? "", hasPassword: user.passwordHash != null } : null;
+}

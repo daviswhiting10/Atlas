@@ -101,7 +101,7 @@ export function TodayScreen({
           <p className={label}>Plan</p>
           <h2 className="mt-3 text-[44px] font-semibold leading-none tracking-[-0.04em] text-ink">Complete.</h2>
           {athlete.selfServe && (
-            <Link href={`${base}/you?goals=1`} className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text sm:max-w-sm">
+            <Link href={`${base}/plan/new`} className="press mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text sm:max-w-sm">
               Build the next one
             </Link>
           )}
@@ -130,7 +130,7 @@ export function TodayScreen({
           <Link href={`${base}/workouts/new`} className="press flex h-14 w-full items-center justify-center rounded-2xl bg-dusk-button text-[17px] font-semibold text-dusk-button-text hover:bg-dusk-button/90 sm:max-w-sm">
             Log a workout
           </Link>
-          <Link href={`${base}/you?goals=1`} className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
+          <Link href={`${base}/plan/new`} className="press mt-1 flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-ink-soft hover:text-ink sm:max-w-sm">
             Choose a plan
           </Link>
         </section>

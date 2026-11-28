@@ -3,14 +3,35 @@ import { describe, expect, it } from "vitest";
 
 const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
-describe("You: the demo's AI-assistant link is in How it works, not its own row", () => {
-  it("is no longer a row on You", () => {
-    expect(src("components/athlete/YouScreen.tsx")).not.toContain("Watch an AI assistant");
-    expect(src("components/athlete/YouScreen.tsx")).toContain("aiDemo={athlete.isDemo}");
+describe("You: one screen, scannable", () => {
+  const y = src("components/athlete/YouScreen.tsx");
+  it("has no How it works, no Change goals / Close / Sign out buttons, no password panel, no goals wizard", () => {
+    for (const gone of ["HowItWorks", "GoalsPanel", "SignOutButton", "PasswordPanel", "PlanWizard", "OwnProgramPicker"]) expect(y).not.toContain(gone);
   });
-  it("is the last step of the How it works sheet, for the demo only", () => {
+  it("is the person, the plan as one link, and Goals & challenges", () => {
+    expect(y).toContain("Your plan");
+    expect(y).toContain("href={`${base}/plan`}");
+    expect(y).toContain("{challenges}");
+  });
+  it("an old /you?goals=1 link lands on New plan", () => {
+    expect(src("app/(client)/you/page.tsx")).toContain('redirect("/plan/new")');
+  });
+  it("How it works stays where the demo link to the AI walkthrough is: its last step", () => {
     const s = src("components/HowItWorks.tsx");
     expect(s).toContain("aiDemo && step === last");
     expect(s).toContain("/agents#demo");
+  });
+});
+
+describe("the ⋯ menu: Password and Sign out", () => {
+  const h = src("components/nav/HeaderActions.tsx");
+  it("an athlete signs out from the ⋯ menu (a guest is asked first); a real account can set a password there", () => {
+    expect(h).toContain("An athlete's Sign out lives here only");
+    expect(h).toContain("setLeaving(true)");
+    expect(h).toContain("canPassword && !isCoach");
+    expect(h).toContain("<PasswordSheet");
+  });
+  it("the layout offers the password only to a real account (not a guest, a demo or a coach)", () => {
+    expect(src("app/(client)/layout.tsx")).toContain("canPassword={!athlete.isGuest && !athlete.isDemo && !athlete.isCoach}");
   });
 });
