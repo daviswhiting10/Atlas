@@ -66,6 +66,7 @@ npx tsx scripts/exercise-cleanup/undo.ts <batch-id> --only <exercise-id>
 - `RESEND_API_KEY= AUTH_URL=http://localhost:3000 NEXTAUTH_URL=http://localhost:3000 AUTH_TRUST_HOST=true npx next dev`. With an empty Resend key, sign-in links print to the dev log.
 - Tests: `npx vitest run`. Types: `npx tsc --noEmit -p .`. Lint: `npx next lint`.
 - Push to `main` deploys to https://atlas-red-eight.vercel.app. Commit or push only when the user asks.
+- Ships go through `scripts/release/` (`queue.sh` → `release.sh`: checks, build, Monday loop on :3950, push, deploy, `health.sh`). Logs in `~/Documents/atlas-release-logs`. See scripts/release/README.md. Don't keep ship scripts in a temp folder.
 - Never show token values. Never `vercel env pull .env.local` (it wipes local vars). The user enters tokens into Vercel.
 
 ## Which model for which task
