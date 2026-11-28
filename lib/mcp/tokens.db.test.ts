@@ -18,7 +18,7 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
   let prisma: typeof import("@/lib/db/client").prisma;
   let ws = "";
   const tag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const P = {} as Record<"coach" | "selfServe" | "coached" | "other", Person>;
+  const P = {} as Record<"coach" | "selfServe" | "coached" | "other" | "ny", Person>;
   let planWorkouts: Array<{ id: string; exercises: Array<{ exerciseId: string }> }> = [];
 
   /** Sign the mocked session in as a person, the way the jwt callback fills it. */
@@ -668,6 +668,40 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
       const own = await prisma.clientProfile.create({ data: { workspaceId: ws, userId: P.coach.user, fullName: "Me", status: "ACTIVE" }, select: { id: true } });
       expect(await zoneFor((await lookupClient(own.id, ws))!, undefined)).toBe("America/Chicago");
       await prisma.clientProfile.delete({ where: { id: own.id } });
+    }, 60_000);
+
+    it("create_plan_from_outline: with no startDate, week 1 starts on today in the person's zone, not the server's", async () => {
+      const { executeTool } = await import("./tool");
+      const { createPlanFromOutline } = await import("./tools/outline");
+      const { getActiveProgram } = await import("./tools/programs");
+      const { lookupClient } = await import("./data");
+      const deps = { transport: "http" as const, audit: async () => {}, lookupClient, allowWrite: async () => true };
+      // A new self-serve athlete with no goal and no plan, their zone saved from the browser.
+      const user = await prisma.user.create({ data: { email: `${tag}-ny@example.test`, role: "CLIENT", workspaceId: ws, timeZone: "America/New_York" }, select: { id: true } });
+      const cp = await prisma.clientProfile.create({ data: { workspaceId: ws, userId: user.id, fullName: "Nia York", status: "ACTIVE", goalTargets: { athlete: { demo: false } } }, select: { id: true } });
+      P.ny = { user: user.id, client: cp.id, email: `${tag}-ny@example.test` }; // cleaned up with the others
+      const caller = { userId: user.id, role: "CLIENT" as const, workspaceId: ws, clientProfileId: cp.id };
+      const outline = { name: "Evening plan", weeks: 2, days: [{ name: "Day 1", exercises: [{ exercise: "Back Squat", prescription: "3x5" }] }, { name: "Day 2", exercises: [{ exercise: "Romanian Deadlift", prescription: "3x8" }] }] };
+      const program = async () => ((await executeTool(getActiveProgram, caller, {}, deps)) as { data: { program: { startDate: string; workouts: Array<{ scheduledDate: string; week: number }> } } }).data.program;
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(new Date("2026-11-28T02:30:00Z")); // 21:30 on the 27th in New York; already the 28th in UTC
+        expect((await executeTool(createPlanFromOutline, caller, outline, deps)).outcome).toBe("ok");
+        let p = await program();
+        expect(p.startDate).toBe("2026-11-27");
+        expect(p.workouts[0].scheduledDate).toBe("2026-11-27"); // day 1 today; day 2 spread later in the week
+        // The argument comes first.
+        expect((await executeTool(createPlanFromOutline, caller, { ...outline, timezone: "UTC" }, deps)).outcome).toBe("ok");
+        expect((await program()).startDate).toBe("2026-11-28");
+        // A given startDate is that calendar day as written, whatever the zone (even one past UTC+12).
+        await prisma.user.update({ where: { id: user.id }, data: { timeZone: "Pacific/Auckland" } });
+        expect((await executeTool(createPlanFromOutline, caller, { ...outline, startDate: "2026-12-07" }, deps)).outcome).toBe("ok");
+        p = await program();
+        expect(p.startDate).toBe("2026-12-07");
+        expect(p.workouts[0].scheduledDate).toBe("2026-12-07");
+      } finally {
+        vi.useRealTimers();
+      }
     }, 60_000);
   });
 });
