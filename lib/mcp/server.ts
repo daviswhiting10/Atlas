@@ -12,7 +12,7 @@ import type { McpCaller, McpTransport } from "./context";
 import { lookupClient, lookupOwnClient } from "./data";
 import { allowMcpWrite } from "./write-limit";
 import { executeTool, type ToolDef, type ToolDeps, type ToolResult } from "./tool";
-import { getExerciseHistory, getWorkoutHistory, logWorkout } from "./tools/workouts";
+import { getExerciseHistory, getWorkoutHistory, logOffPlanWorkout, logWorkout } from "./tools/workouts";
 import { analyzeProgress } from "./tools/progress";
 import { generateProgram, getActiveProgram } from "./tools/programs";
 import { searchExercises } from "./tools/exercises";
@@ -21,8 +21,8 @@ import { editPlan } from "./tools/plan";
 import { createPlanFromOutline } from "./tools/outline";
 
 /**
- * Eleven tools, each a whole job: read the athlete, the plan, the history and
- * the progress; get next-session advice; find an exercise; log a session;
+ * Twelve tools, each a whole job: read the athlete, the plan, the history and
+ * the progress; get next-session advice; find an exercise; log a plan session or an off-plan one;
  * edit the plan; write a new plan from an outline; and (for coaches) draft a program.
  */
 export const TOOLS: ToolDef[] = [
@@ -34,6 +34,7 @@ export const TOOLS: ToolDef[] = [
   getTrainingRecommendations,
   searchExercises,
   logWorkout,
+  logOffPlanWorkout,
   editPlan,
   createPlanFromOutline,
   generateProgram,
@@ -85,8 +86,8 @@ export function createMcpServer(caller: McpCaller, deps: ToolDeps): McpServer {
     {
       instructions:
         caller.role === "CLIENT"
-          ? "Atlas training data for one athlete. Every tool acts on the signed-in athlete's own data; clientId can be omitted. Every result starts with actedOn; say what you logged or changed. Start with get_active_program (the plan, and the ids edits take) or analyze_progress (trends and records). get_training_recommendations says what to do next session and which lifts have stalled. Change the plan with edit_plan, write a new one with create_plan_from_outline (self-serve athletes), and record a session with log_workout; nothing deletes logged history. Weights are in pounds."
-          : "Atlas coaching data for one workspace. Whenever the user names a client (or means one), pass that client's clientId. With no clientId, a tool acts on the coach's OWN training (\"my workout\", \"build me a plan\"), when they train in Atlas. Every result starts with actedOn: tell the user whose data you read or changed (\"Logged for you\" or \"Logged for <client name>\"), and if it isn't who they meant, say so before doing anything else. Start with get_active_program (the plan, and the ids edits take) or analyze_progress (trends and records). get_training_recommendations says what to do next session and which lifts have stalled. Change a plan with edit_plan, write a new plan with create_plan_from_outline (a draft for a client; live at once for the coach's own training), and record a session with log_workout. generate_program drafts a program as text and saves nothing. Weights are in pounds.",
+          ? "Atlas training data for one athlete. Every tool acts on the signed-in athlete's own data; clientId can be omitted. Every result starts with actedOn; say what you logged or changed. Start with get_active_program (the plan, and the ids edits take) or analyze_progress (trends and records). get_training_recommendations says what to do next session and which lifts have stalled. Change the plan with edit_plan, write a new one with create_plan_from_outline (self-serve athletes), and record a session with log_workout (a plan workout) or log_off_plan_workout (anything else: a run, a walk, lifts with no plan workout); nothing deletes logged history. Pass timezone (the person's IANA zone) to every tool that takes it, so today is their today. Weights are in pounds."
+          : "Atlas coaching data for one workspace. Whenever the user names a client (or means one), pass that client's clientId. With no clientId, a tool acts on the coach's OWN training (\"my workout\", \"build me a plan\"), when they train in Atlas. Every result starts with actedOn: tell the user whose data you read or changed (\"Logged for you\" or \"Logged for <client name>\"), and if it isn't who they meant, say so before doing anything else. Start with get_active_program (the plan, and the ids edits take) or analyze_progress (trends and records). get_training_recommendations says what to do next session and which lifts have stalled. Change a plan with edit_plan, write a new plan with create_plan_from_outline (a draft for a client; live at once for the coach's own training), and record a session with log_workout (a plan workout) or log_off_plan_workout (a run, a walk, lifts with no plan workout). Pass timezone (the person's IANA zone) to every tool that takes it, so today is their today. generate_program drafts a program as text and saves nothing. Weights are in pounds.",
     }
   );
 

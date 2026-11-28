@@ -25,6 +25,7 @@ const EXPECTED: Record<string, { roles: McpRole[]; permission: string; scope: "c
   get_training_recommendations: { roles: EVERYONE, permission: "read", scope: "client" },
   search_exercises: { roles: EVERYONE, permission: "read", scope: "workspace" },
   log_workout: { roles: EVERYONE, permission: "write", scope: "client" },
+  log_off_plan_workout: { roles: EVERYONE, permission: "write", scope: "client" },
   // Plan editing: an athlete edits their own plan, a coach any client's in their workspace.
   edit_plan: { roles: EVERYONE, permission: "write", scope: "client" },
   // A new plan: a coach's draft for a client, or a self-serve athlete's own live plan (checked in the handler).
@@ -36,6 +37,7 @@ const EXPECTED: Record<string, { roles: McpRole[]; permission: string; scope: "c
 const VALID: Record<string, Record<string, unknown>> = {
   get_exercise_history: { exerciseId: "ex_1" },
   log_workout: { assignedWorkoutId: "aw_1", sets: [{ exerciseId: "ex_1", setNumber: 1, weight: 100, reps: 8 }] },
+  log_off_plan_workout: { cardio: { activity: "run", distance: 3 } },
   generate_program: { goal: "hypertrophy", durationWeeks: 8, sessionsPerWeek: 3, sessionLength: 60, equipment: "full gym" },
   edit_plan: { action: "swap_exercise", planExerciseId: "awe_1", slug: "plank" },
   create_plan_from_outline: { name: "Block", days: [{ name: "Day 1", exercises: [{ exercise: "Back Squat", prescription: "3x8" }] }] },

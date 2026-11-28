@@ -23,7 +23,7 @@ describe("no MCP tool can set the minor flag or touch photos", () => {
   const writes = TOOLS.filter((t) => t.permission === "write");
 
   it("covers the write tools", () => {
-    expect(writes.map((t) => t.name).sort()).toEqual(["create_plan_from_outline", "edit_plan", "log_workout"]);
+    expect(writes.map((t) => t.name).sort()).toEqual(["create_plan_from_outline", "edit_plan", "log_off_plan_workout", "log_workout"]);
   });
 
   it.each(TOOLS.map((t) => [t.name, t] as const))("%s: no isMinor, isYouth or photo field in its input", (_, t) => {
