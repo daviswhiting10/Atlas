@@ -21,7 +21,7 @@ import { isCoached } from "@/lib/athlete/coached";
 import { RefreshWhileEmpty } from "@/components/athlete/RefreshWhileEmpty";
 import { PlanView, type PlanActions } from "@/components/athlete/PlanView";
 import { PlanWeek } from "@/components/athlete/PlanWeek";
-import { deleteMySession, reassignMySession, sessionSummary } from "@/lib/actions/athlete";
+import { changeMySessionDate, deleteMySession, reassignMySession, sessionSummary } from "@/lib/actions/athlete";
 import { WeekNotesList } from "@/components/plan/WeekNoteCard";
 import { upNextView } from "@/lib/plan/up-next";
 
@@ -110,7 +110,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         <p className="eyebrow">{upNext.eyebrow}</p>
         <h1 className="mt-1.5 text-[30px] leading-[1.1] text-ink sm:text-[38px]">{plan.name}</h1>
       </div>
-      <PlanWeek plan={plan} today={localDay(new Date(), timeZone)} timeZone={timeZone} totalWeeks={plan.totalWeeks} summary={sessionSummary} deleteSession={deleteMySession} reassign={reassignMySession} />
+      <PlanWeek plan={plan} today={localDay(new Date(), timeZone)} timeZone={timeZone} totalWeeks={plan.totalWeeks} summary={sessionSummary} deleteSession={deleteMySession} changeDate={changeMySessionDate} reassign={reassignMySession} />
       {plan.weekNotes.length > 0 && (
         <div className="mt-6 max-w-3xl">
           <WeekNotesList notes={plan.weekNotes} currentWeek={plan.currentWeek} />

@@ -22,6 +22,7 @@ export function ProgressScreen({
   bodyWeight = [],
   summary = sessionSummary,
   deleteSession,
+  changeDate,
   reassign,
   loadWeeks,
   loadDay,
@@ -36,6 +37,7 @@ export function ProgressScreen({
   summary?: typeof sessionSummary;
   /** A tapped session in History can be deleted, and moved to another day of the plan (not in the demo). */
   deleteSession?: React.ComponentProps<typeof HistoryCalendar>["deleteSession"];
+  changeDate?: React.ComponentProps<typeof HistoryCalendar>["changeDate"];
   reassign?: React.ComponentProps<typeof HistoryCalendar>["reassign"];
   loadWeeks?: React.ComponentProps<typeof HistoryCalendar>["loadWeeks"];
   loadDay?: React.ComponentProps<typeof HistoryCalendar>["loadDay"];
@@ -46,7 +48,7 @@ export function ProgressScreen({
   const lite = liteProgress(data);
   return (
     <div className="pt-4">
-      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} session={{ load: summary, hrefPrefix: "/workouts/", by: "workoutId" }} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} deleteSession={deleteSession} reassign={reassign} loadWeeks={loadWeeks} loadDay={loadDay} />} />
+      <ProgressView data={lite.data} overall={lite.overall} loadSeries={exerciseSeries} goalMetric={athlete.metric} session={{ load: summary, hrefPrefix: "/workouts/", by: "workoutId" }} history={<HistoryCalendar calendar={historyView(calendar)} summary={summary} deleteSession={deleteSession} changeDate={changeDate} reassign={reassign} loadWeeks={loadWeeks} loadDay={loadDay} />} />
       <BodyWeightSection points={bodyWeight} />
       {chapters.length > 0 && (
         <section className="mt-14">
