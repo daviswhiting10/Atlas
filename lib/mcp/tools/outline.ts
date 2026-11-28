@@ -17,7 +17,7 @@ import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 import { canImportPlan } from "@/lib/athlete/empty-state";
 import { saveSheetPlan } from "@/lib/programs/save-sheet-plan";
-import { resolveExercises } from "@/lib/programs/resolve-exercise";
+import { resolveForClient } from "@/lib/programs/resolve-exercise";
 import { addSuggestion, coreGaps, rangeAddedLines } from "@/lib/programs/plan-rules";
 import { parseSetsReps, type SheetGrid } from "@/lib/programs/sheet-plan";
 import { ALL_ROLES } from "../auth";
@@ -26,7 +26,7 @@ import { ClientIdArg, IsoDate } from "../schemas";
 import { clientTool } from "../tool";
 
 const OutlineExercise = z.object({
-  exercise: z.string().trim().min(2).max(80).describe("Exercise name, e.g. 'Back Squat', 'DB Bench Press'. Matched to the library; a name it doesn't know becomes the workspace's own exercise."),
+  exercise: z.string().trim().min(2).max(80).describe("Exercise name, e.g. 'Back Squat', 'DB Bench Press'. Matched to what this person already logs first (so the plan continues their history), then the workspace's exercises, then the library; a name nothing knows becomes the workspace's own exercise. The result says what each name matched."),
   prescription: z.string().trim().min(1).max(40).describe("Sets x reps as a coach writes it: '3x8-10', '5x5', '3x30 sec', '1x20 min'. A lone number of 6 or more reps becomes a range (3x10 → 3x8-10)."),
   notes: z.string().max(300).optional(),
 });
@@ -68,16 +68,7 @@ export const createPlanFromOutline = clientTool({
       }
     }
 
-    // Every name matched the way the importer matches them; one it doesn't know is created for this workspace, never dropped.
-    const started = new Date();
-    const asWritten = Array.from(new Set(args.days.flatMap((d) => d.exercises.map((e) => e.exercise))));
-    const found = await resolveExercises(asWritten, client.workspaceId);
-    const created = new Set(
-      (await prisma.exercise.findMany({ where: { id: { in: Array.from(found.values(), (e) => e.id) }, workspaceId: client.workspaceId, createdAt: { gte: started } }, select: { id: true } })).map((e) => e.id),
-    );
-
-    // The outline as the importer reads a sheet: week 1 written out, repeated for the plan's length. The save matches the
-    // same names again and lands on the same exercises (any new ones exist now).
+    // The outline as the importer reads a sheet: week 1 written out, repeated for the plan's length.
     let grid: SheetGrid = {
       programName: args.name,
       days: args.days.map((d) => ({ name: d.name, exercises: d.exercises.map((e) => ({ name: e.exercise, notes: e.notes, weeks: [{ week: 1, setsReps: e.prescription }] })) })),
@@ -85,6 +76,11 @@ export const createPlanFromOutline = clientTool({
     const gaps = coreGaps(grid);
     if (args.addSuggestedCore) for (const g of gaps) grid = addSuggestion(grid, g.day, g.slug);
     const rangesAdded = rangeAddedLines(grid);
+
+    // Every name matched to what this person already logs first, so the plan continues their lifts (resolveForClient);
+    // one nothing knows is created for this workspace, never dropped.
+    const asWritten = Array.from(new Set(args.days.flatMap((d) => d.exercises.map((e) => e.exercise))));
+    const found = await resolveForClient(Array.from(new Set(grid.days.flatMap((d) => d.exercises.map((e) => e.name)))), client);
 
     // Live now for an athlete's own plan, and for a coach's OWN training (no coach screen shows a draft of it, so a draft
     // there could never be assigned). A coach writing for a client still gets a draft.
@@ -101,6 +97,7 @@ export const createPlanFromOutline = clientTool({
       context: { durationWeeks: args.weeks, trainingDays: null, startAtWeek: 1 },
       history: false,
       status: live ? "ACTIVE" : "PAUSED",
+      matched: found,
     });
 
     return {
@@ -109,7 +106,7 @@ export const createPlanFromOutline = clientTool({
       status: live ? "ACTIVE" : "DRAFT",
       weeks: saved.weeks,
       daysPerWeek: saved.days,
-      exercises: asWritten.map((n) => ({ asWritten: n, savedAs: found.get(n)!.name, exerciseId: found.get(n)!.id, newExercise: created.has(found.get(n)!.id) })),
+      exercises: asWritten.map((n) => ({ asWritten: n, matched: found.get(n)!.name, exerciseId: found.get(n)!.id, how: found.get(n)!.how })),
       rangesAdded,
       coreWork: gaps.map((g) => ({ day: g.dayName, suggestion: `${g.name}, ${g.dose}`, added: args.addSuggestedCore })),
       previousPlan: live

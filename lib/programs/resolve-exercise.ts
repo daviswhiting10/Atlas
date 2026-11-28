@@ -2,13 +2,17 @@ import { prisma } from "@/lib/db/client";
 import { CATALOG } from "@/lib/plan/catalog";
 import { createCustomExercise } from "@/lib/exercises/create";
 import { findExerciseByName, liveExercise, visibleTo } from "@/lib/exercises/find";
+import { bestMatch, type Candidate } from "@/lib/exercises/match";
+
+/** A matched exercise; `close` when it was a near name (step 3), `created` when it's new (step 4). */
+type Resolved = { id: string; name: string; close?: true; created?: true };
 
 /**
  * Match an exercise name from the screenshot to the library: the shared one,
  * or this workspace's own. Anything new is created privately for this
  * workspace, never in the shared library.
  */
-export async function resolveExercise(name: string, workspaceId: string): Promise<{ id: string; name: string }> {
+export async function resolveExercise(name: string, workspaceId: string): Promise<Resolved> {
   const visible = visibleTo(workspaceId);
   // Coaches' shorthand, spelled out: "DB Bench Press" is the Dumbbell Bench Press.
   name = expandShorthand(name);
@@ -41,13 +45,13 @@ export async function resolveExercise(name: string, workspaceId: string): Promis
         // Not a combined entry ("Band Pull-Apart / Face Pull") unless that's what was asked for.
         .filter((c) => !labelled(c.name) && words(c.name) <= words(name) + 2 && (name.includes("/") || !c.name.includes("/")))
         .sort((a, b) => a.name.length - b.name.length)[0] ?? null;
-    if (ex) return ex;
+    if (ex) return { ...ex, close: true };
   }
 
   // 4) create it, private to this workspace (the same path the picker uses)
   const created = await createCustomExercise(workspaceId, name);
   if (!created) throw new Error("That exercise has no name.");
-  return { id: created.id, name: created.name };
+  return { id: created.id, name: created.name, created: true };
 }
 
 const SHORTHAND: Array<[RegExp, string]> = [
@@ -71,8 +75,8 @@ export function expandShorthand(name: string): string {
  * query and exact names in another (the workspace's own first); only the names neither finds go through the one-by-one
  * path (alternate names, the same name written differently, a near match, or a new exercise). Keys are the names as given.
  */
-export async function resolveExercises(names: string[], workspaceId: string): Promise<Map<string, { id: string; name: string }>> {
-  const out = new Map<string, { id: string; name: string }>();
+export async function resolveExercises(names: string[], workspaceId: string): Promise<Map<string, Resolved>> {
+  const out = new Map<string, Resolved>();
   const expanded = new Map(names.map((n) => [n, expandShorthand(n)] as const));
   const lower = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -121,3 +125,58 @@ export async function resolveExercises(names: string[], workspaceId: string): Pr
   return out;
 }
 
+
+export type How = "your history" | "workspace" | "library" | "close match" | "new";
+
+/**
+ * Names an AI wrote for one person (the MCP tools), so a new plan continues the lifts they already log:
+ *  1. an exercise this person has logged: the best name match (lib/exercises/match), the most logged sets among
+ *     genuine matches; a merged exercise counts as its survivor;
+ *  2. the workspace's own exercises, by the same match;
+ *  3. the shared library and the importer's fallbacks (resolveExercises): a close match, else a new exercise for
+ *     this workspace. Never dropped.
+ */
+export async function resolveForClient(names: string[], client: { id: string; workspaceId: string }): Promise<Map<string, { id: string; name: string; how: How }>> {
+  const history = await loggedExercises(client);
+  const own: Candidate[] = (await prisma.exercise.findMany({ where: { workspaceId: client.workspaceId, mergedIntoId: null }, select: { id: true, name: true } })).map((e) => ({ ...e, sets: 0 }));
+
+  const out = new Map<string, { id: string; name: string; how: How }>();
+  const rest: string[] = [];
+  for (const n of names) {
+    const hit = bestMatch(n, history) ?? bestMatch(n, own);
+    if (hit) out.set(n, { id: hit.id, name: hit.name, how: history.includes(hit) ? "your history" : "workspace" });
+    else rest.push(n);
+  }
+  if (rest.length === 0) return out;
+
+  const found = await resolveExercises(rest, client.workspaceId);
+  const logged = new Set(history.map((h) => h.id));
+  const shared = new Set((await prisma.exercise.findMany({ where: { id: { in: Array.from(found.values(), (f) => f.id) }, workspaceId: null }, select: { id: true } })).map((e) => e.id));
+  for (const n of rest) {
+    const f = found.get(n)!;
+    // An alternate name can still land on something they've logged.
+    const how: How = logged.has(f.id) ? "your history" : f.created ? "new" : f.close ? "close match" : shared.has(f.id) ? "library" : "workspace";
+    out.set(n, { id: f.id, name: f.name, how });
+  }
+  return out;
+}
+
+/** Every exercise this person has logged a set of, as it stands now (merged ones as their survivor), with its set count. */
+async function loggedExercises(client: { id: string; workspaceId: string }): Promise<Candidate[]> {
+  const rows = await prisma.setLog.groupBy({
+    by: ["exerciseId"],
+    where: { workoutLog: { clientId: client.id }, completed: true, exerciseId: { not: null } },
+    _count: { _all: true },
+  });
+  const exercises = await prisma.exercise.findMany({ where: { id: { in: rows.map((r) => r.exerciseId!) } }, select: { id: true, name: true, workspaceId: true, mergedIntoId: true } });
+  const sets = new Map<string, Candidate>();
+  for (const r of rows) {
+    let ex = exercises.find((e) => e.id === r.exerciseId);
+    if (ex?.mergedIntoId) ex = (await liveExercise(ex.id)) ?? undefined;
+    if (!ex || ex.mergedIntoId || (ex.workspaceId !== null && ex.workspaceId !== client.workspaceId)) continue;
+    const c = sets.get(ex.id) ?? { id: ex.id, name: ex.name, sets: 0 };
+    c.sets += r._count._all;
+    sets.set(ex.id, c);
+  }
+  return Array.from(sets.values());
+}
