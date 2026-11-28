@@ -6,10 +6,11 @@ import { format, parseISO } from "date-fns";
 import { ChevronDown, Search, X } from "lucide-react";
 import type { ExerciseProgress, ProgressData } from "@/lib/athlete/data";
 import type { FocusMetric } from "@/lib/plan/generator";
-import { formatValue, metricFor, shortFor, unitFor } from "@/lib/plan/overload";
+import { formatValue, unitFor } from "@/lib/plan/overload";
 import { overallProgress, type Overall } from "@/lib/progress/overall";
 import type { SessionPoint } from "@/lib/plan/overload";
 import { defaultLift } from "@/lib/progress/default-lift";
+import { strengthHeadline, type HeadlineMetric } from "@/lib/progress/strength-headline";
 import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
 import { SessionSheet } from "@/components/athlete/SessionSheet";
@@ -161,19 +162,14 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
   }, [sheet]);
   const exercise = useMemo(() => (picked ? { ...picked, series: picked.series.length ? picked.series : (fetched[picked.exerciseId] ?? []) } : null), [picked, fetched]);
   const loading = needs;
-  const metric = exercise ? metricFor(goalMetric, exercise.series) : goalMetric;
+  // A loaded lift leads with its estimated 1RM (weight and reps in one number); "Reps" is one tap away. A lift with no weight is reps.
+  const [pickMetric, setPickMetric] = useState<HeadlineMetric>("e1rm");
+  const loadedLift = exercise != null && exercise.loaded && exercise.series.some((p) => p.weight != null);
+  const metric: FocusMetric = exercise ? (loadedLift ? pickMetric : "reps") : goalMetric;
   const OverallC = useLoaded(loadOverall, true);
   const ProgressC = useLoaded(loadProgress, sheet || exercise != null);
 
-  const one = useMemo(() => {
-    if (!exercise) return null;
-    // A deload session is low on purpose, so it is left out of the change.
-    const counted = exercise.series.filter((p) => !p.deload && p[metric] != null);
-    if (counted.length === 0) return null;
-    const first = counted[0][metric] as number;
-    const latest = counted[counted.length - 1][metric] as number;
-    return { latest, change: counted.length > 1 && first ? Math.round(((latest - first) / first) * 100) : null, sessions: counted.length, since: counted[0].date as string };
-  }, [exercise, metric]);
+  const head = useMemo(() => (exercise ? strengthHeadline(exercise.series, metric === "reps" ? "reps" : "e1rm", { loaded: loadedLift, timed: exercise.timed }) : null), [exercise, metric, loadedLift]);
 
   const sessions = data.totals.sessions;
   const record = records ? (data.recentPRs[0] ?? null) : null;
@@ -200,12 +196,24 @@ export function ProgressView({ data, goalMetric, history, overall: given, loadSe
       {exercise ? (
         <Section title="Strength" control={chooser}>
           {loading && <div className="h-[56px]" aria-busy />}
-          {one && (
-            <Big
-              value={one.change != null && one.sessions >= THIN ? `${one.change > 0 ? "+" : ""}${one.change}%` : formatValue(one.latest, metric)}
-              label={one.change != null && one.sessions >= THIN ? sinceLabel(shortFor(metric, exercise.timed), one.since) : unitFor(metric, exercise.loaded, exercise.timed)}
-              accent={one.change != null && one.change > 0 && one.sessions >= THIN}
-            />
+          {head && (
+            <>
+              <Big
+                value={head.pct != null && head.sessions >= THIN ? `${head.pct > 0 ? "+" : ""}${head.pct}%` : head.fallback}
+                label={head.pct != null && head.sessions >= THIN ? head.label : head.pct == null ? head.label : unitFor(metric, exercise.loaded, exercise.timed)}
+                accent={head.pct != null && head.pct > 0 && head.sessions >= THIN}
+              />
+              {head.subtitle && <p className="mt-2 text-[15px] text-ink-soft">{head.subtitle}</p>}
+            </>
+          )}
+          {loadedLift && (
+            <div className="mt-3 inline-flex rounded-full border border-line p-0.5" role="group" aria-label="Measure by">
+              {(["e1rm", "reps"] as const).map((m) => (
+                <button key={m} type="button" aria-pressed={pickMetric === m} onClick={() => setPickMetric(m)} className={cn("press min-h-9 rounded-full px-3.5 text-[13px] font-semibold", pickMetric === m ? "bg-ink text-bone" : "text-ink-mute")}>
+                  {m === "e1rm" ? "Est. 1RM" : "Reps"}
+                </button>
+              ))}
+            </div>
           )}
           {loading && <div className="mt-5 h-[200px]" aria-busy />}
           {exercise.series.length >= THIN && (

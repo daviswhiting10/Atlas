@@ -26,8 +26,11 @@ describe("challenges: a chip on Home, a home for managing them on You", () => {
     expect(read("lib/actions/goals.ts")).toContain("prisma.goal.deleteMany({ where: { id: goalId, clientId } })");
     expect(read("prisma/schema.prisma")).toMatch(/goal\s+Goal\s+@relation\(fields: \[goalId\], references: \[id\], onDelete: Cascade\)/);
   });
-  it("You lists the challenges", () => {
+  it("You lists the challenges, in one Goals & challenges list with starting one", () => {
     expect(read("components/athlete/YouScreen.tsx")).toContain("{challenges}");
-    expect(read("components/challenges/ChallengesList.tsx")).toContain("Running · since");
+    const g = read("components/challenges/GoalsAndChallenges.tsx");
+    expect(g).toContain("Running · since");
+    expect(g).toContain("Start a goal");
+    expect(g).toContain("Goals &amp; challenges");
   });
 });

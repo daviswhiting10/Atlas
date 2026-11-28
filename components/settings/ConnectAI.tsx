@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/lib/actions/mcp-tokens";
 import { inputClass } from "@/components/athlete/account";
 import { claudeCodeCommand, tokenLine } from "@/lib/mcp/connect";
@@ -41,7 +41,12 @@ function CopyButton({ text, label, className }: { text: string; label: string; c
  * Connect your AI: personal tokens that let an assistant (Claude Code, for one) use Atlas as an MCP server.
  * A new token is shown once, on this screen only, and is dropped from state at Done.
  */
-export function ConnectAI({ className }: { className?: string }) {
+/**
+ * `collapsible` (the athlete's You tab): one "Connect your AI" row that opens in place, so You stays one screen. It opens
+ * by itself when the page is reached at #connect-ai (the ⋯ menu's shortcut). Settings shows it open.
+ */
+export function ConnectAI({ className, collapsible = false }: { className?: string; collapsible?: boolean }) {
+  const [open, setOpen] = useState(!collapsible);
   const [tokens, setTokens] = useState<Token[] | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,8 +64,19 @@ export function ConnectAI({ className }: { className?: string }) {
       .catch(() => setError("Couldn't load your tokens."));
   }
   useEffect(() => {
-    void load();
-  }, []);
+    if (open) void load();
+  }, [open]);
+  useEffect(() => {
+    if (!collapsible) return;
+    const fromHash = () => {
+      if (window.location.hash !== "#connect-ai") return;
+      setOpen(true);
+      requestAnimationFrame(() => document.getElementById("connect-ai")?.scrollIntoView({ block: "start" }));
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, [collapsible]);
   useEffect(() => {
     if (created) shownRef.current?.focus();
   }, [created]);
@@ -102,9 +118,20 @@ export function ConnectAI({ className }: { className?: string }) {
 
   return (
     <section aria-labelledby="connect-ai" className={cn("rounded-2xl border border-line bg-paper px-5 py-4", className)}>
-      <h2 id="connect-ai" className="text-[17px] font-semibold text-ink">
-        Connect your AI
-      </h2>
+      {collapsible ? (
+        <h2 id="connect-ai" className="scroll-mt-24 text-[17px] font-semibold text-ink">
+          <button type="button" aria-expanded={open} aria-controls="connect-ai-body" onClick={() => setOpen((o) => !o)} className="press -my-2 flex min-h-11 w-full items-center justify-between gap-3 text-left">
+            Connect your AI
+            <ChevronDown aria-hidden className={cn("h-4 w-4 shrink-0 text-ink-soft transition-transform", open && "rotate-180")} />
+          </button>
+        </h2>
+      ) : (
+        <h2 id="connect-ai" className="scroll-mt-24 text-[17px] font-semibold text-ink">
+          Connect your AI
+        </h2>
+      )}
+      {open && (
+      <div id="connect-ai-body">
       <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">Let an AI assistant read and log your training. Revoke any time.</p>
 
       {created ? (
@@ -180,6 +207,8 @@ export function ConnectAI({ className }: { className?: string }) {
             </li>
           ))}
         </ul>
+      )}
+      </div>
       )}
     </section>
   );

@@ -3,8 +3,9 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Clock, Dumbbell, Flame, HeartPulse, Home, Loader2, PersonStanding, Sparkles, Trophy, Warehouse } from "lucide-react";
-import { DAYS_PER_WEEK, EQUIPMENT, EXPERIENCE, GOALS, GOAL_TEXT_MAX, generatePlan, type Experience, type Goal, type Prefs } from "@/lib/plan/generator";
+import { ArrowLeft, ArrowRight, Check, Clock, Dumbbell, Flame, HeartPulse, Home, Loader2, PersonStanding, Repeat, Sparkles, Warehouse } from "lucide-react";
+import { GOAL_PICKS, applyPick, isPicked, type GoalPick } from "@/lib/plan/goal-picks";
+import { DAYS_PER_WEEK, EQUIPMENT, EXPERIENCE, GOAL_TEXT_MAX, generatePlan, type Experience, type Prefs } from "@/lib/plan/generator";
 import { interpretGoal } from "@/lib/plan/goal";
 import { durationRange } from "@/lib/sessions/duration";
 import type { Equipment } from "@/lib/plan/catalog";
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { ExerciseName } from "@/components/ExerciseName";
 import { AthleteImport } from "./AthleteImport";
 
-const GOAL_ICONS: Record<Goal, typeof Dumbbell> = { muscle: Dumbbell, strength: Trophy, fat_loss: Flame, general: HeartPulse };
+const PICK_ICONS: Record<GoalPick["key"], typeof Dumbbell> = { muscle: Dumbbell, fat_loss: Flame, maintenance: Repeat, pain_free: HeartPulse };
 const EQUIPMENT_ICONS: Record<Equipment, typeof Dumbbell> = { gym: Warehouse, dumbbells: Home, bodyweight: PersonStanding };
 
 function Choice({
@@ -166,7 +167,6 @@ export function PlanWizard({
   const steps = [
     {
       title: "What are you training for?",
-      hint: "Say it in your own words. Atlas reads the goal, any area you want to prioritise, and anything you need to work around.",
       body: (
         <div>
           <label className="block">
@@ -180,34 +180,24 @@ export function PlanWizard({
               className="w-full resize-none rounded-2xl border border-line-strong bg-dusk-raised p-4 text-[17px] leading-relaxed text-ink outline-none transition-shadow placeholder:text-ink-mute focus:border-signal focus:shadow-[0_0_0_3px_rgba(124,199,189,0.18)]"
             />
           </label>
-          <p className="mt-2 min-h-[1.25rem] text-sm text-ink-soft" aria-live="polite">
-            {reading.understood.length > 0 ? (
-              <>
-                <span className="font-semibold text-signal">Atlas read:</span> {reading.understood.join(", ")}.
-              </>
-            ) : (prefs.goalText ?? "").trim() ? (
-              "Nothing specific yet — add a few more words, or use a quick pick below."
-            ) : null}
-          </p>
-
-          <p className="eyebrow mb-2 mt-5">{reading.goal ? "Quick picks — your words above decide the goal" : "Or pick one"}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {(Object.keys(GOALS) as Goal[]).map((g) => {
-              const Icon = GOAL_ICONS[g];
-              const selected = (reading.goal ?? prefs.goal) === g;
+          {/* The four goals, one compact row. Your words above decide the goal when they name one; the highlight shows which. */}
+          <div className="mt-4 grid grid-cols-4 gap-2">
+            {GOAL_PICKS.map((g) => {
+              const Icon = PICK_ICONS[g.key];
+              const selected = isPicked(g, { goal: reading.goal ?? prefs.goal, conditions: prefs.conditions });
               return (
                 <button
-                  key={g}
+                  key={g.key}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => set("goal", g)}
+                  onClick={() => setPrefs((p) => applyPick(p, g))}
                   className={cn(
-                    "press flex items-center gap-2.5 rounded-xl border bg-paper px-3 py-2.5 text-left text-[15px] font-semibold",
+                    "press flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-xl border bg-paper px-1 py-2 text-center text-[12.5px] font-semibold leading-tight",
                     selected ? "border-signal text-ink shadow-[0_0_0_3px_rgba(124,199,189,0.18)]" : "border-line text-ink-soft hover:border-ink/20"
                   )}
                 >
-                  <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-signal" : "text-ink-mute")} />
-                  {GOALS[g].label}
+                  <Icon className={cn("h-5 w-5 shrink-0", selected ? "text-signal" : "text-ink-mute")} />
+                  {g.label}
                 </button>
               );
             })}
@@ -346,7 +336,7 @@ export function PlanWizard({
 
   return (
     <>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
+      <div className={cn("grid gap-8", mode === "signup" && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12")}>
         <div>
           <div className="mb-6 flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${steps.length}`}>
             {steps.map((_, i) => (
@@ -356,7 +346,7 @@ export function PlanWizard({
 
           <div key={step} className="rise">
             <h1 className="font-display text-[34px] leading-[1.1] text-ink sm:text-[40px]">{current.title}</h1>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-mute">{current.hint}</p>
+            {"hint" in current && current.hint && <p className="mt-2.5 text-[15px] leading-relaxed text-ink-mute">{current.hint}</p>}
             {!imported && <div className="mt-7">{current.body}</div>}
             {step === 0 && importer && (
               <div className={imported ? "mt-7" : "rule mt-8 pt-6"}>
@@ -409,7 +399,7 @@ export function PlanWizard({
         </div>
 
         {/* While a plan read from a file is showing, that is the plan: no generated one beside it. */}
-        {!imported && <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />}
+        {!imported && mode === "signup" && <PlanPreview prefs={prefs} className="lg:sticky lg:top-24 lg:self-start" />}
       </div>
       <BuildingOverlay mode={creating ? "plan" : pending} />
     </>

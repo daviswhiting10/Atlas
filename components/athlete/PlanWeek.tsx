@@ -8,7 +8,7 @@ import { cueOf } from "@/lib/plan/up-next";
 import { addDays, defaultDay, openingMonday, planWeekOf, weekBounds, weekGrid, weekRange, type DayCell, type DayItem } from "@/lib/plan/week-grid";
 import { cn } from "@/lib/utils";
 import type { SessionSummary } from "@/lib/actions/athlete";
-import { SessionMini, type SlotWeek } from "@/components/athlete/SessionMini";
+import { SessionMini, type ChangeDate, type SlotWeek } from "@/components/athlete/SessionMini";
 import { slotsByWeek } from "@/lib/sessions/reassign";
 
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
@@ -31,7 +31,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * outlined, today dotted), above the tapped day's cards. Workouts sit on their dates; a done one on the day it was really
  * logged. It opens on today's week. The grid never scrolls.
  */
-export function PlanWeek({ plan, today, timeZone = "UTC", totalWeeks, base = "", summary, deleteSession, reassign }: { plan: PlanOverview; today: string; /** The athlete's timezone: a session is drawn on its day there. */ timeZone?: string; totalWeeks: number; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Move a logged session to another day of the plan. */ reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
+export function PlanWeek({ plan, today, timeZone = "UTC", totalWeeks, base = "", summary, deleteSession, changeDate, reassign }: { plan: PlanOverview; today: string; /** The athlete's timezone: a session is drawn on its day there. */ timeZone?: string; totalWeeks: number; /** A logged day's mini summary (the real one, or the demo's). */ summary?: (id: string) => Promise<SessionSummary | null>; /** Change the calendar day a logged session was done on (not in the demo). */ changeDate?: ChangeDate; /** Delete a logged session (not in the demo). */ deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Move a logged session to another day of the plan. */ reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; /** Prefix for links ("/demo" keeps the demo inside /demo). */ base?: string }) {
   const [monday, setMonday] = useState(() => openingMonday(plan, today, timeZone));
   const grid = weekGrid(plan, monday, today, timeZone);
   const bounds = weekBounds(plan, today, timeZone);
@@ -88,7 +88,7 @@ export function PlanWeek({ plan, today, timeZone = "UTC", totalWeeks, base = "",
             <OpenCard cell={cell} base={base} />
           ) : (
             cell.items.map((item, i) => (
-              <DayCard key={item.workout.id} cell={cell} item={item} first={i === 0} base={base} today={today} summary={summary} deleteSession={deleteSession} reassign={reassign} weeks={slotsByWeek(plan.workouts, item.workout.id)} />
+              <DayCard key={item.workout.id} cell={cell} item={item} first={i === 0} base={base} today={today} summary={summary} deleteSession={deleteSession} changeDate={changeDate} reassign={reassign} weeks={slotsByWeek(plan.workouts, item.workout.id)} />
             ))
           )}
         </>
@@ -153,7 +153,7 @@ function OpenCard({ cell, base }: { cell: DayCell; base: string }) {
 }
 
 /** One workout on the tapped day: a done one's mini summary (View session, delete, move), or a planned one's lifts and Start. */
-function DayCard({ cell, item, first, weeks, reassign, base, today, summary, deleteSession }: { cell: DayCell; item: DayItem; first: boolean; base: string; today: string; weeks: SlotWeek[]; reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
+function DayCard({ cell, item, first, weeks, reassign, base, today, summary, deleteSession, changeDate }: { changeDate?: ChangeDate; cell: DayCell; item: DayItem; first: boolean; base: string; today: string; weeks: SlotWeek[]; reassign?: (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>; summary?: (id: string) => Promise<SessionSummary | null>; deleteSession?: (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }> }) {
   const w = item.workout;
   const eyebrow = (s: string) => <p className="eyebrow">{`${longDay(cell.date)} · ${s}`}</p>;
   const done = item.done;
@@ -167,7 +167,7 @@ function DayCard({ cell, item, first, weeks, reassign, base, today, summary, del
       </p>
       <p className="mt-0.5 text-[13px] text-ink-mute">{meta}</p>
       {done && w.logId && summary ? (
-        <SessionMini logId={w.logId} href={`${base}/workouts/${w.id}`} load={summary} remove={deleteSession} move={reassign} weeks={weeks} />
+        <SessionMini logId={w.logId} href={`${base}/workouts/${w.id}`} load={summary} remove={deleteSession} changeDate={changeDate} day={cell.date} move={reassign} weeks={weeks} />
       ) : (
         <>
       <ul className="mb-3.5 mt-3">

@@ -13,6 +13,7 @@ import { useEscape } from "@/hooks/use-escape";
 
 type Load = (id: string) => Promise<SessionSummary | null>;
 export type Remove = (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
+export type ChangeDate = (raw: { workoutLogId: string; day: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
 export type Move = (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
 export type SlotWeek = { week: number; slots: Slot[] };
 
@@ -23,11 +24,12 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * a way to open it and, when `remove` is given, a red Delete session that asks first. Deleting takes the session, its sets
  * and its notes away, and the day goes back to scheduled.
  */
-export function SessionMini({ logId, href, load, remove, move, weeks, loadWeeks, actionsOnly = false, onChanged }: { logId: string; href: string; load?: Load; remove?: Remove; /** Move it to another day of the plan (with the plan's days to choose from). */ move?: Move; weeks?: SlotWeek[]; /** History doesn't carry the plan: fetch its days when Reassign is tapped. */ loadWeeks?: (logId: string) => Promise<SlotWeek[]>; /** Only the buttons (History's sheet already shows the sets and notes): no summary, no View session. */ actionsOnly?: boolean; /** After a delete or a move went through (the History sheet closes itself). */ onChanged?: () => void }) {
+export function SessionMini({ logId, href, load, remove, move, weeks, loadWeeks, actionsOnly = false, onChanged, changeDate, day }: { logId: string; href: string; load?: Load; /** Change the calendar day it was done on (not its plan day). `day` is the day it is on now. */ changeDate?: ChangeDate; day?: string; remove?: Remove; /** Move it to another day of the plan (with the plan's days to choose from). */ move?: Move; weeks?: SlotWeek[]; /** History doesn't carry the plan: fetch its days when Reassign is tapped. */ loadWeeks?: (logId: string) => Promise<SlotWeek[]>; /** Only the buttons (History's sheet already shows the sets and notes): no summary, no View session. */ actionsOnly?: boolean; /** After a delete or a move went through (the History sheet closes itself). */ onChanged?: () => void }) {
   const router = useRouter();
   const [s, setS] = useState<SessionSummary | null | "loading">("loading");
   const [asking, setAsking] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [dating, setDating] = useState(false);
   const [fetchedWeeks, setFetchedWeeks] = useState<SlotWeek[] | null>(null);
   const openMove = () => {
     if (weeks || fetchedWeeks) return void setMoving(true);
@@ -76,9 +78,14 @@ export function SessionMini({ logId, href, load, remove, move, weeks, loadWeeks,
             View session
           </Link>
         )}
+        {changeDate && day && (
+          <button type="button" onClick={() => setDating(true)} className="press flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
+            Change date
+          </button>
+        )}
         {move && (weeks || loadWeeks) && (
           <button type="button" onClick={openMove} className="press flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
-            Reassign to…
+            Reassign plan day
           </button>
         )}
         {remove && (
@@ -88,7 +95,49 @@ export function SessionMini({ logId, href, load, remove, move, weeks, loadWeeks,
         )}
       </div>
       {moving && move && (weeks ?? fetchedWeeks) && <ReassignSheet weeks={(weeks ?? fetchedWeeks)!} onClose={() => setMoving(false)} onMove={(to) => move({ workoutLogId: logId, toAssignedWorkoutId: to })} onDone={() => { setMoving(false); toast.success("Session moved"); router.refresh(); onChanged?.(); }} />}
+      {dating && changeDate && day && <DateSheet day={day} onClose={() => setDating(false)} onSave={(d) => changeDate({ workoutLogId: logId, day: d })} onDone={() => { setDating(false); toast.success("Date changed"); router.refresh(); onChanged?.(); }} />}
       {asking && <ConfirmDelete pending={pending} onCancel={() => !pending && setAsking(false)} onConfirm={confirm} />}
+    </div>
+  );
+}
+
+/** Pick the calendar day the session was really done. Its plan day stays; only the date moves. */
+function DateSheet({ day, onClose, onSave, onDone }: { day: string; onClose: () => void; onSave: (day: string) => Promise<{ ok: true } | { ok: false; error: string }>; onDone: () => void }) {
+  useEscape(true, onClose);
+  const [picked, setPicked] = useState(day);
+  const [pending, start] = useTransition();
+  const [today] = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  });
+  const go = () =>
+    start(async () => {
+      const r = await onSave(picked);
+      if (!r.ok) return void toast.error(r.error);
+      onDone();
+    });
+  return (
+    <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={() => !pending && onClose()}>
+      <SheetLock />
+      <div role="dialog" aria-modal="true" aria-label="Change date" onClick={(e) => e.stopPropagation()} className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
+        <h2 className="text-[22px] font-semibold text-ink">Change date</h2>
+        <p className="mt-1 text-[14px] text-ink-mute">The day you did it. Its plan day, sets and notes stay as they are.</p>
+        <input
+          type="date"
+          value={picked}
+          max={today}
+          min="2000-01-01"
+          onChange={(e) => setPicked(e.target.value)}
+          aria-label="Date"
+          className="mt-4 h-[52px] w-full rounded-2xl border border-line-strong bg-dusk-raised px-4 text-[17px] text-ink"
+        />
+        <button type="button" onClick={go} disabled={pending || !picked || picked === day} className="press mt-4 flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[16px] font-semibold text-dusk-button-text disabled:opacity-40">
+          {pending && <Loader2 className="h-4 w-4 animate-spin" />} {picked && picked !== day ? `Move to ${dayLabel(picked)}` : "Choose a new date"}
+        </button>
+        <button type="button" onClick={onClose} disabled={pending} className="press mt-1 flex h-12 w-full items-center justify-center text-[15px] font-semibold text-ink-soft">
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

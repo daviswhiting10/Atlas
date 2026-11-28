@@ -25,3 +25,12 @@ describe("the calendar key matches the day card", () => {
     expect(s).toContain(': ", open"}');
   });
 });
+
+describe("the Strength headline", () => {
+  const v = readFileSync(new URL("../components/athlete/ProgressView.tsx", import.meta.url), "utf8");
+  it("leads with estimated 1RM, with Reps one tap away, and a line with the actual set", () => {
+    expect(v).toContain('useState<HeadlineMetric>("e1rm")');
+    expect(v).toContain("head.subtitle");
+    expect(v).toContain('aria-label="Measure by"');
+  });
+});
