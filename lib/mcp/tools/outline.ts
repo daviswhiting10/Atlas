@@ -29,6 +29,7 @@ const OutlineExercise = z.object({
   exercise: z.string().trim().min(2).max(80).describe("Exercise name, e.g. 'Back Squat', 'DB Bench Press'. Matched to what this person already logs first (so the plan continues their history), then the workspace's exercises, then the library; a name nothing knows becomes the workspace's own exercise. The result says what each name matched."),
   prescription: z.string().trim().min(1).max(40).describe("Sets x reps as a coach writes it: '3x8-10', '5x5', '3x30 sec', '1x20 min'. A lone number of 6 or more reps becomes a range (3x10 → 3x8-10)."),
   notes: z.string().max(300).optional(),
+  group: z.string().trim().max(12).optional().describe("Exercises next to each other with the same group (e.g. 'A') are a superset: done back to back, then rest."),
 });
 const OutlineDay = z.object({
   name: z.string().trim().min(1).max(60).describe("e.g. 'Upper A', 'Day 1: Lower'."),
@@ -71,7 +72,7 @@ export const createPlanFromOutline = clientTool({
     // The outline as the importer reads a sheet: week 1 written out, repeated for the plan's length.
     let grid: SheetGrid = {
       programName: args.name,
-      days: args.days.map((d) => ({ name: d.name, exercises: d.exercises.map((e) => ({ name: e.exercise, notes: e.notes, weeks: [{ week: 1, setsReps: e.prescription }] })) })),
+      days: args.days.map((d) => ({ name: d.name, exercises: d.exercises.map((e) => ({ name: e.exercise, notes: e.notes, label: e.group, weeks: [{ week: 1, setsReps: e.prescription }] })) })),
     };
     const gaps = coreGaps(grid);
     if (args.addSuggestedCore) for (const g of gaps) grid = addSuggestion(grid, g.day, g.slug);

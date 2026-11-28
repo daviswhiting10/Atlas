@@ -51,4 +51,10 @@ export const LoggedSetInput = z.object({
   weight: z.number().min(0).max(2000).nullable().optional().catch(null).describe("Pounds. null or omitted for bodyweight."),
   reps: z.number().int().min(0).max(14400).nullable().catch(null).describe("Reps, or seconds for a timed set (900 = 15 min; up to 14400 s = 240 min)."),
   rpe: z.number().min(1).max(10).nullable().optional().catch(null),
+  implements: z
+    .union([z.literal(1), z.literal(2)])
+    .nullable()
+    .optional()
+    .catch(null)
+    .describe("Dumbbells and kettlebells only: 2 = one in each hand (the weight is per bell), 1 = one bell. Omitted: the exercise's usual."),
 });

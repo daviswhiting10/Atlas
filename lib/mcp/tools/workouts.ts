@@ -256,7 +256,7 @@ export const logWorkout = clientTool({
             select: { id: true, weight: true },
           });
           const row = existing
-            ? await tx.setLog.update({ where: { id: existing.id }, data, select: { id: true } })
+            ? await tx.setLog.update({ where: { id: existing.id }, data: { ...data, implements: implementsToStore(exerciseById.get(s.exerciseId)!, s.implements, false) }, select: { id: true } })
             : await tx.setLog.create({
               select: { id: true },
               data: {
@@ -265,8 +265,8 @@ export const logWorkout = clientTool({
                 exerciseId: s.exerciseId,
                 assignedWorkoutExerciseId: aweId,
                 setNumber: s.setNumber,
-                // A dumbbell or kettlebell set: the catalog's per hand default (the weight is one bell).
-                implements: implementsToStore(exerciseById.get(s.exerciseId)!, undefined, true),
+                // A dumbbell or kettlebell set: as sent (1 or 2 bells), else the catalog's per hand default (the weight is one bell).
+                implements: implementsToStore(exerciseById.get(s.exerciseId)!, s.implements, true),
               },
             });
           // The same set sent again at the same weight: logged before, so not a new record.

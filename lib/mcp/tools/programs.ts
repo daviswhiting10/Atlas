@@ -9,6 +9,7 @@ import { loadMethodology } from "@/lib/ai/methodology-loader";
 import { buildProgramPrompt } from "@/lib/ai/prompts/program";
 import { displayName } from "@/lib/plan/catalog";
 import { iso, weekOf } from "@/lib/athlete/sessions";
+import { structure } from "@/lib/workouts/structure";
 import { ALL_ROLES, COACH_ROLES } from "../auth";
 import { notFound, rateLimited } from "../context";
 import { describePrescription, loadActiveAssignment } from "../data";
@@ -30,27 +31,33 @@ export const getActiveProgram = clientTool({
     if (!assignment) return { client: client.fullName, program: null };
 
     const start = assignment.startDate.getTime();
-    const workouts = assignment.assignedWorkouts.map((w) => ({
-      assignedWorkoutId: w.id,
-      name: w.name,
-      week: weekOf(w.scheduledDate.getTime(), start),
-      lighterWeek: isLighterWeek(w.scheduledDate, assignment, client.selfServe),
-      scheduledDate: iso(w.scheduledDate),
-      status: w.status,
-      note: w.notes,
-      exercises: w.exercises.map((e) => {
-        const rx = describePrescription(e.prescribedSets);
-        const weight = (Array.isArray(e.prescribedSets) ? (e.prescribedSets[0] as { weight?: number | null } | undefined)?.weight : null) ?? null;
-        return {
-          planExerciseId: e.id,
-          exerciseId: e.exerciseId,
-          exercise: displayName(e.exercise.slug, e.exercise.name),
-          sets: rx.sets,
-          reps: rx.reps,
-          targetWeightLb: weight,
-        };
-      }),
-    }));
+    const workouts = assignment.assignedWorkouts.map((w) => {
+      // "2A", "2B": a superset, as the app letters it (lib/workouts/structure); "1" is an exercise on its own.
+      const s = structure(w.exercises, (e) => e.section);
+      const block = new Map([...s.warmup.map((i) => [i.index, "warm-up"] as const), ...s.cooldown.map((i) => [i.index, "cool-down"] as const), ...s.blocks.flatMap((b) => b.items.map((i) => [i.index, i.label] as const))]);
+      return {
+        assignedWorkoutId: w.id,
+        name: w.name,
+        week: weekOf(w.scheduledDate.getTime(), start),
+        lighterWeek: isLighterWeek(w.scheduledDate, assignment, client.selfServe),
+        scheduledDate: iso(w.scheduledDate),
+        status: w.status,
+        note: w.notes,
+        exercises: w.exercises.map((e, i) => {
+          const rx = describePrescription(e.prescribedSets);
+          const weight = (Array.isArray(e.prescribedSets) ? (e.prescribedSets[0] as { weight?: number | null } | undefined)?.weight : null) ?? null;
+          return {
+            planExerciseId: e.id,
+            exerciseId: e.exerciseId,
+            exercise: displayName(e.exercise.slug, e.exercise.name),
+            block: block.get(i) ?? null,
+            sets: rx.sets,
+            reps: rx.reps,
+            targetWeightLb: weight,
+          };
+        }),
+      };
+    });
     // In plan order, like Today and Plan: an unlogged workout from an earlier date is still next.
     const orderOf = new Map(assignment.assignedWorkouts.map((w) => [w.id, w.order]));
     const nextId = nextInPlan(workouts.map((w) => ({ id: w.assignedWorkoutId, week: w.week, status: w.status, order: orderOf.get(w.assignedWorkoutId)! })))?.id;
