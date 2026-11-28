@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PasswordPanel } from "@/components/athlete/account";
 import { HowItWorks } from "@/components/HowItWorks";
+import { ConnectAI } from "@/components/settings/ConnectAI";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 
 type Profile = { name: string; email: string; voiceProfile: string; hasPassword?: boolean };
@@ -126,6 +127,8 @@ export default function SettingsPage() {
           <PasswordPanel key={String(saved.hasPassword)} className="mt-3" email={saved.email} hasPassword={saved.hasPassword === true} />
         </section>
       )}
+
+      {saved && !guest && <ConnectAI className="rise rise-2 mt-10" />}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { isCoached } from "@/lib/athlete/coached";
 import { GoalsPanel } from "@/components/athlete/GoalsPanel";
 import { PasswordPanel, SaveAccountPanel } from "@/components/athlete/account";
 import { OwnProgramPicker, type LibraryProgram } from "@/components/athlete/OwnProgramPicker";
+import { ConnectAI } from "@/components/settings/ConnectAI";
 import { YouTabs } from "@/components/nutrition/YouTabs";
 import { youLine, type YouPlan } from "@/lib/athlete/you-summary";
 
@@ -79,6 +80,8 @@ export function YouScreen({
       {/* A guest's own plan is worth keeping. (The demo's link to the AI walkthrough is in the last step of How it works.) */}
       {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-6" />}
       {account && !athlete.isCoach && <PasswordPanel className="mt-6" email={account.email ?? ""} hasPassword={account.passwordHash != null} />}
+      {/* A coach connects theirs in Settings. */}
+      {account && !athlete.isCoach && <ConnectAI className="mt-6" />}
 
       <div className="mt-6">
         <GoalsPanel
