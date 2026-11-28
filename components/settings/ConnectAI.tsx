@@ -67,7 +67,8 @@ export function ConnectAI({ className, collapsible = false }: { className?: stri
     if (open) void load();
   }, [open]);
   useEffect(() => {
-    if (!collapsible) return;
+    // Reached at #connect-ai (the ⋯ menu's shortcut): open it (You) and bring it into view (You and Settings). The
+    // browser's own jump to the hash runs before this section has drawn, so it doesn't land.
     const fromHash = () => {
       if (window.location.hash !== "#connect-ai") return;
       setOpen(true);
@@ -76,7 +77,7 @@ export function ConnectAI({ className, collapsible = false }: { className?: stri
     fromHash();
     window.addEventListener("hashchange", fromHash);
     return () => window.removeEventListener("hashchange", fromHash);
-  }, [collapsible]);
+  }, []);
   useEffect(() => {
     if (created) shownRef.current?.focus();
   }, [created]);
