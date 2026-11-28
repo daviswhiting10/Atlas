@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/db/client";
 import { assignProgram, upsertProgram } from "@/lib/db/programs";
 import { resolveExercises } from "./resolve-exercise";
+import { savedRange } from "./plan-rules";
 import { type PlanWeek, type SheetGrid } from "./sheet-plan";
 import { dayDate, planStart, shapeSheet } from "./sheet-summary";
 import { NO_CONTEXT, type PlanContext } from "./plan-context";
@@ -51,22 +52,26 @@ export async function saveProgramFromGrid(input: {
         name: d.name,
         dayOfWeek: d.dayOfWeek,
         order: i + 1,
-        exercises: d.entries.map((e, j) => ({
-          exerciseId: ids.get(e.exercise)!,
-          order: j + 1,
-          notes: e.notes,
-          section: e.section,
-          prescribedSets: Array.from({ length: e.rx.sets }, (_, k) => ({
-            setNumber: k + 1,
-            weight: input.loadsAsTargets ? e.load?.weight ?? null : null,
-            unit: e.rx.unit,
-            repMin: e.rx.repMin,
-            repMax: e.rx.repMax,
-            rpe: null,
-            restSeconds: e.rest ?? null,
-            notes: "",
-          })),
-        })),
+        exercises: d.entries.map((e, j) => {
+          // A lone number is saved as a range, widened down; a written range as written (lib/programs/plan-rules).
+          const range = savedRange(e.rx, e.exercise);
+          return {
+            exerciseId: ids.get(e.exercise)!,
+            order: j + 1,
+            notes: e.notes,
+            section: e.section,
+            prescribedSets: Array.from({ length: e.rx.sets }, (_, k) => ({
+              setNumber: k + 1,
+              weight: input.loadsAsTargets ? e.load?.weight ?? null : null,
+              unit: e.rx.unit,
+              repMin: range.repMin,
+              repMax: range.repMax,
+              rpe: null,
+              restSeconds: e.rest ?? null,
+              notes: range.note ?? "",
+            })),
+          };
+        }),
       })),
     })),
   });
@@ -131,7 +136,8 @@ export async function saveSheetPlan(input: {
       const log = await tx.workoutLog.create({ data: { clientId: input.clientId, assignedWorkoutId: aw.id, source: "IMPORT", date, completedAt: date, trainerSeen: true }, select: { id: true } });
       const sets = day.entries.flatMap((e, j) => {
         const awe = aw.exercises.find((x) => x.order === j + 1);
-        if (!awe) return [];
+        // An exercise added in the preview wasn't in the sheet, so the sheet doesn't say it was done.
+        if (!awe || e.added) return [];
         return Array.from({ length: e.rx.sets }, (_, k) => ({
           workoutLogId: log.id,
           exerciseId: awe.exerciseId,

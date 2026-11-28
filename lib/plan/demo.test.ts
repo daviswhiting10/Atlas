@@ -57,10 +57,11 @@ describe("simulateDemoHistory", () => {
     expect(demo.logs).toHaveLength(WEEKS_OF_HISTORY * DEMO.daysPerWeek - 2);
   });
 
-  it("keeps personal records rare: 8 to 12 across the whole block", () => {
+  it("keeps personal records rare: 8 to 13 across the whole block", () => {
     const records = Array.from(demo.series.values()).flat().filter((p) => p.record).length;
     expect(records).toBeGreaterThanOrEqual(8);
-    expect(records).toBeLessThanOrEqual(12);
+    // 13 since the upper days took a core exercise for their last accessory (plan design rule B), which reshuffled the simulated history.
+    expect(records).toBeLessThanOrEqual(13);
   });
 
   it("never logs the same session volume twice in a row for a lift", () => {
@@ -121,6 +122,7 @@ describe("demo weights are believable", () => {
     "atlas-leg-curl": [50, 150],
     "atlas-leg-extension": [60, 180],
     "atlas-standing-calf-raise": [90, 300],
+    "pallof-press": [15, 70],
   };
 
   const demo = seriesByExercise(DEMO);

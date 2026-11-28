@@ -17,6 +17,7 @@
 
 import { CATALOG_BY_SLUG, SLOTS, type CatalogExercise, type Equipment, type Slot } from "./catalog";
 import { AREAS, CONDITIONS, interpretGoal, type Area, type Condition } from "./goal";
+import { isCorePattern } from "./rules";
 
 export type { Area, Condition } from "./goal";
 
@@ -184,14 +185,14 @@ type DayTemplate = { name: string; focus: string; slots: Slot[] };
 const FULL_A: DayTemplate = { name: "Full Body A", focus: "Squat · Press · Row", slots: ["squat", "press", "row", "legcurl", "curl", "core"] };
 const FULL_B: DayTemplate = { name: "Full Body B", focus: "Hinge · Overhead · Pull", slots: ["deadlift", "overhead", "pull", "lunge", "triceps", "core2"] };
 const FULL_C: DayTemplate = { name: "Full Body C", focus: "Legs · Incline · Row", slots: ["quad", "incline", "row2", "glute", "lateral", "core3"] };
-const UPPER_A: DayTemplate = { name: "Upper A", focus: "Chest · Back", slots: ["press", "row", "overhead", "pull", "curl", "triceps"] };
+const UPPER_A: DayTemplate = { name: "Upper A", focus: "Chest · Back", slots: ["press", "row", "overhead", "pull", "curl", "core3"] };
 const LOWER_A: DayTemplate = { name: "Lower A", focus: "Quads · Hamstrings", slots: ["squat", "hinge", "lunge", "legcurl", "calf", "core"] };
-const UPPER_B: DayTemplate = { name: "Upper B", focus: "Shoulders · Lats", slots: ["overhead", "pull", "incline", "row2", "lateral", "reardelt"] };
+const UPPER_B: DayTemplate = { name: "Upper B", focus: "Shoulders · Lats", slots: ["overhead", "pull", "incline", "row2", "lateral", "core"] };
 const LOWER_B: DayTemplate = { name: "Lower B", focus: "Posterior chain", slots: ["deadlift", "quad", "glute", "legext", "calf", "core2"] };
-const PUSH_A: DayTemplate = { name: "Push", focus: "Chest · Shoulders · Triceps", slots: ["press", "overhead", "incline", "lateral", "triceps", "fly"] };
+const PUSH_A: DayTemplate = { name: "Push", focus: "Chest · Shoulders · Triceps", slots: ["press", "overhead", "incline", "lateral", "triceps", "core2"] };
 const PULL_A: DayTemplate = { name: "Pull", focus: "Back · Biceps", slots: ["pull", "row", "row2", "reardelt", "curl", "core3"] };
 const LEGS_A: DayTemplate = { name: "Legs", focus: "Quads · Hamstrings · Glutes", slots: ["squat", "hinge", "quad", "legcurl", "calf", "core"] };
-const PUSH_B: DayTemplate = { name: "Push B", focus: "Shoulders · Upper chest", slots: ["overhead", "incline", "press", "lateral", "triceps", "fly"] };
+const PUSH_B: DayTemplate = { name: "Push B", focus: "Shoulders · Upper chest", slots: ["overhead", "incline", "press", "lateral", "triceps", "core"] };
 const PULL_B: DayTemplate = { name: "Pull B", focus: "Rows · Lats", slots: ["row", "pull", "row2", "curl", "reardelt", "core2"] };
 const LEGS_B: DayTemplate = { name: "Legs B", focus: "Posterior chain", slots: ["deadlift", "quad", "lunge", "legext", "calf", "core2"] };
 
@@ -398,8 +399,28 @@ function buildDay(template: DayTemplate, offset: number, prefs: ResolvedPrefs): 
     });
   }
 
+  // Every strength workout keeps one core exercise (docs/plan-design-rules.md, rule B), even when time, emphasis or a
+  // finisher pushed its slot off the end: it takes the place of the last accessory (never a main lift or the finisher).
+  if (!exercises.some((e) => isCorePattern(CATALOG_BY_SLUG[e.slug].pattern))) {
+    const slot = template.slots.find((s) => CORE_SLOTS.includes(s)) ?? "core";
+    const slug = resolveSlug(slot, prefs);
+    const exercise = slug ? CATALOG_BY_SLUG[slug] : undefined;
+    if (exercise) {
+      let at = exercises.length;
+      if (at >= limit) {
+        while (at > 2 && exercises[at - 1].slot === "finisher") at -= 1;
+        at -= 1;
+      }
+      const role = roleFor(at);
+      const s = schemeFor(prefs, role, exercise);
+      exercises.splice(at, at < exercises.length ? 1 : 0, { slot, slug: exercise.slug, name: exercise.name, role, sets: s.sets, repMin: s.repMin, repMax: s.repMax, unit: exercise.unit ?? "reps", restSeconds: s.rest });
+    }
+  }
+
   return { name: template.name, focus: template.focus, offset, exercises };
 }
+
+const CORE_SLOTS: Slot[] = ["core", "core2", "core3"];
 
 const ROLE_RANK: Record<PlannedExercise["role"], number> = { main: 0, secondary: 1, accessory: 2 };
 

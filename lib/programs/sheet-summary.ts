@@ -71,7 +71,7 @@ export function summarizeSheetImport(input: { grid: SheetGrid; context?: PlanCon
   for (const w of weeks) {
     const done = w.days.filter((d) => d.logged);
     if (done.length === 0) continue;
-    perWeek.push({ week: w.week, sessions: done.length, sets: done.reduce((n, d) => n + d.entries.reduce((m, e) => m + e.rx.sets, 0), 0) });
+    perWeek.push({ week: w.week, sessions: done.length, sets: done.reduce((n, d) => n + d.entries.reduce((m, e) => m + (e.added ? 0 : e.rx.sets), 0), 0) });
     for (const d of done) dates.push(dayDate(start, w.week, d.dayOfWeek));
   }
   dates.sort((a, b) => a.getTime() - b.getTime());

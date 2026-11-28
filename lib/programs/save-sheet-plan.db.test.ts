@@ -50,6 +50,9 @@ describe.skipIf(!RUN)("saveSheetPlan, batched", () => {
     expect((day1[2].scheduledDate.getTime() - day1[0].scheduledDate.getTime()) / 86_400_000).toBe(14);
     const squat = day1.map((w) => w.exercises[0].prescribedSets as Array<{ repMin: number; weight: number | null }>);
     expect(squat.map((s) => `${s.length}x${s[0].repMin}@${s[0].weight}`)).toEqual(["3x8@185", "3x8@195", "4x6@215", "2x8@155"]);
+    // A lone number is saved widened down ("3x12" → 10–12); the written ranges above as written.
+    const curl = day1[0].exercises[1].prescribedSets as Array<{ repMin: number; repMax: number }>;
+    expect([curl[0].repMin, curl[0].repMax]).toEqual([10, 12]);
     // "DB Curl" and "Dumbbell Curl" are one exercise, looked up once.
     const curls = new Set(plan.assignedWorkouts.flatMap((w) => w.exercises.filter((e) => /curl/i.test(e.exercise.name)).map((e) => e.exercise.name)));
     expect(curls.size).toBe(1);
@@ -59,5 +62,18 @@ describe.skipIf(!RUN)("saveSheetPlan, batched", () => {
     const statuses = await prisma.programAssignment.findMany({ where: { clientId }, select: { id: true, status: true } });
     expect(statuses.find((a) => a.id === first.assignmentId)?.status).toBe("COMPLETED");
     expect(statuses.find((a) => a.id === second.assignmentId)?.status).toBe("ACTIVE");
+  }, 120_000);
+
+  it("history logs the reps as written and never the core exercise accepted in the preview", async () => {
+    const { saveSheetPlan } = await import("./save-sheet-plan");
+    const { addSuggestion } = await import("./plan-rules");
+    const done = { programName: "History test", days: [{ name: "Day 1", exercises: [{ name: "Back Squat", weeks: wk(["3x10", "3x10"], ["185", ""]) }] }] };
+    const withCore = addSuggestion(done as never, 0, "plank");
+    const saved = await saveSheetPlan({ workspaceId: ws, clientId, grid: withCore, name: "History", goals: [], weekOneStart: new Date("2026-11-02T00:00:00"), context: { durationWeeks: null, trainingDays: null, startAtWeek: null }, history: true });
+    expect(saved.sessionsLogged).toBe(1);
+    const sets = await prisma.setLog.findMany({ where: { workoutLog: { clientId, source: "IMPORT" } }, select: { reps: true, exercise: { select: { name: true } } } });
+    expect(sets.map((s) => `${s.exercise?.name}:${s.reps}`)).toEqual(["Back Squat:10", "Back Squat:10", "Back Squat:10"]);
+    const planned = await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkout: { programAssignmentId: saved.assignmentId } }, orderBy: [{ assignedWorkout: { scheduledDate: "asc" } }, { order: "asc" }], select: { prescribedSets: true, exercise: { select: { name: true } } } });
+    expect(planned.map((e) => `${e.exercise.name}:${(e.prescribedSets as Array<{ repMin: number; repMax: number }>)[0].repMin}-${(e.prescribedSets as Array<{ repMax: number }>)[0].repMax}`)).toEqual(["Back Squat:8-10", "Plank:30-45", "Back Squat:8-10", "Plank:30-45"]);
   }, 120_000);
 });
