@@ -39,7 +39,7 @@ export const createPlanFromOutline = clientTool({
   name: "create_plan_from_outline",
   title: "Create plan from outline",
   description:
-    "Write a new plan from an outline: training days, each with exercises and sets x reps, repeated for `weeks` weeks. As a coach: saved as a DRAFT next to the client's live plan; the coach checks it and assigns it in Atlas. As a self-serve athlete: it becomes your live plan now and the previous plan is marked completed. Logged sessions are never changed or deleted. A strength day with no core work is flagged with a suggestion; pass addSuggestedCore to add it.",
+    "Write a new plan from an outline: training days, each with exercises and sets x reps, repeated for `weeks` weeks. As a coach writing for a client: saved as a DRAFT next to the client's live plan; the coach checks it and assigns it in Atlas. For your own training (a self-serve athlete, or a coach's own profile): it becomes the live plan now and the previous plan is marked completed. Logged sessions are never changed or deleted. A strength day with no core work is flagged with a suggestion; pass addSuggestedCore to add it.",
   permission: "write",
   roles: ALL_ROLES,
   input: z.object({
@@ -86,7 +86,10 @@ export const createPlanFromOutline = clientTool({
     if (args.addSuggestedCore) for (const g of gaps) grid = addSuggestion(grid, g.day, g.slug);
     const rangesAdded = rangeAddedLines(grid);
 
-    const live = caller.role === "CLIENT";
+    // Live now for an athlete's own plan, and for a coach's OWN training (no coach screen shows a draft of it, so a draft
+    // there could never be assigned). A coach writing for a client still gets a draft.
+    const ownTraining = caller.role !== "CLIENT" && (await prisma.clientProfile.findFirst({ where: { id: client.id, workspaceId: client.workspaceId }, select: { userId: true } }))?.userId === caller.userId;
+    const live = caller.role === "CLIENT" || ownTraining;
     const previous = live ? await prisma.programAssignment.findMany({ where: { clientId: client.id, workspaceId: client.workspaceId, status: "ACTIVE" }, select: { id: true, name: true } }) : [];
     const saved = await saveSheetPlan({
       workspaceId: client.workspaceId,

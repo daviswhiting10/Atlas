@@ -9,7 +9,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import type { AuditSink } from "./audit";
 import type { McpCaller, McpTransport } from "./context";
-import { lookupClient } from "./data";
+import { lookupClient, lookupOwnClient } from "./data";
 import { allowMcpWrite } from "./write-limit";
 import { executeTool, type ToolDef, type ToolDeps, type ToolResult } from "./tool";
 import { getExerciseHistory, getWorkoutHistory, logWorkout } from "./tools/workouts";
@@ -44,7 +44,7 @@ export const prismaAuditSink: AuditSink = async (entry) => {
   await prisma.auditLog.create({ data: entry });
 };
 
-export const defaultDeps = (transport: McpTransport, tokenId: string | null = null): ToolDeps => ({ lookupClient, audit: prismaAuditSink, transport, tokenId, allowWrite: allowMcpWrite });
+export const defaultDeps = (transport: McpTransport, tokenId: string | null = null): ToolDeps => ({ lookupClient, lookupOwn: lookupOwnClient, audit: prismaAuditSink, transport, tokenId, allowWrite: allowMcpWrite });
 
 /**
  * Advertise a tool's real JSON Schema to clients, but let every call through

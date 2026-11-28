@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { authorizeRole, resolveClientScope, type ClientLookup } from "./auth";
+import { authorizeRole, resolveClientScope, type ClientLookup, type OwnClientLookup } from "./auth";
 import { buildAuditEntry, type AuditSink } from "./audit";
 import { McpError, rateLimited, type McpCaller, type McpOutcome, type McpRole, type McpTransport, type ScopedClient } from "./context";
 
@@ -45,6 +45,8 @@ export const workspaceTool = <S extends z.ZodObject>(def: Omit<WorkspaceTool<S>,
 
 export type ToolDeps = {
   lookupClient: ClientLookup;
+  /** A coach's own training, for a call that names no client (optional: tests and the local runner may leave it out). */
+  lookupOwn?: OwnClientLookup;
   audit: AuditSink;
   transport: McpTransport;
   /** The personal access token the session came with (for the audit trail); null otherwise. */
@@ -77,7 +79,7 @@ export async function executeTool(def: ToolDef, caller: McpCaller, rawArgs: unkn
     let data: unknown;
     if (def.scope === "client") {
       const requested = typeof args.clientId === "string" ? args.clientId : undefined;
-      const client = await resolveClientScope(caller, requested, deps.lookupClient);
+      const client = await resolveClientScope(caller, requested, deps.lookupClient, deps.lookupOwn);
       clientId = client.id;
       data = await def.handler({ ...ctx, client }, args);
     } else {

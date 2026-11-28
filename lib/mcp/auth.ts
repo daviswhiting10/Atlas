@@ -20,6 +20,8 @@ export function authorizeRole(caller: McpCaller, allowed: readonly McpRole[]): v
 
 /** Finds a client by id inside one workspace, or null. The only way handlers reach a ClientProfile. */
 export type ClientLookup = (clientId: string, workspaceId: string) => Promise<ScopedClient | null>;
+/** A coach's OWN training profile in their workspace (the "Me" side), or null. */
+export type OwnClientLookup = (userId: string, workspaceId: string) => Promise<ScopedClient | null>;
 
 /**
  * Decide which client a call acts on.
@@ -32,7 +34,8 @@ export type ClientLookup = (clientId: string, workspaceId: string) => Promise<Sc
 export async function resolveClientScope(
   caller: McpCaller,
   requestedClientId: string | undefined,
-  lookup: ClientLookup
+  lookup: ClientLookup,
+  lookupOwn?: OwnClientLookup
 ): Promise<ScopedClient> {
   if (caller.role === "CLIENT") {
     if (!caller.clientProfileId) throw notFound();
@@ -42,7 +45,12 @@ export async function resolveClientScope(
     return own;
   }
 
-  if (!requestedClientId) throw invalid("clientId is required when calling as a coach.");
+  if (!requestedClientId) {
+    // "My workout", "build me a plan": a coach who trains in Atlas means their own training. Never a guess at a client.
+    const own = lookupOwn ? await lookupOwn(caller.userId, caller.workspaceId) : null;
+    if (own) return own;
+    throw invalid("clientId is required when calling as a coach.");
+  }
   const client = await lookup(requestedClientId, caller.workspaceId);
   if (!client) throw notFound();
   return client;

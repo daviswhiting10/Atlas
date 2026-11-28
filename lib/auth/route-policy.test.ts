@@ -152,3 +152,17 @@ describe("decide: guests and the demo", () => {
     expect(decide("/api/ai/program-generate", coach)).toEqual(next);
   });
 });
+
+describe("a token-authenticated MCP call passes the middleware (the route checks the token)", () => {
+  it("only /api/mcp with a Bearer header", async () => {
+    const { bearerToMcp } = await import("./route-policy");
+    expect(bearerToMcp("/api/mcp", "Bearer atlas_pat_abc")).toBe(true);
+    expect(bearerToMcp("/api/mcp", "bearer atlas_pat_abc")).toBe(true);
+    expect(bearerToMcp("/api/mcp", null)).toBe(false);
+    expect(bearerToMcp("/api/mcp", "Bearer ")).toBe(false);
+    expect(bearerToMcp("/api/mcp", "Basic abc")).toBe(false);
+    expect(bearerToMcp("/api/mcpx", "Bearer atlas_pat_abc")).toBe(false);
+    expect(bearerToMcp("/api/clients/x/erase", "Bearer atlas_pat_abc")).toBe(false);
+    expect(bearerToMcp("/today", "Bearer atlas_pat_abc")).toBe(false);
+  });
+});

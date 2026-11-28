@@ -206,3 +206,21 @@ describe("plan editing", () => {
     expect(rows).toEqual(Object.keys(ACTIONS).map(() => "edit_plan:not_found"));
   });
 });
+
+describe("a coach who names no client means their own training", () => {
+  const me: ScopedClient = { id: "me", workspaceId: "ws_a", fullName: "Coach", primaryGoal: null, keyLiftIds: [], selfServe: true };
+  const ownOf = vi.fn(async (userId: string, ws: string) => (userId === "u_TRAINER" && ws === "ws_a" ? me : null));
+  it("no clientId: the coach's own profile", async () => {
+    expect(await resolveClientScope(caller("TRAINER"), undefined, lookup, ownOf)).toBe(me);
+  });
+  it("a named client still wins", async () => {
+    expect(await resolveClientScope(caller("TRAINER"), "alice", lookup, ownOf)).toBe(CLIENTS.alice);
+  });
+  it("no own profile (or no lookup): clientId is still required", async () => {
+    await expect(resolveClientScope(caller("ADMIN"), undefined, lookup, ownOf)).rejects.toMatchObject({ outcome: "validation_error" });
+    await expect(resolveClientScope(caller("TRAINER"), undefined, lookup)).rejects.toMatchObject({ outcome: "validation_error" });
+  });
+  it("an athlete is unaffected: always their own profile", async () => {
+    expect(await resolveClientScope(caller("CLIENT", "alice"), undefined, lookup, ownOf)).toBe(CLIENTS.alice);
+  });
+});
