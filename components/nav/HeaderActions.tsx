@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { KeyRound, LogOut, MoreHorizontal, PlayCircle, RotateCcw, Scale, Settings } from "lucide-react";
+import { KeyRound, LogOut, Plug, MoreHorizontal, PlayCircle, RotateCcw, Scale, Settings } from "lucide-react";
 import { LeaveSheet } from "@/components/athlete/LeaveSheet";
 import { PasswordSheet } from "@/components/athlete/PasswordSheet";
 import { BodyWeightSheet } from "@/components/athlete/BodyWeightSheet";
@@ -22,13 +22,26 @@ const ICON = "press flex h-11 w-11 items-center justify-center rounded-full text
  * The header's right side, for both sides of the app (one component, not a copy in each header).
  * What shows where is decided by lib/header-actions.
  */
-export function HeaderActions({ side, demo, isCoach, restartPlan = false, canPassword = false, guest = false }: { side: Side; demo: boolean; isCoach: boolean; /** ...and Restart plan (not a guest or a demo account). */ restartPlan?: boolean; /** A real account (not a guest, a demo, or a coach: theirs is in Settings): Password. */ canPassword?: boolean; /** A guest: signing out asks first. */ guest?: boolean }) {
+export function HeaderActions({ side, demo, isCoach, restartPlan = false, canPassword = false, canConnect = false, guest = false }: { side: Side; demo: boolean; isCoach: boolean; /** ...and Restart plan (not a guest or a demo account). */ restartPlan?: boolean; /** A real account (not a guest, a demo, or a coach: theirs is in Settings): Password. */ canPassword?: boolean; /** A guest: signing out asks first. */ guest?: boolean; /** A real account (not a guest or the demo): Connect your AI, which is on Settings (a coach) or You (an athlete). */ canConnect?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [weighIn, setWeighIn] = useState(false);
   const [restart, setRestart] = useState(false);
   const [password, setPassword] = useState(false);
   const [leaving, setLeaving] = useState(false);
+
+  /**
+   * To the Connect your AI section, open. From another page that is a navigation to its #connect-ai. On the page itself the
+   * section opens on a hash change, and a client navigation to the same page's hash doesn't fire one, so it is fired here.
+   */
+  const goConnect = (path: string) => {
+    if (pathname === path) {
+      if (window.location.hash !== "#connect-ai") window.location.hash = "#connect-ai";
+      else window.dispatchEvent(new HashChangeEvent("hashchange"));
+      return;
+    }
+    router.push(`${path}#connect-ai`);
+  };
 
   const render = (a: HeaderAction) => {
     switch (a) {
@@ -63,6 +76,11 @@ export function HeaderActions({ side, demo, isCoach, restartPlan = false, canPas
               <DropdownMenuItem className="min-h-11" onClick={() => setWeighIn(true)}>
                 <Scale className="mr-2 h-4 w-4" /> Add body weight
               </DropdownMenuItem>
+              {canConnect && (
+                <DropdownMenuItem className="min-h-11" onClick={() => goConnect(isCoach ? "/settings" : "/you")}>
+                  <Plug className="mr-2 h-4 w-4" /> Connect your AI
+                </DropdownMenuItem>
+              )}
               {canPassword && !isCoach && (
                 <DropdownMenuItem className="min-h-11" onClick={() => setPassword(true)}>
                   <KeyRound className="mr-2 h-4 w-4" /> Password
