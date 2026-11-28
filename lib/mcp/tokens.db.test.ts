@@ -320,7 +320,7 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
       expect(r.outcome).toBe("ok");
       const data = (r as { data: Record<string, unknown> }).data as {
         assignmentId: string; status: string; weeks: number; daysPerWeek: number; previousPlan: Array<{ assignmentId: string; status: string }>;
-        exercises: Array<{ asWritten: string; savedAs: string; newExercise: boolean }>; rangesAdded: string[]; coreWork: Array<{ day: string; added: boolean }>;
+        exercises: Array<{ asWritten: string; matched: string; exerciseId: string; how: string }>; rangesAdded: string[]; coreWork: Array<{ day: string; added: boolean }>;
       };
       expect(data).toMatchObject({ status: "ACTIVE", weeks: 3, daysPerWeek: 2 });
       expect(data.previousPlan).toEqual([{ assignmentId: old.id, name: old.name, status: "COMPLETED", history: "kept" }]);
@@ -332,10 +332,11 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
 
       // Names: matched, shorthand spelled out, and an unknown one created for this workspace (never dropped).
       const zork = data.exercises.find((e) => e.asWritten.startsWith("Zork Press"))!;
-      expect(zork.newExercise).toBe(true);
-      expect(data.exercises.find((e) => e.asWritten === "Back Squat")!.newExercise).toBe(false);
-      expect(data.exercises.find((e) => e.asWritten === "DB Bench Press")!.savedAs).toMatch(/dumbbell/i);
-      expect(await prisma.exercise.count({ where: { workspaceId: ws, name: zork.savedAs } })).toBe(1);
+      expect(zork.how).toBe("new");
+      // Both lifts this athlete has logged continue their history.
+      expect(data.exercises.find((e) => e.asWritten === "Back Squat")).toMatchObject({ how: "your history", exerciseId: planWorkouts[0].exercises[0].exerciseId });
+      expect(data.exercises.find((e) => e.asWritten === "DB Bench Press")).toMatchObject({ how: "your history", matched: expect.stringMatching(/dumbbell/i) });
+      expect(await prisma.exercise.count({ where: { workspaceId: ws, name: zork.matched } })).toBe(1);
 
       // The plan rules: 3x10 widened to 8-10; 5x5 kept and marked fixed; a written range kept; the Upper day flagged for core.
       const upper = await prisma.assignedWorkout.findFirstOrThrow({ where: { programAssignmentId: data.assignmentId, name: "Upper" }, orderBy: { scheduledDate: "asc" }, select: { id: true } });
@@ -381,9 +382,142 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
       expect(await prisma.programAssignment.count({ where: { clientId: me.client! } })).toBe(plans);
     });
 
+    it("a written name lands on the lift this person logs: 'Bench Press' → their Barbell Bench Press, not the library's or the dumbbell", async () => {
+      const me = P.coached;
+      const ex = (name: string, extra: Record<string, unknown> = {}) =>
+        prisma.exercise.create({ data: { workspaceId: ws, name, slug: `${name.toLowerCase().replace(/\W+/g, "-")}-${tag}`, movementPattern: "HORIZONTAL_PUSH", equipment: "BARBELL", primaryMuscles: [], secondaryMuscles: [], instructions: [], ...extra }, select: { id: true } });
+      const barbell = await ex("Barbell Bench Press");
+      // An older name merged into it: its sets count for the survivor.
+      await ex("Flat BB Bench", { mergedIntoId: barbell.id });
+      const merged = await prisma.exercise.findFirstOrThrow({ where: { workspaceId: ws, name: "Flat BB Bench" }, select: { id: true } });
+      const libraryBench = await prisma.exercise.findFirstOrThrow({ where: { workspaceId: null, name: "Bench Press", mergedIntoId: null }, select: { id: true } });
+      const dumbbell = await prisma.exercise.findFirstOrThrow({ where: { workspaceId: null, name: "Dumbbell Bench Press", mergedIntoId: null }, select: { id: true } });
+      const log = await prisma.workoutLog.create({ data: { clientId: me.client!, source: "OFF_PLAN", title: "Old bench days", date: new Date("2026-10-01T12:00:00Z"), completedAt: new Date("2026-10-01T13:00:00Z") }, select: { id: true } });
+      const sets = (exerciseId: string, n: number) => Array.from({ length: n }, (_, i) => ({ workoutLogId: log.id, exerciseId, setNumber: i + 1, weight: 135, reps: 5, completed: true }));
+      // More dumbbell sets than barbell: still not a match for a bare "Bench Press".
+      await prisma.setLog.createMany({ data: [...sets(barbell.id, 3), ...sets(merged.id, 2), ...sets(dumbbell.id, 8)] });
+
+      const r = await run({ userId: P.coach.user, role: "TRAINER", clientProfileId: null }, {
+        clientId: me.client, name: "Match check", weeks: 1,
+        days: [{ name: "Day 1", exercises: [{ exercise: "Bench Press", prescription: "3x5" }, { exercise: "Press", prescription: "3x5" }, { exercise: "Back Squat", prescription: "3x5" }, { exercise: "Squat", prescription: "3x5" }] }],
+      });
+      expect(r.outcome).toBe("ok");
+      const data = (r as { data: { assignmentId: string; exercises: Array<{ asWritten: string; matched: string; exerciseId: string; how: string }> } }).data;
+      // No squat history: the shared library's Back Squat (a bare "Squat" is the back squat), not a new exercise.
+      expect(data.exercises.find((e) => e.asWritten === "Squat")).toMatchObject({ matched: "Back Squat", how: "library" });
+      expect(await prisma.exercise.count({ where: { workspaceId: ws, name: "Squat" } })).toBe(0);
+      const by = (n: string) => data.exercises.find((e) => e.asWritten === n)!;
+      expect(by("Bench Press")).toEqual({ asWritten: "Bench Press", matched: "Barbell Bench Press", exerciseId: barbell.id, how: "your history" });
+      expect(by("Back Squat").how).toBe("library");
+      // A broad word doesn't take the bench history.
+      expect(by("Press").exerciseId).not.toBe(barbell.id);
+
+      // The saved plan's bench is the history exercise.
+      const saved = await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkout: { programAssignmentId: data.assignmentId } }, select: { exerciseId: true } });
+      const ids = saved.map((s) => s.exerciseId);
+      expect(ids).toContain(barbell.id);
+      expect(ids).not.toContain(libraryBench.id);
+      expect(ids).not.toContain(dumbbell.id);
+    }, 60_000);
+
+    it("a superset group is saved as one block, and get_active_program shows the pair (1A, 1B)", async () => {
+      const me = P.other;
+      const r = await run({ userId: me.user, role: "CLIENT", clientProfileId: me.client }, {
+        name: "Superset block", weeks: 1, startDate: "2026-12-07",
+        days: [{ name: "Upper", exercises: [
+          { exercise: "Dumbbell Bench Press", prescription: "3x10", group: "A" },
+          { exercise: "Face Pull", prescription: "3x15", group: "A" },
+          { exercise: "Back Squat", prescription: "3x5" },
+          { exercise: "Plank", prescription: "3x30 sec" },
+        ] }],
+      });
+      expect(r.outcome).toBe("ok");
+      const { assignmentId } = (r as { data: { assignmentId: string } }).data;
+      const saved = await prisma.assignedWorkoutExercise.findMany({ where: { assignedWorkout: { programAssignmentId: assignmentId } }, orderBy: { order: "asc" }, select: { section: true } });
+      expect(saved.map((e) => e.section)).toEqual(["block:1", "block:1", "block:2", "block:3"]);
+
+      const { executeTool } = await import("./tool");
+      const { getActiveProgram } = await import("./tools/programs");
+      const { lookupClient } = await import("./data");
+      const shown = await executeTool(getActiveProgram, { userId: me.user, role: "CLIENT", workspaceId: ws, clientProfileId: me.client }, { week: 1 }, { transport: "http", audit: async () => {}, lookupClient, allowWrite: async () => true });
+      const program = (shown as { data: { program: { assignmentId: string; workouts: Array<{ exercises: Array<{ block: string | null }> }> } } }).data.program;
+      expect(program.assignmentId).toBe(assignmentId);
+      expect(program.workouts[0].exercises.map((e) => e.block)).toEqual(["1A", "1B", "2", "3"]);
+    }, 60_000);
+
     it("a prescription that isn't sets x reps is refused before anything is written", async () => {
       const r = await run({ userId: P.coach.user, role: "TRAINER", clientProfileId: null }, { clientId: P.coached.client, name: "Bad", days: [{ name: "D", exercises: [{ exercise: "Back Squat", prescription: "heavy" }] }] });
       expect(r.outcome).toBe("validation_error");
     });
+  });
+
+  // ── log_workout says what it earned ─────────────────────────────────────
+
+  describe("log_workout: new PRs and milestones", () => {
+    it("returns the record and the milestones this call created, and nothing when the same set is sent again", async () => {
+      const { executeTool } = await import("./tool");
+      const { logWorkout } = await import("./tools/workouts");
+      const deps = { transport: "http" as const, audit: async () => {}, lookupClient: (await import("./data")).lookupClient, allowWrite: async () => true };
+      const athlete = { userId: P.selfServe.user, role: "CLIENT" as const, workspaceId: ws, clientProfileId: P.selfServe.client };
+      // Back Squat so far: 100 (plan) and 135 (off plan). 140 is a record and a first plate.
+      const w = planWorkouts[0];
+      const squat = w.exercises[0].exerciseId;
+      const call = () => executeTool(logWorkout, athlete, { assignedWorkoutId: w.id, sets: [{ exerciseId: squat, setNumber: 2, weight: 140, reps: 5 }] }, deps);
+      const r = await call();
+      expect(r.outcome).toBe("ok");
+      const data = (r as { data: { newPRs: unknown[]; newMilestones: Array<{ kind: string; exercise?: string }> } }).data;
+      expect(data.newPRs).toEqual([{ exercise: "Back Squat", weightLb: 140, previousBestLb: 135 }]);
+      expect(data.newMilestones.map((m) => m.kind).sort()).toEqual(["first_pr", "plate_squat_135"]);
+      expect(data.newMilestones.every((m) => m.exercise === "Back Squat")).toBe(true);
+
+      const again = (await call()) as { data: { newPRs: unknown[]; newMilestones: unknown[] } };
+      expect(again.data).toMatchObject({ newPRs: [], newMilestones: [] });
+    }, 60_000);
+
+    it("a PR milestone from this call is listed in newPRs too (earlier sets had no weight): one answer, not two", async () => {
+      const { executeTool } = await import("./tool");
+      const { logWorkout } = await import("./tools/workouts");
+      const deps = { transport: "http" as const, audit: async () => {}, lookupClient: (await import("./data")).lookupClient, allowWrite: async () => true };
+      const athlete = { userId: P.selfServe.user, role: "CLIENT" as const, workspaceId: ws, clientProfileId: P.selfServe.client };
+      const w = planWorkouts[0];
+      const lift = w.exercises[w.exercises.length - 1];
+      // Earlier sets of this lift with reps but no weight (ticked without one).
+      const old = await prisma.workoutLog.create({ data: { clientId: P.selfServe.client!, source: "OFF_PLAN", title: "No weights", date: new Date("2026-10-02T12:00:00Z"), completedAt: new Date("2026-10-02T13:00:00Z") }, select: { id: true } });
+      await prisma.setLog.createMany({ data: [1, 2].map((n) => ({ workoutLogId: old.id, exerciseId: lift.exerciseId, setNumber: n, weight: null, reps: 8, completed: true })) });
+      const r = await executeTool(logWorkout, athlete, { assignedWorkoutId: w.id, sets: [{ exerciseId: lift.exerciseId, setNumber: 1, weight: 95, reps: 8 }] }, deps);
+      expect(r.outcome).toBe("ok");
+      const data = (r as { data: { newPRs: Array<{ exercise: string; previousBestLb: number | null }>; newMilestones: Array<{ kind: string; exercise?: string }> } }).data;
+      for (const m of data.newMilestones.filter((x) => x.kind === "first_pr")) {
+        expect(data.newPRs.find((p) => p.exercise === m.exercise)).toMatchObject({ previousBestLb: null });
+      }
+    }, 60_000);
+
+    it("implements: 1 and 2 are stored as sent on a dumbbell set, omitted gives the default, and other equipment never gets one", async () => {
+      const { executeTool } = await import("./tool");
+      const { logWorkout } = await import("./tools/workouts");
+      const deps = { transport: "http" as const, audit: async () => {}, lookupClient: (await import("./data")).lookupClient, allowWrite: async () => true };
+      const athlete = { userId: P.selfServe.user, role: "CLIENT" as const, workspaceId: ws, clientProfileId: P.selfServe.client };
+      const w = planWorkouts[0];
+      const [squat, bench] = w.exercises.map((e) => e.exerciseId);
+      const r = await executeTool(logWorkout, athlete, {
+        assignedWorkoutId: w.id,
+        sets: [
+          { exerciseId: bench, setNumber: 3, weight: 40, reps: 10, implements: 1 },
+          { exerciseId: bench, setNumber: 4, weight: 40, reps: 10, implements: 2 },
+          { exerciseId: bench, setNumber: 5, weight: 40, reps: 10 },
+          { exerciseId: squat, setNumber: 3, weight: 95, reps: 5, implements: 2 },
+        ],
+      }, deps);
+      expect(r.outcome).toBe("ok");
+      const log = await prisma.workoutLog.findUniqueOrThrow({ where: { assignedWorkoutId: w.id }, select: { id: true } });
+      const stored = async (exerciseId: string, setNumber: number) => (await prisma.setLog.findFirstOrThrow({ where: { workoutLogId: log.id, exerciseId, setNumber }, select: { implements: true } })).implements;
+      expect(await stored(bench, 3)).toBe(1);
+      expect(await stored(bench, 4)).toBe(2);
+      expect(await stored(bench, 5)).toBe(2);
+      expect(await stored(squat, 3)).toBeNull();
+      // Sent again with a change: the update keeps what was sent.
+      await executeTool(logWorkout, athlete, { assignedWorkoutId: w.id, sets: [{ exerciseId: bench, setNumber: 4, weight: 40, reps: 10, implements: 1 }] }, deps);
+      expect(await stored(bench, 4)).toBe(1);
+    }, 60_000);
   });
 });

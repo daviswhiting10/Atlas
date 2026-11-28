@@ -5,6 +5,7 @@ import { displayName } from "@/lib/plan/catalog";
 import { isTimedSet, setVolume, TIMED_SELECT } from "@/lib/sessions/volume";
 import { implementsToStore } from "@/lib/exercises/implements";
 import { checkSessionMilestones, checkStrengthMilestones } from "@/lib/progress/milestones";
+import { isRecordWeight } from "@/lib/progress/milestone-rules";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
 import { invalid, notFound } from "../context";
@@ -173,7 +174,7 @@ export const logWorkout = clientTool({
   name: "log_workout",
   title: "Log workout sets",
   description:
-    "Record sets for one of the client's assigned workouts. Sets are matched by exercise and set number, so calling again with the same set updates it. Set `complete` to mark the workout finished.",
+    "Record sets for one of the client's assigned workouts. Sets are matched by exercise and set number, so calling again with the same set updates it. Set `complete` to mark the workout finished. The result lists newPRs and newMilestones earned by this call: tell the person about them.",
   permission: "write",
   roles: ALL_ROLES,
   input: z.object({
@@ -237,7 +238,7 @@ export const logWorkout = clientTool({
             select: { id: true, completedAt: true },
           }));
 
-        const written: Array<{ setLogId: string; exerciseId: string; weight: number | null; reps: number | null }> = [];
+        const written: Array<{ setLogId: string; exerciseId: string; weight: number | null; reps: number | null; resent: boolean }> = [];
         for (const s of args.sets) {
           const aweId = aweByExercise.get(s.exerciseId) as string;
           const data = {
@@ -252,10 +253,10 @@ export const logWorkout = clientTool({
               assignedWorkoutExerciseId: aweId,
               setNumber: s.setNumber,
             },
-            select: { id: true },
+            select: { id: true, weight: true },
           });
           const row = existing
-            ? await tx.setLog.update({ where: { id: existing.id }, data, select: { id: true } })
+            ? await tx.setLog.update({ where: { id: existing.id }, data: { ...data, implements: implementsToStore(exerciseById.get(s.exerciseId)!, s.implements, false) }, select: { id: true } })
             : await tx.setLog.create({
               select: { id: true },
               data: {
@@ -264,11 +265,12 @@ export const logWorkout = clientTool({
                 exerciseId: s.exerciseId,
                 assignedWorkoutExerciseId: aweId,
                 setNumber: s.setNumber,
-                // A dumbbell or kettlebell set: the catalog's per hand default (the weight is one bell).
-                implements: implementsToStore(exerciseById.get(s.exerciseId)!, undefined, true),
+                // A dumbbell or kettlebell set: as sent (1 or 2 bells), else the catalog's per hand default (the weight is one bell).
+                implements: implementsToStore(exerciseById.get(s.exerciseId)!, s.implements, true),
               },
             });
-          written.push({ setLogId: row.id, exerciseId: s.exerciseId, weight: data.weight, reps: data.reps });
+          // The same set sent again at the same weight: logged before, so not a new record.
+          written.push({ setLogId: row.id, exerciseId: s.exerciseId, weight: data.weight, reps: data.reps, resent: existing?.weight === data.weight });
         }
 
         if (args.complete) {
@@ -296,11 +298,30 @@ export const logWorkout = clientTool({
 
     // The milestones the app's loggers award (a record, a plate, a session count), after the write commits.
     // Awaited so the next read sees them; a failure here never undoes the logged workout.
+    // Then what this call earned, so the AI can say it: the milestones it created, and each exercise whose heaviest set
+    // here is a record (heavier than every other set they've logged of it; a first-ever set is not a record).
+    const newMilestones: Array<{ kind: string; title: string; exercise?: string; value?: number; unit?: string | null }> = [];
+    const newPRs: Array<{ exercise: string; weightLb: number; previousBestLb: number | null }> = [];
     try {
+      const had = new Set((await prisma.milestone.findMany({ where: { clientId: client.id }, select: { id: true } })).map((m) => m.id));
       for (const w of result.written) {
         await checkStrengthMilestones(client.workspaceId, client.id, w.exerciseId, exerciseById.get(w.exerciseId)!.name, { weight: w.weight, reps: w.reps, completed: true }, w.setLogId);
       }
       if (args.complete) await checkSessionMilestones(client.workspaceId, client.id);
+      const all = await prisma.milestone.findMany({ where: { clientId: client.id }, orderBy: { createdAt: "asc" }, select: { id: true, type: true, title: true, metricValue: true, metricUnit: true, exercise: { select: { name: true } } } });
+      for (const m of all.filter((x) => !had.has(x.id))) {
+        newMilestones.push({ kind: m.type, title: m.title, ...(m.exercise && { exercise: m.exercise.name }), ...(m.metricValue != null && { value: m.metricValue, unit: m.metricUnit }) });
+      }
+      const thisCall = result.written.map((w) => w.setLogId);
+      for (const exerciseId of Array.from(new Set(result.written.map((w) => w.exerciseId)))) {
+        const top = Math.max(0, ...result.written.filter((w) => w.exerciseId === exerciseId && !w.resent).map((w) => w.weight ?? 0));
+        const before = await prisma.setLog.aggregate({ where: { workoutLog: { clientId: client.id }, exerciseId, completed: true, id: { notIn: thisCall } }, _max: { weight: true } });
+        if (isRecordWeight([before._max.weight], top)) newPRs.push({ exercise: exerciseById.get(exerciseId)!.name, weightLb: top, previousBestLb: before._max.weight });
+      }
+      // A PR milestone from this call is a PR too (e.g. their first weighted set after weightless ones): one answer, not two.
+      for (const m of newMilestones) {
+        if (m.kind === "first_pr" && m.exercise && m.value != null && !newPRs.some((p) => p.exercise === m.exercise)) newPRs.push({ exercise: m.exercise, weightLb: m.value, previousBestLb: null });
+      }
     } catch (err) {
       console.error("[mcp] milestone check failed", err instanceof Error ? err.message : err);
     }
@@ -311,6 +332,8 @@ export const logWorkout = clientTool({
       setsWritten: args.sets.length,
       status: args.complete ? "LOGGED" : "in progress",
       loggedBy,
+      newPRs,
+      newMilestones,
     };
   },
 });

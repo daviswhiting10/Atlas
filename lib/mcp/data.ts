@@ -162,7 +162,7 @@ export async function loadActiveAssignment(client: ScopedClient) {
           notes: true,
           exercises: {
             orderBy: { order: "asc" },
-            select: { id: true, exerciseId: true, prescribedSets: true, exercise: { select: { name: true, slug: true } } },
+            select: { id: true, exerciseId: true, prescribedSets: true, section: true, exercise: { select: { name: true, slug: true } } },
           },
         },
       },

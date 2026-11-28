@@ -30,6 +30,8 @@ export async function saveProgramFromGrid(input: {
   context?: PlanContext;
   /** A load in a week's cell is that week's target weight, not a session done. */
   loadsAsTargets?: boolean;
+  /** Names already matched (an AI's plan, matched to the person's history first: resolveForClient). The rest are resolved here. */
+  matched?: Map<string, { id: string }>;
 }): Promise<{ programId: string; weeks: PlanWeek[]; lastLoggedWeek: number; exercises: number }> {
   const { weeks, lastLoggedWeek } = shapeSheet(input.grid, input.context ?? NO_CONTEXT);
 
@@ -37,8 +39,9 @@ export async function saveProgramFromGrid(input: {
   // Never a plan with nothing in it: the read step refuses this first, with a message for the coach.
   if (names.length === 0) throw new Error("saveProgramFromGrid: no exercises read as sets and reps");
   // Every name in a few queries (catalog and exact names together), the rest one by one: see resolveExercises.
-  const found = await resolveExercises(names, input.workspaceId);
-  const ids = new Map(Array.from(found, ([n, e]) => [n, e.id] as const));
+  const rest = names.filter((n) => !input.matched?.has(n));
+  const found = [...Array.from(input.matched ?? []), ...Array.from(rest.length > 0 ? await resolveExercises(rest, input.workspaceId) : [])];
+  const ids = new Map(found.map(([n, e]) => [n, e.id] as const));
 
   const program = await upsertProgram(input.workspaceId, {
     name: input.name.slice(0, 120),
@@ -92,6 +95,7 @@ export async function saveSheetPlan(input: {
   history: boolean;
   /** A load in a week's cell is that week's target weight (an athlete's own plan), not a session done. */
   loadsAsTargets?: boolean;
+  matched?: Map<string, { id: string }>;
   /** "PAUSED" (the default): a coach's draft to check. "ACTIVE": the live plan now; an earlier live plan is finished. */
   status?: "PAUSED" | "ACTIVE";
   today?: Date;
