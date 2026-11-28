@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import { displayName } from "@/lib/plan/catalog";
-import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
+import { localDay } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
-import { loadSetRows } from "../data";
+import { loadSetRows, zoneFor } from "../data";
 import { groupByExercise, muscleTrends, recommend, volumeByWeek } from "../derive";
 import { ClientIdArg, TimeZoneArg } from "../schemas";
 import { clientTool } from "../tool";
@@ -20,7 +20,7 @@ export const getTrainingRecommendations = clientTool({
   roles: ALL_ROLES,
   input: z.object({ clientId: ClientIdArg, timezone: TimeZoneArg }),
   async handler({ client }, args) {
-    const tz = safeTimeZone(args.timezone);
+    const tz = await zoneFor(client, args.timezone);
     const [rows, plannedReps] = await Promise.all([
       loadSetRows(client, { since: new Date(Date.now() - 16 * 7 * DAY_MS) }),
       plannedRepsByExercise(client),
@@ -53,7 +53,7 @@ export const getUserFitnessProfile = clientTool({
   roles: ALL_ROLES,
   input: z.object({ clientId: ClientIdArg, timezone: TimeZoneArg }),
   async handler({ client }, args) {
-    const tz = safeTimeZone(args.timezone);
+    const tz = await zoneFor(client, args.timezone);
     // Re-read with the scope in the query: this is the most sensitive read in the server.
     const profile = await prisma.clientProfile.findFirst({
       where: { id: client.id, workspaceId: client.workspaceId, deletedAt: null },

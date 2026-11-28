@@ -3,10 +3,10 @@ import { weekOf } from "@/lib/athlete/sessions";
 import { inPlanOrder } from "@/lib/plan/plan-order";
 import { prisma } from "@/lib/db/client";
 import { strengthComposite, weightTrendEMA } from "@/lib/progress/math";
-import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
+import { localDay } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
 import type { ScopedClient } from "../context";
-import { describePrescription, loadActiveAssignment, loadSetRows } from "../data";
+import { describePrescription, loadActiveAssignment, loadSetRows, zoneFor } from "../data";
 import { groupByExercise, personalRecords, summarizeSession, volumeByWeek, type ExerciseHistory } from "../derive";
 import { ClientIdArg, TimeZoneArg } from "../schemas";
 import { clientTool } from "../tool";
@@ -54,7 +54,7 @@ export const analyzeProgress = clientTool({
     timezone: TimeZoneArg,
   }),
   async handler({ client }, args) {
-    const tz = safeTimeZone(args.timezone);
+    const tz = await zoneFor(client, args.timezone);
     const since = new Date(Date.now() - args.weeks * 7 * DAY_MS);
     const [rows, allRows, measurements] = await Promise.all([
       loadSetRows(client, { since }),

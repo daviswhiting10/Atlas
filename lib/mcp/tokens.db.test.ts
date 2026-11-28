@@ -268,6 +268,7 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
         log_workout: [{ assignedWorkoutId: w.id, sets: [{ exerciseId: w.exercises[0].exerciseId, setNumber: 1, weight: 95, reps: 8 }] }],
         edit_plan: [{ action: "set_note", text: "Felt good" }],
         create_plan_from_outline: [{ name: "Privacy check", weeks: 1, days: [{ name: "Day 1", exercises: [{ exercise: "Back Squat", prescription: "3x8" }] }] }],
+        log_off_plan_workout: [{ cardio: { activity: "walk", minutes: 20 } }],
       };
       const clientTools = TOOLS.filter((t) => t.roles.includes("CLIENT"));
       expect(clientTools.map((t) => t.name).sort()).toEqual(Object.keys(ARGS).sort());
@@ -518,6 +519,106 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
       // Sent again with a change: the update keeps what was sent.
       await executeTool(logWorkout, athlete, { assignedWorkoutId: w.id, sets: [{ exerciseId: bench, setNumber: 4, weight: 40, reps: 10, implements: 1 }] }, deps);
       expect(await stored(bench, 4)).toBe(1);
+    }, 60_000);
+  });
+
+  // ── log_off_plan_workout ────────────────────────────────────────────────
+
+  describe("log_off_plan_workout", () => {
+    const NY = "America/New_York";
+    const call = async (args: Record<string, unknown>, p: Person = P.selfServe) => {
+      const { executeTool } = await import("./tool");
+      const { logOffPlanWorkout } = await import("./tools/workouts");
+      const { lookupClient } = await import("./data");
+      return executeTool(logOffPlanWorkout, { userId: p.user, role: "CLIENT", workspaceId: ws, clientProfileId: p.client }, args, { transport: "http", audit: async () => {}, lookupClient, allowWrite: async () => true });
+    };
+    /** The app's History for this athlete, day by day, as the Progress page builds it for a viewer in `tz`. */
+    const calendarDays = async (clientId: string, tz: string) => {
+      const { loadCalendar } = await import("@/lib/history/load");
+      const cal = await loadCalendar({ clientId, workspaceId: ws, timeZone: tz, viewer: { kind: "athlete" } });
+      if (cal.kind !== "grid") throw new Error(`calendar is ${cal.kind}`);
+      return cal.byDay;
+    };
+
+    it("a lift by name lands on the person's history, with the record said out loud", async () => {
+      const squat = planWorkouts[0].exercises[0].exerciseId;
+      const r = await call({ title: "Hotel gym", date: "2026-11-25", timezone: NY, exercises: [{ name: "Squat", sets: [{ weight: 150, reps: 3 }, { weight: 150, reps: null }] }] });
+      expect(r.outcome).toBe("ok");
+      const data = (r as { data: Record<string, unknown> }).data as { workoutLogId: string; date: string; exercises: unknown[]; setsLogged: number; newPRs: unknown[] };
+      expect(data.exercises).toEqual([{ asWritten: "Squat", matched: "Back Squat", exerciseId: squat, how: "your history" }]);
+      // A set with no reps isn't saved (the Quick log rule).
+      expect(data.setsLogged).toBe(1);
+      expect(data.newPRs).toEqual([{ exercise: "Back Squat", weightLb: 150, previousBestLb: 140 }]);
+      expect(data.date).toBe("2026-11-25");
+      const log = await prisma.workoutLog.findUniqueOrThrow({ where: { id: data.workoutLogId }, select: { source: true, date: true, completedAt: true, sets: { select: { exerciseId: true } } } });
+      expect(log).toMatchObject({ source: "OFF_PLAN", sets: [{ exerciseId: squat }] });
+      expect(log.completedAt).not.toBeNull();
+      // Noon on that day in New York.
+      expect(log.date.toISOString()).toBe("2026-11-25T17:00:00.000Z");
+    }, 60_000);
+
+    it("a run with distance and minutes is cardio, on the right New York day in History", async () => {
+      const r = await call({ date: "2026-11-26", timezone: NY, cardio: { activity: "run", distance: 3, minutes: 27 } });
+      expect(r.outcome).toBe("ok");
+      const data = (r as { data: { workoutLogId: string; title: string; date: string } }).data;
+      expect(data).toMatchObject({ title: "Run", date: "2026-11-26" });
+      const log = await prisma.workoutLog.findUniqueOrThrow({ where: { id: data.workoutLogId }, select: { activity: true, distanceM: true, durationMin: true, source: true, title: true } });
+      expect(log).toEqual({ activity: "RUN", distanceM: 4828, durationMin: 27, source: "OFF_PLAN", title: "Run" });
+      const days = await calendarDays(P.selfServe.client!, NY);
+      expect(days["2026-11-26"]).toEqual([expect.objectContaining({ title: "Run", mode: "R", work: expect.objectContaining({ runMin: 27, sets: 0 }) })]);
+
+      // Distance alone (the AI wasn't told the time): stored, and the day shows the run.
+      const d = await call({ date: "2026-11-24", timezone: NY, cardio: { activity: "run", distance: 5, unit: "km" } });
+      const only = await prisma.workoutLog.findUniqueOrThrow({ where: { id: (d as { data: { workoutLogId: string } }).data.workoutLogId }, select: { activity: true, distanceM: true, durationMin: true } });
+      expect(only).toEqual({ activity: "RUN", distanceM: 5000, durationMin: null });
+      expect((await calendarDays(P.selfServe.client!, NY))["2026-11-24"]).toEqual([expect.objectContaining({ title: "Run", mode: "R" })]);
+      // Neither, or both kinds at once: refused.
+      expect((await call({ cardio: { activity: "run" } })).outcome).toBe("validation_error");
+      expect((await call({ cardio: { activity: "run", minutes: 10 }, exercises: [{ name: "Squat", sets: [{ reps: 5 }] }] })).outcome).toBe("validation_error");
+    }, 60_000);
+
+    it("with no date it is today in the person's zone, in the result and in History", async () => {
+      const { localDay } = await import("@/lib/athlete/sessions");
+      const today = localDay(new Date(), NY);
+      const r = await call({ timezone: NY, cardio: { activity: "walk", minutes: 15 } });
+      expect((r as { data: { date: string; timezone: string } }).data).toMatchObject({ date: today, timezone: NY });
+      expect((await calendarDays(P.selfServe.client!, NY))[today]).toContainEqual(expect.objectContaining({ title: "Walk", work: expect.objectContaining({ walkMin: 15 }) }));
+    }, 60_000);
+
+    it("a CLIENT token naming another client gets 404, and nothing is written", async () => {
+      const made = await newToken(P.selfServe);
+      current.user = null;
+      const before = await prisma.workoutLog.count({ where: { clientId: P.coached.client! } });
+      const r = await mcp(made.token, "tools/call", { name: "log_off_plan_workout", arguments: { clientId: P.coached.client, cardio: { activity: "run", minutes: 20 } } });
+      expect(r.json.result.isError).toBe(true);
+      expect(r.json.result.content[0].text).toBe("404 not found: Not found.");
+      expect(await prisma.workoutLog.count({ where: { clientId: P.coached.client! } })).toBe(before);
+    });
+  });
+
+  // ── Timezone: a session lands on the person's day ───────────────────────
+
+  describe("timezone", () => {
+    it("log_workout's date is that calendar day in the zone given; reads use the zone given, else the zone of their latest goal", async () => {
+      const { executeTool } = await import("./tool");
+      const { logWorkout, getWorkoutHistory } = await import("./tools/workouts");
+      const { lookupClient } = await import("./data");
+      const deps = { transport: "http" as const, audit: async () => {}, lookupClient, allowWrite: async () => true };
+      const me = P.other;
+      const caller = { userId: me.user, role: "CLIENT" as const, workspaceId: ws, clientProfileId: me.client };
+      const plan = await prisma.assignedWorkout.findFirstOrThrow({ where: { programAssignment: { clientId: me.client!, status: "ACTIVE" }, workoutLog: null }, select: { id: true, exercises: { select: { exerciseId: true }, take: 1 } } });
+      const r = await executeTool(logWorkout, caller, { assignedWorkoutId: plan.id, date: "2026-11-27", timezone: "Pacific/Auckland", complete: true, sets: [{ exerciseId: plan.exercises[0].exerciseId, setNumber: 1, reps: 5 }] }, deps);
+      expect((r as { data: { date: string; timezone: string } }).data).toMatchObject({ date: "2026-11-27", timezone: "Pacific/Auckland" });
+      const log = await prisma.workoutLog.findUniqueOrThrow({ where: { assignedWorkoutId: plan.id }, select: { id: true, date: true } });
+      // Noon in Auckland (UTC+13) is 23:00 UTC the day before: still the 27th there.
+      expect(log.date.toISOString()).toBe("2026-11-26T23:00:00.000Z");
+      const dayOf = async (args: Record<string, unknown>) => ((await executeTool(getWorkoutHistory, caller, args, deps)) as { data: { workouts: Array<{ workoutLogId: string; date: string }> } }).data.workouts.find((w) => w.workoutLogId === log.id)!.date;
+      expect(await dayOf({ timezone: "Pacific/Auckland" })).toBe("2026-11-27");
+      expect(await dayOf({})).toBe("2026-11-26"); // no zone known: UTC
+      // A goal started in the app records the device's zone; reads without one use it.
+      await prisma.goal.create({ data: { workspaceId: ws, clientId: me.client!, name: "Zone goal", category: "challenge", rules: {}, startedBy: "CLIENT", timeZone: "Pacific/Auckland", startDay: "2026-11-20" } });
+      expect(await dayOf({})).toBe("2026-11-27");
+      expect((await executeTool(logWorkout, caller, { assignedWorkoutId: plan.id, date: "2026-02-30", sets: [{ exerciseId: plan.exercises[0].exerciseId, setNumber: 1, reps: 5 }] }, deps)).outcome).toBe("validation_error");
     }, 60_000);
   });
 });

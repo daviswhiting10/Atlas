@@ -13,6 +13,7 @@ import { durationRange } from "@/lib/sessions/duration";
 import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
 import type { ClientLookup, OwnClientLookup } from "./auth";
 import type { ScopedClient } from "./context";
+import { safeTimeZone } from "@/lib/athlete/sessions";
 
 const CLIENT_SELECT = { id: true, workspaceId: true, fullName: true, primaryGoal: true, keyLiftIds: true, goalTargets: true } as const;
 type ClientRow = { id: string; workspaceId: string; fullName: string; primaryGoal: string | null; keyLiftIds: string[] | null; goalTargets: unknown };
@@ -124,6 +125,17 @@ export async function loadSetRows(
 }
 
 /** An exercise the workspace may see: its own, or the global library (workspaceId null). */
+/**
+ * The timezone a person's days are in, for placing a session on a calendar day: the one the AI passed, else the zone the
+ * app saw when they last started a goal (the profile keeps no zone of its own; the app reads it from the device), else UTC,
+ * the app's own default (safeTimeZone).
+ */
+export async function zoneFor(client: ScopedClient, given: string | undefined): Promise<string> {
+  if (given && safeTimeZone(given) === given) return given;
+  const goal = await prisma.goal.findFirst({ where: { clientId: client.id }, orderBy: { createdAt: "desc" }, select: { timeZone: true } });
+  return safeTimeZone(goal?.timeZone);
+}
+
 export async function findVisibleExercise(exerciseId: string, workspaceId: string) {
   // An exercise merged into another stands for that one.
   const live = await liveExercise(exerciseId);
