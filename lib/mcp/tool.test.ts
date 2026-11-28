@@ -43,7 +43,7 @@ describe("executeTool", () => {
   it("runs the handler with parsed arguments and the scoped client", async () => {
     const h = harness();
     const result = await executeTool(h.read, trainer, { clientId: "client_1" }, h.deps);
-    expect(result).toEqual({ outcome: "ok", data: { ok: true } });
+    expect(result).toEqual({ outcome: "ok", data: { actedOn: { clientId: "client_1", name: "Sam", who: "client", text: "Sam (your client)" }, ok: true } });
     expect(h.handler).toHaveBeenCalledWith(expect.objectContaining({ caller: trainer, client }), { clientId: "client_1", limit: 5 });
   });
 
@@ -145,5 +145,62 @@ describe("audit trail", () => {
     };
     expect((await executeTool(h.read, trainer, { clientId: "client_1" }, h.deps)).outcome).toBe("ok");
     quiet.mockRestore();
+  });
+});
+
+describe("whose data: a coach who names no client acts on their own training, and every result says so", () => {
+  const coach: McpCaller = { userId: "u_coach", role: "TRAINER", workspaceId: "ws_1", clientProfileId: null };
+  const mine: ScopedClient = { id: "me_1", workspaceId: "ws_1", fullName: "Davis", primaryGoal: null, keyLiftIds: [], selfServe: true };
+  const other: ScopedClient = { id: "far_1", workspaceId: "ws_2", fullName: "Elsewhere", primaryGoal: null, keyLiftIds: [], selfServe: false };
+  function coachHarness() {
+    const writes: string[] = [];
+    const handler = vi.fn(async ({ client }: { client: ScopedClient }) => {
+      writes.push(client.id);
+      return { logged: true };
+    });
+    const deps: ToolDeps = {
+      transport: "http",
+      audit: async () => {},
+      lookupClient: async (id, ws) => [client, mine, other].find((c) => c.id === id && c.workspaceId === ws) ?? null,
+      lookupOwn: async (userId, ws) => (userId === "u_coach" && ws === "ws_1" ? mine : null),
+      allowWrite: async () => true,
+    };
+    const write = clientTool({
+      name: "log_thing",
+      title: "Log",
+      description: "",
+      permission: "write",
+      roles: ["TRAINER", "ADMIN", "CLIENT"],
+      input: z.object({ clientId: z.string().optional() }),
+      handler,
+    });
+    return { writes, deps, write };
+  }
+
+  it("coach token, no clientId: the write lands on the coach's own profile and the result says it was for you", async () => {
+    const h = coachHarness();
+    const result = await executeTool(h.write, coach, {}, h.deps);
+    expect(h.writes).toEqual(["me_1"]);
+    expect(result).toEqual({ outcome: "ok", data: { actedOn: { clientId: "me_1", name: "Davis", who: "you", text: "you (Davis, your own training)" }, logged: true } });
+  });
+
+  it("coach naming a client in the workspace: the client's data, and the result names the client", async () => {
+    const h = coachHarness();
+    const result = await executeTool(h.write, coach, { clientId: "client_1" }, h.deps);
+    expect(h.writes).toEqual(["client_1"]);
+    expect(result.outcome === "ok" && (result.data as { actedOn: { who: string; name: string } }).actedOn).toMatchObject({ who: "client", name: "Sam" });
+  });
+
+  it("coach naming a clientId outside the workspace: still 404, nothing written", async () => {
+    const h = coachHarness();
+    const result = await executeTool(h.write, coach, { clientId: "far_1" }, h.deps);
+    expect(result).toMatchObject({ outcome: "not_found" });
+    expect(h.writes).toEqual([]);
+  });
+
+  it("an athlete's own data reads as you", async () => {
+    const h = coachHarness();
+    const result = await executeTool(h.write, { userId: "u_client", role: "CLIENT", workspaceId: "ws_1", clientProfileId: "client_1" }, {}, h.deps);
+    expect(result.outcome === "ok" && (result.data as { actedOn: { who: string } }).actedOn.who).toBe("you");
   });
 });

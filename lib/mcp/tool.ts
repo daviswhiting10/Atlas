@@ -57,6 +57,13 @@ export type ToolDeps = {
 
 export type ToolResult = { outcome: "ok"; data: unknown } | { outcome: Exclude<McpOutcome, "ok">; message: string };
 
+/** Whose data a client-scoped tool acted on, as the first field of its result. */
+export function actedOnLabel(client: { id: string; fullName: string }, own: boolean): { clientId: string; name: string; who: "you" | "client"; text: string } {
+  return own
+    ? { clientId: client.id, name: client.fullName, who: "you", text: `you (${client.fullName}, your own training)` }
+    : { clientId: client.id, name: client.fullName, who: "client", text: `${client.fullName} (your client)` };
+}
+
 export async function executeTool(def: ToolDef, caller: McpCaller, rawArgs: unknown, deps: ToolDeps): Promise<ToolResult> {
   const started = Date.now();
   let clientId: string | null = null;
@@ -81,7 +88,12 @@ export async function executeTool(def: ToolDef, caller: McpCaller, rawArgs: unkn
       const requested = typeof args.clientId === "string" ? args.clientId : undefined;
       const client = await resolveClientScope(caller, requested, deps.lookupClient, deps.lookupOwn);
       clientId = client.id;
-      data = await def.handler({ ...ctx, client }, args);
+      const out = await def.handler({ ...ctx, client }, args);
+      // Every result says whose data it is, so the AI can tell the person who it read or logged for: "you" (the
+      // caller's own training: an athlete, or a coach's own profile) or the client's name.
+      const ownId = caller.role === "CLIENT" ? caller.clientProfileId : deps.lookupOwn ? ((await deps.lookupOwn(caller.userId, caller.workspaceId))?.id ?? null) : null;
+      const actedOn = actedOnLabel(client, client.id === ownId);
+      data = out && typeof out === "object" && !Array.isArray(out) ? { actedOn, ...(out as Record<string, unknown>) } : { actedOn, result: out };
     } else {
       data = await def.handler(ctx, args);
     }
