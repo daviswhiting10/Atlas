@@ -318,6 +318,10 @@ export const logWorkout = clientTool({
         const before = await prisma.setLog.aggregate({ where: { workoutLog: { clientId: client.id }, exerciseId, completed: true, id: { notIn: thisCall } }, _max: { weight: true } });
         if (isRecordWeight([before._max.weight], top)) newPRs.push({ exercise: exerciseById.get(exerciseId)!.name, weightLb: top, previousBestLb: before._max.weight });
       }
+      // A PR milestone from this call is a PR too (e.g. their first weighted set after weightless ones): one answer, not two.
+      for (const m of newMilestones) {
+        if (m.kind === "first_pr" && m.exercise && m.value != null && !newPRs.some((p) => p.exercise === m.exercise)) newPRs.push({ exercise: m.exercise, weightLb: m.value, previousBestLb: null });
+      }
     } catch (err) {
       console.error("[mcp] milestone check failed", err instanceof Error ? err.message : err);
     }

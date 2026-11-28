@@ -399,10 +399,13 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
 
       const r = await run({ userId: P.coach.user, role: "TRAINER", clientProfileId: null }, {
         clientId: me.client, name: "Match check", weeks: 1,
-        days: [{ name: "Day 1", exercises: [{ exercise: "Bench Press", prescription: "3x5" }, { exercise: "Press", prescription: "3x5" }, { exercise: "Back Squat", prescription: "3x5" }] }],
+        days: [{ name: "Day 1", exercises: [{ exercise: "Bench Press", prescription: "3x5" }, { exercise: "Press", prescription: "3x5" }, { exercise: "Back Squat", prescription: "3x5" }, { exercise: "Squat", prescription: "3x5" }] }],
       });
       expect(r.outcome).toBe("ok");
       const data = (r as { data: { assignmentId: string; exercises: Array<{ asWritten: string; matched: string; exerciseId: string; how: string }> } }).data;
+      // No squat history: the shared library's Back Squat (a bare "Squat" is the back squat), not a new exercise.
+      expect(data.exercises.find((e) => e.asWritten === "Squat")).toMatchObject({ matched: "Back Squat", how: "library" });
+      expect(await prisma.exercise.count({ where: { workspaceId: ws, name: "Squat" } })).toBe(0);
       const by = (n: string) => data.exercises.find((e) => e.asWritten === n)!;
       expect(by("Bench Press")).toEqual({ asWritten: "Bench Press", matched: "Barbell Bench Press", exerciseId: barbell.id, how: "your history" });
       expect(by("Back Squat").how).toBe("library");
@@ -469,6 +472,24 @@ describe.skipIf(!RUN)("MCP tokens (local database)", () => {
 
       const again = (await call()) as { data: { newPRs: unknown[]; newMilestones: unknown[] } };
       expect(again.data).toMatchObject({ newPRs: [], newMilestones: [] });
+    }, 60_000);
+
+    it("a PR milestone from this call is listed in newPRs too (earlier sets had no weight): one answer, not two", async () => {
+      const { executeTool } = await import("./tool");
+      const { logWorkout } = await import("./tools/workouts");
+      const deps = { transport: "http" as const, audit: async () => {}, lookupClient: (await import("./data")).lookupClient, allowWrite: async () => true };
+      const athlete = { userId: P.selfServe.user, role: "CLIENT" as const, workspaceId: ws, clientProfileId: P.selfServe.client };
+      const w = planWorkouts[0];
+      const lift = w.exercises[w.exercises.length - 1];
+      // Earlier sets of this lift with reps but no weight (ticked without one).
+      const old = await prisma.workoutLog.create({ data: { clientId: P.selfServe.client!, source: "OFF_PLAN", title: "No weights", date: new Date("2026-10-02T12:00:00Z"), completedAt: new Date("2026-10-02T13:00:00Z") }, select: { id: true } });
+      await prisma.setLog.createMany({ data: [1, 2].map((n) => ({ workoutLogId: old.id, exerciseId: lift.exerciseId, setNumber: n, weight: null, reps: 8, completed: true })) });
+      const r = await executeTool(logWorkout, athlete, { assignedWorkoutId: w.id, sets: [{ exerciseId: lift.exerciseId, setNumber: 1, weight: 95, reps: 8 }] }, deps);
+      expect(r.outcome).toBe("ok");
+      const data = (r as { data: { newPRs: Array<{ exercise: string; previousBestLb: number | null }>; newMilestones: Array<{ kind: string; exercise?: string }> } }).data;
+      for (const m of data.newMilestones.filter((x) => x.kind === "first_pr")) {
+        expect(data.newPRs.find((p) => p.exercise === m.exercise)).toMatchObject({ previousBestLb: null });
+      }
     }, 60_000);
 
     it("implements: 1 and 2 are stored as sent on a dumbbell set, omitted gives the default, and other equipment never gets one", async () => {

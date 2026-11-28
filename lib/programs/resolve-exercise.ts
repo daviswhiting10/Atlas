@@ -139,12 +139,14 @@ export type How = "your history" | "workspace" | "library" | "close match" | "ne
 export async function resolveForClient(names: string[], client: { id: string; workspaceId: string }): Promise<Map<string, { id: string; name: string; how: How }>> {
   const history = await loggedExercises(client);
   const own: Candidate[] = (await prisma.exercise.findMany({ where: { workspaceId: client.workspaceId, mergedIntoId: null }, select: { id: true, name: true } })).map((e) => ({ ...e, sets: 0 }));
+  // The shared library with the same matcher ("Squat" is the library's "Back Squat"), before the importer's looser fallbacks.
+  const library: Candidate[] = (await prisma.exercise.findMany({ where: { workspaceId: null, mergedIntoId: null }, select: { id: true, name: true } })).map((e) => ({ ...e, sets: 0 }));
 
   const out = new Map<string, { id: string; name: string; how: How }>();
   const rest: string[] = [];
   for (const n of names) {
-    const hit = bestMatch(n, history) ?? bestMatch(n, own);
-    if (hit) out.set(n, { id: hit.id, name: hit.name, how: history.includes(hit) ? "your history" : "workspace" });
+    const hit = bestMatch(n, history) ?? bestMatch(n, own) ?? bestMatch(n, library);
+    if (hit) out.set(n, { id: hit.id, name: hit.name, how: history.includes(hit) ? "your history" : own.includes(hit) ? "workspace" : "library" });
     else rest.push(n);
   }
   if (rest.length === 0) return out;
