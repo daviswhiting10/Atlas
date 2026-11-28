@@ -17,7 +17,10 @@ import { GOALS, normalizePrefs, resolvePrefs } from "@/lib/plan/generator";
 import { createHandBuiltPlan, createPlanForClient, ensureCatalog } from "@/lib/plan/persist";
 import { assignProgram } from "@/lib/db/programs";
 import { checkSessionMilestones } from "@/lib/progress/milestones";
-import { MAX_SETS, getLoggerData, getProgress, type LoggerSet } from "@/lib/athlete/data";
+import { MAX_SETS, TZ_COOKIE, getLoggerData, getProgress, type LoggerSet } from "@/lib/athlete/data";
+import { cookies } from "next/headers";
+import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
+import { dayToDate } from "@/lib/sessions/day";
 import type { SessionPoint } from "@/lib/plan/overload";
 import { toMetres } from "@/lib/cardio";
 import { replayConflict, type ServerSetState } from "@/lib/sessions/replay";
@@ -524,6 +527,31 @@ export async function deleteMySession(raw: { workoutLogId: string }): Promise<{ 
   const log = await prisma.workoutLog.findFirst({ where: { id: parsed.data.workoutLogId, clientId }, select: { id: true } });
   if (!log) return { ok: false, error: "That session isn't there." };
   await prisma.$transaction((tx) => deleteSessionRows(tx, log.id));
+  refresh();
+  return { ok: true };
+}
+
+/**
+ * Change the calendar day one of your own sessions is on (Tuesday's workout was really done on Wednesday). Only the day moves:
+ * its plan day, sets and notes stay, and the time of day it was finished and its length are kept. Not into the future.
+ */
+export async function changeMySessionDate(raw: { workoutLogId: string; day: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = await requireAthlete();
+  const parsed = z.object({ workoutLogId: z.string().min(1).max(64), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Pick a date." };
+  const tz = safeTimeZone(cookies().get(TZ_COOKIE)?.value);
+  const { day } = parsed.data;
+  if (day > localDay(new Date(), tz)) return { ok: false, error: "That day hasn't happened yet." };
+  if (day < "2000-01-01" || Number.isNaN(Date.parse(`${day}T12:00:00Z`))) return { ok: false, error: "Pick a date." };
+  const log = await prisma.workoutLog.findFirst({ where: { id: parsed.data.workoutLogId, clientId }, select: { id: true, date: true, completedAt: true } });
+  if (!log) return { ok: false, error: "That session isn't there." };
+  const from = localDay(log.date, tz);
+  if (from === day) return { ok: false, error: "It's already on that day." };
+  const days = Math.round((Date.parse(`${day}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+  await prisma.workoutLog.update({
+    where: { id: log.id },
+    data: { date: dayToDate(day, tz), ...(log.completedAt ? { completedAt: new Date(log.completedAt.getTime() + days * 86_400_000) } : {}) },
+  });
   refresh();
   return { ok: true };
 }
