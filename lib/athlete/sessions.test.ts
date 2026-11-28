@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, localDay, mondayOf, referenceSession, safeTimeZone, sessionBefore, weekOf } from "./sessions";
+import { DAY_MS, firstZone, ianaZone, localDay, mondayOf, referenceSession, safeTimeZone, sessionBefore, weekOf } from "./sessions";
 
 const set = (weight: number | null, reps: number, completed = true) => ({ weight, reps, completed });
 
@@ -87,5 +87,32 @@ describe("sessionBefore", () => {
     expect(sessionBefore([a], a)).toBeNull();
     expect(sessionBefore([lighter], lighter)).toBeNull();
     expect(sessionBefore([], null)).toBeNull();
+  });
+});
+
+describe("firstZone: the zone MCP uses (argument, then saved, then goal, then UTC)", () => {
+  const NY = "America/New_York", LA = "America/Los_Angeles", AKL = "Pacific/Auckland";
+  it("takes the tiers in order", () => {
+    expect(firstZone(NY, LA, AKL)).toBe(NY); // the argument
+    expect(firstZone(undefined, LA, AKL)).toBe(LA); // the saved zone
+    expect(firstZone(undefined, null, AKL)).toBe(AKL); // the goal's
+    expect(firstZone(undefined, null, null)).toBe("UTC");
+  });
+  it("skips a zone the runtime doesn't know", () => {
+    expect(firstZone("Mars/Olympus", LA, AKL)).toBe(LA);
+    expect(firstZone("", "Not/AZone", AKL)).toBe(AKL);
+    expect(firstZone("nonsense", "Not/AZone", "Also/Not")).toBe("UTC");
+  });
+});
+
+describe("ianaZone: a zone fit to save", () => {
+  it("keeps a known IANA name", () => {
+    expect(ianaZone("America/New_York")).toBe("America/New_York");
+    expect(ianaZone("UTC")).toBe("UTC");
+    expect(ianaZone("america/new_york")).toBe("America/New_York"); // saved in the runtime's spelling
+    expect(ianaZone("America/Argentina/Buenos_Aires")).toMatch(/Buenos_Aires$/);
+  });
+  it("refuses anything else", () => {
+    for (const bad of ["Mars/Olympus", "", "+05:00", "America/New_York; DROP TABLE", "a".repeat(70), null, undefined, 42, {}]) expect(ianaZone(bad)).toBeNull();
   });
 });

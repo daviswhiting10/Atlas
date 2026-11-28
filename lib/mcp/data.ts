@@ -13,7 +13,7 @@ import { durationRange } from "@/lib/sessions/duration";
 import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
 import type { ClientLookup, OwnClientLookup } from "./auth";
 import type { ScopedClient } from "./context";
-import { safeTimeZone } from "@/lib/athlete/sessions";
+import { firstZone, safeTimeZone } from "@/lib/athlete/sessions";
 
 const CLIENT_SELECT = { id: true, workspaceId: true, fullName: true, primaryGoal: true, keyLiftIds: true, goalTargets: true } as const;
 type ClientRow = { id: string; workspaceId: string; fullName: string; primaryGoal: string | null; keyLiftIds: string[] | null; goalTargets: unknown };
@@ -124,18 +124,22 @@ export async function loadSetRows(
   });
 }
 
-/** An exercise the workspace may see: its own, or the global library (workspaceId null). */
 /**
- * The timezone a person's days are in, for placing a session on a calendar day: the one the AI passed, else the zone the
- * app saw when they last started a goal (the profile keeps no zone of its own; the app reads it from the device), else UTC,
- * the app's own default (safeTimeZone).
+ * The timezone a person's days are in: which calendar day a session is on, and what "today" is. Every MCP read and
+ * write takes it from here. In order: the zone the AI passed; the zone saved on the account of the person whose data it
+ * is (the client's own login, or the coach's for their own training; a client with no login has none), from their
+ * browser (lib/actions/time-zone.ts); the zone of their latest goal; else UTC, the app's default. Unknown names are skipped.
  */
 export async function zoneFor(client: ScopedClient, given: string | undefined): Promise<string> {
   if (given && safeTimeZone(given) === given) return given;
-  const goal = await prisma.goal.findFirst({ where: { clientId: client.id }, orderBy: { createdAt: "desc" }, select: { timeZone: true } });
-  return safeTimeZone(goal?.timeZone);
+  const row = await prisma.clientProfile.findFirst({
+    where: { id: client.id, workspaceId: client.workspaceId },
+    select: { user: { select: { timeZone: true } }, goals: { orderBy: { createdAt: "desc" }, take: 1, select: { timeZone: true } } },
+  });
+  return firstZone(given, row?.user?.timeZone, row?.goals[0]?.timeZone);
 }
 
+/** An exercise the workspace may see: its own, or the global library (workspaceId null). */
 export async function findVisibleExercise(exerciseId: string, workspaceId: string) {
   // An exercise merged into another stands for that one.
   const live = await liveExercise(exerciseId);

@@ -22,7 +22,9 @@ import { addSuggestion, coreGaps, rangeAddedLines } from "@/lib/programs/plan-ru
 import { parseSetsReps, type SheetGrid } from "@/lib/programs/sheet-plan";
 import { ALL_ROLES } from "../auth";
 import { forbidden, invalid } from "../context";
-import { ClientIdArg, IsoDate } from "../schemas";
+import { ClientIdArg, IsoDate, TimeZoneArg } from "../schemas";
+import { zoneFor } from "../data";
+import { localDay } from "@/lib/athlete/sessions";
 import { clientTool } from "../tool";
 
 const OutlineExercise = z.object({
@@ -47,7 +49,8 @@ export const createPlanFromOutline = clientTool({
     clientId: ClientIdArg,
     name: z.string().trim().min(1).max(120).describe("The plan's name."),
     weeks: z.number().int().min(1).max(16).default(4).describe("How many weeks the days repeat for."),
-    startDate: IsoDate.optional().describe("Week 1's first day (YYYY-MM-DD). Defaults to today."),
+    startDate: IsoDate.optional().describe("Week 1's first day (YYYY-MM-DD), a calendar day. Defaults to today in `timezone`."),
+    timezone: TimeZoneArg,
     goals: z.array(z.string().trim().max(40)).max(5).default([]),
     days: z.array(OutlineDay).min(1).max(7).describe("One entry per training day of the week, in order."),
     addSuggestedCore: z.boolean().default(false).describe("Add the suggested core exercise to each strength day that has none."),
@@ -95,6 +98,9 @@ export const createPlanFromOutline = clientTool({
       name: args.name,
       goals: args.goals,
       weekOneStart: args.startDate ? new Date(`${args.startDate}T00:00:00`) : null,
+      // "Today" is the person's today (zoneFor), not the server's: after 7 pm in New York, UTC is already tomorrow. Plan
+      // dates are calendar days (the server's midnight of the day, read back with iso), so a given startDate is that day as written.
+      today: new Date(`${localDay(new Date(), await zoneFor(client, args.timezone))}T12:00:00`),
       context: { durationWeeks: args.weeks, trainingDays: null, startAtWeek: 1 },
       history: false,
       status: live ? "ACTIVE" : "PAUSED",

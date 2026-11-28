@@ -11,6 +11,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 import { generateToken, hashToken } from "@/lib/mcp/token";
+import { ianaZone } from "@/lib/athlete/sessions";
 
 /** Active (unrevoked) tokens one user may hold at once. */
 const MAX_ACTIVE = 10;
@@ -23,7 +24,12 @@ async function signedIn(): Promise<{ id: string; guest: boolean } | null> {
   return user?.id ? { id: user.id, guest: (user.email ?? "").endsWith(`@${GUEST_EMAIL_DOMAIN}`) } : null;
 }
 
-export async function createMcpToken(raw: { name: string }): Promise<{ ok: true; id: string; token: string; name: string } | { ok: false; error: string }> {
+/**
+ * `timeZone` is the browser's zone. It is saved on the account, replacing one saved before: the person is at their device
+ * setting up their AI right now, so it is the freshest zone Atlas will see (the first-load save never overwrites). An
+ * unknown name is ignored; the token is created either way.
+ */
+export async function createMcpToken(raw: { name: string; timeZone?: string }): Promise<{ ok: true; id: string; token: string; name: string } | { ok: false; error: string }> {
   const user = await signedIn();
   if (!user) return { ok: false, error: "Sign in again to create a token." };
   // A guest account is removed when it's left; save it first.
@@ -36,6 +42,8 @@ export async function createMcpToken(raw: { name: string }): Promise<{ ok: true;
 
   const token = generateToken();
   const row = await prisma.mcpToken.create({ data: { userId: user.id, name: input.data.name, tokenHash: hashToken(token) }, select: { id: true, name: true } });
+  const zone = ianaZone(raw.timeZone);
+  if (zone) await prisma.user.updateMany({ where: { id: user.id }, data: { timeZone: zone } });
   return { ok: true, id: row.id, token, name: row.name };
 }
 
