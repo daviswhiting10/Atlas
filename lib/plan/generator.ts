@@ -112,7 +112,7 @@ export const GOALS: Record<
     primaryGoal: "weight_loss",
   },
   general: {
-    label: "Stay fit",
+    label: "Maintenance",
     blurb: "Balanced full-body training you can keep up for years.",
     metric: "weight",
     metricWhy: "Your charts lead with the weight on the bar — the simplest sign you're improving.",

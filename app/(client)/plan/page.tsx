@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, getAthlete, getPlanOverview } from "@/lib/athlete/data";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
@@ -42,7 +42,7 @@ const ACTIONS: PlanActions = {
 
 /**
  * The Plan tab (option B): up next first, with its exercises and Start, then the rest of the week,
- * "All N weeks". Edit plan and Change goals are two quiet buttons at the bottom (the header's ⋯ no longer has them). The newest progress report is a row under the plan; the older ones are on All weeks.
+ * "All N weeks". New plan and Edit plan are the two buttons at the bottom (the header's ⋯ has neither; changing goals is making a new plan). The newest progress report is a row under the plan; the older ones are on All weeks.
  * ?view=all shows every week; ?view=edit the same with editing (not for a coached athlete).
  */
 export default async function PlanPage({ searchParams }: { searchParams?: { view?: string } }) {
@@ -73,7 +73,7 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         {athlete.selfServe ? (
           <>
             <p className="mt-2 max-w-sm text-[15px] text-ink-soft">Tell Atlas your goal and it lays out your next 12 weeks.</p>
-            <Link href="/you?goals=1" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
+            <Link href="/plan/new" className="press mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-dusk-button px-6 text-[15px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
               Build my plan <ArrowRight className="h-4 w-4" />
             </Link>
           </>
@@ -117,16 +117,16 @@ export default async function PlanPage({ searchParams }: { searchParams?: { view
         </div>
       )}
       {newestReport}
-      {/* Changing the plan or the goals: quiet, last on the page (they are not part of reading the week). */}
-      <div className="mt-10 flex max-w-3xl flex-col gap-2 sm:flex-row">
-        {!locked && (
-          <Link href="/plan?view=edit" className="press flex h-12 flex-1 items-center justify-center rounded-xl border border-line-strong text-[15px] font-semibold text-ink hover:bg-ink/5">
-            Edit plan
+      {/* Making a new plan (which is also how goals change) is the main door at the bottom; editing this one is beside it. */}
+      <div className="mt-10 flex max-w-3xl flex-col gap-2">
+        {athlete.selfServe && (
+          <Link href="/plan/new" className="press flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-dusk-button text-[16px] font-semibold text-dusk-button-text hover:bg-dusk-button/85">
+            <Plus className="h-4 w-4" /> New plan
           </Link>
         )}
-        {athlete.selfServe && (
-          <Link href="/you?goals=1" className="press flex h-12 flex-1 items-center justify-center rounded-xl border border-line-strong text-[15px] font-semibold text-ink hover:bg-ink/5">
-            Change goals
+        {!locked && (
+          <Link href="/plan?view=edit" className="press flex h-[52px] items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink hover:bg-ink/5">
+            Edit plan
           </Link>
         )}
       </div>
