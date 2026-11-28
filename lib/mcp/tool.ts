@@ -8,9 +8,9 @@
  */
 
 import { z } from "zod";
-import { authorizeRole, resolveClientScope, type ClientLookup } from "./auth";
+import { authorizeRole, resolveClientScope, type ClientLookup, type OwnClientLookup } from "./auth";
 import { buildAuditEntry, type AuditSink } from "./audit";
-import { McpError, type McpCaller, type McpOutcome, type McpRole, type McpTransport, type ScopedClient } from "./context";
+import { McpError, rateLimited, type McpCaller, type McpOutcome, type McpRole, type McpTransport, type ScopedClient } from "./context";
 
 export type ToolContext = { caller: McpCaller; transport: McpTransport };
 
@@ -43,9 +43,26 @@ export const clientTool = <S extends z.ZodObject>(def: Omit<ClientTool<S>, "scop
 export const workspaceTool = <S extends z.ZodObject>(def: Omit<WorkspaceTool<S>, "scope">): ToolDef =>
   ({ ...def, scope: "workspace" }) as unknown as ToolDef;
 
-export type ToolDeps = { lookupClient: ClientLookup; audit: AuditSink; transport: McpTransport };
+export type ToolDeps = {
+  lookupClient: ClientLookup;
+  /** A coach's own training, for a call that names no client (optional: tests and the local runner may leave it out). */
+  lookupOwn?: OwnClientLookup;
+  audit: AuditSink;
+  transport: McpTransport;
+  /** The personal access token the session came with (for the audit trail); null otherwise. */
+  tokenId?: string | null;
+  /** Counts one write for the user; false when they are over the write limit (lib/mcp/write-limit.ts). */
+  allowWrite: (userId: string) => Promise<boolean>;
+};
 
 export type ToolResult = { outcome: "ok"; data: unknown } | { outcome: Exclude<McpOutcome, "ok">; message: string };
+
+/** Whose data a client-scoped tool acted on, as the first field of its result. */
+export function actedOnLabel(client: { id: string; fullName: string }, own: boolean): { clientId: string; name: string; who: "you" | "client"; text: string } {
+  return own
+    ? { clientId: client.id, name: client.fullName, who: "you", text: `you (${client.fullName}, your own training)` }
+    : { clientId: client.id, name: client.fullName, who: "client", text: `${client.fullName} (your client)` };
+}
 
 export async function executeTool(def: ToolDef, caller: McpCaller, rawArgs: unknown, deps: ToolDeps): Promise<ToolResult> {
   const started = Date.now();
@@ -60,14 +77,23 @@ export async function executeTool(def: ToolDef, caller: McpCaller, rawArgs: unkn
       throw new McpError("validation_error", z.prettifyError(parsed.error));
     }
     const args = parsed.data as Record<string, unknown>;
+    // Writes are capped per user; reads never are. Refused before the handler runs, so nothing is written.
+    if (def.permission === "write" && !(await deps.allowWrite(caller.userId))) {
+      throw rateLimited("Too many changes: Atlas takes up to 300 writes an hour from AI tools. Nothing was written; try again later.");
+    }
     const ctx: ToolContext = { caller, transport: deps.transport };
 
     let data: unknown;
     if (def.scope === "client") {
       const requested = typeof args.clientId === "string" ? args.clientId : undefined;
-      const client = await resolveClientScope(caller, requested, deps.lookupClient);
+      const client = await resolveClientScope(caller, requested, deps.lookupClient, deps.lookupOwn);
       clientId = client.id;
-      data = await def.handler({ ...ctx, client }, args);
+      const out = await def.handler({ ...ctx, client }, args);
+      // Every result says whose data it is, so the AI can tell the person who it read or logged for: "you" (the
+      // caller's own training: an athlete, or a coach's own profile) or the client's name.
+      const ownId = caller.role === "CLIENT" ? caller.clientProfileId : deps.lookupOwn ? ((await deps.lookupOwn(caller.userId, caller.workspaceId))?.id ?? null) : null;
+      const actedOn = actedOnLabel(client, client.id === ownId);
+      data = out && typeof out === "object" && !Array.isArray(out) ? { actedOn, ...(out as Record<string, unknown>) } : { actedOn, result: out };
     } else {
       data = await def.handler(ctx, args);
     }
@@ -92,6 +118,7 @@ export async function executeTool(def: ToolDef, caller: McpCaller, rawArgs: unkn
         args: rawArgs ?? {},
         outcome: result.outcome,
         latencyMs: Date.now() - started,
+        tokenId: deps.tokenId ?? null,
       })
     );
   } catch (err) {

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { GUEST_EMAIL_DOMAIN, decide, mergeCookieHeader, needsRecheck, type RouteUser } from "./lib/auth/route-policy";
+import { GUEST_EMAIL_DOMAIN, bearerToMcp, decide, mergeCookieHeader, needsRecheck, type RouteUser } from "./lib/auth/route-policy";
 
 /**
  * Reads the session cookie, and every 10 minutes has the server re-check it
@@ -12,6 +12,9 @@ import { GUEST_EMAIL_DOMAIN, decide, mergeCookieHeader, needsRecheck, type Route
  * page rendered for this same request.
  */
 export default async function middleware(req: NextRequest) {
+  // A token-authenticated MCP call: the route checks the token (lib/auth/route-policy.ts, bearerToMcp).
+  if (bearerToMcp(req.nextUrl.pathname, req.headers.get("authorization"))) return NextResponse.next();
+
   // Same choices Auth.js makes: AUTH_URL (if set) decides the cookie's name, and the secret falls back to NEXTAUTH_SECRET.
   const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
   const secure = (authUrl ? new URL(authUrl).protocol : req.nextUrl.protocol) === "https:";

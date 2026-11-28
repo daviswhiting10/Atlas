@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Athlete } from "@/lib/athlete/data";
 import { SaveAccountPanel } from "@/components/athlete/account";
+import { ConnectAI } from "@/components/settings/ConnectAI";
 import { YouTabs } from "@/components/nutrition/YouTabs";
 import { youLine, type YouPlan } from "@/lib/athlete/you-summary";
 
@@ -16,7 +17,7 @@ export function YouScreen({
   plan = null,
   base = "",
 }: {
-  athlete: Pick<Athlete, "name" | "isDemo" | "isGuest">;
+  athlete: Pick<Athlete, "name" | "isDemo" | "isGuest"> & Partial<Pick<Athlete, "isCoach">>;
   /** The NUTRITION flag is on: a Profile | Nutrition switch at the top. */
   nutrition?: boolean;
   /** Goals & challenges: starting one, the running one, the finished ones (streamed in). */
@@ -59,6 +60,8 @@ export function YouScreen({
 
       {/* A guest's own plan is worth keeping. */}
       {athlete.isGuest && !athlete.isDemo && <SaveAccountPanel className="mt-6" />}
+      {/* One row that opens in place, so You stays one screen; a coach connects theirs in Settings. */}
+      {!athlete.isGuest && !athlete.isDemo && !athlete.isCoach && <ConnectAI collapsible className="mt-6" />}
     </div>
   );
 }

@@ -11,22 +11,8 @@
 
 import { prisma } from "@/lib/db/client";
 import { createGuest, GUEST_EMAIL_DOMAIN } from "@/lib/guest";
+import { callerForUser } from "./caller";
 import type { McpCaller } from "./context";
-
-async function callerForUser(userId: string): Promise<McpCaller | null> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, role: true, workspaceId: true, clientProfile: { select: { id: true } } },
-  });
-  if (!user?.workspaceId) return null;
-  if (user.role === "CLIENT" && !user.clientProfile) return null;
-  return {
-    userId: user.id,
-    role: user.role,
-    workspaceId: user.workspaceId,
-    clientProfileId: user.role === "CLIENT" ? (user.clientProfile?.id ?? null) : null,
-  };
-}
 
 export async function resolveLocalCaller(env: NodeJS.ProcessEnv = process.env): Promise<McpCaller> {
   const email = env.ATLAS_MCP_USER_EMAIL?.trim().toLowerCase();

@@ -35,6 +35,16 @@ export type Decision =
 
 const matches = (path: string, list: string[]) => list.some((p) => path === p || path.startsWith(p + "/"));
 
+/**
+ * A remote AI client calling the MCP endpoint with a personal access token (Authorization: Bearer ...) carries no
+ * session cookie, so the session rules below would refuse it. The route authenticates the token itself (hash lookup,
+ * revoked tokens refused, same caller as the session path) and never reads the cookie when the header is present, so
+ * the middleware lets exactly that request through untouched.
+ */
+export function bearerToMcp(path: string, authorization: string | null): boolean {
+  return (path === "/api/mcp" || path.startsWith("/api/mcp/")) && !!authorization && /^Bearer\s+\S/i.test(authorization);
+}
+
 export function decide(path: string, user: RouteUser): Decision {
   const isApi = path.startsWith("/api/");
   const next = { kind: "next" } as const;

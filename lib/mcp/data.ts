@@ -11,24 +11,29 @@ import { LIGHTER_SELECT, isLighterWeek } from "@/lib/plan/lighter";
 import { displayName } from "@/lib/plan/catalog";
 import { durationRange } from "@/lib/sessions/duration";
 import { isTimedSet, TIMED_SELECT } from "@/lib/sessions/volume";
-import type { ClientLookup } from "./auth";
+import type { ClientLookup, OwnClientLookup } from "./auth";
 import type { ScopedClient } from "./context";
 
+const CLIENT_SELECT = { id: true, workspaceId: true, fullName: true, primaryGoal: true, keyLiftIds: true, goalTargets: true } as const;
+type ClientRow = { id: string; workspaceId: string; fullName: string; primaryGoal: string | null; keyLiftIds: string[] | null; goalTargets: unknown };
+const scoped = (c: ClientRow) => ({
+  id: c.id,
+  workspaceId: c.workspaceId,
+  fullName: c.fullName,
+  primaryGoal: c.primaryGoal,
+  keyLiftIds: c.keyLiftIds ?? [],
+  selfServe: (c.goalTargets as { athlete?: unknown } | null)?.athlete != null,
+});
+
 export const lookupClient: ClientLookup = async (clientId, workspaceId) => {
-  const c = await prisma.clientProfile.findFirst({
-    where: { id: clientId, workspaceId, deletedAt: null },
-    select: { id: true, workspaceId: true, fullName: true, primaryGoal: true, keyLiftIds: true, goalTargets: true },
-  });
-  if (!c) return null;
-  const meta = (c.goalTargets as { athlete?: unknown } | null)?.athlete;
-  return {
-    id: c.id,
-    workspaceId: c.workspaceId,
-    fullName: c.fullName,
-    primaryGoal: c.primaryGoal,
-    keyLiftIds: c.keyLiftIds ?? [],
-    selfServe: meta != null,
-  };
+  const c = await prisma.clientProfile.findFirst({ where: { id: clientId, workspaceId, deletedAt: null }, select: CLIENT_SELECT });
+  return c ? scoped(c) : null;
+};
+
+/** A coach's own training profile (the "Me" side) in their workspace. */
+export const lookupOwnClient: OwnClientLookup = async (userId, workspaceId) => {
+  const c = await prisma.clientProfile.findFirst({ where: { userId, workspaceId, deletedAt: null }, select: CLIENT_SELECT, orderBy: { createdAt: "asc" } });
+  return c ? scoped(c) : null;
 };
 
 export type SetRow = {

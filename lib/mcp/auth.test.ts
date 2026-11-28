@@ -27,6 +27,8 @@ const EXPECTED: Record<string, { roles: McpRole[]; permission: string; scope: "c
   log_workout: { roles: EVERYONE, permission: "write", scope: "client" },
   // Plan editing: an athlete edits their own plan, a coach any client's in their workspace.
   edit_plan: { roles: EVERYONE, permission: "write", scope: "client" },
+  // A new plan: a coach's draft for a client, or a self-serve athlete's own live plan (checked in the handler).
+  create_plan_from_outline: { roles: EVERYONE, permission: "write", scope: "client" },
   generate_program: { roles: COACHES, permission: "generate", scope: "client" },
 };
 
@@ -36,6 +38,7 @@ const VALID: Record<string, Record<string, unknown>> = {
   log_workout: { assignedWorkoutId: "aw_1", sets: [{ exerciseId: "ex_1", setNumber: 1, weight: 100, reps: 8 }] },
   generate_program: { goal: "hypertrophy", durationWeeks: 8, sessionsPerWeek: 3, sessionLength: 60, equipment: "full gym" },
   edit_plan: { action: "swap_exercise", planExerciseId: "awe_1", slug: "plank" },
+  create_plan_from_outline: { name: "Block", days: [{ name: "Day 1", exercises: [{ exercise: "Back Squat", prescription: "3x8" }] }] },
 };
 const argsFor = (tool: { name: string }, extra: Record<string, unknown> = {}) => ({ ...VALID[tool.name], ...extra });
 
@@ -54,7 +57,7 @@ const caller = (role: McpRole, clientProfileId: string | null = null, workspaceI
   clientProfileId,
 });
 
-const deps: ToolDeps = { transport: "http", audit: async () => {}, lookupClient: lookup };
+const deps: ToolDeps = { transport: "http", audit: async () => {}, lookupClient: lookup, allowWrite: async () => true };
 
 describe("tool inventory", () => {
   it("exposes exactly the planned tools", () => {
@@ -201,5 +204,23 @@ describe("plan editing", () => {
     const audited: ToolDeps = { ...deps, audit: async (e) => void rows.push(`${e.tool}:${e.outcome}`) };
     for (const [action, args] of Object.entries(ACTIONS)) await executeTool(editPlan, caller("CLIENT", "alice"), { action, ...args, clientId: "bob" }, audited);
     expect(rows).toEqual(Object.keys(ACTIONS).map(() => "edit_plan:not_found"));
+  });
+});
+
+describe("a coach who names no client means their own training", () => {
+  const me: ScopedClient = { id: "me", workspaceId: "ws_a", fullName: "Coach", primaryGoal: null, keyLiftIds: [], selfServe: true };
+  const ownOf = vi.fn(async (userId: string, ws: string) => (userId === "u_TRAINER" && ws === "ws_a" ? me : null));
+  it("no clientId: the coach's own profile", async () => {
+    expect(await resolveClientScope(caller("TRAINER"), undefined, lookup, ownOf)).toBe(me);
+  });
+  it("a named client still wins", async () => {
+    expect(await resolveClientScope(caller("TRAINER"), "alice", lookup, ownOf)).toBe(CLIENTS.alice);
+  });
+  it("no own profile (or no lookup): clientId is still required", async () => {
+    await expect(resolveClientScope(caller("ADMIN"), undefined, lookup, ownOf)).rejects.toMatchObject({ outcome: "validation_error" });
+    await expect(resolveClientScope(caller("TRAINER"), undefined, lookup)).rejects.toMatchObject({ outcome: "validation_error" });
+  });
+  it("an athlete is unaffected: always their own profile", async () => {
+    expect(await resolveClientScope(caller("CLIENT", "alice"), undefined, lookup, ownOf)).toBe(CLIENTS.alice);
   });
 });

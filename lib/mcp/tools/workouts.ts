@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/client";
 import { displayName } from "@/lib/plan/catalog";
 import { isTimedSet, setVolume, TIMED_SELECT } from "@/lib/sessions/volume";
 import { implementsToStore } from "@/lib/exercises/implements";
+import { checkSessionMilestones, checkStrengthMilestones } from "@/lib/progress/milestones";
 import { localDay, safeTimeZone } from "@/lib/athlete/sessions";
 import { ALL_ROLES } from "../auth";
 import { invalid, notFound } from "../context";
@@ -236,6 +237,7 @@ export const logWorkout = clientTool({
             select: { id: true, completedAt: true },
           }));
 
+        const written: Array<{ setLogId: string; exerciseId: string; weight: number | null; reps: number | null }> = [];
         for (const s of args.sets) {
           const aweId = aweByExercise.get(s.exerciseId) as string;
           const data = {
@@ -252,10 +254,10 @@ export const logWorkout = clientTool({
             },
             select: { id: true },
           });
-          if (existing)
-            await tx.setLog.update({ where: { id: existing.id }, data });
-          else
-            await tx.setLog.create({
+          const row = existing
+            ? await tx.setLog.update({ where: { id: existing.id }, data, select: { id: true } })
+            : await tx.setLog.create({
+              select: { id: true },
               data: {
                 ...data,
                 workoutLogId: log.id,
@@ -266,6 +268,7 @@ export const logWorkout = clientTool({
                 implements: implementsToStore(exerciseById.get(s.exerciseId)!, undefined, true),
               },
             });
+          written.push({ setLogId: row.id, exerciseId: s.exerciseId, weight: data.weight, reps: data.reps });
         }
 
         if (args.complete) {
@@ -286,10 +289,21 @@ export const logWorkout = clientTool({
             data: { lastContactAt: new Date() },
           });
         }
-        return { workoutLogId: log.id };
+        return { workoutLogId: log.id, written };
       },
       { timeout: 20_000, maxWait: 10_000 },
     );
+
+    // The milestones the app's loggers award (a record, a plate, a session count), after the write commits.
+    // Awaited so the next read sees them; a failure here never undoes the logged workout.
+    try {
+      for (const w of result.written) {
+        await checkStrengthMilestones(client.workspaceId, client.id, w.exerciseId, exerciseById.get(w.exerciseId)!.name, { weight: w.weight, reps: w.reps, completed: true }, w.setLogId);
+      }
+      if (args.complete) await checkSessionMilestones(client.workspaceId, client.id);
+    } catch (err) {
+      console.error("[mcp] milestone check failed", err instanceof Error ? err.message : err);
+    }
 
     return {
       workoutLogId: result.workoutLogId,
