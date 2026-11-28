@@ -203,6 +203,9 @@ export type SessionPoint = {
   volume: number;
   sets: number;
   /** Which session this point is (a tap on the chart opens it), its name, and the plan workout it was. Absent on sample data. */
+  /** The set that gave the best estimated 1-rep max (the headline's "185 lb × 10"): not always the heaviest one. */
+  e1rmWeight?: number | null;
+  e1rmReps?: number | null;
   logId?: string;
   title?: string;
   workoutId?: string | null;
@@ -230,13 +233,19 @@ export function sessionPoint(date: string, sets: LoggedSet[], deload = false, ti
 
   let weight: number | null = null;
   let best1rm: number | null = null;
+  let bestW: number | null = null;
+  let bestR: number | null = null;
   let volume = 0;
   for (const s of done) {
     const reps = s.reps as number;
     if (s.weight != null && s.weight > 0) {
       if (weight == null || s.weight > weight) weight = s.weight;
       const est = e1rm(s.weight, reps);
-      if (best1rm == null || est > best1rm) best1rm = est;
+      if (best1rm == null || est > best1rm) {
+        best1rm = est;
+        bestW = s.weight;
+        bestR = reps;
+      }
     }
     // Bodyweight: volume is total reps; timed: total seconds; loaded reps: weight × reps.
     volume += timed ? reps : setVolume({ weight: s.weight, reps }) || reps;
@@ -249,6 +258,8 @@ export function sessionPoint(date: string, sets: LoggedSet[], deload = false, ti
     weight,
     reps,
     e1rm: best1rm == null ? null : Math.round(best1rm * 10) / 10,
+    e1rmWeight: bestW,
+    e1rmReps: bestR,
     volume: Math.round(volume),
     sets: done.length,
     deload,
