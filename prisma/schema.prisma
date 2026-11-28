@@ -50,6 +50,8 @@ model User {
   passwordChangedAt   DateTime?
   /// "Not now" on the set-password step: don't ask again before this.
   passwordPromptAfter DateTime?
+  /// IANA zone from their browser (e.g. America/New_York): which calendar day an MCP read or write is on. Null until seen.
+  timeZone            String?
   image               String?
   role                Role            @default(TRAINER)
   workspaceId         String?

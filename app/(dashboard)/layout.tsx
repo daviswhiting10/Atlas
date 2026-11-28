@@ -4,6 +4,8 @@ import { LiveSessionBar } from "@/components/coach/LiveSessionBar";
 import { auth } from "@/lib/auth";
 import { GUEST_EMAIL_DOMAIN } from "@/lib/auth/route-policy";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { SaveTimeZoneIfEmpty } from "@/components/time-zone/SaveTimeZoneIfEmpty";
 
 /**
  * The coach side uses the athlete app's frame: the same header, the same
@@ -21,6 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {children}
         <LiveSessionBar owner={session.user.id ?? ""} />
         <LiveTransitionGate />
+        <Suspense fallback={null}><SaveTimeZoneIfEmpty userId={session.user.id} /></Suspense>
       </main>
     </div>
   );

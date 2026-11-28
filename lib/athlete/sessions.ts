@@ -26,6 +26,25 @@ export function safeTimeZone(raw: string | undefined | null): string {
   }
 }
 
+/** The first of these zones the runtime knows (in the order given), else UTC. */
+export function firstZone(...zones: Array<string | null | undefined>): string {
+  for (const z of zones) if (z && safeTimeZone(z) === z) return z;
+  return "UTC";
+}
+
+/**
+ * An IANA zone name ("America/New_York", "UTC") the runtime knows, in its canonical spelling; null for anything else
+ * (a typo, an offset like "+05:00", junk). For a zone that is saved, not just used for one request.
+ */
+export function ianaZone(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > 64 || !/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/.test(raw)) return null;
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: raw }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
 /** Monday (yyyy-mm-dd) of the week containing the given calendar day. */
 export function mondayOf(day: string): string {
   const x = new Date(day + "T00:00:00Z");

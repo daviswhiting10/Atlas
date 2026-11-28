@@ -28,7 +28,7 @@ export const TimeZoneArg = z
   .string()
   .max(64)
   .optional()
-  .describe("The person's IANA timezone, e.g. America/New_York: which calendar day a session is on, and what 'today' is. Always pass it when you know or can infer it (after 7 pm in New York it is already tomorrow in UTC). Left out: the zone Atlas last saw from their device, else UTC.");
+  .describe("The person's IANA timezone, e.g. America/New_York: which calendar day a session is on, and what 'today' is. Always pass it when you know or can infer it (after 7 pm in New York it is already tomorrow in UTC). Left out: the zone saved from their device, else their goal's, else UTC.");
 
 export const MOVEMENT_PATTERNS = [
   "SQUAT",

@@ -85,7 +85,7 @@ export function ConnectAI({ className, collapsible = false }: { className?: stri
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await createMcpToken({ name }).catch(() => ({ ok: false as const, error: "Couldn't create a token. Please try again." }));
+    const res = await createMcpToken({ name, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }).catch(() => ({ ok: false as const, error: "Couldn't create a token. Please try again." }));
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
