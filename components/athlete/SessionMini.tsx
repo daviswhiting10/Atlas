@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import { useEscape } from "@/hooks/use-escape";
 
 type Load = (id: string) => Promise<SessionSummary | null>;
-type Remove = (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
-type Move = (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
+export type Remove = (raw: { workoutLogId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
+export type Move = (raw: { workoutLogId: string; toAssignedWorkoutId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
 export type SlotWeek = { week: number; slots: Slot[] };
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
@@ -23,13 +23,19 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * a way to open it and, when `remove` is given, a red Delete session that asks first. Deleting takes the session, its sets
  * and its notes away, and the day goes back to scheduled.
  */
-export function SessionMini({ logId, href, load, remove, move, weeks }: { logId: string; href: string; load: Load; remove?: Remove; /** Move it to another day of the plan (with the plan's days to choose from). */ move?: Move; weeks?: SlotWeek[] }) {
+export function SessionMini({ logId, href, load, remove, move, weeks, loadWeeks, actionsOnly = false, onChanged }: { logId: string; href: string; load?: Load; remove?: Remove; /** Move it to another day of the plan (with the plan's days to choose from). */ move?: Move; weeks?: SlotWeek[]; /** History doesn't carry the plan: fetch its days when Reassign is tapped. */ loadWeeks?: (logId: string) => Promise<SlotWeek[]>; /** Only the buttons (History's sheet already shows the sets and notes): no summary, no View session. */ actionsOnly?: boolean; /** After a delete or a move went through (the History sheet closes itself). */ onChanged?: () => void }) {
   const router = useRouter();
   const [s, setS] = useState<SessionSummary | null | "loading">("loading");
   const [asking, setAsking] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [fetchedWeeks, setFetchedWeeks] = useState<SlotWeek[] | null>(null);
+  const openMove = () => {
+    if (weeks || fetchedWeeks) return void setMoving(true);
+    loadWeeks?.(logId).then((w) => { setFetchedWeeks(w); setMoving(true); }, () => toast.error("Couldn't load your plan's days."));
+  };
   const [pending, start] = useTransition();
   useEffect(() => {
+    if (actionsOnly || !load) return;
     let live = true;
     setS("loading");
     load(logId)
@@ -38,7 +44,7 @@ export function SessionMini({ logId, href, load, remove, move, weeks }: { logId:
     return () => {
       live = false;
     };
-  }, [load, logId]);
+  }, [load, logId, actionsOnly]);
 
   const facts = s && s !== "loading" ? [s.setCount != null ? plural(s.setCount, "set") : null, s.minutes ? `${s.minutes} min` : null].filter(Boolean).join(" · ") : "";
   const confirm = () =>
@@ -48,12 +54,13 @@ export function SessionMini({ logId, href, load, remove, move, weeks }: { logId:
       setAsking(false);
       toast.success("Session deleted");
       router.refresh();
+      onChanged?.();
     });
 
   return (
     <div>
-      {s === "loading" ? <div className="mt-3 h-14" aria-busy /> : facts ? <p className="mt-0.5 text-[13px] text-ink-mute">{facts}</p> : null}
-      {s && s !== "loading" && (s.notes ?? []).length > 0 && (
+      {actionsOnly ? null : s === "loading" ? <div className="mt-3 h-14" aria-busy /> : facts ? <p className="mt-0.5 text-[13px] text-ink-mute">{facts}</p> : null}
+      {!actionsOnly && s && s !== "loading" && (s.notes ?? []).length > 0 && (
         <div className="mt-3 space-y-1.5 rounded-xl border border-line px-3 py-2 text-[14px] leading-snug text-ink-soft">
           {(s.notes ?? []).map((n) => (
             <p key={n.label}>
@@ -64,11 +71,13 @@ export function SessionMini({ logId, href, load, remove, move, weeks }: { logId:
         </div>
       )}
       <div className="mt-3.5 flex flex-col gap-2">
-        <Link href={href} className="press flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[17px] font-semibold text-ink">
-          View session
-        </Link>
-        {move && weeks && (
-          <button type="button" onClick={() => setMoving(true)} className="press flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
+        {!actionsOnly && (
+          <Link href={href} className="press flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[17px] font-semibold text-ink">
+            View session
+          </Link>
+        )}
+        {move && (weeks || loadWeeks) && (
+          <button type="button" onClick={openMove} className="press flex h-[52px] w-full items-center justify-center rounded-2xl border border-line-strong text-[16px] font-semibold text-ink">
             Reassign to…
           </button>
         )}
@@ -78,7 +87,7 @@ export function SessionMini({ logId, href, load, remove, move, weeks }: { logId:
           </button>
         )}
       </div>
-      {moving && move && weeks && <ReassignSheet weeks={weeks} onClose={() => setMoving(false)} onMove={(to) => move({ workoutLogId: logId, toAssignedWorkoutId: to })} onDone={() => { setMoving(false); toast.success("Session moved"); router.refresh(); }} />}
+      {moving && move && (weeks ?? fetchedWeeks) && <ReassignSheet weeks={(weeks ?? fetchedWeeks)!} onClose={() => setMoving(false)} onMove={(to) => move({ workoutLogId: logId, toAssignedWorkoutId: to })} onDone={() => { setMoving(false); toast.success("Session moved"); router.refresh(); onChanged?.(); }} />}
       {asking && <ConfirmDelete pending={pending} onCancel={() => !pending && setAsking(false)} onConfirm={confirm} />}
     </div>
   );

@@ -6,10 +6,12 @@ import Link from "next/link";
 import { ArrowLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { SessionSummary } from "@/lib/actions/athlete";
+import { toast } from "sonner";
 import { shortDay, type CalendarSession } from "@/lib/history/calendar";
 import type { HistoryView } from "@/lib/history/view";
 import { useEscape } from "@/hooks/use-escape";
 import { YearHeatmap } from "./YearHeatmap";
+import { SessionMini, type Move, type Remove, type SlotWeek } from "./SessionMini";
 
 /** "18 sets · 55 min", leaving out what isn't there (never a zero). */
 function detail(s: CalendarSession): string {
@@ -52,7 +54,9 @@ function SessionRow({ s, sub, onOpen }: { s: CalendarSession; sub?: string; onOp
 }
 
 /** What a finished session was: its sets by exercise. Read-only; Edit (behind the ⋯) opens the logger. */
-function SummaryView({ s, load, onBack, onClose }: { s: CalendarSession; load: (id: string) => Promise<SessionSummary | null>; onBack: () => void; onClose: () => void }) {
+type Actions = { deleteSession?: Remove; reassign?: Move; loadWeeks?: (logId: string) => Promise<SlotWeek[]> };
+
+function SummaryView({ s, load, onBack, onClose, actions }: { s: CalendarSession; load: (id: string) => Promise<SessionSummary | null>; onBack: () => void; onClose: () => void; actions?: Actions }) {
   const [summary, setSummary] = useState<SessionSummary | null | "loading">("loading");
   useEffect(() => {
     let live = true;
@@ -105,12 +109,16 @@ function SummaryView({ s, load, onBack, onClose }: { s: CalendarSession; load: (
           </>
         )}
       </div>
+      {/* The same buttons as the Plan calendar's mini summary. Only a session on a day of the plan can be moved; a quick-logged run or walk can only be deleted. */}
+      {actions?.deleteSession && (
+        <SessionMini actionsOnly logId={s.id} href={s.href ?? "#"} remove={actions.deleteSession} move={s.planned ? actions.reassign : undefined} loadWeeks={s.planned ? actions.loadWeeks : undefined} onChanged={onClose} />
+      )}
     </>
   );
 }
 
 /** A day's sessions in a bottom sheet: the day, then each session; with `summary`, tapping one shows what was done. */
-function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: CalendarSession[]; summary?: (id: string) => Promise<SessionSummary | null>; onClose: () => void }) {
+function DaySheet({ day, sessions, summary, onClose, actions }: { day: string; sessions: CalendarSession[]; summary?: (id: string) => Promise<SessionSummary | null>; onClose: () => void; actions?: Actions }) {
   useSheetLock();
   const [view, setView] = useState<CalendarSession | null>(sessions.length === 1 && summary ? sessions[0] : null);
   useEscape(true, onClose);
@@ -125,7 +133,7 @@ function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: 
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
       >
         {view && summary ? (
-          <SummaryView s={view} load={summary} onBack={() => (sessions.length > 1 ? setView(null) : onClose())} onClose={onClose} />
+          <SummaryView s={view} load={summary} onBack={() => (sessions.length > 1 ? setView(null) : onClose())} onClose={onClose} actions={actions} />
         ) : (
           <>
             <div className="flex min-h-12 items-center justify-between gap-3">
@@ -150,8 +158,15 @@ function DaySheet({ day, sessions, summary, onClose }: { day: string; sessions: 
  * History: the session count and the year of training as a heatmap (YearHeatmap, from lib/history/calendar).
  * Under three sessions: "Day one" and the first session.
  */
-export function HistoryCalendar({ calendar, summary, compact = false }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ }) {
+export function HistoryCalendar({ calendar, summary, compact = false, deleteSession, reassign, loadWeeks, loadDay }: { calendar: HistoryView; summary?: (id: string) => Promise<SessionSummary | null>; /** The athlete's own History (not the demo, not the coach's view): Delete on a session, and Reassign on one that is on the plan. */ deleteSession?: Remove; reassign?: Move; loadWeeks?: (logId: string) => Promise<SlotWeek[]>; /** A tap on a heatmap day (the second, once its tooltip is up) opens that day's sessions. Fetched then: the page carries no session ids. */ loadDay?: (day: string) => Promise<CalendarSession[]>; /** Home: the count sits in the heading line and the grid follows closely. */ compact?: boolean; /** The athlete's own screen: a button to log cardio or a walk. */ }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [dayOpen, setDayOpen] = useState<{ day: string; sessions: CalendarSession[] } | null>(null);
+  const openDay = (day: string) => {
+    loadDay?.(day).then(
+      (sessions) => sessions.length > 0 && setDayOpen({ day, sessions }),
+      () => toast.error("Couldn't open that day.")
+    );
+  };
   if (calendar.kind === "empty") return null;
 
   return (
@@ -166,7 +181,7 @@ export function HistoryCalendar({ calendar, summary, compact = false }: { calend
           <div className="mt-6">
             <SessionRow s={calendar.first} sub={shortDay(calendar.first.day)} onOpen={summary ? () => setOpen(calendar.first.day) : undefined} />
           </div>
-          {open && summary && <DaySheet day={open} sessions={[calendar.first]} summary={summary} onClose={() => setOpen(null)} />}
+          {open && summary && <DaySheet day={open} sessions={[calendar.first]} summary={summary} onClose={() => setOpen(null)} actions={{ deleteSession, reassign, loadWeeks }} />}
         </>
       ) : (
         <>
@@ -178,7 +193,8 @@ export function HistoryCalendar({ calendar, summary, compact = false }: { calend
           )}
           <p className="sr-only">{calendar.summary}</p>
           <div className={compact ? "mt-1" : "mt-6"}>
-            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} />
+            <YearHeatmap byDay={calendar.days} today={calendar.today} summary={calendar.summary} onOpenDay={loadDay && summary ? openDay : undefined} />
+            {dayOpen && summary && <DaySheet day={dayOpen.day} sessions={dayOpen.sessions} summary={summary} onClose={() => setDayOpen(null)} actions={{ deleteSession, reassign, loadWeeks }} />}
           </div>
         </>
       )}

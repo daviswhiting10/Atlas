@@ -47,6 +47,8 @@ export type CalendarSession = {
   record: boolean;
   /** Where it opens; null when there is no page for it. */
   href: string | null;
+  /** Attached to a day of the plan: only these can be moved to another day. */
+  planned?: boolean;
 };
 
 export type CalendarDay = {
@@ -87,7 +89,7 @@ export type HistoryCalendar =
       byDay: Record<string, CalendarSession[]>;
     };
 
-export type SessionMeta = { title: string; href: string | null };
+export type SessionMeta = { title: string; href: string | null; /** Logged against a day of the plan (a quick-logged run or walk is not). */ planned?: boolean };
 export type ChapterSpan = { name: string; from: string; to: string };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -134,6 +136,7 @@ export function historyCalendar(
     mode: sessionMode(s),
     record: recordSessions.has(s.id),
     href: opts.meta[s.id]?.href ?? null,
+    planned: opts.meta[s.id]?.planned ?? false,
   });
 
   if (dated.length < CALENDAR_MIN_SESSIONS) {
