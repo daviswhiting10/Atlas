@@ -40,7 +40,7 @@ export function YouScreen({
         <Link href={`${base}/plan`} aria-label={`Your plan: ${plan.name}`} className="press mt-6 flex items-center justify-between gap-3 rounded-[22px] border border-line bg-paper p-4">
           <span className="min-w-0 flex-1">
             <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute">Your plan</span>
-            <span className="mt-1.5 block truncate text-[20px] font-semibold leading-tight text-ink">{plan.name}</span>
+            <span className="mt-1.5 block text-[20px] font-semibold leading-tight text-ink">{plan.name}</span>
             {plan.goalText && <span className="mt-1 block text-[14px] leading-snug text-ink-soft">{plan.goalText}</span>}
             <span className="mt-3 block h-2 overflow-hidden rounded-full bg-ink/15" role="img" aria-label={`${plan.done} of ${plan.total} workouts done`}>
               <span className="block h-full rounded-full bg-signal" style={{ width: `${plan.total ? Math.min(100, Math.round((plan.done / plan.total) * 100)) : 0}%` }} />

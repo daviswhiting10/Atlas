@@ -35,3 +35,16 @@ describe("the ⋯ menu: Password and Sign out", () => {
     expect(src("app/(client)/layout.tsx")).toContain("canPassword={!athlete.isGuest && !athlete.isDemo && !athlete.isCoach}");
   });
 });
+
+describe("header sheets open on the page, not inside the header", () => {
+  it("the Password and guest-leave sheets are drawn on <body>", () => {
+    for (const f of ["components/athlete/PasswordSheet.tsx", "components/athlete/LeaveSheet.tsx"]) {
+      const s = src(f);
+      expect(s).toContain("createPortal(");
+      expect(s).toContain("document.body");
+    }
+  });
+  it("a long plan name wraps instead of being cut off on You", () => {
+    expect(src("components/athlete/YouScreen.tsx")).not.toContain("truncate text-[20px]");
+  });
+});

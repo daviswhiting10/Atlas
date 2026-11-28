@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { SheetLock } from "@/components/ui/sheet-lock";
 import { useEscape } from "@/hooks/use-escape";
@@ -18,7 +19,9 @@ export function PasswordSheet({ onClose }: { onClose: () => void }) {
       live = false;
     };
   }, []);
-  return (
+  // On <body>: inside the header, a fixed sheet would be placed against the header, not the screen.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <SheetLock />
       <div role="dialog" aria-modal="true" aria-label="Password" onClick={(e) => e.stopPropagation()} className="sheet-up max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
@@ -30,6 +33,7 @@ export function PasswordSheet({ onClose }: { onClose: () => void }) {
         </div>
         {status === "loading" ? <div className="h-16" aria-busy /> : status ? <PasswordPanel email={status.email} hasPassword={status.hasPassword} /> : <p className="text-[15px] text-ink-soft">Couldn&apos;t load your account. Try again.</p>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

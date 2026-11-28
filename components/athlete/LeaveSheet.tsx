@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { SheetLock } from "@/components/ui/sheet-lock";
 import { useEscape } from "@/hooks/use-escape";
@@ -14,7 +15,9 @@ export function LeaveSheet({ onClose }: { onClose: () => void }) {
     const { signOutAndForget } = await import("@/lib/sign-out");
     await signOutAndForget(`${window.location.origin}/`);
   }
-  return (
+  // On <body>: inside the header, a fixed sheet would be placed against the header, not the screen.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fade-in fixed inset-0 z-50 flex items-end justify-center bg-night/40 backdrop-blur-sm sm:items-center" onClick={() => !leaving && onClose()}>
       <SheetLock />
       <div role="dialog" aria-modal="true" aria-label="Leave this guest account?" onClick={(e) => e.stopPropagation()} className="sheet-up w-full max-w-md rounded-t-[28px] bg-bone p-5 sm:rounded-[28px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
@@ -29,6 +32,7 @@ export function LeaveSheet({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
