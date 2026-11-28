@@ -18,7 +18,7 @@ const TABS = [
 
 /** `isCoach`: a coach on their own training gets the Coach | Me toggle (the way back to their clients).
  *  There's no avatar: the person is the You tab. */
-export function AppNav({ isDemo, isCoach = false, hasProgress = true, restartPlan = false, canPassword = false, isGuest = false, preview }: { isDemo: boolean; isCoach?: boolean; /** ...and Restart plan. */ restartPlan?: boolean; /** Password in the ⋯ menu (a real account). */ canPassword?: boolean; /** A guest signing out is asked first. */ isGuest?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
+export function AppNav({ isDemo, isCoach = false, hasProgress = true, restartPlan = false, canPassword = false, canConnect = false, isGuest = false, preview }: { isDemo: boolean; isCoach?: boolean; /** ...and Restart plan. */ restartPlan?: boolean; /** Password in the ⋯ menu (a real account). */ canPassword?: boolean; /** A guest signing out is asked first. */ isGuest?: boolean; /** Connect your AI in the ⋯ menu (a real account). */ canConnect?: boolean; /** No Progress tab until there is a finished session to show. */ hasProgress?: boolean; /** Drawn as the optimistic shell while this side loads: as if on this path, and doing nothing else. */ preview?: string }) {
   const real = usePathname();
   const pathname = preview ?? real;
   useRegisterChrome(preview ? {} : { demo: isDemo, hasProgress });
@@ -62,7 +62,7 @@ export function AppNav({ isDemo, isCoach = false, hasProgress = true, restartPla
             ))}
           </nav>
 
-          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} restartPlan={restartPlan} canPassword={canPassword} guest={isGuest} />
+          <HeaderActions side="me" demo={isDemo} isCoach={isCoach} restartPlan={restartPlan} canPassword={canPassword} canConnect={canConnect} guest={isGuest} />
         </div>
       </header>
 
