@@ -17,6 +17,8 @@ export type AuditEntry = {
   argsHash: string;
   outcome: McpOutcome;
   latencyMs: number;
+  /** The personal access token the call came with; null for a browser session or the local runner. */
+  tokenId: string | null;
 };
 
 export type AuditSink = (entry: AuditEntry) => Promise<void>;
@@ -43,6 +45,7 @@ export function buildAuditEntry(input: {
   args: unknown;
   outcome: McpOutcome;
   latencyMs: number;
+  tokenId?: string | null;
 }): AuditEntry {
   return {
     workspaceId: input.caller.workspaceId,
@@ -54,5 +57,6 @@ export function buildAuditEntry(input: {
     argsHash: hashArgs(input.args),
     outcome: input.outcome,
     latencyMs: Math.max(0, Math.round(input.latencyMs)),
+    tokenId: input.tokenId ?? null,
   };
 }

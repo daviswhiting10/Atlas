@@ -38,6 +38,8 @@ export const POLICIES = {
   linkIp: { kind: "requests", max: 20, windowMs: 60 * MIN },
   /** Wrong "current password" when changing it: 5 free, then 1 min doubling to 15. */
   changeUser: { kind: "failures", free: 5, baseMs: MIN, maxMs: 15 * MIN, windowMs: 60 * MIN },
+  /** MCP writes per user, across every write tool: 300 an hour (generous for logging; stops a looping agent). Reads aren't counted. */
+  mcpWriteUser: { kind: "requests", max: 300, windowMs: 60 * MIN },
 } satisfies Record<string, Policy>;
 
 export type Row = { count: number; windowStart: Date; blockedUntil: Date | null };

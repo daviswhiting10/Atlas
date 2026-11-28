@@ -61,6 +61,7 @@ model User {
   clientProfile       ClientProfile?  @relation("ClientUser")
   sentMessages        Message[]
   usageLogs           UsageLog[]
+  mcpTokens           McpToken[]
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 }
@@ -840,10 +841,27 @@ model AuditLog {
   argsHash    String // sha256 of normalised arguments; never raw arguments
   outcome     String // "ok" | "validation_error" | "forbidden" | "not_found" | "rate_limited" | "error"
   latencyMs   Int?
+  /// The personal access token the call came with (McpToken.id); null for a browser session or the local runner.
+  tokenId     String?
   createdAt   DateTime  @default(now())
 
   @@index([workspaceId, createdAt])
   @@index([clientId, createdAt])
+}
+
+/// A personal access token for the MCP endpoint (Settings → AI access). Only its SHA-256 is stored; the token itself is
+/// shown once, at creation. Revoked tokens are kept (revokedAt set) so the list and the audit trail still name them.
+model McpToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  name       String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
 }
 
 // ── Goals (docs/goals-layer.md) ──────────────────────────────────────────────

@@ -16,6 +16,7 @@ function harness() {
     transport: "stdio",
     audit: async (e) => void rows.push(e),
     lookupClient: async (id, ws) => (id === "client_1" && ws === "ws_1" ? client : null),
+    allowWrite: async () => true,
   };
   const read = clientTool({
     name: "read_thing",
